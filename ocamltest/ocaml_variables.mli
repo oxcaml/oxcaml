@@ -94,6 +94,9 @@ val asmext : Variables.t
 val ocamlc_byte : Variables.t
 val ocamlopt_byte : Variables.t
 val ocamlrun : Variables.t
+val ocamlrun_sys : Variables.t
+val stdlib : Variables.t
+val runtime : Variables.t
 
 val ocamlc_flags : Variables.t
 val ocamlc_default_flags : Variables.t
@@ -119,6 +122,10 @@ val ocamlc_opt_exit_status : Variables.t
 
 val ocamlopt_opt_exit_status : Variables.t
 
+val ocamlopt_jsir_js_exit_status : Variables.t
+
+val ocamlopt_jsir_wasm_exit_status : Variables.t
+
 val ocamlrunparam : Variables.t
 
 val ocamlsrcdir : Variables.t
@@ -135,6 +142,8 @@ val ocamldoc_output : Variables.t
 val ocamldoc_reference : Variables.t
 
 val ocaml_script_as_argument : Variables.t
+
+val ocamlfilt : Variables.t
 
 val plugins : Variables.t
 

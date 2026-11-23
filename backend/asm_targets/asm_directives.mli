@@ -145,6 +145,10 @@ val cfi_def_cfa_offset : bytes:int -> unit
     frame address. *)
 val cfi_offset : reg:int -> offset:int -> unit
 
+(** Note that the previous value of [reg] is saved at [offset] from the current
+    value of the register that the frame address is computed from. *)
+val cfi_rel_offset : reg:int -> offset:int -> unit
+
 (** Mark the beginning of a function, for CFI purposes. *)
 val cfi_startproc : unit -> unit
 
@@ -464,6 +468,10 @@ module Directive : sig
     | Cfi_def_cfa_offset of int
     | Cfi_endproc
     | Cfi_offset of
+        { reg : int;
+          offset : int
+        }
+    | Cfi_rel_offset of
         { reg : int;
           offset : int
         }

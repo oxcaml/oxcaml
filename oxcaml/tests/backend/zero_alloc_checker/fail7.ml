@@ -12,3 +12,7 @@ let[@zero_alloc] [@inline never] test n =
   | 2 -> raise_notrace (Exn_int n)
   | 3 -> raise_notrace (Exn_string "foo")
   | _ -> 10
+
+let[@inline never] fail n = raise_notrace (Exn_int n)
+
+let[@zero_alloc] test_nontail n = fail n [@nontail]

@@ -65,7 +65,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
 let event_before loc exp lam = match lam with
 | Lstaticraise (_,_) -> lam
 | _ ->
-  if !Clflags.debug && not (Clflags.target_is_native ())
+  if !Clflags.debug && Clflags.target_is_bytecode ()
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_before;
                     lev_repr = None;
@@ -73,7 +73,7 @@ let event_before loc exp lam = match lam with
   else lam
 
 let event_after loc exp lam =
-  if !Clflags.debug && not (Clflags.target_is_native ())
+  if !Clflags.debug && Clflags.target_is_bytecode ()
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_after exp.exp_type;
                     lev_repr = None;

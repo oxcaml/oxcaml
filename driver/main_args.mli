@@ -28,6 +28,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _H_file : string -> unit
@@ -50,6 +51,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _open_cmi : string -> unit
+  val _open_cmi_x : string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit
@@ -178,6 +180,8 @@ module type Compiler_options = sig
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
+  val _enable_action_trace : unit -> unit
+  val _debug_action_trace : unit -> unit
 
   val _args: string -> string array
   val _args0: string -> string array
@@ -286,6 +290,8 @@ module type Optcomp_options = sig
   val _shared : unit -> unit
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
+  val _gated_trace_pc_guard : unit -> unit
+  val _gated_trace_pc_guard_define_gate : unit -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit

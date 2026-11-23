@@ -146,15 +146,15 @@ jobs:
 
           - name: cfg-invariants (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
-            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
             check_arch: true
             sysdeps: gdb
 
           - name: cfg-invariants (aarch64-linux)
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
-            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
+            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
             check_arch: true
             sysdeps: gdb
 
@@ -462,6 +462,12 @@ jobs:
         if: failure() && matrix.dwarf_tests_only == true
         continue-on-error: true
         run: bash tools/ci/actions/promote-and-capture-diff.sh promote
+
+      - name: Test coverage instrumentation with sancov
+        if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        run: make runtest-sancov
+        env:
+          OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
       - name: Build and test OxCaml Llvmize
         if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'

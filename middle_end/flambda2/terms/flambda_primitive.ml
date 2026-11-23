@@ -1178,6 +1178,10 @@ module Reinterpret_64_bit_word = struct
       Format.pp_print_string ppf "Unboxed_float64_as_unboxed_int64"
 end
 
+type boolean_representation =
+  | Tagged_bool
+  | Naked_bool
+
 type unary_primitive =
   | Block_load of
       { kind : Block_access_kind.t;
@@ -1211,7 +1215,7 @@ type unary_primitive =
       { src : Flambda_kind.Standard_int_or_float.t;
         dst : Flambda_kind.Standard_int_or_float.t
       }
-  | Boolean_not
+  | Boolean_not of boolean_representation
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t
   | Reinterpret_boxed_vector
   | Unbox_number of Flambda_kind.Boxable_number.t
@@ -1255,7 +1259,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Float_arith _ ->
     (* See comment in effects_and_coeffects *)
     Flambda_features.float_const_prop ()
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     true
   | Unbox_number _ | Untag_immediate -> false
@@ -1288,7 +1292,7 @@ let compare_unary_primitive p1 p2 =
     | Int_arith _ -> 10
     | Float_arith _ -> 11
     | Num_conv _ -> 12
-    | Boolean_not -> 13
+    | Boolean_not _ -> 13
     | Reinterpret_64_bit_word _ -> 14
     | Unbox_number _ -> 15
     | Box_number _ -> 16
@@ -1400,13 +1404,14 @@ let compare_unary_primitive p1 p2 =
     Variable.compare alloc_region1 alloc_region2
   | Peek kind1, Peek kind2 ->
     Flambda_kind.Standard_int_or_float.compare kind1 kind2
+  | Boolean_not repr1, Boolean_not repr2 -> Stdlib.compare repr1 repr2
   | ( Make_lazy { lazy_tag = lazy_tag1; alloc_region = alloc_region1 },
       Make_lazy { lazy_tag = lazy_tag2; alloc_region = alloc_region2 } ) ->
     let c = Lazy_block_tag.compare lazy_tag1 lazy_tag2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
       | Is_null | Get_tag | String_length _ | Int_as_pointer _
-      | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+      | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
       | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
       | Array_length _ | Bigarray_length _ | Unbox_number _ | Box_number _
       | Untag_immediate | Tag_immediate | Project_function_slot _
@@ -1448,7 +1453,8 @@ let print_unary_primitive ppf p =
     fprintf ppf "Num_conv_%a_to_%a"
       Flambda_kind.Standard_int_or_float.print_lowercase src
       Flambda_kind.Standard_int_or_float.print_lowercase dst
-  | Boolean_not -> fprintf ppf "Boolean_not"
+  | Boolean_not Tagged_bool -> fprintf ppf "Boolean_not"
+  | Boolean_not Naked_bool -> fprintf ppf "(Boolean_not naked)"
   | Reinterpret_64_bit_word reinterpret ->
     fprintf ppf "@[<hov 1>(Reinterpret_64_bit_word@ %a)@]"
       Reinterpret_64_bit_word.print reinterpret
@@ -1499,7 +1505,8 @@ let arg_kind_of_unary_primitive p =
   | Opaque_identity { middle_end_only = _; kind } -> kind
   | Int_arith (kind, _) -> K.Standard_int.to_kind kind
   | Num_conv { src; dst = _ } -> K.Standard_int_or_float.to_kind src
-  | Boolean_not -> K.value
+  | Boolean_not Tagged_bool -> K.value
+  | Boolean_not Naked_bool -> K.naked_immediate
   | Reinterpret_boxed_vector -> K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
@@ -1537,7 +1544,8 @@ let result_kind_of_unary_primitive p : result_kind =
   | Opaque_identity { middle_end_only = _; kind } -> Singleton kind
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
   | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
-  | Boolean_not -> Singleton K.value
+  | Boolean_not Tagged_bool -> Singleton K.value
+  | Boolean_not Naked_bool -> Singleton K.naked_immediate
   | Reinterpret_boxed_vector -> Singleton K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
@@ -1612,7 +1620,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, (Swap_byte_endianness | Not))
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Abs | Neg)) ->
@@ -1691,7 +1699,7 @@ let unary_classify_for_printing p =
   | Duplicate_array _ | Duplicate_block _ | Obj_dup _ -> Constructive
   | String_length _ | Get_tag -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Boolean_not _ | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
   | Float_arith _ ->
     Neither
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate ->
@@ -1724,7 +1732,7 @@ let free_names_unary_primitive p =
   | Make_lazy { alloc_region; _ } ->
     Name_occurrences.singleton_variable alloc_region Name_mode.normal
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
@@ -1772,7 +1780,7 @@ let apply_renaming_unary_primitive p renaming =
     then p
     else Make_lazy { alloc_region = alloc_region'; lazy_tag }
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
@@ -1791,7 +1799,7 @@ let ids_for_export_unary_primitive p =
   | Make_lazy { alloc_region; _ } ->
     Ids_for_export.singleton_variable alloc_region
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _

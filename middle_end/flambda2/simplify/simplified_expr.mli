@@ -121,6 +121,8 @@ and simplified_switch = private
     cse_before_switch : Common_subexpression_elimination.t
   }
 
+val print : Format.formatter -> t -> unit
+
 val notify_removed : operation:Removed_operations.t -> t -> t
 
 val mark_as_cold : t -> t

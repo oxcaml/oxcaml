@@ -32,4 +32,4 @@ val transl_modify_mode : (allowed * 'r) Locality.t -> Lambda.modify_mode
 
 val transl_unique_barrier : Typedtree.Unique_barrier.t -> Lambda.unique_barrier
 
-val transl_staticity_mode_r : ('l * allowed) Staticity.t -> Lambda.staticity
+val transl_staticity_mode : Staticity.Const.t -> Lambda.staticity

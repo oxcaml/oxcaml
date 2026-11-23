@@ -2404,7 +2404,23 @@ let prefix_idents root prefixing_sub sg =
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
-  prefix_idents root [] prefixing_sub sg
+  let items_and_paths, prefixing_sub =
+    prefix_idents root [] prefixing_sub sg
+  in
+  (* We could compute [values] eagerly as part of computing [prefix_idents],
+     which already does a recursive traversal of the signature. We make the
+     computation lazy for efficiency reasons. If values are never looked up,
+     then keeping the signature [sg] alive (captured by the lazy) tends to be
+     better than allocating a list of [Pdot] entries eagerly. See #7854. *)
+  let values =
+    lazy
+      (List.filter_map
+         (function
+           | Sig_value (id, _, _) -> Some (id, Pdot (root, Ident.name id))
+           | _ -> None)
+         sg)
+  in
+  items_and_paths, Subst.add_lazy_values values prefixing_sub
 
 (* Compute structure descriptions *)
 
@@ -2655,7 +2671,7 @@ let rec components_of_module_maker
         items_and_paths;
       inner_full_env := !env;
       Ok (Structure_comps c)
-  | Mty_functor(arg, ty_res, _) ->
+  | Mty_functor(arg, ty_res, _, _) ->
       let sub = cm_prefixing_subst in
       let scoping = Subst.Rescope (Path.scope cm_path) in
       let open Subst.Lazy in
@@ -3474,7 +3490,8 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   let pers_sig =
     Persistent_env.Persistent_signature.{
       filename; cmi;
-      visibility = Visible { cmx_guaranteed = false }
+      include_flags =
+        { visibility = Visible; cmx_guaranteed = false }
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
@@ -4553,9 +4570,9 @@ let open_pers_signature name env =
   in
   path, env
 
-let open_pers_signature_cmi filename env =
+let open_pers_signature_cmi ~cmx_guaranteed filename env =
   let global_name, _sign =
-    Persistent_env.read_cmi_file !persistent_env filename
+    Persistent_env.read_cmi_file !persistent_env ~cmx_guaranteed filename
   in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
@@ -5490,6 +5507,9 @@ let report_lookup_error_doc loc env = function
                 "To project an unboxed record field, use %a instead of %a."
                 (Style.as_inline_code print_projection) (".#", lid)
                 (Style.as_inline_code print_projection) (".", lid) ]
+          | Legacy, Mutation ->
+            [ Location.msg
+                "Only mutable fields of boxed records can be mutated." ]
           | _ -> [])
        | None -> []
      in

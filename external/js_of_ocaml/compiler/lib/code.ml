@@ -552,12 +552,43 @@ module Marshalable_program = struct
     { start; blocks; free_pc }
 end
 
-type cmj_body =
-  { program : Marshalable_program.t
+type jsir_target =
+  | Js
+  | Wasm
+
+module Linkage_name = struct
+  type t = string
+
+  let of_string t = t
+
+  let to_string t = t
+
+  module Hashtbl = String.Hashtbl
+end
+
+module Variable_name = struct
+  type t =
+    { name : string
+    ; generated : bool
+    }
+
+  let of_var var =
+    match Var.get_name var with
+    | None -> None
+    | Some name -> Some { name; generated = Var.generated_name var }
+
+  let set var { name; generated } = Var.set_name var ~generated name
+end
+
+type jsir_file =
+  { target : jsir_target
+  ; program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
             [js_of_ocaml] to keep the two in sync. *)
+  ; var_names : (Var.t * Variable_name.t) list
+        (** The names of the variables of [program]. *)
   ; imported_compilation_units : string list
         (** Full paths of the compilation units that must be linked and
             initialised before [program]. *)
@@ -566,6 +597,16 @@ type cmj_body =
             in [Unit_info.t]. *)
   ; force_link : bool
         (** Whether the unit was compiled with [-linkall]. *)
+  ; whole_program : bool
+        (** Whether [program] is a whole program rather than a compilation
+            unit. *)
+  ; symbol_imports : (Var.t * Linkage_name.t) list
+        (** The variables bound at the start of the entry block of [program]
+            to the symbols of other compilation units, with the linkage names
+            of those symbols. *)
+  ; symbol_exports : (Linkage_name.t * Var.t) list
+        (** The symbols of this unit that other compilation units may fetch,
+            by linkage name, with the variables holding their values. *)
   }
 
 let noloc = No

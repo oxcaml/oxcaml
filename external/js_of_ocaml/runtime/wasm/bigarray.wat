@@ -2450,6 +2450,30 @@
          (local.get $v))
       (ref.i31 (i32.const 0)))
 
+   ;; Accesses at a flat element offset, which the OxCaml JSIR backend has
+   ;; already computed (and bounds-checked if needed). The compiler inlines
+   ;; them when it knows the kind of the bigarray, but needs these as
+   ;; fallbacks.
+
+   (func (export "caml_ba_get_raw_unsafe")
+      (param $vba (ref eq)) (param $vi (ref eq)) (result (ref eq))
+      (return_call $caml_ba_get_at_offset
+         (ref.cast (ref $bigarray) (local.get $vba))
+         (@if $portable-int
+         (@then (call $caml_ba_index_val (local.get $vi)))
+         (@else (i31.get_u (ref.cast (ref i31) (local.get $vi)))))))
+
+   (func (export "caml_ba_set_raw_unsafe")
+      (param $vba (ref eq)) (param $vi (ref eq)) (param $v (ref eq))
+      (result (ref eq))
+      (call $caml_ba_set_at_offset
+         (ref.cast (ref $bigarray) (local.get $vba))
+         (@if $portable-int
+         (@then (call $caml_ba_index_val (local.get $vi)))
+         (@else (i31.get_u (ref.cast (ref i31) (local.get $vi)))))
+         (local.get $v))
+      (ref.i31 (i32.const 0)))
+
    (@string $too_many_indices "Bigarray.slice: too many indices")
 
    (func (export "caml_ba_slice")

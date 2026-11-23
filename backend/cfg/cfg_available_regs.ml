@@ -21,6 +21,14 @@ let dprintf fmt =
    codegen is broken when enabled. *)
 let extend_live () = !Dwarf_flags.gdwarf_may_alter_codegen_experimental
 
+(* With [-gno-upstream-dwarf] and [-gdwarf-may-alter-codegen], a coverage probe
+   (see [Cfg_trace_pc_guard]) also saves the registers that are available but
+   not live across its call, so that the variables in them can still be
+   displayed afterwards. *)
+let save_available_regs_across_coverage_probes () =
+  (not !Clflags.restrict_to_upstream_dwarf)
+  && !Dwarf_flags.gdwarf_may_alter_codegen
+
 (* CR mshinwell: The old "all_regs_that_might_be_named" (see git history) seems
    broken, I think a backwards dataflow pass may be necessary to compute this *)
 
@@ -360,6 +368,60 @@ module Transfer = struct
           in
           dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
           ok avail_across, ok avail_after
+        | Op (Trace_pc_guard _) ->
+          (* The call to the coverage callback preserves the registers that are
+             live across it, so [Proc.destroyed_at_basic] says that it destroys
+             none. It does not preserve the others, which may still be
+             available. Among those, the registers that a C function may clobber
+             become unavailable; or, if debugging information may alter the
+             generated code, they are added to the live set, which makes the
+             call preserve them. *)
+          let not_live_across =
+            RD_quotient_set.filter
+              (fun reg ->
+                let reg = RD.reg reg in
+                Proc.may_be_destroyed_by_c_function reg
+                && not
+                     (Reg.Set.exists
+                        (fun live_reg ->
+                          Reg.same_loc_fatal_on_unknown
+                            ~fatal_message:
+                              "Found Unknown register location, but we should \
+                               now be post-register allocation"
+                            live_reg reg)
+                        instr.live))
+              avail_before
+          in
+          let not_preserved =
+            if save_available_regs_across_coverage_probes ()
+            then (
+              (* Only the registers known to hold a variable are worth
+                 saving. *)
+              let named, anonymous =
+                RD_quotient_set.partition
+                  (fun reg -> Option.is_some (RD.debug_info reg))
+                  not_live_across
+              in
+              RD_quotient_set.iter
+                (fun reg -> instr.live <- Reg.Set.add (RD.reg reg) instr.live)
+                named;
+              anonymous)
+            else not_live_across
+          in
+          let avail_after = RD_quotient_set.diff avail_before not_preserved in
+          (* Until the call sequence has restored the registers that it saves,
+             no hardware register is known to hold its value: the callback and
+             the sequence itself, which also uses a temporary register that C
+             functions preserve, overwrite them. *)
+          let avail_across =
+            RD_quotient_set.filter
+              (fun reg -> not (Reg.is_reg (RD.reg reg)))
+              avail_after
+          in
+          dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
+          dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
+          dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
+          ok avail_across, ok avail_after
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
             | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
@@ -367,7 +429,8 @@ module Transfer = struct
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
             | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
             | Begin_region | End_region | Specific _ | Dls_get | Tls_get
-            | Domain_index | Thread_self_id | Poll | Alloc _ | Pause )
+            | Domain_index | Thread_self_id | Poll | Alloc _ | Pause
+            | Trace_pc_guard_gate )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
@@ -395,7 +458,8 @@ module Transfer = struct
             "Cfg_available_regs.terminator: unexpected Never terminator"
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Call _ | Prim _ | Return | Raise _ | Tailcall_func _
-        | Call_no_return _ | Invalid _ | Tailcall_self _ ->
+        | Call_no_return _ | External_call_no_return _ | Invalid _
+        | Tailcall_self _ ->
           common ~avail_before ~destroyed_at:Proc.destroyed_at_terminator
             ~is_interesting_constructor:
               Cfg.(
@@ -403,10 +467,12 @@ module Transfer = struct
                 | Never ->
                   Misc.fatal_error
                     "Cfg_available_regs.terminator: unexpected Never terminator"
-                | Call _ | Prim { op = Probe _; label_after = _ } -> true
+                | Call _ | Call_no_return _
+                | Prim { op = Probe _; label_after = _ } ->
+                  true
                 | Always _ | Parity_test _ | Truth_test _ | Float_test _
                 | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-                | Tailcall_func _ | Call_no_return _ | Invalid _
+                | Tailcall_func _ | External_call_no_return _ | Invalid _
                 | Prim { op = External _; label_after = _ } ->
                   false)
             ~is_end_region:(fun _ -> false)

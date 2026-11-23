@@ -156,6 +156,8 @@ let is_move_basic : Cfg.basic -> bool =
     | Thread_self_id -> false
     | Poll -> false
     | Pause -> false
+    | Trace_pc_guard_gate -> false
+    | Trace_pc_guard _ -> false
     | Alloc _ -> false)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->

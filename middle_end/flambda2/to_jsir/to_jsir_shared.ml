@@ -38,9 +38,14 @@ let bind_expr_to_var ~env ~res fvar expr =
   let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
   env, res
 
+type expr_binding =
+  { bound_var : Jsir.Var.t;
+    defining_expr : Jsir.expr
+  }
+
 let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
   let repr =
-    Target_ocaml_int.to_targetint Thirty_two_no_gc_tag_bit targetint
+    Target_ocaml_int.to_targetint (To_jsir_target.machine_width ()) targetint
     |> Targetint_32_64.repr
   in
   let targetint =
@@ -72,7 +77,9 @@ let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
 let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 
 let nativeint_to_jsir_const nativeint : Jsir.constant =
-  Int32 (Targetint_32_64.to_int32 nativeint)
+  match Targetint_32_64.repr nativeint with
+  | Int32 int32 -> NativeInt (Targetnativeint.of_int32_exn int32)
+  | Int64 int64 -> NativeInt (Targetnativeint.of_int64_exn int64)
 
 let rec reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
@@ -88,8 +95,9 @@ let rec reg_width_const const : Jsir.constant =
   | Null -> Jsir.Null_
   | Poison (kind, name) ->
     reg_width_const
-      (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind
-         (String.hash name))
+      (Reg_width_const.of_int_of_kind
+         (To_jsir_target.machine_width ())
+         kind (String.hash name))
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ ->
     (* CR-someday selee: SIMD support *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
@@ -122,6 +130,88 @@ let bound_parameters ~env bound_params =
       var :: params, env)
     (Bound_parameters.to_list bound_params)
     ([], env)
+
+let repr_of_value_subkind
+    (subkind : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
+    Optimization_hint.repr =
+  match subkind with
+  | Boxed_float -> Float
+  | Boxed_int32 -> Int32
+  | Boxed_int64 -> Int64
+  | Boxed_nativeint -> Nativeint
+  | Tagged_immediate -> Int
+  | Anything | Boxed_float32 | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+  | Boxed_mask | Variant _ | Float_block _ | Float_array | Immediate_array
+  | Value_array | Generic_array | Unboxed_float32_array | Untagged_int_array
+  | Untagged_int8_array | Untagged_int16_array | Unboxed_int32_array
+  | Unboxed_int64_array | Unboxed_nativeint_array | Unboxed_vec128_array
+  | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_mask_array
+  | Unboxed_product_array ->
+    Value
+
+let repr_of_kind (kind : Flambda_kind.With_subkind.t) :
+    Optimization_hint.repr option =
+  match Flambda_kind.With_subkind.kind kind with
+  | Value -> (
+    match Flambda_kind.With_subkind.nullable kind with
+    | Nullable -> Some Value
+    | Non_nullable ->
+      Some
+        (repr_of_value_subkind
+           (Flambda_kind.With_subkind.non_null_value_subkind kind)))
+  | Naked_number Naked_immediate -> Some Int
+  | Naked_number Naked_float -> Some Float
+  | Naked_number Naked_int32 -> Some Int32
+  | Naked_number Naked_int64 -> Some Int64
+  | Naked_number Naked_nativeint -> Some Nativeint
+  | Naked_number
+      ( Naked_float32 | Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
+      | Naked_vec512 | Naked_mask )
+  | Region | Rec_info ->
+    None
+
+let reprs_of_arity arity =
+  Flambda_arity.unarize arity |> Misc.Stdlib.List.map_option repr_of_kind
+
+let return_repr_of_arity arity : Optimization_hint.repr option =
+  match reprs_of_arity arity with
+  | None -> None
+  | Some [repr] -> Some repr
+  | Some ([] | _ :: _ :: _) ->
+    (* Several unarised results are returned as a block. *)
+    Some Value
+
+let closure_hint code_metadata ~params : Optimization_hint.closure_hint option =
+  let params_arity = Code_metadata.params_arity code_metadata in
+  if
+    List.compare_length_with params
+      (Flambda_arity.cardinal_unarized params_arity)
+    <> 0
+  then
+    Misc.fatal_errorf "%d closure parameters do not match the arity %a"
+      (List.length params) Flambda_arity.print params_arity;
+  match
+    ( reprs_of_arity params_arity,
+      return_repr_of_arity (Code_metadata.result_arity code_metadata) )
+  with
+  | Some param_reprs, Some return ->
+    let inline : Optimization_hint.inline_attribute =
+      match Code_metadata.inline code_metadata with
+      | Always_inline -> Always_inline
+      | Available_inline -> Hint_inline
+      | Never_inline -> Never_inline
+      | Unroll n -> Unroll n
+      | Default_inline -> Default_inline
+    in
+    Some
+      { params = param_reprs;
+        return;
+        inline;
+        (* Flambda 2 has no specialise attribute *)
+        specialise = Default_specialise;
+        is_a_functor = Code_metadata.is_a_functor code_metadata
+      }
+  | (Some _ | None), (Some _ | None) -> None
 
 let block ~env ~res ~tag ~mut ~fields :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =

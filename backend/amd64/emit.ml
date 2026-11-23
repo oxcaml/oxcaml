@@ -101,12 +101,7 @@ let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
 module I = struct
   include I
 
-  exception Extension_disabled of string
-
-  let () =
-    Printexc.register_printer (function
-      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
-      | _ -> None)
+  exception Extension_disabled = Arch.Extension.Disabled
 
   let require_vec256 () =
     if not (Arch.Extension.enabled_vec256 ())
@@ -545,10 +540,12 @@ let addressing addr typ i n =
   match addr with
   | Ibased (sym_name, sym_global, ofs) ->
     add_used_symbol sym_name;
-    let sym_global : Cmm.is_global =
-      match sym_global with Global -> Global | Local -> Local
+    let sym : Cmm.symbol =
+      match sym_global with
+      | Global -> Cmm.global_symbol ~ty:Cmm.typ_int sym_name
+      | Local -> Cmm.local_symbol ~ty:Cmm.typ_int sym_name
     in
-    mem64_rip typ (emit_cmm_symbol_str { sym_name; sym_global }) ~ofs
+    mem64_rip typ (emit_cmm_symbol_str sym) ~ofs
   | Iindexed d -> mem64 typ d (arg_idx i n)
   | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg_idx i (n + 1))
   | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg_idx i n)
@@ -561,7 +558,8 @@ let addressing addr typ i n =
 (* A global symbol that maybe calls the GC, suffixed by the class of simd
    register which should be saved *)
 let global_gc_sym ~simd name =
-  Cmm.global_symbol (name ^ Regs.Save_simd_regs.symbol_suffix simd)
+  Cmm.global_symbol ~ty:Cmm.typ_int
+    (name ^ Regs.Save_simd_regs.symbol_suffix simd)
 
 let must_save_simd_regs live : Regs.Save_simd_regs.t =
   let v128, v256, v512 = ref false, ref false, ref false in
@@ -657,10 +655,8 @@ type gc_call =
 let call_gc_sites = ref ([] : gc_call list)
 
 let call_gc_local_sym ~simd : Cmm.symbol =
-  { sym_name =
-      Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd);
-    sym_global = Local
-  }
+  Cmm.local_symbol ~ty:Cmm.typ_int
+    (Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd))
 
 let emit_call_gc gc =
   D.define_label gc.gc_lbl;
@@ -718,8 +714,10 @@ let emit_call_safety_error kind sc =
   D.define_label sc.sc_lbl;
   emit_debug_info sc.sc_dbg;
   (match kind with
-  | Bound_check -> emit_call (Cmm.global_symbol "caml_ml_array_bound_error")
-  | Align_check -> emit_call (Cmm.global_symbol "caml_ml_array_align_error"));
+  | Bound_check ->
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_bound_error")
+  | Align_check ->
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_align_error"));
   D.define_label sc.sc_frame
 
 let clear_safety_checks () =
@@ -734,13 +732,13 @@ let emit_call_safety_errors () =
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_bound_error"));
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_bound_error"));
   List.iter (emit_call_safety_error Align_check) align_checks.sc_sites;
   match align_checks.sc_call with
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_align_error")
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_ml_array_align_error")
 
 (* Stack reallocation *)
 type stack_realloc =
@@ -1026,6 +1024,13 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
   | Ieventest ->
     I.test (int 1) (arg8 i 0);
     taken E
+
+(* The guards of the coverage probes of the unit *)
+
+(* CR mshinwell: remove this global state. [begin_assembly] should return the
+   state of the emission of the unit, for [fundecl] and [end_assembly] to take
+   as an argument, which requires passing it through [Asmgen]. *)
+let sancov = ref (Emit_sancov.create ())
 
 (* Floating-point constants *)
 
@@ -2068,13 +2073,31 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   | Load op -> emit_simd ~mode:(mode, Load) op i
   | Store op -> emit_simd ~mode:(mode, Store_modify) op i
 
+let emit_combine_edx_eax dst =
+  let rdx = X86_ast.Reg64 RDX in
+  (* RDTSC and RDPMC fill the low 32 bits of the result registers. On processors
+     that support the Intel 64 architecture, the high-order 32 bits of each of
+     RAX and RDX are cleared. *)
+  I.sal (int 32) rdx;
+  (* Preserve the shifted high half when the destination is rdx. *)
+  match reg64 dst with
+  | RAX -> I.or_ rdx (reg dst)
+  | RDX -> I.or_ rax (reg dst)
+  | RBX | RCX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14
+  | R15 ->
+    I.mov rax (reg dst);
+    I.or_ rdx (reg dst)
+
 let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* A label that only delimits a DWARF range is not a branch target: aligning
+     it would make the generated code depend on debugging information. *)
+  if (not fallthrough) && !fastcode_flag && not is_dwarf_only_label
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Emit an instruction *)
@@ -2248,17 +2271,21 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
-      load_symbol_addr (Cmm.global_symbol func) rax;
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_int func) rax;
       (match stack_align with
-      | Align_16 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args")
-      | Align_32 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx")
+      | Align_16 ->
+        emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args")
+      | Align_32 ->
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args_avx")
       | Align_64 ->
-        emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx512"));
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call_stack_args_avx512"));
       record_frame i.live (Dbg_other i.dbg))
     else if alloc
     then (
-      load_symbol_addr (Cmm.global_symbol func) rax;
-      emit_call (Cmm.global_symbol "caml_c_call");
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_int func) rax;
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
     else
       let switch_stacks = not Config.no_stack_checks in
@@ -2271,7 +2298,7 @@ let emit_instr ~first ~last ~fallthrough i =
            through this unless we were to tag this calling frame with
            cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
-      emit_call (Cmm.global_symbol func);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int func);
       if switch_stacks
       then (
         I.mov r13 rsp;
@@ -2613,35 +2640,16 @@ let emit_instr ~first ~last ~fallthrough i =
     assert (Reg.same_loc ifnot i.res.(0));
     let taken c = I.cmov c (reg ifso) (res i 0) in
     emit_test i tst ~taken
-  | Lop (Specific Irdtsc) -> (
+  | Lop (Specific Irdtsc) ->
     I.rdtsc ();
-    let rdx = X86_ast.Reg64 RDX in
-    (* The instruction fills in the low 32 bits of the result registers. *)
-    (* Combine edx and eax into a single 64-bit result. *)
-    I.sal (int 32) rdx;
-    (* shift edx to the high part of rdx *)
-    (* On processors that support the Intel 64 architecture, the high-order 32
-       bits of each of RAX and RDX are cleared. *)
-    match reg64 i.res.(0) with
-    | RAX -> I.or_ rdx (res i 0) (* combine high and low into rax *)
-    | RDX -> I.or_ rax (res i 0) (* combine high and low into rdx *)
-    | RBX | RCX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11 | R12 | R13 | R14
-    | R15 ->
-      (* combine high and low into res *)
-      I.mov rax (res i 0);
-      I.or_ rdx (res i 0))
+    emit_combine_edx_eax i.res.(0)
   | Lop (Specific Irdpmc) ->
     assert (equal_reg64 (arg64 i 0) RCX);
     I.rdpmc ();
-    let rdx = X86_ast.Reg64 RDX in
-    (* The instruction fills in the low 32 bits of the result registers. *)
-    (* Combine edx and eax into a single 64-bit result. *)
-    I.sal (int 32) rdx;
-    (* shift edx to the high part of rdx *)
-    I.mov eax (res32 i 0);
-    (* zero-extend eax *)
-    I.or_ rdx (res i 0)
-    (* combine high and low into rax *)
+    emit_combine_edx_eax i.res.(0)
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:(res i 0)
+  | Lop (Trace_pc_guard index) ->
+    Emit_sancov.emit_call !sancov ~live:i.live ~move ~emit_call ~index
   | Lop (Specific Ilfence) -> I.lfence ()
   | Lop (Specific Isfence) -> I.sfence ()
   | Lop (Specific Imfence) -> I.mfence ()
@@ -2802,7 +2810,7 @@ let emit_instr ~first ~last ~fallthrough i =
     stack_offset := !stack_offset - 16
   | Lraise k -> (
     let call_raise sym =
-      emit_call (Cmm.global_symbol sym);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_int sym);
       record_frame Reg.Set.empty (Dbg_raise i.dbg);
       (* Add a nop if this is the last instruction of this function, so that the
          return address (used in backtraces) lies in the right function. *)
@@ -2849,7 +2857,17 @@ let rec emit_all ~first ~fallthrough i =
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
         Printlinear.instr i;
       raise exn);
-    emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
+    let fallthrough =
+      match i.desc with
+      | Llabel_for_dwarf _ -> fallthrough
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
+      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _
+      | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        Linear.has_fallthrough i.desc
+    in
+    emit_all ~first:false ~fallthrough i.next
 
 let all_functions = ref []
 
@@ -2862,6 +2880,7 @@ let emit_function_type_and_size fun_sym =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.start_function !sancov;
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2908,7 +2927,8 @@ let fundecl fundecl =
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
-  then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
+  then
+    emit_call (Cmm.global_symbol ~ty:Cmm.typ_int "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
@@ -2969,6 +2989,7 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
+  sancov := Emit_sancov.create ();
   all_functions := []
 
 let begin_assembly unix =
@@ -2976,8 +2997,9 @@ let begin_assembly unix =
   if !Oxcaml_flags.internal_assembler && !Emitaux.binary_backend_available
   then X86_proc.register_internal_assembler (Internal_assembler.assemble unix);
   (* We initialize the new assembly directives. *)
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments
       (* As a first step, we emit by calling the corresponding x86 emit
@@ -3222,7 +3244,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   I.mov (reg saved_r15) r15;
   (* Emit call to handler *)
   add_used_symbol handler_code_sym;
-  emit_call (Cmm.global_symbol handler_code_sym);
+  emit_call (Cmm.global_symbol ~ty:Cmm.typ_int handler_code_sym);
   (* Record a frame description for the wrapper *)
   let label = Cmm.new_label () in
   let live_offset =
@@ -3305,6 +3327,7 @@ let end_assembly () =
     D.switch_to_section Sixtyfour_byte_literals;
     D.align ~fill:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
+  Emit_sancov.emit_data !sancov ~add_def_symbol ~emit_call;
   (* Emit probe handler wrappers *)
   List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");

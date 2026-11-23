@@ -235,7 +235,7 @@ module Gen = struct
     | Mty_signature sig_items ->
       let env = Env.add_signature sig_items env in
       Mod.structure @@ structure env sig_items
-    | Mty_functor (param, out, _) ->
+    | Mty_functor (param, out, _, _) ->
       let param =
         match param with
         | Unit -> Parsetree.Unit

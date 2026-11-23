@@ -41,9 +41,6 @@ let x86_peephole_remove_redundant_test = ref true
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref true
-(* -cfg-eliminate-dead-trap-handlers *)
-
 let cfg_eliminate_dead_code_validate = ref false
 (* -cfg-eliminate-dead-code-validate *)
 
@@ -325,9 +322,12 @@ module Flambda2 = struct
     let fexpr_after = ref Last_pass
     let fexpr_annot = ref false
     let fexpr_annot_after = ref []
+    let fexpr_print_branch_annotations = ref false
+    let fexpr_print_fdo_counters = ref false
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
+    let simplified = ref false
     let simplify = ref false
     let reaper = ref false
   end

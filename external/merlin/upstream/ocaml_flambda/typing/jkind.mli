@@ -560,6 +560,15 @@ val product_of_fields :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
+(** Choose an appropriate jkind for an [@@unboxed] record type. *)
+val for_at_at_unboxed_record :
+  get_ty_base:
+    (Types.type_expr ->
+    Jkind_types.Sort.t Jkind_types.Layout.t Types.jkind_base) ->
+  lbl:Types.label_declaration ->
+  ld_type:Types.type_expr ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record :
   (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l
@@ -602,6 +611,27 @@ val for_or_null_variant :
   modality:Mode.Modality.Const.t ->
   payload_jkind:Types.jkind_l ->
   (Types.jkind_l, unit) result
+
+(** Choose an appropriate jkind for an unboxed variant type. [decl_params],
+    [type_apply], and [get_free_vars] have the same meaning as in
+    [for_boxed_variant]. [get_ty_base] fetches the base of the jkind for a given
+    type in an environment.
+
+    The [Types.constructor_declaration] is the only constructor of the variant.
+*)
+val for_unboxed_variant :
+  decl_params:Types.type_expr list ->
+  type_apply:
+    (Types.type_expr list ->
+    Types.type_expr ->
+    Types.type_expr list ->
+    Types.type_expr) ->
+  get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  get_ty_base:
+    (Types.type_expr ->
+    Jkind_types.Sort.t Jkind_types.Layout.t Types.jkind_base) ->
+  Types.constructor_declaration ->
+  Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -1016,6 +1046,12 @@ val is_obviously_max : ('l * allowed) Types.jkind -> bool
 (** Checks to see whether a jkind's mod bounds are max. Never does any mutation.
     Is conservative and does not do any expansion. *)
 val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
+
+(** Checks whether [sub] is a subjkind of [super]. Never does any mutation. Is
+    conservative: it does not do any expansion, and only compares constant
+    layouts. *)
+val is_obviously_sub :
+  (allowed * 'r) Types.jkind -> ('l * allowed) Types.jkind -> bool
 
 (** Fully expands the jkind's base - useful to avoid expanding twice for clients
     that both want to inspect the mod bounds and apply other functions to the

@@ -42,7 +42,6 @@ val x86_peephole_remove_redundant_test : bool ref
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
-val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_eliminate_dead_code_validate : bool ref
 val cfg_dominators_validate : bool ref
 val cfg_liveness_validate : bool ref
@@ -238,9 +237,12 @@ module Flambda2 : sig
     val fexpr_after : pass ref
     val fexpr_annot : bool ref
     val fexpr_annot_after : string list ref
+    val fexpr_print_branch_annotations : bool ref
+    val fexpr_print_fdo_counters : bool ref
     val slot_offsets : bool ref
     val freshen : bool ref
     val flow : bool ref
+    val simplified : bool ref
     val simplify : bool ref
     val reaper : bool ref
   end

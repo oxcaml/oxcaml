@@ -115,6 +115,10 @@ val dump_fexpr_annot : unit -> bool
 
 val dump_fexpr_annot_after : unit -> string list
 
+val fexpr_print_branch_annotations : unit -> bool
+
+val fexpr_print_fdo_counters : unit -> bool
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string
@@ -124,6 +128,8 @@ val dump_fexpr : pass -> dump_target
 val dump_slot_offsets : unit -> bool
 
 val dump_flow : unit -> bool
+
+val dump_simplified : unit -> bool
 
 val dump_simplify : unit -> bool
 

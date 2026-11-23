@@ -33,24 +33,6 @@ let get_module_info comp_unit =
   then None
   else Compilenv.get_unit_export_info comp_unit
 
-let dump_to_target_if_any main_dump_ppf target ~header ~f a =
-  match (target : Flambda_features.dump_target) with
-  | Nowhere -> ()
-  | Main_dump_stream ->
-    Format.fprintf main_dump_ppf "\n%t%s:%t@ %a@." Flambda_colours.each_file
-      header Flambda_colours.pop f a
-  | File filename ->
-    Misc.protect_output_to_file filename (fun out ->
-        let ppf = Format.formatter_of_out_channel out in
-        f ppf a;
-        Format.pp_print_flush ppf ())
-
-let dump_if_enabled ppf enabled ~header ~f a =
-  let target : Flambda_features.dump_target =
-    if enabled then Main_dump_stream else Nowhere
-  in
-  dump_to_target_if_any ppf target ~header ~f a
-
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
 
@@ -71,20 +53,20 @@ let dump_fexpr_annot ~prefixname suffix unit =
         Format.pp_print_flush ppf ())
 
 let print_rawflambda ppf unit =
-  dump_if_enabled ppf
+  Flambda_dump.if_enabled ppf
     (Flambda_features.dump_rawflambda ())
     ~header:"After CPS conversion" ~f:Flambda_unit.print unit;
-  dump_to_target_if_any ppf
+  Flambda_dump.to_target_if_any ppf
     (Flambda_features.dump_rawfexpr ())
     ~header:"After CPS conversion" ~f:pp_flambda_as_fexpr unit
 
 let print_flambda name condition ppf unit =
   let header = "After " ^ name in
-  dump_if_enabled ppf condition ~header ~f:Flambda_unit.print unit
+  Flambda_dump.if_enabled ppf condition ~header ~f:Flambda_unit.print unit
 
 let print_fexpr name target ppf unit =
   let header = "After " ^ name in
-  dump_to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
+  Flambda_dump.to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
 
 module NO = Flambda2_nominal.Name_occurrences
 
@@ -267,8 +249,8 @@ let flambda_to_flambda0 : type m.
             unit = flambda
           } =
         Profile.record_call ~accumulate:true "simplify" (fun () ->
-            Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
-              raw_flambda)
+            Simplify.run ~ppf_dump:ppf ~cmx_loader ~machine_width ~round
+              ~code_slot_offsets raw_flambda)
       in
       (if Flambda_features.inlining_report ()
        then
@@ -450,13 +432,33 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
   let run () =
     let { flambda; all_code; offsets; reachable_names } =
       lambda_to_flambda ~ppf_dump ~prefixname
-        ~machine_width:Thirty_two_no_gc_tag_bit program
+        ~machine_width:(Flambda2_to_jsir.To_jsir_target.machine_width ())
+        program
     in
-    let { Flambda2_to_jsir.To_jsir_result.program; imported_compilation_units }
-        =
+    let { Flambda2_to_jsir.To_jsir_result.program;
+          imported_compilation_units;
+          symbol_imports;
+          symbol_exports
+        } =
       Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
     in
+    let linkage_name symbol =
+      Flambda2_identifiers.Symbol.linkage_name_as_string symbol
+      |> Jsoo_imports.Code.Linkage_name.of_string
+    in
+    let symbol_imports =
+      List.map (fun (var, symbol) -> var, linkage_name symbol) symbol_imports
+    in
+    let symbol_exports =
+      List.map (fun (symbol, var) -> linkage_name symbol, var) symbol_exports
+    in
     if not keep_symbol_tables then reset_symbol_tables ();
-    { Optcomp_intf.program; imported_compilation_units }
+    { Optcomp_intf.program;
+      imported_compilation_units;
+      symbol_imports;
+      symbol_exports
+    }
   in
   Profile.record_call "flambda2" run
+
+let link_jsir = Flambda2_to_jsir.Jsir_linker.link

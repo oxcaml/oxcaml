@@ -1,5 +1,12 @@
 (* TEST
  include ocamlcommon;
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   jsir;
+ }
 *)
 
 module Fmt = Format_doc

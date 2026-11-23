@@ -1,6 +1,13 @@
 (* TEST
  include ocamlcommon;
  flags = "-I ${ocamlsrcdir}/parsing";
+ {
+   bytecode;
+ }{
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* See [testsuite/tests/parsetree/source_jane_street.ml] for tests for

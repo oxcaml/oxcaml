@@ -1,5 +1,6 @@
 #include <caml/simd.h>
 #include <assert.h>
+#include <cpuid.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,20 @@ intnat test_buf_eq(intnat unused)
 {
   (void)unused;
   return memcmp(bufs[1], bufs[2], 512) == 0;
+}
+
+intnat test_has_avx512_bf16(intnat unused)
+{
+  unsigned int eax, ebx, ecx, edx;
+  (void)unused;
+  return __get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx) && (eax & (1u << 5));
+}
+
+intnat test_has_vpclmulqdq(intnat unused)
+{
+  unsigned int eax, ebx, ecx, edx;
+  (void)unused;
+  return __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1u << 10));
 }
 
 #ifdef ARCH_AVX512

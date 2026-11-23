@@ -316,6 +316,21 @@ let destroyed_at_pushtrap = [| |]
 
 let destroyed_at_alloc_or_poll = [| reg_x8 |]
 
+let may_be_destroyed_by_c_function (r : Reg.t) =
+  match r.loc with
+  | Reg
+      ( X0 | X1 | X2 | X3 | X4 | X5 | X6 | X7 | X8 | X9 | X10 | X11 | X12 | X13
+      | X14 | X15 | X16 | X17 ) ->
+    true
+  | Reg (X19 | X20 | X21 | X22 | X23 | X24 | X25 | X26 | X27 | X28) -> false
+  | Reg
+      ( D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | D10 | D11 | D12 | D13
+      | D14 | D15 | D16 | D17 | D18 | D19 | D20 | D21 | D22 | D23 | D24 | D25
+      | D26 | D27 | D28 | D29 | D30 | D31 ) ->
+    (* C functions preserve at most the low half of a vector register. *)
+    true
+  | Stack _ | Unknown -> false
+
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
@@ -365,6 +380,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _
         | Begin_region | End_region | Dls_get | Tls_get | Domain_index
         | Thread_self_id)
   | Poptrap _ | Prologue | Epilogue
@@ -398,13 +414,15 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Never ->
     Misc.fatal_error
       "Proc.destroyed_at_terminator: unexpected Never terminator"
+  | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} ->
     all_phys_regs
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     [||]
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
@@ -420,14 +438,15 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Never ->
     Misc.fatal_error
       "Proc.is_destruction_point: unexpected Never terminator"
+  | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} ->
     true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                            stack_ofs; _ }; _ } ->
     if more_destruction_points then

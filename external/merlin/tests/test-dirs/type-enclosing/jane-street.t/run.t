@@ -366,7 +366,7 @@ escape characters in string literals, so we use the revert-newlines script.
   type ('a : immediate) p2 = A2 of 'a [@@unboxed]
                        ^
   With verbosity 0: "type ('a : immediate) p2 = A2 of 'a [@@unboxed]"
-  With verbosity 1: "type ('a : immediate) p2 : immediate = A2 of 'a [@@unboxed]"
+  With verbosity 1: "type ('a : immediate) p2 : immediate mod dynamic with 'a = A2 of 'a [@@unboxed]"
   
 
 - parameter

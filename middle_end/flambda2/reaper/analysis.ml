@@ -15,26 +15,118 @@
 
 module PTA = Points_to_analysis
 module UA = Unboxing_analysis
+module Schemas = Datalog_helpers.Schemas
 
-(* We use unit maps instead of sets, because it allows reuse of the tables
-   stored in the Datalog database without copying. *)
-type 'f solution =
-  { analysis_scope : Analysis_scope.t;
-    has_usage : unit Code_id_or_name.Map.t;
-    has_source : unit Code_id_or_name.Map.t;
-    field_of_constructor_is_used : unit Field.Map.t Code_id_or_name.Map.t;
-    directly_called : Code_id.Set.t Or_unknown.t Code_id_or_name.Map.t;
-    known_masks : PTA.keep_or_delete list Code_id_or_name.Map.t;
-    unknown_masks : PTA.keep_or_delete list list Code_id_or_name.Map.t;
-    unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
-    changed_representation :
-      (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
-    code_changes : Unboxing_analysis.code_changes;
-    slot_offsets : Slot_offsets.result;
-    types_rewrite_context :
-      ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
-    final_typing_env : ('f, typing_env) Traverse.With_types.t
-  }
+module Solution = struct
+  type 'f t =
+    { analysis_scope : Analysis_scope.t;
+      has_usage : Schemas.N.t;
+      has_source : Schemas.N.t;
+      field_of_constructor_is_used : Schemas.NF.t;
+      directly_called : Code_id.Set.t Or_unknown.t Code_id_or_name.Map.t;
+      known_masks : PTA.keep_or_delete list Code_id_or_name.Map.t;
+      unknown_masks : PTA.keep_or_delete list list Code_id_or_name.Map.t;
+      unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
+      changed_representation :
+        (UA.Changed_representation.t * Code_id_or_name.t) Code_id_or_name.Map.t;
+      code_changes : UA.Code_changes.t;
+      slot_offsets : Slot_offsets.result;
+      types_rewrite_context :
+        ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
+      final_typing_env : ('f, typing_env) Traverse.With_types.t
+    }
+
+  let ids_for_export
+      { analysis_scope = _;
+        has_usage;
+        has_source;
+        field_of_constructor_is_used;
+        directly_called;
+        known_masks;
+        unknown_masks;
+        unboxed_fields;
+        changed_representation;
+        code_changes;
+        slot_offsets = _;
+        types_rewrite_context = Without_types;
+        final_typing_env = Without_types
+      } =
+    (* Slots are not hashconsed, so the offsets need no renaming. *)
+    Ids_for_export.union_list
+      [ Schemas.N.ids_for_export has_usage;
+        Schemas.N.ids_for_export has_source;
+        Schemas.NF.ids_for_export field_of_constructor_is_used;
+        Ids_for_export.ids_for_export_code_id_or_name_map Ids_for_export.no_ids
+          known_masks;
+        Ids_for_export.ids_for_export_code_id_or_name_map Ids_for_export.no_ids
+          unknown_masks;
+        Ids_for_export.ids_for_export_code_id_or_name_map
+          (fun (targets : _ Or_unknown.t) ->
+            match targets with
+            | Unknown -> Ids_for_export.empty
+            | Known targets -> Ids_for_export.ids_for_export_code_id_set targets)
+          directly_called;
+        Ids_for_export.ids_for_export_code_id_or_name_map
+          (UA.Unboxed_fields.ids_for_export Ids_for_export.singleton_variable)
+          unboxed_fields;
+        Ids_for_export.ids_for_export_code_id_or_name_map
+          (fun (repr, allocation_point) ->
+            Ids_for_export.add_code_id_or_name
+              (UA.Changed_representation.ids_for_export repr)
+              allocation_point)
+          changed_representation;
+        UA.Code_changes.ids_for_export code_changes ]
+
+  let apply_renaming
+      { analysis_scope;
+        has_usage;
+        has_source;
+        field_of_constructor_is_used;
+        directly_called;
+        known_masks;
+        unknown_masks;
+        unboxed_fields;
+        changed_representation;
+        code_changes;
+        slot_offsets;
+        types_rewrite_context = Without_types;
+        final_typing_env = Without_types
+      } renaming =
+    { analysis_scope;
+      has_usage = Schemas.N.apply_renaming has_usage renaming;
+      has_source = Schemas.N.apply_renaming has_source renaming;
+      field_of_constructor_is_used =
+        Schemas.NF.apply_renaming field_of_constructor_is_used renaming;
+      directly_called =
+        Renaming.apply_code_id_or_name_map
+          (fun targets renaming ->
+            Or_unknown.map_sharing
+              ~f:(Renaming.apply_code_id_set renaming)
+              targets)
+          renaming directly_called;
+      known_masks =
+        Renaming.apply_code_id_or_name_map Renaming.not_renamed renaming
+          known_masks;
+      unknown_masks =
+        Renaming.apply_code_id_or_name_map Renaming.not_renamed renaming
+          unknown_masks;
+      unboxed_fields =
+        Renaming.apply_code_id_or_name_map
+          (UA.Unboxed_fields.apply_renaming (fun var renaming ->
+               Renaming.apply_variable renaming var))
+          renaming unboxed_fields;
+      changed_representation =
+        Renaming.apply_code_id_or_name_map
+          (fun (repr, allocation_point) renaming ->
+            ( UA.Changed_representation.apply_renaming repr renaming,
+              Renaming.apply_code_id_or_name renaming allocation_point ))
+          renaming changed_representation;
+      code_changes = UA.Code_changes.apply_renaming code_changes renaming;
+      slot_offsets;
+      types_rewrite_context = Without_types;
+      final_typing_env = Without_types
+    }
+end
 
 let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
@@ -107,7 +199,7 @@ let rewrite_kind_with_subkind (type f)
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
 let solve (type f) (problem : f Traverse.Problem.t)
-    ~(analysis_scope : Analysis_scope.t) =
+    ~(analysis_scope : Analysis_scope.t) : f Solution.t =
   let { Traverse.Problem.deps;
         delayed_deps;
         code_deps;
@@ -176,16 +268,17 @@ let solve (type f) (problem : f Traverse.Problem.t)
     final_typing_env
   }
 
-let get_unboxed_fields solution cn =
+let get_unboxed_fields (solution : _ Solution.t) cn =
   Code_id_or_name.Map.find_opt cn solution.unboxed_fields
 
-let get_changed_representation solution cn =
+let get_changed_representation (solution : _ Solution.t) cn =
   Option.map fst
     (Code_id_or_name.Map.find_opt cn solution.changed_representation)
 
-let has_use solution v = Code_id_or_name.Map.mem v solution.has_usage
+let has_use (solution : _ Solution.t) v =
+  Code_id_or_name.Map.mem v solution.has_usage
 
-let field_used solution v f =
+let field_used (solution : _ Solution.t) v f =
   match
     Code_id_or_name.Map.find_opt v solution.field_of_constructor_is_used
   with
@@ -199,7 +292,7 @@ let find_answer map callee query =
     Misc.fatal_errorf "Analysis: no %s request for callee %a" query
       Code_id_or_name.print callee
 
-let code_id_actually_directly_called solution closure =
+let code_id_actually_directly_called (solution : _ Solution.t) closure =
   find_answer solution.directly_called
     (Code_id_or_name.name closure)
     "direct-call targets"
@@ -213,11 +306,11 @@ let rec apply_mask callee query mask args =
     Misc.fatal_errorf "Analysis: insufficient %s argument width for callee %a"
       query Code_id_or_name.print callee
 
-let arguments_used_by_known_arity_call solution callee args =
+let arguments_used_by_known_arity_call (solution : _ Solution.t) callee args =
   let mask = find_answer solution.known_masks callee "known-arity" in
   apply_mask callee "known-arity" mask args
 
-let arguments_used_by_unknown_arity_call solution callee args =
+let arguments_used_by_unknown_arity_call (solution : _ Solution.t) callee args =
   let masks = find_answer solution.unknown_masks callee "unknown-arity" in
   let rec apply_groups masks args =
     match args, masks with
@@ -231,23 +324,24 @@ let arguments_used_by_unknown_arity_call solution callee args =
   in
   apply_groups masks args
 
-let has_source solution v = Code_id_or_name.Map.mem v solution.has_source
+let has_source (solution : _ Solution.t) v =
+  Code_id_or_name.Map.mem v solution.has_source
 
-let get_calling_convention_change solution code_id =
+let get_calling_convention_change (solution : _ Solution.t) code_id =
   Unboxing_analysis.get_calling_convention_change solution.code_changes
     ~analysis_scope:solution.analysis_scope code_id
 
-let is_changing_calling_convention solution code_id =
+let is_changing_calling_convention (solution : _ Solution.t) code_id =
   Unboxing_analysis.is_changing_calling_convention solution.code_changes
     ~analysis_scope:solution.analysis_scope code_id
 
-let find_code_metadata solution code_id =
+let find_code_metadata (solution : _ Solution.t) code_id =
   Unboxing_analysis.find_code_metadata solution.code_changes
     ~analysis_scope:solution.analysis_scope code_id
 
-let slot_offsets solution = solution.slot_offsets
+let slot_offsets (solution : _ Solution.t) = solution.slot_offsets
 
-let rewrite_kind_with_subkind solution =
+let rewrite_kind_with_subkind (solution : _ Solution.t) =
   rewrite_kind_with_subkind solution.types_rewrite_context
 
-let final_typing_env solution = solution.final_typing_env
+let final_typing_env (solution : _ Solution.t) = solution.final_typing_env

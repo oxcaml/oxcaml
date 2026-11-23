@@ -108,11 +108,9 @@ let all_code_ids_for_export t =
     t Code_id.Set.empty
 
 let apply_renaming t renaming =
-  let rename_code_id = Renaming.apply_code_id renaming in
-  Code_id.Map.fold
-    (fun key v acc ->
-      Code_id.Map.add (rename_code_id key) (rename_code_id v) acc)
-    t Code_id.Map.empty
+  Renaming.apply_code_id_map
+    (fun code_id renaming -> Renaming.apply_code_id renaming code_id)
+    renaming t
 
 let clean_for_export t ~reachable_names =
   Code_id.Map.filter

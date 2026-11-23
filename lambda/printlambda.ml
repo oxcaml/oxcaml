@@ -1330,7 +1330,7 @@ let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
   | Const_base(Const_untagged_char c) ->
-      fprintf ppf "#%C" (Char.chr (c land 0xff))
+      fprintf ppf "#%C" (Char.chr (Numbers.Int8.to_int c land 0xff))
   | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
   | Const_immstring s -> fprintf ppf "#%S" s
   | Const_base(Const_float f) -> fprintf ppf "%s" f
@@ -1339,23 +1339,26 @@ let rec struct_const ppf = function
       fprintf ppf "%s" (Misc.format_as_unboxed_literal f)
   | Const_base(Const_unboxed_float32 f) ->
       fprintf ppf "%ss" (Misc.format_as_unboxed_literal f)
-  | Const_base(Const_int8 n) -> fprintf ppf "%is" n
-  | Const_base(Const_int16 n) -> fprintf ppf "%iS" n
+  | Const_base(Const_int8 n) -> fprintf ppf "%is" (Numbers.Int8.to_int n)
+  | Const_base(Const_int16 n) -> fprintf ppf "%iS" (Numbers.Int16.to_int n)
   | Const_base(Const_int32 n) -> fprintf ppf "%lil" n
   | Const_base(Const_int64 n) -> fprintf ppf "%LiL" n
-  | Const_base(Const_nativeint n) -> fprintf ppf "%nin" n
+  | Const_base(Const_nativeint n) -> fprintf ppf "%sn" (Targetint.to_string n)
   | Const_base(Const_untagged_int i) ->
       fprintf ppf "%sm" (Misc.format_as_unboxed_literal (Int.to_string i))
   | Const_base(Const_untagged_int8 i) ->
-      fprintf ppf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+      fprintf ppf "%ss"
+        (Misc.format_as_unboxed_literal (Int.to_string (Numbers.Int8.to_int i)))
   | Const_base(Const_untagged_int16 i) ->
-      fprintf ppf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
+      fprintf ppf "%sS"
+        (Misc.format_as_unboxed_literal
+           (Int.to_string (Numbers.Int16.to_int i)))
   | Const_base(Const_unboxed_int32 i) ->
       fprintf ppf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
   | Const_base(Const_unboxed_int64 i) ->
       fprintf ppf "%sL" (Misc.format_as_unboxed_literal (Int64.to_string i))
   | Const_base(Const_unboxed_nativeint i) ->
-      fprintf ppf "%sn" (Misc.format_as_unboxed_literal (Nativeint.to_string i))
+      fprintf ppf "%sn" (Misc.format_as_unboxed_literal (Targetint.to_string i))
   | Const_block(tag, []) ->
       fprintf ppf "[%i]" tag
   | Const_block(tag, hd::tl) ->

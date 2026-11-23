@@ -1798,7 +1798,7 @@ module Basis = struct
            let component_visibility : Desc.visibility =
              match load_visibility, deprecated with
              | Hidden, _ | _, Deprecated -> Hidden
-             | Visible _, Not_deprecated -> Visible
+             | Visible, Not_deprecated -> Visible
              in
            Component.Module(origin, id, desc, Component.Global, component_visibility))
         loads

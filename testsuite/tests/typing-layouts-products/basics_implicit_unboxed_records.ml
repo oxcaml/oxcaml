@@ -161,6 +161,17 @@ Error: This value is "local"
 
 (* Unboxed versions of mutable fields are mutable, but can't be mutated *)
 
+type mut = { mutable a : int }
+let cannot_set (x : mut#) = x.a <- 1
+[%%expect{|
+type mut = { mutable a : int; }
+Line 2, characters 28-36:
+2 | let cannot_set (x : mut#) = x.a <- 1
+                                ^^^^^^^^
+Error: The unboxed record field "a" is declared mutable,
+       but fields of unboxed records can't be mutated.
+|}]
+
 (* Unboxed "mutable" records can't be mutated in place yet, but for forward
    compatibility, reading their [mutable] fields still requires [shared]. *)
 type doesn't_cross_contention = { mutable r : int ref; k : int }
@@ -474,11 +485,11 @@ val f : r# = #{i = 1}
 
 let () = f.i <- 2
 [%%expect{|
-Line 1, characters 9-10:
+Line 1, characters 9-17:
 1 | let () = f.i <- 2
-             ^
-Error: This expression has type "r#",
-       which is an unboxed record rather than a boxed one.
+             ^^^^^^^^
+Error: The unboxed record field "i" is not mutable
+Hint: Only mutable fields of boxed records can be mutated.
 |}]
 
 (*****************************************)

@@ -1,5 +1,9 @@
 (* TEST
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* Unboxing of variants with mixed constructors *)

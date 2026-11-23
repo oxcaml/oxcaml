@@ -136,6 +136,10 @@ type 'g block =
        [Cfg_of_ssa] attaches it to the exception-bucket move it emits at the
        entry of a trap handler, matching [Cfg_selectgen.setup_catch_handler]. *)
     handler_dbg : Debuginfo.t;
+    (* The debuginfo of the arm of a [Cmm.Cifthenelse] or [Cmm.Cswitch] that
+       starts at this block. [Cfg_of_ssa] gives it to the instructions at the
+       start of the block, matching [Cfg_selectgen]. *)
+    entry_dbg : Debuginfo.t;
     cold : bool;
     mutable dominator_info : 'g dominator_info;
     mutable block_end_trap_stack : 'g block list
@@ -225,13 +229,15 @@ and dummy_block : under_construction block =
     terminator = pending_terminator;
     terminator_dbg = Debuginfo.none;
     handler_dbg = Debuginfo.none;
+    entry_dbg = Debuginfo.none;
     cold = false;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
   }
 
 let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool)
-    ~(handler_dbg : Debuginfo.t) : under_construction block =
+    ~(handler_dbg : Debuginfo.t) ~(entry_dbg : Debuginfo.t) :
+    under_construction block =
   { block_id = Block_id.get_and_incr block_id_gen;
     params;
     predecessors = [];
@@ -240,6 +246,7 @@ let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool)
     terminator = pending_terminator;
     terminator_dbg = Debuginfo.none;
     handler_dbg;
+    entry_dbg;
     cold;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
@@ -249,8 +256,9 @@ module Block = struct
   type nonrec 'g t = 'g block
 
   let create (graph : under_construction graph) ~(params : Cmm.machtype)
-      ~(cold : bool) ~(handler_dbg : Debuginfo.t) : under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg
+      ~(cold : bool) ~(handler_dbg : Debuginfo.t) ~(entry_dbg : Debuginfo.t) :
+      under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg ~entry_dbg
       ~params:
         (params
         |> Array.map (fun typ ->
@@ -258,8 +266,9 @@ module Block = struct
 
   let create_with_names (graph : under_construction graph)
       ~(params : (Cmm.machtype_component * Backend_var.t option) array)
-      ~(cold : bool) ~(handler_dbg : Debuginfo.t) : under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg
+      ~(cold : bool) ~(handler_dbg : Debuginfo.t) ~(entry_dbg : Debuginfo.t) :
+      under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg ~entry_dbg
       ~params:
         (params
         |> Array.map (fun (typ, name) ->
@@ -384,6 +393,8 @@ module Block = struct
   let terminator_dbg (block : finished t) : Debuginfo.t = block.terminator_dbg
 
   let handler_dbg (block : finished t) : Debuginfo.t = block.handler_dbg
+
+  let entry_dbg (block : finished t) : Debuginfo.t = block.entry_dbg
 
   let cold (block : 'g t) : bool = block.cold
 
@@ -531,7 +542,7 @@ module Instruction = struct
       | Specific s -> not (Arch.operation_is_pure s)
       | Name_for_debugger _ -> false
       | Dls_get | Tls_get | Domain_index | Thread_self_id -> false
-      | Poll | Pause -> true
+      | Poll | Pause | Trace_pc_guard_gate | Trace_pc_guard _ -> true
       | Alloc _ -> true)
     | Push_trap _ | Pop_trap _ -> true
 
@@ -680,12 +691,13 @@ let check_terminator (term : under_construction terminator) : unit =
          nontail"
   | Call { continuation = Raise _; _ } ->
     Misc.fatal_error "Ssa.check_terminator: a Call continuation cannot be Raise"
-  | Call { continuation = Unreachable; op = External _; _ } -> ()
-  | Call { continuation = Unreachable; op = Direct _ | Indirect _ | Probe _; _ }
+  | Call
+      { continuation = Unreachable; op = Direct _ | Indirect _ | External _; _ }
     ->
+    ()
+  | Call { continuation = Unreachable; op = Probe _; _ } ->
     Misc.fatal_error
-      "Ssa.check_terminator: a Call with continuation Unreachable must be an \
-       external call"
+      "Ssa.check_terminator: a probe cannot have continuation Unreachable"
   | Call { continuation = Goto _; _ } | Invalid _ -> ()
 
 module Cursor = struct
@@ -755,6 +767,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
   let instruction_id_gen = Instruction_id.create_generator () in
   let entry =
     create_block ~block_id_gen ~cold:false ~handler_dbg:Debuginfo.none
+      ~entry_dbg:Debuginfo.none
       ~params:
         (Function_info.flattened_parameters function_info
         |> Array.map (fun typ : block_param ->

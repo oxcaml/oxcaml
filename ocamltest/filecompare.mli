@@ -21,9 +21,16 @@ type result =
   | Unexpected_output
   | Error of string * int
 
-type tool
-
 type ignore = {bytes: int; lines: int}
+
+type tool =
+  | External of {
+                   tool_name : string;
+                   tool_flags : string;
+                   result_of_exitcode : string -> int -> result
+                }
+  | Internal of ignore
+
 val make_cmp_tool : ignore:ignore -> tool
 
 val make_comparison_tool :

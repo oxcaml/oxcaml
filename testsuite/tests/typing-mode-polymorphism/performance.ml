@@ -1,6 +1,10 @@
 (* TEST
  flags += "-extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* The following tests are known performance regressions *)

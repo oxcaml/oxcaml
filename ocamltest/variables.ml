@@ -17,12 +17,12 @@
 
 type value = string
 
-type exporter = value -> string * string
+type exporter = string * (string -> string)
 
 type t = {
   variable_name : string;
   variable_description : string;
-  variable_exporter : exporter
+  variable_exporter : exporter option;
 }
 
 let compare v1 v2 = String.compare v1.variable_name v2.variable_name
@@ -35,20 +35,18 @@ exception No_such_variable of string
 
 exception Recursive_variable_definition of string
 
-let default_exporter varname value = (varname, value)
-
 let make (name, description) =
   if name="" then raise Empty_variable_name else {
     variable_name = name;
     variable_description = description;
-    variable_exporter = default_exporter name
+    variable_exporter = None
   }
 
 let make_with_exporter exporter (name, description) =
   if name="" then raise Empty_variable_name else {
     variable_name = name;
     variable_description = description;
-    variable_exporter = exporter
+    variable_exporter = Some exporter
   }
 
 let name_of_variable v = v.variable_name
@@ -66,8 +64,17 @@ let find_variable variable_name =
   try Some (Hashtbl.find variables variable_name)
   with Not_found -> None
 
+let exported_name v =
+  match v.variable_exporter with
+  | Some (n, _) -> n
+  | None -> v.variable_name
+
 let string_of_binding variable value =
-  let (varname, value) = variable.variable_exporter value in
+  let varname, value =
+    match variable.variable_exporter with
+    | Some (n, f) -> n, f value
+    | None -> variable.variable_name, value
+  in
   Printf.sprintf "%s=%s" varname value
 
 let get_registered_variables () =

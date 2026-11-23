@@ -40,10 +40,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          | Ishiftarith (_, _)
          | Ibswap _ | Isignext _ | Isimd _ ))
   | Op
-      ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Const_int _
-      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      ( Move | Spill | Reload | Opaque | Pause | Trace_pc_guard_gate
+      | Trace_pc_guard _ | Begin_region | End_region | Dls_get | Tls_get
+      | Domain_index | Thread_self_id | Poll | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -65,6 +66,6 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   | Prim { op = External _; _ }
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Invalid _ ->
+  | Call_no_return _ | External_call_no_return _ | Call _ | Invalid _ ->
     (* no rewrite *)
     May_still_have_spilled_registers

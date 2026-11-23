@@ -535,6 +535,17 @@ let iter_type_expr_with_stages f env fm ty =
   | _ ->
     iter_type_expr (f env) fm ty
 
+let fold_type_expr_with_stages f env fm init ty =
+  match get_desc ty with
+  | Tquote ty ->
+    f (incr_stage env) init ty
+  | Tsplice ty ->
+    f (decr_stage env) init ty
+  | Tquote_eval ty ->
+    f (incr_stage env) init ty
+  | _ ->
+    fold_type_expr (f env) fm init ty
+
 (* CR metaprogramming jbachurski: We use this to adjust the environment while
    printing error messages. The original type may have been well-staged,
    but since we always print (non-unification) errors at stage 0, we should
@@ -968,7 +979,7 @@ exception CCFailure of closed_class_failure
 let closed_class ~zap_scope params sign =
   with_type_mark begin fun mark ->
   List.iter (mark_type mark) params;
-  ignore (try_mark_node mark sign.csig_self_row);
+  mark_node mark sign.csig_self_row;
   try
     Meths.iter
       (fun lab (priv, _, ty) ->
@@ -1273,7 +1284,7 @@ let rec update_level env level expand ty =
         let needs_expand =
           expand ||
           List.exists2
-            (fun var ty -> var = Variance.null && get_level ty > level)
+            (fun var ty -> Variance.is_null var && get_level ty > level)
             variance tl
         in
         begin try
@@ -1378,11 +1389,11 @@ let rec lower_contravariant env var_level visited contra ty =
             List.map (fun _ -> Variance.unknown) tyl,
             false
         in
-        if List.for_all ((=) Variance.null) variance then () else
+        if List.for_all Variance.is_null variance then () else
           let not_expanded () =
             List.iter2
               (fun v t ->
-                if v = Variance.null then () else
+                if Variance.is_null v then () else
                   if Variance.(mem May_weak v)
                   then lower_rec true t
                   else lower_rec contra t)
@@ -2179,7 +2190,8 @@ let curry_mode (type r)
     (arg : With_locality.lr) : With_locality.Comonadic.l =
   With_locality.Comonadic.join
     [(With_locality.close_over arg).comonadic;
-     (With_locality.Comonadic.disallow_right alloc)]
+     With_locality.Comonadic.disallow_right alloc]
+
 let curry_mode_const alloc arg : With_locality.Const.t =
   let acc =
     With_locality.Comonadic.Const.join
@@ -2187,8 +2199,49 @@ let curry_mode_const alloc arg : With_locality.Const.t =
       (With_locality.Const.partial_apply alloc)
   in
   With_locality.Const.merge
-    {comonadic = acc;
-     monadic = With_locality.Monadic.Const.legacy}
+    { comonadic = acc; monadic = With_locality.Monadic.Const.legacy }
+
+module Curry_mode = struct
+  type t =
+    | Const of With_locality.Const.t
+    | Variable of
+        { comonadic : With_locality.Comonadic.l;
+          areality : Locality.Const.t }
+
+  let comonadic = function
+    | Const c ->
+      With_locality.Comonadic.of_const (With_locality.Const.partial_apply c)
+    | Variable { comonadic; _ } -> comonadic
+
+  let areality = function
+    | Const c -> c.areality
+    | Variable { areality; _ } -> areality
+
+  let mode ~level = function
+    | Const c -> With_locality.of_const c
+    | Variable { comonadic; _ } ->
+      let comonadic, _ =
+        With_locality.Comonadic.newvar_above level comonadic
+      in
+      { comonadic; monadic = With_locality.Monadic.newvar level }
+
+  let add_arg t marg ~upper_areality =
+    let areality = Locality.Const.join (areality t) upper_areality in
+    let pinned =
+      With_locality.Comonadic.of_const
+        { With_locality.Comonadic.Const.min with areality }
+    in
+    Variable
+      { comonadic =
+          With_locality.Comonadic.join [curry_mode (comonadic t) marg; pinned];
+        areality }
+
+  let add_const_arg t (arg : With_locality.Const.t) =
+    match t with
+    | Const c -> Const (curry_mode_const c arg)
+    | Variable _ ->
+      add_arg t (With_locality.of_const arg) ~upper_areality:arg.areality
+end
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
@@ -3440,21 +3493,28 @@ and estimate_unboxed_product_jkind
   Jkind.product_of_fields ~why fields layouts
 
 let rec estimate_type_jkind_unwrapped
-      level ~expand_components env ~unwrapped_ty =
+      level ~expand_components ~ignore_mod_bounds env ~unwrapped_ty =
   match
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds:false env
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds env
       unwrapped_ty.ty
     |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
   with
   | Ok jkind -> jkind
   | Error prev_unwrapped_ty ->
-    estimate_type_jkind_unwrapped level ~expand_components env
-      ~unwrapped_ty:prev_unwrapped_ty
+    estimate_type_jkind_unwrapped level ~expand_components ~ignore_mod_bounds
+      env ~unwrapped_ty:prev_unwrapped_ty
 
-let type_jkind env ty =
+let type_jkind ~ignore_mod_bounds env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
-    ~expand_components:true env
+    ~expand_components:true ~ignore_mod_bounds env
+
+let type_jkind_base env ty =
+  let jkind = type_jkind ~ignore_mod_bounds:true env ty in
+  jkind.jkind.base
+
+let type_jkind env ty =
+  type_jkind ~ignore_mod_bounds:false env ty
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
@@ -4063,11 +4123,13 @@ let generic_private_abbrev env path =
     | _ -> false
   with Not_found -> false
 
-let is_contractive env p =
-  try
-    let decl = Env.find_type p env in
-    in_pervasives p && decl.type_manifest = None || is_datatype decl
-  with Not_found -> false
+let is_contractive_with_rectypes_decl p decl =
+  in_pervasives p && decl.type_manifest = None || is_datatype decl
+
+let is_contractive_with_rectypes env p =
+  match Env.find_type p env with
+  | decl -> is_contractive_with_rectypes_decl p decl
+  | exception Not_found -> false
 
 
                               (*****************)
@@ -4077,39 +4139,141 @@ let is_contractive env p =
 
 exception Occur
 
-let rec occur_rec env visited allow_recursive parents ty0 ty =
-  if not_marked_node visited ty then begin
+let rec occur_fast visited allow_recursive ty0 ty =
+  if try_mark_node visited ty then begin
     if eq_type ty ty0 then raise Occur;
     begin match get_desc ty with
-      Tconstr(p, _tl, _abbrev) ->
-        if allow_recursive && is_contractive env p then () else
-        begin try
-          if TypeSet.mem ty parents then raise Occur;
-          let parents = TypeSet.add ty parents in
-          iter_type_expr
-            (occur_rec env visited allow_recursive parents ty0)
-            (Fun.const ()) ty
-        with Occur -> try
-          let ty' = try_expand_head try_expand_safe env ty in
-          (* This call used to be inlined, but there seems no reason for it.
-            Message was referring to change in rev. 1.58 of the CVS repo. *)
-          occur_rec env visited allow_recursive parents ty0 ty'
-        with Cannot_expand ->
-          raise Occur
-        end
+    | Tconstr(_, _ :: _, _abbrev) ->
+        iter_type_expr
+          (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
     | Tobject _ | Tvariant _ ->
         ()
     | _ ->
-        if allow_recursive ||  TypeSet.mem ty parents then () else begin
-          let parents = TypeSet.add ty parents in
-          iter_type_expr_with_stages
-            (fun env -> occur_rec env visited allow_recursive parents ty0)
-            env
-            (Fun.const ()) ty
+        if not allow_recursive then begin
+          iter_type_expr
+            (occur_fast visited allow_recursive ty0) (Fun.const ()) ty
         end
-    end;
-    ignore (try_mark_node visited ty)
+    end
   end
+
+let rec occur_precise env visited occurs allow_recursive ty0 ty =
+  if not (try_mark_node visited ty) then not_marked_node occurs ty
+  else begin
+    let safe =
+      if eq_type ty ty0 then false
+      else begin
+        match get_desc ty with
+        | Tconstr(_, [], _) -> true
+        | Tconstr(p, tl, _abbrev) ->
+            begin match Env.find_type p env with
+            | exception Not_found ->
+                fold_type_expr
+                  (fun acc ty ->
+                     occur_precise env visited occurs allow_recursive ty0 ty
+                     && acc)
+                  (fun acc _ -> acc) true ty
+            | decl ->
+                if allow_recursive && is_contractive_with_rectypes_decl p decl
+                then true
+                else
+                  List.fold_left2
+                    (fun acc v t ->
+                       if Variance.(mem May_noncontractive v) then
+                         occur_precise env visited occurs allow_recursive ty0 t
+                         && acc
+                       else
+                         acc)
+                    true decl.type_variance tl
+            end
+        | Tobject _ | Tvariant _ ->
+            true
+        | _ ->
+            if allow_recursive then true else begin
+              fold_type_expr_with_stages
+                (fun env acc ty ->
+                   occur_precise env visited occurs allow_recursive ty0 ty
+                   && acc)
+                env (fun acc _ -> acc) true ty
+            end
+      end
+    in
+    if not safe then mark_node occurs ty;
+    safe
+  end
+
+let rec occur_with_expansion
+    env visited_with_expansion visited_precise occurs allow_recursive ty0 ty =
+  if try_mark_node visited_with_expansion ty then begin
+    (* Nodes not yet seen by [occur_precise] were created by an expansion.
+       Classify them first, so that we only expand abbreviations whose
+       arguments are known to contain [ty0]. *)
+    let unsafe =
+      if not_marked_node visited_precise ty then
+        not (occur_precise env visited_precise occurs allow_recursive ty0 ty)
+      else marked_node occurs ty
+    in
+    if unsafe then begin
+      if eq_type ty ty0 then raise Occur;
+      begin match get_desc ty with
+      | Tconstr(p, ((_ :: _) as tl), _) ->
+          begin match Env.find_type p env with
+          | exception Not_found ->
+              iter_type_expr
+                (occur_with_expansion
+                   env visited_with_expansion visited_precise
+                   occurs allow_recursive ty0)
+                (Fun.const ()) ty
+          | decl ->
+              if allow_recursive && is_contractive_with_rectypes_decl p decl
+              then ()
+              else begin
+                match try_expand_head try_expand_safe env ty with
+                | ty' ->
+                    occur_with_expansion
+                      env visited_with_expansion visited_precise
+                      occurs allow_recursive ty0 ty'
+                | exception Cannot_expand ->
+                    List.iter2
+                      (fun v t ->
+                         if Variance.(mem May_noncontractive v) then
+                           occur_with_expansion
+                             env visited_with_expansion visited_precise
+                             occurs allow_recursive ty0 t)
+                      decl.type_variance tl
+              end
+          end
+      | Tobject _ | Tvariant _ ->
+          ()
+      | _ ->
+          if not allow_recursive then begin
+            iter_type_expr_with_stages
+              (fun env ->
+                 occur_with_expansion
+                   env visited_with_expansion visited_precise
+                   occurs allow_recursive ty0)
+              env (Fun.const ()) ty
+          end
+      end
+    end
+  end
+
+let occur_full env allow_recursive ty0 ty =
+  match
+    with_type_mark (fun visited ->
+      occur_fast visited allow_recursive ty0 ty)
+  with
+  | () -> ()
+  | exception Occur ->
+      with_type_mark (fun visited_precise ->
+        with_type_mark (fun occurs ->
+          let safe =
+            occur_precise env visited_precise occurs allow_recursive ty0 ty
+          in
+          if not safe then begin
+            with_type_mark (fun visited_with_expansion ->
+              occur_with_expansion env visited_with_expansion
+                visited_precise occurs allow_recursive ty0 ty)
+          end))
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 
@@ -4122,9 +4286,9 @@ let occur uenv ty0 ty =
   try
     while
       type_changed := false;
-      if not (eq_type ty0 ty) then
-        with_type_mark (fun mark ->
-          occur_rec env mark allow_recursive TypeSet.empty ty0 ty);
+      if not (eq_type ty0 ty) then begin
+        occur_full env allow_recursive ty0 ty
+      end;
       !type_changed
     do () (* prerr_endline "changed" *) done;
     merge type_changed old
@@ -4151,22 +4315,28 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
     match get_desc ty with
       Tconstr(p', args, _abbrev) ->
         if Path.same p p' then raise Occur;
-        if allow_rec && not strict && is_contractive env p' then () else
+        if allow_rec
+           && not strict && is_contractive_with_rectypes env p' then () else
         let visited = get_id ty :: visited in
         begin try
           (* try expanding, since [p] could be hidden *)
           local_non_recursive_abbrev ~allow_rec strict visited env p
             (try_expand_head try_expand_safe_opt env ty)
         with Cannot_expand ->
-          let params =
-            try (Env.find_type p' env).type_params
-            with Not_found -> args
+          let params, variance =
+            match Env.find_type p' env with
+            | decl -> decl.type_params, decl.type_variance
+            | exception Not_found ->
+                let variance = List.map (fun _ -> Variance.unknown) args in
+                args, variance
           in
-          List.iter2
-            (fun tv ty ->
-              let strict = strict || not (is_Tvar tv) in
-              local_non_recursive_abbrev ~allow_rec strict visited env p ty)
-            params args
+          Stdlib.List.iter3
+            (fun tv ty v ->
+               if strict || Variance.(mem May_noncontractive v) then begin
+                 let strict = strict || not (is_Tvar tv) in
+                 local_non_recursive_abbrev ~allow_rec strict visited env p ty
+               end)
+            params args variance
         end
     | Tobject _ | Tvariant _ when not strict ->
         ()
@@ -4261,7 +4431,7 @@ let occur_univar ?(inj_only=false) env ty =
   let rec occur_rec env bound ty =
     if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (ignore (try_mark_node mark ty); occur_desc env bound ty)
+        (mark_node mark ty; occur_desc env bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
@@ -4296,7 +4466,7 @@ let occur_univar ?(inj_only=false) env ty =
                    in this position. Physical expansion, as done in `occur`,
                    would be costly here, since we need to check inside
                    object and variant types too. *)
-                if Variance.(if inj_only then mem Inj v else not (eq v null))
+                if Variance.(if inj_only then mem Inj v else not (is_null v))
                 then occur_rec env bound t)
               tl td.type_variance
           with Not_found ->
@@ -4352,7 +4522,7 @@ let univars_escape env univar_pairs vl ty =
             let td = Env.find_type p env in
             List.iter2
               (* see occur_univar *)
-              (fun t v -> if not Variance.(eq v null) then occur env t)
+              (fun t v -> if not (Variance.is_null v) then occur env t)
               tl td.type_variance
           with Not_found ->
             List.iter (occur env) tl
@@ -6764,6 +6934,142 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
     in
     raise_for Moregen (Mode_mismatch (pos, e))
 
+exception Complicated_moregen
+
+let rec expand_path_fast env p =
+  match Env.find_type_expansion p env with
+  | exception Not_found -> Env.normalize_type_path None env p, None
+  | (params, body, _scope) ->
+    match get_desc body with
+    | Tconstr (p', args, _)
+        when args == params || List.equal eq_type args params ->
+      expand_path_fast env p'
+    | _ -> Env.normalize_type_path None env p, Some (params, body)
+
+let expand_paths_fast env p1 p2 =
+  if Path.scope p1 >= Path.scope p2 then begin
+    let p1, exp1 = expand_path_fast env p1 in
+    if Path.same p1 p2 then p1, exp1, p2, None
+    else
+      let p2, exp2 = expand_path_fast env p2 in
+      p1, exp1, p2, exp2
+  end else begin
+    let p2, exp2 = expand_path_fast env p2 in
+    if Path.same p1 p2 then p1, None, p2, exp2
+    else
+      let p1, exp1 = expand_path_fast env p1 in
+      p1, exp1, p2, exp2
+  end
+
+let moregen_mode_fast v m1 m2 =
+  let ok =
+    match v with
+    | Invariant -> With_locality.Guts.(sub_loose m1 m2 && sub_loose m2 m1)
+    | Covariant -> With_locality.Guts.sub_loose m1 m2
+    | Contravariant -> With_locality.Guts.sub_loose m2 m1
+    | Bivariant -> true
+  in
+  if not ok then raise_notrace Complicated_moregen
+
+let mgen_fast_tuple_jkind : jkind_l = Jkind.for_non_float ~why:Tuple
+
+let mgen_fast_package_jkind : jkind_l =
+  Jkind.for_non_float ~why:First_class_module
+
+(* An upper bound on the jkind of [ty], for the shapes of [ty] where computing
+   one is cheap and needs no mutation; raises [Complicated_moregen] otherwise.
+*)
+let mgen_fast_estimate_jkind ty =
+  match get_desc ty with
+  | Tvar { jkind } -> Jkind.disallow_right jkind
+  | Tarrow _ -> Jkind.for_arrow
+  | Tobject _ -> Jkind.for_object
+  (* These have with-bounds, so for simplicity we use an upper bound *)
+  | Ttuple _ -> mgen_fast_tuple_jkind
+  | Tpackage _ -> mgen_fast_package_jkind
+  (* FIXME: maybe a better [Tconstr] check could be done? *)
+  | _ -> raise_notrace Complicated_moregen
+
+let rec mgen_fast env subst scope maxnodes variance t1 t2 =
+  decr maxnodes;
+  if !maxnodes = 0 then raise_notrace Complicated_moregen;
+  if eq_type t1 t2 then () else
+  match get_desc t1, get_desc t2 with
+  | Tsubst (ty, _), _ when eq_type ty t2 -> ()
+  | Tvar { jkind }, _ when get_level t1 = generic_level ->
+    (* Properly computing the jkind of [t2] is expensive, so we avoid it.
+       Instead, we compare against an upper bound that is cheap to compute
+       based on [t2]'s shape; if that is not obviously a subjkind, bail. *)
+    if not (Jkind.is_obviously_max jkind
+            || Jkind.is_obviously_sub (mgen_fast_estimate_jkind t2) jkind)
+    then raise_notrace Complicated_moregen;
+    For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+  | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
+       when l1 = l2 ->
+    moregen_mode_fast (neg_variance variance) a1 a2;
+    moregen_mode_fast variance r1 r2;
+    mgen_fast env subst scope maxnodes (neg_variance variance) t1 t2;
+    mgen_fast env subst scope maxnodes variance u1 u2
+  | Ttuple tl1, Ttuple tl2 ->
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tunboxed_tuple tl1, Tunboxed_tuple tl2 ->
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
+    let p2 =
+      try Subst.type_path subst p2
+      with Subst.Not_path -> raise_notrace Complicated_moregen
+    in
+    if Path.same p1 p2 then mgen_fast_list env subst scope maxnodes tl1 tl2
+    else begin
+      let p1, exp1, p2, exp2 = expand_paths_fast env p1 p2 in
+      if Path.same p1 p2 then mgen_fast_list env subst scope maxnodes tl1 tl2
+      else
+        match tl1, exp1, tl2, exp2 with
+        | [], Some ([], exp1), [], Some ([], exp2) ->
+          mgen_fast env Subst.identity scope maxnodes variance exp1 exp2
+        | [], Some ([], exp1), _, _ ->
+          mgen_fast env subst scope maxnodes variance exp1 t2
+        | _, _, [], Some ([], exp2) ->
+          mgen_fast env Subst.identity scope maxnodes variance t1 exp2
+        | _, _, _, _ -> raise_notrace Complicated_moregen
+    end
+  | Tpoly (t1, []), Tpoly(t2, []) ->
+    mgen_fast env subst scope maxnodes variance t1 t2
+  (* FIXME: handling of [Tvariant]? Annoying but does come up... *)
+  | _, _ ->
+    raise_notrace Complicated_moregen
+
+and mgen_fast_list env subst scope maxnodes tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | t1 :: tl1, t2 :: tl2 ->
+    mgen_fast env subst scope maxnodes Invariant t1 t2;
+    mgen_fast_list env subst scope maxnodes tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
+and mgen_fast_labeled env subst scope maxnodes variance tl1 tl2 =
+  match tl1, tl2 with
+  | [], [] -> ()
+  | (l1, t1) :: tl1, (l2, t2) :: tl2 ->
+    (* This is an actual failure, but we raise [Complicated_moregen] so that
+       the slow path can give a nicer error. *)
+    if not (Option.equal String.equal l1 l2) then
+      raise_notrace Complicated_moregen;
+    mgen_fast env subst scope maxnodes variance t1 t2;
+    mgen_fast_labeled env subst scope maxnodes variance tl1 tl2
+  | _, _ -> raise_notrace Complicated_moregen
+
+let moregeneral_fast env patt subst subj =
+  For_copy.with_scope (fun scope ->
+    let snap = snapshot () in
+    (* Fixed upper limit of the number of nodes,
+       so that we don't diverge on equirecursive types *)
+    let maxnodes = ref 200 in
+    match mgen_fast env subst scope maxnodes Covariant patt subj with
+    | () -> true
+    | exception (Complicated_moregen | Moregen_trace _) ->
+      backtrack snap; false)
+
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
   if inst_nongen then level <> subject_level
@@ -7080,7 +7386,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen
+let moregeneral_slow ~self_check env inst_nongen
     pat_sch_sorts subj_sch_sorts pat_sch subj_sch =
   let instantiate_modes = not self_check in
   (* Moregen splits the generic level into two finer levels:
@@ -7150,9 +7456,25 @@ let moregeneral ~self_check env inst_nongen
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
+
+let moregeneral ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch subst_subj_sch =
+  (* The fast path does not handle layout-polymorphic schemes, so only try it
+     when there are no sort variables on either side. *)
+  let fast =
+    match pat_sch_sorts, subj_sch_sorts with
+    | [], [] -> moregeneral_fast env pat_sch subst subj_sch
+    | _, _ -> false
+  in
+  if fast then []
+  else
+    moregeneral_slow ~self_check env inst_nongen
+      pat_sch_sorts subj_sch_sorts pat_sch (Lazy.force subst_subj_sch)
+
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
-    moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch
+    moregeneral ~self_check:false env inst_nongen [] []
+      pat_sch Subst.identity subj_sch (Lazy.from_val subj_sch)
   with
   | _ -> true
   | exception Moregen _ -> false

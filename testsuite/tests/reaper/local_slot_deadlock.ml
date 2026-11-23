@@ -2,6 +2,7 @@
    flambda2;
    flags += "-flambda2-reaper -reaper-local-fields";
    { native; check-program-output; }
+   { jsir; }
  *)
 
 let[@inline never] go t b =

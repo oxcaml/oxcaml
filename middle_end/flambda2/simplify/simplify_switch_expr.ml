@@ -118,12 +118,7 @@ let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
             | None -> Some action
           in
           match cont_info_from_uenv with
-          | Linearly_used_and_inlinable
-              { handler;
-                free_names_of_handler = _;
-                params;
-                cost_metrics_of_handler = _
-              } ->
+          | Linearly_used_and_inlinable { handler; params } ->
             assert (Bound_parameters.is_empty params);
             check_handler ~handler ~action
           | Non_inlinable_zero_arity { handler = Known handler } ->
@@ -362,7 +357,6 @@ let ( let$ ) expr k uacc ~shareable_constants ~typing_env_before_switch
     | None ->
       let named = Named.create_prim prim dbg in
       let var = Variable.create name kind in
-      let uacc = UA.add_free_names uacc (NO.singleton_variable var NM.normal) in
       let local_cse =
         match P.Eligible_for_cse.create prim with
         | None -> local_cse
@@ -387,10 +381,8 @@ let ( let$ ) expr k uacc ~shareable_constants ~typing_env_before_switch
       in
       EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body)
 
-let return ~added_code_size ~free_names expr uacc ~shareable_constants:_
-    ~typing_env_before_switch:_ ~cse_before_switch:_ ~local_cse:_ =
-  let uacc = UA.notify_added ~code_size:added_code_size uacc in
-  let uacc = UA.add_free_names uacc free_names in
+let return expr uacc ~shareable_constants:_ ~typing_env_before_switch:_
+    ~cse_before_switch:_ ~local_cse:_ =
   expr, uacc
 
 let run uacc ~shareable_constants ~typing_env_before_switch ~cse_before_switch k
@@ -496,8 +488,8 @@ let enough_arms ~num_arms = function
 let bound_tagged_scrutinee scrutinee dbg =
   bound_prim "tagged_scrutinee" K.value (P.Unary (Tag_immediate, scrutinee)) dbg
 
-let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
-  let dbg = Debuginfo.none in
+let rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg mergeable_argument
+    k =
   match mergeable_argument with
   | Invariant_argument simple -> k simple
   | Affine_argument { kind; offset; slope } -> (
@@ -543,7 +535,7 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
     let$ tagged_scrutinee = bound_tagged_scrutinee scrutinee dbg in
     let$ not_scrutinee =
       bound_prim "not_scrutinee" K.value
-        (P.Unary (Boolean_not, tagged_scrutinee))
+        (P.Unary (Boolean_not Tagged_bool, tagged_scrutinee))
         dbg
     in
     k not_scrutinee
@@ -552,8 +544,12 @@ let rebuild_mergeable_argument ~machine_width ~scrutinee mergeable_argument k =
     let module ALK = P.Array_load_kind in
     let element_kind = ALK.kind_of_loaded_value array_load_kind in
     let loaded_kind = KS.kind element_kind in
+    (* The table is data, not code: its fields have no debuginfo, so that
+       identical tables built for different switches remain equal as static
+       constants and can be shared. *)
     let$ switch_block =
-      bound_lookup_table "switch_block" ~element_kind ~array_kind simples dbg
+      bound_lookup_table "switch_block" ~element_kind ~array_kind simples
+        Debuginfo.none
     in
     let$ tagged_scrutinee =
       bound_prim "tagged_scrutinee" K.value
@@ -790,10 +786,11 @@ let rebuild_switch
   let body, uacc =
     if num_arms < 1
     then
-      let uacc = UA.notify_removed ~operation:Removed_operations.branch uacc in
-      RE.create_invalid Zero_switch_arms, uacc
+      ( RE.notify_removed ~operation:Removed_operations.branch
+          (RE.create_invalid Zero_switch_arms),
+        uacc )
     else
-      let dbg = Debuginfo.none in
+      let dbg = condition_dbg in
       let[@inline] normal_case uacc =
         (* In that case, even though some branches were removed by simplify we
            should not count them in the number of removed operations: these
@@ -815,9 +812,6 @@ let rebuild_switch
       in
       match switch_merged with
       | Some (dest, args) ->
-        let uacc =
-          UA.notify_removed ~operation:Removed_operations.branch uacc
-        in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
           match mergeable_args with
@@ -830,19 +824,19 @@ let rebuild_switch
             let is_cold = UE.is_cold_continuation (UA.uenv uacc) dest in
             let apply_cont = Apply_cont.create dest ~args ~dbg in
             return
-              (RE.create_apply_cont ~is_cold apply_cont)
-              ~added_code_size:(Code_size.apply_cont apply_cont)
-              ~free_names:(Apply_cont.free_names apply_cont)
+              (RE.create_apply_cont ~is_cold apply_cont
+              |> RE.notify_removed ~operation:Removed_operations.branch)
           | special_arg :: special_args ->
-            rebuild_mergeable_argument ~machine_width ~scrutinee special_arg
-              (fun arg -> rebuild_merged_switch special_args (arg :: args_rev))
+            rebuild_mergeable_argument ~machine_width ~scrutinee ~dbg
+              special_arg (fun arg ->
+                rebuild_merged_switch special_args (arg :: args_rev))
         in
         run uacc ~shareable_constants ~typing_env_before_switch
           ~cse_before_switch
           (rebuild_merged_switch args [])
       | None -> normal_case uacc
   in
-  let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
+  let expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
 let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =

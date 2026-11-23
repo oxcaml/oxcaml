@@ -13,6 +13,7 @@ module Place = Ir.Place
 module Statement = Ir.Statement
 module Sum = Ir.Sum
 module Ty = Ir.Ty
+module Un_op = Ir.Un_op
 
 module State = struct
   type t =
@@ -26,7 +27,11 @@ module State = struct
       mutable exceptions : Exn.t list;
       mutable variant_types : Ty.variant list;
       mutable matches_remaining : int;
-      mutable tries_remaining : int
+      mutable tries_remaining : int;
+      mutable closure_calls_remaining : int;
+      mutable let_recs_remaining : int;
+      mutable recursive_calls_remaining : int;
+      mutable recursive_callees : Name.t list
     }
 
   let create random_state =
@@ -41,7 +46,11 @@ module State = struct
       exceptions = [];
       variant_types = [];
       matches_remaining = Config.max_match_count;
-      tries_remaining = Config.max_try_count
+      tries_remaining = Config.max_try_count;
+      closure_calls_remaining = Config.max_closure_call_count;
+      let_recs_remaining = Config.max_let_rec_count;
+      recursive_calls_remaining = 0;
+      recursive_callees = []
     }
 
   let fresh t = Fresh.next t.names
@@ -59,14 +68,51 @@ module Loop_variable = struct
     }
 end
 
+module Local_function = struct
+  type t =
+    { name : Name.t;
+      params : Ty.t list;
+      result : Ty.t
+    }
+end
+
+(* The functions of a set of local recursive functions. *)
+module Recursion = struct
+  type t =
+    { fuel : Name.t;
+          (* Each function takes this as an argument, and calls between them
+             decrease it to ensure termination. *)
+      functions : Local_function.t list
+    }
+
+  let fuel_ty = Ty.Number (NumberTy.boxed Int)
+
+  (* The functions that [start] calls, directly or not, and [start]. *)
+  let reachable ~callees start =
+    let rec visit reached = function
+      | [] -> reached
+      | name :: names ->
+        if List.exists (Name.equal name) reached
+        then visit reached names
+        else visit (name :: reached) (callees name @ names)
+    in
+    visit [] [start]
+end
+
 module Env = struct
   type t =
     { bindings : Binding.t list;
       loop_variables : Loop_variable.t list;
-      catchable_exceptions : Exn.t list
+      catchable_exceptions : Exn.t list;
+      recursion : Recursion.t option
     }
 
-  let empty = { bindings = []; loop_variables = []; catchable_exceptions = [] }
+  let empty =
+    { bindings = [];
+      loop_variables = [];
+      catchable_exceptions = [];
+      recursion = None
+    }
 
   let can_raise t exn = List.exists (Exn.equal exn) t.catchable_exceptions
 
@@ -85,6 +131,24 @@ module Env = struct
         }
     in
     { t with loop_variables = loop_variable :: t.loop_variables }
+
+  (* Closures cannot capture mutable variables, which include loop variables.
+     They can be called after the handlers around them have been left, so they
+     must not raise, nor call the recursive functions around them, which could
+     then be called without a bound. *)
+  let for_closure t =
+    let is_loop_variable (binding : Binding.t) =
+      List.exists
+        (fun ({ name; _ } : Loop_variable.t) -> Name.equal name binding.name)
+        t.loop_variables
+    in
+    { empty with
+      bindings =
+        List.filter
+          (fun (binding : Binding.t) ->
+            (not binding.is_mutable) && not (is_loop_variable binding))
+          t.bindings
+    }
 end
 
 (* CR-someday xclerc: We should consider changing this to be a monad, which
@@ -172,6 +236,13 @@ let random_int_in_range (st : State.t) ~min ~max =
 let with_probability (st : State.t) ~probability =
   Random.State.int st.random_state Config.max_probability < probability
 
+(* [Some prefix] if [types] is [prefix @ suffix] with a nonempty [prefix]. *)
+let split_suffix types ~suffix =
+  let count = List.length types - List.length suffix in
+  if count > 0 && List.equal Ty.equal (List.drop count types) suffix
+  then Some (List.take count types)
+  else None
+
 let maybe_assert (st : State.t) ~f =
   match st.swarm.assertions with
   | Disabled | Unreachable_only -> f ()
@@ -200,10 +271,43 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
-  | Add | Sub | Mul | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right
-  | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
+  | Div | Rem ->
+    (* Assume right-to-left evaluation rather than binding the operands, so
+       differences in exception order remain observable. *)
+    make lhs rhs
+  | Add | Sub | Mul | Min | Max | Min_num | Max_num | Bit_and | Bit_or | Bit_xor
+  | Shift_left | Shift_right | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+(* Guard integer division and remainder when [Division_by_zero] cannot be
+   caught. Evaluate both operands once, right-to-left, even when the divisor is
+   zero, returning the dividend in that case. *)
+let safe_div_or_rem (st : State.t) (nty : NumberTy.t) op ~lhs ~rhs =
+  let lhs_name = State.fresh st in
+  let rhs_name = State.fresh st in
+  let dividend = Expr.Read (Place.Variable lhs_name) in
+  let divisor = Expr.Read (Place.Variable rhs_name) in
+  let ty = Ty.Number nty in
+  let zero =
+    Expr.Convert
+      { expr = Expr.Const (Number.of_integral_bits nty.base 0L);
+        from = NumberTy.boxed nty.base;
+        to_ = nty
+      }
+  in
+  let body =
+    Expr.If
+      { condition = Expr.Bin_op { ty; op = Eq; lhs = divisor; rhs = zero };
+        if_true = dividend;
+        if_false = Expr.Bin_op { ty; op; lhs = dividend; rhs = divisor }
+      }
+  in
+  Expr.Let
+    { name = rhs_name;
+      expr = rhs;
+      body = Expr.Let { name = lhs_name; expr = lhs; body }
+    }
 
 let assign (st : State.t) ty target expr =
   match st.swarm.assertions with
@@ -218,26 +322,6 @@ let assign (st : State.t) ty target expr =
 
 let maybe_opaque st ~enabled ~probability expr =
   if enabled && with_probability st ~probability then Expr.Opaque expr else expr
-
-(* CR-soon xclerc: Add general expressions for shift counts. *)
-let gen_shift_count (st : State.t) (nty : NumberTy.t) =
-  let width =
-    match nty.base with
-    | Int -> Sys.int_size
-    | Nativeint -> Sys.word_size
-    | Int64 -> 64
-    | Int32 -> 32
-    | Int16 -> 16
-    | Int8 -> 8
-    | Float | Float32 ->
-      Misc.fatal_errorf "gen_shift_count: expected an integral type"
-  in
-  let count =
-    if Random.State.bool st.random_state
-    then random_element st [0; 1; width - 2; width - 1]
-    else Random.State.int st.random_state width
-  in
-  Expr.Const (Number.Int count)
 
 let gen_array_dimensions (st : State.t) =
   let dimensions =
@@ -257,13 +341,20 @@ let gen_array_dimensions (st : State.t) =
   in
   sizes dimensions Config.max_array_elements
 
+let gen_scalar_type ?(value_only = false) (st : State.t) =
+  if with_probability st ~probability:Config.bool_probability
+  then Ty.Bool
+  else if with_probability st ~probability:Config.string_probability
+  then Ty.String
+  else Ty.Number (random_number_ty ~value_only st)
+
 (* With [value_only], only types of layout value are generated. Arrays are
    values whatever their element type. *)
 let gen_scalar_or_array_type ?(value_only = false) (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
-  then Ty.Array (random_number_ty st, gen_array_dimensions st)
-  else Ty.Number (random_number_ty ~value_only st)
+  then Ty.Array (gen_scalar_type st, gen_array_dimensions st)
+  else gen_scalar_type ~value_only st
 
 let gen_type_with_unboxed_tuples (st : State.t) ~leaf =
   let rec gen depth =
@@ -348,15 +439,16 @@ let gen_exception (st : State.t) id =
     then Some (gen_record_or_scalar_type ~value_only:true st)
     else None
   in
-  { Exn.id; payload }
+  Exn.Generated { id; payload }
 
 let gen_exceptions (st : State.t) =
   if not st.swarm.exceptions
   then []
   else
-    List.init
-      (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
-      (gen_exception st)
+    Exn.Division_by_zero
+    :: List.init
+         (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
+         (gen_exception st)
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
@@ -389,7 +481,7 @@ let gen_variant_types (st : State.t) =
 let gen_or_null_payload_type (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
-  then Ty.Array (random_number_ty st, gen_array_dimensions st)
+  then Ty.Array (gen_scalar_type st, gen_array_dimensions st)
   else
     let numbers =
       List.filter_map
@@ -406,7 +498,7 @@ let gen_or_null_payload_type (st : State.t) =
     let variants =
       List.map (fun variant -> Ty.Variant variant) st.variant_types
     in
-    random_element st (numbers @ records @ variants)
+    random_element st (Ty.Bool :: Ty.String :: (numbers @ records @ variants))
 
 let gen_sum_type (st : State.t) =
   Gen.run_exn
@@ -419,10 +511,13 @@ let gen_sum_type (st : State.t) =
            Gen.when_ st.swarm.or_null (fun () ->
                Sum.Or_null (gen_or_null_payload_type st)) ) ])
 
-(* CR-soon xclerc: Add boolean variable generation. *)
-let gen_type (st : State.t) =
+let rec gen_type ?(arrows = true) (st : State.t) =
   gen_type_with_unboxed_tuples st ~leaf:(fun () ->
       if
+        arrows && st.swarm.closures
+        && with_probability st ~probability:Config.closure_probability
+      then gen_arrow_type st
+      else if
         st.swarm.or_null
         && with_probability st ~probability:Config.or_null_probability
       then Ty.Or_null (gen_or_null_payload_type st)
@@ -431,6 +526,21 @@ let gen_type (st : State.t) =
         && with_probability st ~probability:Config.variant_probability
       then Ty.Variant (random_element st st.variant_types)
       else gen_record_or_scalar_type st)
+
+and gen_arrow_type (st : State.t) =
+  let params =
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_closure_param_count)
+      (fun _ -> gen_type ~arrows:false st)
+  in
+  Ty.curry params (gen_type ~arrows:false st)
+
+let gen_inline (st : State.t) : Inline.t =
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [ 1, Gen.when_ st.swarm.never_inline (fun () -> Inline.Never);
+         1, Gen.when_ st.swarm.always_inline (fun () -> Inline.Always);
+         1, Gen.return Inline.Default ])
 
 let can_convert (st : State.t) from to_ =
   match from, to_ with
@@ -494,11 +604,11 @@ let places (st : State.t) (env : Env.t) ~for_write =
             collect field.ty ((not record.unboxed) && field.is_mutable)
               (fun () -> Place.Field (make (), record, field)))
           record.fields
-      | Ty.Array (nty, dimensions) ->
+      | Ty.Array (element_ty, dimensions) ->
         if for_write && not st.swarm.array_writes
         then []
         else
-          [ ( Ty.Number nty,
+          [ ( element_ty,
               fun () ->
                 Place.Element (make (), gen_array_indices st env dimensions) )
           ]
@@ -512,7 +622,9 @@ let places (st : State.t) (env : Env.t) ~for_write =
                   { tuple; arity = List.length components; index; name }))
           components
         |> List.concat
-      | Ty.Number _ | Ty.Bool | Ty.Variant _ | Ty.Or_null _ -> []
+      | Ty.Number _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _
+      | Ty.Arrow _ ->
+        []
     in
     here @ children
   in
@@ -534,9 +646,8 @@ let gen_existing st env ty =
       let from, make = random_element st choices in
       convert_value st from ty (Expr.Read (make ())))
 
-let gen_numeric_var (st : State.t) env nty =
-  Gen.map
-    (gen_existing st env (Ty.Number nty))
+let gen_var (st : State.t) env ty =
+  Gen.map (gen_existing st env ty)
     ~f:
       (maybe_opaque st ~enabled:st.swarm.opaque_leaves
          ~probability:Config.opaque_leaf_probability)
@@ -565,14 +676,25 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
         let powers =
           List.map
             (fun exponent -> bits_of_float (Float.ldexp 1. exponent))
-            [0; 7; 15; 31; Sys.int_size - 1; 63; fraction_bits + 1]
+            [ 0;
+              7;
+              15;
+              31;
+              Sys.int_size - 1;
+              63;
+              fraction_bits;
+              fraction_bits + 1 ]
         in
+        let rounding = List.map bits_of_float [0.5; 1.5; 2.5] in
         let bits =
-          random_element st (1L :: min_normal :: Int64.pred infinity :: powers)
+          random_element st
+            ([1L; min_normal; Int64.pred infinity] @ rounding @ powers)
         in
         let offset = random_int_in_range st ~min:(-1) ~max:1 in
         with_sign (Int64.add bits (Int64.of_int offset)))
   in
+  (* Explicitly sample infinities and NaNs with either sign. Nonzero payloads
+     cover both quiet and signalling NaNs. *)
   let special =
     Gen.create (fun () ->
         let payload =
@@ -588,7 +710,7 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     (Gen.weighted st.random_state
        [10, Gen.create random_bits; 5, small; 4, boundary; 1, special])
 
-let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
+let gen_scalar_const (st : State.t) (ty : Ty.t) =
   let gen_const_int base =
     Gen.create (fun () ->
         let small ~min ~max =
@@ -596,13 +718,32 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
               Random.State.int_in_range st.random_state ~min ~max
               |> Int64.of_int)
         in
+        let extrema =
+          Gen.create (fun () ->
+              let min, max =
+                match (base : NumberTy.Base.t) with
+                | Int -> Int64.of_int min_int, Int64.of_int max_int
+                | Nativeint ->
+                  ( Int64.of_nativeint Nativeint.min_int,
+                    Int64.of_nativeint Nativeint.max_int )
+                | Int64 -> Int64.min_int, Int64.max_int
+                | Int32 ->
+                  Int64.of_int32 Int32.min_int, Int64.of_int32 Int32.max_int
+                | Int16 -> -32768L, 32767L
+                | Int8 -> -128L, 127L
+                | Float | Float32 ->
+                  Misc.fatal_errorf "gen_const_int: expected an integral type"
+              in
+              if Random.State.bool st.random_state then min else max)
+        in
         let bits =
           Gen.run_exn
             (Gen.weighted st.random_state
                [ 5, small ~min:(-1) ~max:1;
                  5, small ~min:(-10) ~max:10;
+                 5, extrema;
                  10, Gen.create (fun () -> Random.State.bits64 st.random_state)
-                 (* CR-soon xclerc: Add max_int and min_int. *) ])
+               ])
         in
         Expr.Const (Number.of_integral_bits base bits))
   in
@@ -634,29 +775,53 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
       | (Int | Nativeint | Int64 | Int32 | Int16 | Int8) as base ->
         gen_const_int base
     in
-    let const =
-      if nty.unboxed
-      then
-        Gen.map boxed ~f:(fun expr ->
-            Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
-      else boxed
-    in
-    Gen.map const
-      ~f:
-        (maybe_opaque st ~enabled:st.swarm.opaque_leaves
-           ~probability:Config.opaque_leaf_probability)
+    if nty.unboxed
+    then
+      Gen.map boxed ~f:(fun expr ->
+          Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
+    else boxed
   in
-  gen_const nty
+  let const =
+    match ty with
+    | Number nty -> gen_const nty
+    | Bool ->
+      Gen.create (fun () -> Expr.Bool_const (Random.State.bool st.random_state))
+    | String ->
+      Gen.create (fun () ->
+          let length =
+            if Random.State.bool st.random_state
+            then
+              random_element st
+                [0; min 1 Config.max_string_length; Config.max_string_length]
+            else random_int_in_range st ~min:0 ~max:Config.max_string_length
+          in
+          let value =
+            if Random.State.bool st.random_state
+            then
+              String.make length
+                (random_element st ['\000'; '\255'; '"'; '\\'; '\n'; 'a'])
+            else
+              String.init length (fun _ ->
+                  Char.chr (Random.State.int st.random_state 256))
+          in
+          Expr.String_const value)
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ | Arrow _ ->
+      Misc.fatal_errorf "gen_scalar_const: expected a scalar type"
+  in
+  Gen.map const
+    ~f:
+      (maybe_opaque st ~enabled:st.swarm.opaque_leaves
+         ~probability:Config.opaque_leaf_probability)
 
 (* CR-someday xclerc: Let arrays have arbitrary types, including records. *)
-let gen_array st env nty dimensions =
+let gen_array st env element_ty dimensions =
   if with_probability st ~probability:Config.array_literal_probability
   then
     let count = List.fold_left ( * ) 1 dimensions in
     let pool =
       List.init
         (random_int_in_range st ~min:1 ~max:(max 1 (count / 2)))
-        (fun _ -> Gen.run_exn (gen_numeric_const st nty))
+        (fun _ -> Gen.run_exn (gen_scalar_const st element_ty))
     in
     let rec literal = function
       | [] -> random_element st pool
@@ -666,9 +831,9 @@ let gen_array st env nty dimensions =
     literal dimensions
   else
     let init =
-      match gen_numeric_var st env nty with
+      match gen_var st env element_ty with
       | Some generate -> generate ()
-      | None -> Gen.run_exn (gen_numeric_const st nty)
+      | None -> Gen.run_exn (gen_scalar_const st element_ty)
     in
     Expr.Array_make { dimensions; init_name = State.fresh st; init }
 
@@ -678,7 +843,7 @@ let can_gen_try (st : State.t) =
 
 let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
   let payload =
-    match exn.payload with
+    match Exn.payload exn with
     | Some ty
       when with_probability st ~probability:Config.payload_binding_probability
       ->
@@ -715,6 +880,12 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
       (Gen.weighted st.random_state
          [1, Gen.create (fun () -> random_number_ty st); 3, Gen.return nty])
   in
+  let gen_unop nty =
+    Gen.create (fun () ->
+        let inner_ty = gen_ty nty in
+        let expr = gen_unary st env (Ty.Number inner_ty) in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
+  in
   let gen_binop nty =
     Gen.create (fun () ->
         let inner_ty = gen_ty nty in
@@ -733,26 +904,84 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
           match binop with
           | Bin_op.Shift_left | Bin_op.Shift_right | Bin_op.Shift_right_logical
             ->
-            gen_shift_count st inner_ty
+            gen_shift_count st env inner_ty
           | _ -> gen_value st env (Ty.Number inner_ty)
         in
-        Expr.Convert
-          { from = inner_ty;
-            to_ = nty;
-            expr = bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
-          })
+        let expr =
+          match binop with
+          | (Div | Rem)
+            when (not (NumberTy.is_floating_point inner_ty))
+                 && not (Env.can_raise env Exn.Division_by_zero) ->
+            safe_div_or_rem st inner_ty binop ~lhs ~rhs
+          | _ -> bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
+        in
+        Expr.Convert { from = inner_ty; to_ = nty; expr })
   in
   let leaf =
     Gen.weighted st.random_state
-      [2, gen_numeric_var st env nty; 1, gen_numeric_const st nty]
+      [2, gen_var st env (Ty.Number nty); 1, gen_scalar_const st (Ty.Number nty)]
   in
   Gen.run_exn
     (Gen.weighted st.random_state
        [ 5, leaf;
+         2, gen_unop nty;
          3, gen_binop nty;
+         ( 1,
+           Gen.create (fun () ->
+               Expr.Convert
+                 { expr = Expr.String_length (gen_value st env Ty.String);
+                   from = NumberTy.boxed Int;
+                   to_ = nty
+                 }) );
          1, gen_fun_call st env (Ty.Number nty);
+         1, gen_closure_call st env (Ty.Number nty);
+         1, gen_recursive_call st env (Ty.Number nty);
+         1, gen_let_rec st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
+
+and gen_unary (st : State.t) env ty =
+  let op =
+    Un_op.ops_for_ty ty
+    |> List.filter (fun (op : Un_op.t) ->
+        match op with
+        | Bit_not -> st.swarm.bitwise_operations
+        | Neg | Abs | Succ | Pred | Sqrt | Round | Trunc | Ceil | Floor | Not ->
+          true)
+    |> random_element st
+  in
+  let arg = gen_value st env ty in
+  Expr.Un_op { ty; op; arg }
+
+and gen_shift_count (st : State.t) env (nty : NumberTy.t) =
+  let width =
+    match nty.base with
+    | Int -> Sys.int_size
+    | Nativeint -> Sys.word_size
+    | Int64 -> 64
+    | Int32 -> 32
+    | Int16 -> 16
+    | Int8 -> 8
+    | Float | Float32 ->
+      Misc.fatal_errorf "gen_shift_count: expected an integral type"
+  in
+  if Random.State.bool st.random_state
+  then
+    let count =
+      if Random.State.bool st.random_state
+      then random_element st [0; 1; width - 2; width - 1]
+      else Random.State.int st.random_state width
+    in
+    Expr.Const (Number.Int count)
+  else
+    let ty = Ty.Number (NumberTy.boxed Int) in
+    let expr = gen_value st env ty in
+    (* Make the remainder nonnegative, including for [min_int]. Unlike masking
+       with [width - 1], this also covers every count for tagged integers. *)
+    let nonnegative =
+      bin_op st ty Bit_and ~lhs:expr ~rhs:(Expr.Const (Number.Int max_int))
+    in
+    bin_op st ty Rem ~lhs:nonnegative ~rhs:(Expr.Const (Number.Int width))
 
 (* CR-someday xclerc: These function calls can have side effects, because of
    mutable records. Outside [May_raise] mode we rely on a de facto right-to-left
@@ -796,18 +1025,11 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
     in
     let new_function =
       Gen.create (fun () ->
-          let name = State.reserve_function st in
           let params =
             List.init
               (random_int_in_range st ~min:Config.fun_min_param_count
                  ~max:Config.fun_max_param_count) (fun _ ->
-                { Binding.name = State.fresh st;
-                  ty = gen_type st;
-                  is_mutable =
-                    st.swarm.mutable_bindings
-                    && with_probability st
-                         ~probability:Config.mutable_binding_probability
-                })
+                gen_param st (gen_type st))
           in
           let raises =
             List.filter
@@ -816,42 +1038,387 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
                   ~probability:Config.callee_raises_probability)
               caller_env.catchable_exceptions
           in
-          let callee_env =
-            List.fold_left Env.extend
-              { Env.empty with catchable_exceptions = raises }
-              params
-          in
-          let inline : Inline.t =
-            let open Inline in
-            Gen.run_exn
-              (Gen.weighted st.random_state
-                 [ 1, Gen.when_ st.swarm.never_inline (fun () -> Never);
-                   1, Gen.when_ st.swarm.always_inline (fun () -> Always);
-                   1, Gen.return Default ])
+          let (function_ : Function.t) =
+            gen_function st ~params ~return_ty ~raises
           in
           let args = gen_arguments params in
-          let _callee_env, body = gen_fun_body st callee_env 0 in
-          (* CR-someday xclerc: Make sure we use a result that uses as many
-             generated variables as possible. Otherwise, most of the function
-             might become dead code, which is a waste of CPU time for
-             fuzzing. *)
-          let result =
-            match gen_existing st callee_env return_ty with
-            | Some generate -> maybe_assert st ~f:generate
-            | None -> gen_value st callee_env return_ty
-          in
-          let function_ =
-            { Function.name; params; inline; body; return_ty; result; raises }
-          in
-          (* Creating a function after its full body was successfully generated
-             ensures that all the functions called by [function_] were already
-             added to [st.top_level_functions]. This means that functions are
-             topologically sorted by construction. *)
-          st.top_level_functions <- function_ :: st.top_level_functions;
           bind_operands st args ~f:(fun args ->
-              Expr.Call_toplevel { fun_name = name; args }))
+              Expr.Call_toplevel { fun_name = function_.name; args }))
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
+
+and gen_string (st : State.t) env =
+  let leaf =
+    Gen.weighted st.random_state
+      [2, gen_var st env Ty.String; 1, gen_scalar_const st Ty.String]
+  in
+  let concat =
+    Gen.create (fun () ->
+        let lhs = gen_value st env Ty.String in
+        let rhs = gen_value st env Ty.String in
+        bind_operand st rhs ~f:(fun rhs ->
+            bind_operand st lhs ~f:(fun lhs ->
+                (* Bound repeated concatenation in loops as well as literals. *)
+                Expr.Bounded_string_concat
+                  { lhs;
+                    rhs;
+                    result_name = State.fresh st;
+                    max_length = Config.max_string_length
+                  })))
+  in
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [ 5, leaf;
+         2, concat;
+         1, gen_fun_call st env Ty.String;
+         1, gen_closure_call st env Ty.String;
+         1, gen_try_expr st env Ty.String;
+         1, gen_match st env Ty.String ])
+
+and gen_param (st : State.t) ty =
+  { Binding.name = State.fresh st;
+    ty;
+    is_mutable =
+      st.swarm.mutable_bindings
+      && with_probability st ~probability:Config.mutable_binding_probability
+  }
+
+(* Generates a top-level function and adds it to [st.top_level_functions]. *)
+and gen_function (st : State.t) ~params ~return_ty ~raises =
+  let name = State.reserve_function st in
+  let callee_env =
+    List.fold_left Env.extend
+      { Env.empty with catchable_exceptions = raises }
+      params
+  in
+  let inline = gen_inline st in
+  let _callee_env, body = gen_fun_body st callee_env 0 in
+  (* CR-someday xclerc: Make sure we use a result that uses as many generated
+     variables as possible. Otherwise, most of the function might become dead
+     code, which is a waste of CPU time for fuzzing. *)
+  let result =
+    match gen_existing st callee_env return_ty with
+    | Some generate -> maybe_assert st ~f:generate
+    | None -> gen_value st callee_env return_ty
+  in
+  let function_ =
+    { Function.name; params; inline; body; return_ty; result; raises }
+  in
+  (* Creating a function after its full body was successfully generated ensures
+     that all the functions called by [function_] were already added to
+     [st.top_level_functions]. This means that functions are topologically
+     sorted by construction. *)
+  st.top_level_functions <- function_ :: st.top_level_functions;
+  function_
+
+(* The type of a top-level function as a function value, unless it takes
+   [unit]. *)
+and function_type (function_ : Function.t) =
+  match function_.params with
+  | [] -> None
+  | params ->
+    Some
+      (Ty.curry
+         (List.map (fun (binding : Binding.t) -> binding.ty) params)
+         function_.return_ty)
+
+(* Calls a function value of [env] whose result can be converted to
+   [result_ty]. *)
+and gen_closure_call (st : State.t) (env : Env.t) result_ty =
+  let functions =
+    List.filter_map
+      (fun (ty, make) ->
+        match Ty.uncurry ty with
+        | (_ :: _ as params), result when can_convert st result result_ty ->
+          Some (params, result, make)
+        | _ -> None)
+      (places st env ~for_write:false)
+  in
+  let over_applications =
+    if not st.swarm.partial_applications
+    then []
+    else
+      List.filter_map
+        (fun (function_ : Function.t) ->
+          match
+            function_.return_ty, Option.map Ty.uncurry (function_type function_)
+          with
+          | Ty.Arrow _, Some (params, result)
+            when can_convert st result result_ty
+                 && List.for_all (Env.can_raise env) function_.raises ->
+            Some
+              ( params,
+                result,
+                fun args ->
+                  Expr.Call_toplevel { fun_name = function_.name; args } )
+          | _ -> None)
+        st.top_level_functions
+  in
+  let functions =
+    List.map
+      (fun (params, result, make) ->
+        ( params,
+          result,
+          fun args -> Expr.Apply { func = Expr.Read (make ()); args } ))
+      functions
+    @ over_applications
+  in
+  Gen.when_
+    (st.closure_calls_remaining > 0 && not (List.is_empty functions))
+    (fun () ->
+      st.closure_calls_remaining <- st.closure_calls_remaining - 1;
+      let params, result, apply = random_element st functions in
+      let args = List.map (gen_value st env) params in
+      bind_operands st args ~f:(fun args ->
+          convert_value st result result_ty (apply args)))
+
+(* A function value of type [Ty.curry params result], applying a function value
+   or a top-level function to the arguments before [params]. *)
+and gen_partial_application (st : State.t) (env : Env.t) params result =
+  let prefix ty =
+    let all, all_result = Ty.uncurry ty in
+    if Ty.equal all_result result then split_suffix all ~suffix:params else None
+  in
+  let closures =
+    List.filter_map
+      (fun (ty, make) ->
+        Option.map
+          (fun prefix ->
+            prefix, fun args -> Expr.Apply { func = Expr.Read (make ()); args })
+          (prefix ty))
+      (places st env ~for_write:false)
+  in
+  (* Without all its arguments, a function does not run, and its result cannot
+     raise. *)
+  let can_apply (function_ : Function.t) prefix =
+    if List.compare_lengths prefix function_.params < 0
+    then List.is_empty function_.raises
+    else List.for_all (Env.can_raise env) function_.raises
+  in
+  let functions =
+    List.filter_map
+      (fun (function_ : Function.t) ->
+        match Option.bind (function_type function_) prefix with
+        | Some prefix when can_apply function_ prefix ->
+          Some
+            ( prefix,
+              fun args -> Expr.Call_toplevel { fun_name = function_.name; args }
+            )
+        | Some _ | None -> None)
+      st.top_level_functions
+  in
+  let existing =
+    Gen.when_
+      (not (List.is_empty (closures @ functions)))
+      (fun () ->
+        let prefix, apply = random_element st (closures @ functions) in
+        let args = List.map (gen_value st env) prefix in
+        bind_operands st args ~f:apply)
+  in
+  let new_function =
+    Gen.when_
+      (st.swarm.function_calls
+      && State.can_create_function st ~max:Config.max_function_count)
+      (fun () ->
+        let prefix =
+          List.init
+            (random_int_in_range st ~min:1 ~max:Config.max_closure_param_count)
+            (fun _ -> gen_param st (gen_type ~arrows:false st))
+        in
+        let (function_ : Function.t) =
+          gen_function st
+            ~params:(prefix @ List.map (gen_param st) params)
+            ~return_ty:result ~raises:[]
+        in
+        let args =
+          List.map
+            (fun (binding : Binding.t) -> gen_value st env binding.ty)
+            prefix
+        in
+        bind_operands st args ~f:(fun args ->
+            Expr.Call_toplevel { fun_name = function_.name; args }))
+  in
+  Gen.only_if st.swarm.partial_applications
+    (Gen.weighted st.random_state [2, existing; 1, new_function])
+
+and gen_lambda (st : State.t) (env : Env.t) params result_ty =
+  (* A curried function takes the first parameters and returns a function taking
+     the rest. *)
+  let params, result_ty =
+    let count = List.length params in
+    if
+      st.swarm.partial_applications && count > 1
+      && with_probability st ~probability:Config.curried_lambda_probability
+    then
+      let count = random_int_in_range st ~min:1 ~max:(count - 1) in
+      List.take count params, Ty.curry (List.drop count params) result_ty
+    else params, result_ty
+  in
+  let params =
+    List.map
+      (fun ty -> { Binding.name = State.fresh st; ty; is_mutable = false })
+      params
+  in
+  let inline = gen_inline st in
+  let body_env = List.fold_left Env.extend (Env.for_closure env) params in
+  let body =
+    match gen_existing st body_env result_ty with
+    | Some generate when Random.State.bool st.random_state ->
+      maybe_assert st ~f:generate
+    | Some _ | None -> gen_value st body_env result_ty
+  in
+  Expr.Lambda { params; inline; body; result_ty }
+
+and gen_recursive_call (st : State.t) (env : Env.t) result_ty =
+  match env.recursion with
+  | None -> Gen.unavailable
+  | Some { fuel; functions } ->
+    let functions =
+      List.filter
+        (fun ({ result; _ } : Local_function.t) ->
+          can_convert st result result_ty)
+        functions
+    in
+    Gen.when_
+      (st.recursive_calls_remaining > 0 && not (List.is_empty functions))
+      (fun () ->
+        st.recursive_calls_remaining <- st.recursive_calls_remaining - 1;
+        let { Local_function.name; params; result } =
+          random_element st functions
+        in
+        st.recursive_callees <- name :: st.recursive_callees;
+        let func =
+          maybe_opaque st ~enabled:true
+            ~probability:Config.opaque_recursive_call_probability
+            (Expr.Read (Place.Variable name))
+        in
+        let fuel =
+          Expr.Bin_op
+            { ty = Recursion.fuel_ty;
+              op = Sub;
+              lhs = Expr.Read (Place.Variable fuel);
+              rhs = Expr.Const (Number.Int 1)
+            }
+        in
+        let args = List.map (gen_value st env) params in
+        bind_operands st args ~f:(fun args ->
+            convert_value st result result_ty
+              (Expr.Apply { func; args = fuel :: args })))
+
+(* Local mutually recursive functions, which capture the immutable variables in
+   scope, and a call to the first one with a small amount of fuel. For a
+   function type, the call is a partial application and returns a function
+   value. *)
+and gen_let_rec (st : State.t) (env : Env.t) ty =
+  Gen.when_
+    (st.swarm.recursive_functions && st.let_recs_remaining > 0)
+    (fun () ->
+      st.let_recs_remaining <- st.let_recs_remaining - 1;
+      let gen_params () =
+        List.init
+          (random_int_in_range st ~min:0 ~max:Config.max_recursive_param_count)
+          (fun _ -> gen_type ~arrows:false st)
+      in
+      let first =
+        match Ty.uncurry ty with
+        | [], _ -> gen_params (), ty
+        | params, result -> params, result
+      in
+      let signatures =
+        first
+        :: List.init
+             (random_int_in_range st ~min:0
+                ~max:(Config.max_recursive_functions - 1))
+             (fun _ -> gen_params (), gen_type ~arrows:false st)
+      in
+      let functions =
+        List.map
+          (fun (params, result) ->
+            { Local_function.name = State.fresh st; params; result })
+          signatures
+      in
+      let generated =
+        List.map
+          (fun function_ ->
+            function_, gen_recursive_function st env ~functions function_)
+          functions
+      in
+      let first = List.hd functions in
+      let callees name =
+        List.concat_map
+          (fun (({ name = caller; _ } : Local_function.t), (_, callees)) ->
+            if Name.equal caller name then callees else [])
+          generated
+      in
+      let reached = Recursion.reachable ~callees first.name in
+      Expr.Let_rec
+        { functions =
+            List.filter_map
+              (fun (({ name; _ } : Local_function.t), (lambda, _)) ->
+                if
+                  Config.unused_recursive_functions
+                  || List.exists (Name.equal name) reached
+                then Some (name, lambda)
+                else None)
+              generated;
+          body = gen_let_rec_call st env ty first
+        })
+
+and gen_recursive_function (st : State.t) (env : Env.t) ~functions
+    ({ params; result; _ } : Local_function.t) =
+  let binding ty = { Binding.name = State.fresh st; ty; is_mutable = false } in
+  let fuel = binding Recursion.fuel_ty in
+  let params = fuel :: List.map binding params in
+  let body_env = List.fold_left Env.extend (Env.for_closure env) params in
+  let base = gen_value st body_env result in
+  let saved_calls = st.recursive_calls_remaining in
+  let saved_callees = st.recursive_callees in
+  st.recursive_calls_remaining <- Config.max_recursive_calls;
+  st.recursive_callees <- [];
+  let step =
+    let env =
+      { body_env with recursion = Some { fuel = fuel.name; functions } }
+    in
+    match gen_recursive_call st env result with
+    | Some generate when Random.State.bool st.random_state -> generate ()
+    | Some _ | None -> gen_value st env result
+  in
+  let callees = st.recursive_callees in
+  st.recursive_calls_remaining <- saved_calls;
+  st.recursive_callees <- saved_callees;
+  let body =
+    Expr.If
+      { condition =
+          Expr.Bin_op
+            { ty = Recursion.fuel_ty;
+              op = Le;
+              lhs = Expr.Read (Place.Variable fuel.name);
+              rhs = Expr.Const (Number.Int 0)
+            };
+        if_true = base;
+        if_false = step
+      }
+  in
+  Expr.Lambda { params; inline = Default; body; result_ty = result }, callees
+
+and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
+    =
+  let fuel = random_int_in_range st ~min:0 ~max:Config.max_recursion_fuel in
+  let fuel = Expr.Const (Number.Int fuel) in
+  let func = Expr.Read (Place.Variable first.name) in
+  match ty with
+  | Ty.Arrow _ -> Expr.Apply { func; args = [fuel] }
+  | _ ->
+    let partial =
+      (not (List.is_empty first.params)) && Random.State.bool st.random_state
+    in
+    let args = List.map (gen_value st env) first.params in
+    bind_operands st args ~f:(fun args ->
+        if partial
+        then
+          Expr.Apply
+            { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
+        else Expr.Apply { func; args = fuel :: args })
 
 and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
@@ -865,18 +1432,30 @@ and gen_bool (st : State.t) env =
   let gen_bool_arg () = gen_value st env Ty.Bool in
   let gen_bool_binop op = gen_binop op Ty.Bool gen_bool_arg in
   let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
+  let leaf =
+    Gen.weighted st.random_state
+      [2, gen_var st env Ty.Bool; 1, gen_scalar_const st Ty.Bool]
+  in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [ 5, gen_binop comparison (Ty.Number nty) gen_number_arg;
+       [ 5, leaf;
+         5, gen_binop comparison (Ty.Number nty) gen_number_arg;
+         ( 1,
+           gen_binop comparison Ty.String (fun () -> gen_value st env Ty.String)
+         );
+         1, Gen.create (fun () -> gen_unary st env Ty.Bool);
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
+         1, gen_fun_call st env Ty.Bool;
+         1, gen_closure_call st env Ty.Bool;
+         1, gen_recursive_call st env Ty.Bool;
          1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
 
 and gen_raise (st : State.t) (env : Env.t) : Expr.raise =
   let exn = random_element st env.catchable_exceptions in
-  let payload = Option.map (fun ty -> gen_value st env ty) exn.payload in
+  let payload = Option.map (fun ty -> gen_value st env ty) (Exn.payload exn) in
   let notrace =
     with_probability st ~probability:Config.raise_notrace_probability
   in
@@ -887,7 +1466,9 @@ and gen_raise_expr (st : State.t) (env : Env.t) ty =
   let is_value =
     match ty with
     | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
-    | Ty.Array _ | Ty.Bool | Ty.Variant _ | Ty.Or_null _ -> true
+    | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _
+    | Ty.Arrow _ ->
+      true
     | Ty.Unboxed_tuple _ -> false
   in
   Gen.when_
@@ -916,12 +1497,14 @@ and gen_value (st : State.t) env ty =
       match ty with
       | Ty.Number nty -> gen_number st env nty
       | Ty.Bool -> gen_bool st env
-      | Ty.Array (nty, dimensions) ->
+      | Ty.String -> gen_string st env
+      | Ty.Array (element_ty, dimensions) ->
         Gen.run_exn
           (Gen.weighted st.random_state
              [ 3, gen_existing st env ty;
-               2, Gen.create (fun () -> gen_array st env nty dimensions);
+               2, Gen.create (fun () -> gen_array st env element_ty dimensions);
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Unboxed_tuple components ->
@@ -939,6 +1522,7 @@ and gen_value (st : State.t) env ty =
              [ 3, gen_existing st env ty;
                2, construct;
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Record record ->
@@ -968,10 +1552,22 @@ and gen_value (st : State.t) env ty =
                2, construct;
                1, update;
                1, gen_fun_call st env ty;
+               1, gen_closure_call st env ty;
                1, gen_try_expr st env ty;
                1, gen_match st env ty ])
       | Ty.Variant variant -> gen_sum_value st env (Sum.Variant variant)
-      | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload))
+      | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload)
+      | Ty.Arrow _ ->
+        let params, result = Ty.uncurry ty in
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 3, gen_existing st env ty;
+               2, Gen.create (fun () -> gen_lambda st env params result);
+               1, gen_partial_application st env params result;
+               1, gen_let_rec st env ty;
+               1, gen_fun_call st env ty;
+               1, gen_try_expr st env ty;
+               1, gen_match st env ty ]))
 
 and gen_sum_value (st : State.t) env sum =
   Gen.run_exn
@@ -998,7 +1594,8 @@ and gen_sum (st : State.t) env sum =
            Gen.create (fun () ->
                gen_constructor st env sum
                  (random_element st (Sum.constructors sum))) );
-         1, gen_fun_call st env ty ])
+         1, gen_fun_call st env ty;
+         1, gen_closure_call st env ty ])
 
 and gen_match_expr st env sum scrutinee ~branch =
   let cases =
