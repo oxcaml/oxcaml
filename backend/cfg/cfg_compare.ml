@@ -350,15 +350,16 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     map_successors [old_ifso, new_ifso; old_ifnot, new_ifnot]
   (* Truth_test ≈ Int_test against [0] when [lt = gt] (both miss-the-equality
      arms go to the same label, so only the equality bit matters). [is_signed]
-     is irrelevant when comparing to [0]. *)
+     is irrelevant when comparing to [0]. Both [lt] and [gt] are compared with
+     [ifso], so that the FDO counters of each are checked. *)
   | ( Int_test { lt; eq; gt; imm = Some 0; is_signed = _ },
       Truth_test { ifso; ifnot } )
     when Label.equal lt.target gt.target ->
-    map_successors [lt, ifso; eq, ifnot]
+    map_successors [lt, ifso; gt, ifso; eq, ifnot]
   | ( Truth_test { ifso; ifnot },
       Int_test { lt; eq; gt; imm = Some 0; is_signed = _ } )
     when Label.equal lt.target gt.target ->
-    map_successors [ifso, lt; ifnot, eq]
+    map_successors [ifso, lt; ifso, gt; ifnot, eq]
   | ( Int_test
         { lt = old_lt;
           eq = old_eq;
