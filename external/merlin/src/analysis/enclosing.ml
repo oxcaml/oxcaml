@@ -160,6 +160,8 @@ let rec go_down_right acc ~current_loc (expr : Typedtree.expression) =
     (* [let* x = exp1 in][ exp2] *)
     | { exp_desc = Texp_letop { body = { c_rhs = right_expr; _ }; _ }; _ } ->
       go right_expr
+    (* [let mutable x = exp1 in][ exp2] *)
+    | { exp_desc = Texp_letmutable (_, right_expr); _ } -> go right_expr
     | _ -> (current_loc, acc)
 
 let add_intermediate_locs (current_loc, acc) locs =
