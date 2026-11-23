@@ -190,26 +190,38 @@ let comparison_test (cond : value) ~true_label ~false_label :
 (* Fusing a comparison into a branch keeps the comparison's args live until the
    branch. Values may be local, and must not be GC roots once their region has
    ended. Derived pointers must not be live across a GC. *)
-type hazards =
+type blockers =
   { end_region : bool;
     gc : bool
   }
 
-let hazards_of_args (args : value array) =
+let blockers_of_args (args : value array) =
   Array.fold_left
-    (fun hazards (arg : value) : hazards ->
+    (fun blockers (arg : value) : blockers ->
       match Value.typ arg with
-      | Val | Valx2 -> { hazards with end_region = true }
-      | Addr -> { hazards with gc = true }
-      | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> hazards)
+      | Val | Valx2 -> { blockers with end_region = true }
+      | Addr -> { blockers with gc = true }
+      | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> blockers)
     { end_region = false; gc = false }
     args
 
-let is_hazard hazards (instr : instruction) =
-  match[@warning "-fragile-match"] instr with
-  | Op { op = End_region; _ } -> hazards.end_region
-  | Op { op = Alloc _ | Poll; _ } -> hazards.gc
-  | Op _ | Push_trap _ | Pop_trap _ -> false
+let is_blocker blockers (instr : instruction) =
+  match instr with
+  | Op { op = End_region; _ } -> blockers.end_region
+  | Op { op = Alloc _ | Poll; _ } -> blockers.gc
+  | Op
+      { op =
+          ( Move | Spill | Reload | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | Specific _ | Name_for_debugger _ | Dls_get
+          | Tls_get | Domain_index | Thread_self_id | Pause );
+        _
+      }
+  | Push_trap _ | Pop_trap _ ->
+    false
 
 let has_call_terminator (block : block) =
   match Block.terminator block with
@@ -237,22 +249,22 @@ type visit =
    of [branch_block], which [def_block] strictly dominates. The blocks in
    between are those reached backwards from [branch_block] before
    [def_block]. *)
-let path_keeps_args_live hazards ~def_block ~branch_block =
+let path_keeps_args_live blockers ~def_block ~branch_block =
   let visits = Block.Tbl.create 16 in
   (* Calls are GC points *)
-  let check_call block = not (hazards.gc && has_call_terminator block) in
+  let check_call block = not (blockers.gc && has_call_terminator block) in
   let rec keeps_args_live block =
     Block.equal block def_block
     ||
     match Block.Tbl.find_opt visits block with
     | Some Visiting ->
       (* Cycles may get a poll from [Cfg_polling] so count as GC points *)
-      not hazards.gc
+      not blockers.gc
     | Some Visited -> true
     | None ->
       Block.Tbl.replace visits block Visiting;
       let result =
-        (not (Array.exists (is_hazard hazards) (Block.body block)))
+        (not (Array.exists (is_blocker blockers) (Block.body block)))
         && (Block.equal block branch_block || check_call block)
         && List.for_all keeps_args_live (Block.predecessors block)
       in
@@ -263,11 +275,11 @@ let path_keeps_args_live hazards ~def_block ~branch_block =
 
 let can_keep_args_live args ~def_block ~(cond_op : finished Instruction.op_data)
     ~branch_block =
-  let hazards = hazards_of_args args in
-  (not (hazards.end_region || hazards.gc))
-  || (not (Array.exists (is_hazard hazards) (body_after def_block cond_op)))
+  let blockers = blockers_of_args args in
+  (not (blockers.end_region || blockers.gc))
+  || (not (Array.exists (is_blocker blockers) (body_after def_block cond_op)))
      && (Block.equal def_block branch_block
-        || path_keeps_args_live hazards ~def_block ~branch_block)
+        || path_keeps_args_live blockers ~def_block ~branch_block)
 
 (** A Branch condition of [block] that can be folded into its CFG test
     terminator. *)
