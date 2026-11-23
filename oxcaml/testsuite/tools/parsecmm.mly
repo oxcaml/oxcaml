@@ -178,9 +178,9 @@ phrase:
   | EOF         { raise End_of_file }
 ;
 fundecl:
-    LPAREN FUNCTION fun_name LPAREN params RPAREN sequence RPAREN
+    LPAREN FUNCTION fun_name LPAREN params RPAREN return_type sequence RPAREN
       { List.iter (fun (id, ty) -> unbind_ident id) $5;
-        {fun_name = $3; fun_args = $5; fun_body = $7;
+        {fun_name = $3; fun_args = $5; fun_body = $8;
          fun_codegen_options =
            if Config.flambda then [
              Reduce_code_size;
@@ -189,9 +189,11 @@ fundecl:
            else [ Reduce_code_size ];
          fun_poll = Lambda.Default_poll;
          fun_dbg = debuginfo ();
-         (* CR yusumez: Adding return types to the parser might require a lot
-            of changes, so we assume this for now. *)
-         fun_ret_type = Cmm.typ_val } }
+         fun_ret_type = $7 } }
+;
+return_type:
+    COLON machtype              { $2 }
+  |                             { typ_val }
 ;
 fun_name:
     STRING              { Cmm.global_symbol ~ty:typ_code_pointer $1 }
