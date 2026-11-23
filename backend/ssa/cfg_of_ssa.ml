@@ -217,7 +217,8 @@ let is_blocker blockers (instr : instruction) =
           | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | Specific _ | Name_for_debugger _ | Dls_get
-          | Tls_get | Domain_index | Thread_self_id | Pause );
+          | Tls_get | Domain_index | Thread_self_id | Pause
+          | Trace_pc_guard_gate | Trace_pc_guard _ );
         _
       }
   | Push_trap _ | Pop_trap _ ->
