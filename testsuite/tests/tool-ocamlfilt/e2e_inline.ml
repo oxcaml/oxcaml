@@ -104,7 +104,24 @@ let use_first_class x =
    two is indistinguishable from a direct one. *)
 let use_transitive x = E2e_inline_mid.relay x 100
 
+(* Partial applications of functions from another unit name the callee
+   with its unit, whether the wrapper is created by the middle end
+   ([add_one]: [partial{E2e_inline_lib.add}]) or by the frontend because
+   an earlier labelled argument is omitted ([omit_first]:
+   [partial{E2e_inline_lib.labelled}]). Referring to the unit through an
+   alias gives the same name ([omit_first_alias]). *)
+let add_one = E2e_inline_lib.add (Sys.opaque_identity 1)
+
+let[@inline never] omit_first x = E2e_inline_lib.labelled ~b:x
+
+module Lib = E2e_inline_lib
+
+let[@inline never] omit_first_alias x = Lib.labelled ~b:x
+
 let () =
+  ignore (add_one 41);
+  ignore (omit_first 1 ~a:2);
+  ignore (omit_first_alias 3 ~a:4);
   ignore (inline_squares 3 4);
   ignore (chain_three 1 2 3);
   ignore (composed 5);
