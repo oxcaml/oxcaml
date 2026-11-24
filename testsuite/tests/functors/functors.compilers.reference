@@ -54,10 +54,13 @@
                    (%int_add 1 (apply cow x))))
               (makeblock 0 cow sheep))))
        (makeblock 0
-         (function {nlocal = 0} funarg funarg is_a_functor stub
-           (let
-             (let =
-                (apply F (makeblock 0 (field_imm 1 funarg))
-                  (makeblock 0 (field_imm 1 funarg))))
-             (makeblock 0 (field_imm 1 let)))))))
+         (let
+           (F =
+              (function {nlocal = 0} funarg funarg is_a_functor stub
+                (let
+                  (let =
+                     (apply F (makeblock 0 (field_imm 1 funarg))
+                       (makeblock 0 (field_imm 1 funarg))))
+                  (makeblock 0 (field_imm 1 let)))))
+           F))))
   (makeblock 0 O F F1 F2 M))

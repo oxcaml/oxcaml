@@ -1,13 +1,10 @@
 let code Make_0 deleted in
 let code loopify(never) size(15) stub
-      `fn[inlined_attribute_on_functors.ml:19,6--272]_1` (funarg : val)
+      Make_1 (funarg : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  let Make =
-    %project_value_slot.[`fn[inlined_attribute_on_functors.ml:19,6--272]`].[Make]
-      (my_closure)
-  in
+  let Make = %project_value_slot.[Make].[Make] (my_closure) in
   apply &my_alloc_region inlined(forward)
     (Make : val -> val) (funarg) -> k2 * k1
     where k2 (`let` : val) =
@@ -22,15 +19,14 @@ let code loopify(never) size(9) newer_version_of(Make_0)
   cont k (Pmakeblock)
 in
 let $camlInlined_attribute_on_functors__Make_1 =
-  closure Make_0_1 @Make &toplevel
+  closure Make_0_1 @Make_1 &toplevel
 in
-let $`camlInlined_attribute_on_functors__fn[inlined_attribute_on_functors.ml:19,6--272]_2` =
-  closure `fn[inlined_attribute_on_functors.ml:19,6--272]_1`
-    @`fn[inlined_attribute_on_functors.ml:19,6--272]` &toplevel
+let $camlInlined_attribute_on_functors__Make_2 =
+  closure Make_1 @Make &toplevel
   with { Make = $camlInlined_attribute_on_functors__Make_1 }
 in
 let $camlInlined_attribute_on_functors__Pmakeblock_3 =
-  Block 0 ($`camlInlined_attribute_on_functors__fn[inlined_attribute_on_functors.ml:19,6--272]_2`)
+  Block 0 ($camlInlined_attribute_on_functors__Make_2)
 in
 let $camlInlined_attribute_on_functors__Pmakeblock_5 = Block 0 (0) in
 let $camlInlined_attribute_on_functors =
