@@ -2176,13 +2176,12 @@ end = struct
     (* Artifact-size optimization: if this summary is all [Top] (the most common
        case), then leave it out, and let readers infer that a missing summary is
        all [Top]. *)
-    if[@ocaml.warning "-44"]
-      Zero_alloc_info.Encoded.Components.(encoded = all_top)
+    if Zero_alloc_info.Encoded.Components.(equal encoded all_top)
     then None
     else Some encoded
 
   let decode i =
-    if[@ocaml.warning "-44"] Zero_alloc_info.Encoded.Components.(i = all_top)
+    if Zero_alloc_info.Encoded.Components.(equal i all_top)
     then Misc.fatal_error "Zero_alloc_checker: unexpected all-Top encoding"
     else Zero_alloc_info.Encoded.Components.decode ~decode_component:decode i
 

@@ -33,7 +33,7 @@ module Encoded : sig
 
     val all_top : t
 
-    val ( = ) : t -> t -> bool
+    val equal : t -> t -> bool
   end
 end
 

@@ -116,7 +116,7 @@ module Encoded = struct
            Allocation_source.Allocation_other_than_calling_arguments))
       |> encode ~encode_component:Component.encode
 
-    let ( = ) (t1 : t) (t2 : t) =
+    let equal (t1 : t) (t2 : t) =
       match t1, t2 with
       | Unconditional tags1, Unconditional tags2 -> Int.equal tags1 tags2
       | Conditional encoded1, Conditional encoded2 ->
