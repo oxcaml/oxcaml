@@ -298,7 +298,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       SC.block (Tag.Scannable.create_exn tag) Immutable block_shape fields
     in
     register_const acc dbg const "const_mixed_block"
-  | Const_null -> acc, reg_width RWC.const_null, "null"
+  | Const_null -> acc, reg_width (RWC.const_null ()), "null"
 
 let close_const acc const =
   (* For this code path, the debuginfo is discarded (see just below). *)

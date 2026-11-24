@@ -291,6 +291,7 @@ let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
 let calling_convention_changes_rules =
+  Lazy.from_fun @@ fun () ->
   saturate_in_order
     [ (let$ [x] = ["x"] in
        [any_usage x] ==> cannot_change_witness_calling_convention x);
@@ -301,13 +302,13 @@ let calling_convention_changes_rules =
          sources alias alias_source;
          has_source alias_source;
          distinct Cols.n alias_source allocation_id;
-         rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
+         rev_accessor ~base:alias !!(Field.code_id_of_call_witness ()) ~to_:v;
          has_usage v ]
        ==> cannot_change_witness_calling_convention allocation_id);
       (let$ [allocation_id; alias; v] = ["allocation_id"; "alias"; "v"] in
        [ usages allocation_id alias;
          any_source alias;
-         rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
+         rev_accessor ~base:alias !!(Field.code_id_of_call_witness ()) ~to_:v;
          has_usage v ]
        ==> cannot_change_witness_calling_convention allocation_id);
       (let$ [allocation_id; source] = ["allocation_id"; "source"] in
@@ -330,7 +331,7 @@ let calling_convention_changes_rules =
          [cannot_change_witness_calling_convention] should no longer be used. *)
       (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
        [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:code_id;
          has_usage call_witness;
          cannot_change_witness_calling_convention call_witness ]
@@ -344,11 +345,11 @@ let calling_convention_changes_rules =
          ["call_witness"; "set_of_closures"; "codeid"]
        in
        [ rev_constructor ~from:call_witness
-           !!Field.unknown_arity_call_witness
+           !!(Field.unknown_arity_call_witness ())
            ~base:set_of_closures;
          has_usage call_witness;
          constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:codeid ]
        ==> cannot_change_calling_convention codeid) ]
 
@@ -360,6 +361,7 @@ let current_analysis_scope = ref Analysis_scope.Current_unit
 let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
 
 let unboxing_rules =
+  Lazy.from_fun @@ fun () ->
   saturate_in_order
     [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
@@ -443,7 +445,7 @@ let unboxing_rules =
        ==> cannot_change_representation0 allocation_id);
       (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
        [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:code_id ]
        ==> cannot_change_representation0 call_witness);
       (* If the representation of any closure in a set of closures cannot be
@@ -495,9 +497,11 @@ let unboxing_rules =
          pass the value slots as extra arguments. Thus, we prevent unboxing of
          closures if their calling convention cannot be changed. *)
       (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
-       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
+       [ constructor ~base:x
+           !!(Field.known_arity_call_witness ())
+           ~from:call_witness;
          constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 x);
@@ -509,7 +513,9 @@ let unboxing_rules =
          especially for higher-order functions. In that case, we prevent the
          unboxing of the closure, that is, we prevent lambda-lifting. *)
       (let$ [x; call_witness] = ["x"; "call_witness"] in
-       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
+       [ constructor ~base:x
+           !!(Field.known_arity_call_witness ())
+           ~from:call_witness;
          has_usage call_witness;
          filter (fun [] -> not (lambda_lifting ())) [] ]
        ==> cannot_unbox0 x);
@@ -528,7 +534,7 @@ let unboxing_rules =
              | _ -> false)
            relation;
          constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 allocation_id);
@@ -546,7 +552,7 @@ let unboxing_rules =
          has_source allocation_id;
          rev_parameter ~to_:alias relation ~base:call_witness;
          constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 allocation_id);
@@ -742,7 +748,8 @@ let perform_analysis0 ?stats db ~analysis_scope =
         in
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ?stats rule db)
-          db unboxing_rules)
+          db
+          (Lazy.force unboxing_rules))
   in
   let name_of_node =
     if Flambda_features.debug_reaper "nostamps"
@@ -917,7 +924,8 @@ let perform_analysis ?stats db ~analysis_scope =
         (fun () ->
           List.fold_left
             (fun db rule -> Datalog.Schedule.run ?stats rule db)
-            db calling_convention_changes_rules)
+            db
+            (Lazy.force calling_convention_changes_rules))
     else db
   in
   if

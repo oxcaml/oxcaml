@@ -593,6 +593,7 @@ let add_usages_through_function_slots :
     follow_known_arity_calls:bool -> Datalog.database -> usages -> usages =
   let open! Fixit in
   let stmt =
+    Lazy.from_fun @@ fun () ->
     let@ follow_known_arity_calls =
       paramc "follow_known_arity_calls" One.cols One.of_bool
     in
@@ -609,11 +610,11 @@ let add_usages_through_function_slots :
        [ One.flag follow_known_arity_calls;
          out % [x];
          rev_accessor ~base:x
-           !!Field.known_arity_call_witness
+           !!(Field.known_arity_call_witness ())
            ~to_:apply_witness;
          sources apply_witness call_witness;
          constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
+           !!(Field.code_id_of_call_witness ())
            ~from:code_id;
          code_id_my_closure ~code_id ~my_closure:my_closure_of_code_id;
          usages my_closure_of_code_id y;
@@ -628,7 +629,7 @@ let add_usages_through_function_slots :
        ==> out % [z]) ]
   in
   fun ~follow_known_arity_calls db (Usages s) ->
-    Usages (run stmt db follow_known_arity_calls s)
+    Usages (run (Lazy.force stmt) db follow_known_arity_calls s)
 
 let compute_usages_by_function_slots_not_following_known_arity_calls :
     Datalog.database ->
@@ -1034,38 +1035,40 @@ type keep_or_delete =
   | Delete
 
 let unknown_code_id_actually_directly_called_query =
+  Lazy.from_fun @@ fun () ->
   let^? [closure], [known_arity_call_witness] =
     ["closure"], ["known_arity_call_witness"]
   in
   [ rev_accessor ~base:closure
-      !!Field.known_arity_call_witness
+      !!(Field.known_arity_call_witness ())
       ~to_:known_arity_call_witness;
     any_source known_arity_call_witness ]
 
 let code_id_actually_directly_called_query =
+  Lazy.from_fun @@ fun () ->
   query
     (let^$ [closure], [apply_widget; call_witness; codeid] =
        ["closure"], ["apply_widget"; "call_witness"; "codeid"]
      in
      [ rev_accessor ~base:closure
-         !!Field.known_arity_call_witness
+         !!(Field.known_arity_call_witness ())
          ~to_:apply_widget;
        sources apply_widget call_witness;
        has_source call_witness;
        constructor ~base:call_witness
-         !!Field.code_id_of_call_witness
+         !!(Field.code_id_of_call_witness ())
          ~from:codeid ]
      =>? [codeid])
 
 let code_id_actually_directly_called db closure =
   let closure = Code_id_or_name.name closure in
-  if unknown_code_id_actually_directly_called_query [closure] db
+  if Lazy.force unknown_code_id_actually_directly_called_query [closure] db
   then Or_unknown.Unknown
   else
     Or_unknown.Known
       (Datalog.Cursor.fold_with_parameters
-         code_id_actually_directly_called_query [closure] db
-         ~init:Code_id.Set.empty ~f:(fun [codeid] acc ->
+         (Lazy.force code_id_actually_directly_called_query)
+         [closure] db ~init:Code_id.Set.empty ~f:(fun [codeid] acc ->
            let codeid =
              Code_id_or_name.pattern_match' codeid
                ~code_id:(fun code_id -> code_id)

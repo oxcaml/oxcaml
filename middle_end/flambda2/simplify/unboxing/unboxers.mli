@@ -58,7 +58,7 @@ module type Number_S = sig
 
   val unboxing_prim : Simple.t -> P.t
 
-  val unboxer : unboxer
+  val unboxer : unit -> unboxer
 end
 
 module Immediate : Number_S

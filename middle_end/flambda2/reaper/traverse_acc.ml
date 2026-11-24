@@ -473,9 +473,11 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
         (Field.normal_return_of_call i)
         ~from:(Code_id_or_name.var v))
     returns;
-  add_constructor_dep t ~base:witness Field.exn_return_of_call
+  add_constructor_dep t ~base:witness
+    (Field.exn_return_of_call ())
     ~from:(Code_id_or_name.var exn);
-  add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+  add_constructor_dep t ~base:witness
+    (Field.code_id_of_call_witness ())
     ~from:(Code_id_or_name.code_id code_id);
   witness
 
@@ -495,10 +497,13 @@ let make_known_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
         (Field.normal_return_of_call i)
         ~to_:(Code_id_or_name.var v))
     returns;
-  add_accessor_dep t ~base:witness Field.exn_return_of_call
+  add_accessor_dep t ~base:witness
+    (Field.exn_return_of_call ())
     ~to_:(Code_id_or_name.var exn);
   let called = Code_id_or_name.var (Variable.create "called" K.rec_info) in
-  add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
+  add_accessor_dep t ~base:witness
+    (Field.code_id_of_call_witness ())
+    ~to_:called;
   add_any_usage t called;
   let apply = Code_id_or_name.var (Variable.create "apply" K.rec_info) in
   cond_alias t ~denv ~from:apply ~to_:witness;
@@ -517,9 +522,11 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
         (Field.normal_return_of_call i)
         ~from:(Code_id_or_name.var v))
     returns;
-  add_constructor_dep t ~base:witness Field.exn_return_of_call
+  add_constructor_dep t ~base:witness
+    (Field.exn_return_of_call ())
     ~from:(Code_id_or_name.var exn);
-  add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+  add_constructor_dep t ~base:witness
+    (Field.code_id_of_call_witness ())
     ~from:(Code_id_or_name.code_id code_id);
   let untuple_var =
     Code_id_or_name.var (Variable.create "untuple_var" K.value)
@@ -551,7 +558,8 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
   let keep_tuple_alive_var =
     Code_id_or_name.var (Variable.create "keep_tuple_alive_var" K.value)
   in
-  add_accessor_dep t ~to_:keep_tuple_alive_var Field.is_int ~base:untuple_var;
+  add_accessor_dep t ~to_:keep_tuple_alive_var (Field.is_int ())
+    ~base:untuple_var;
   (* Make sure [keep_tuple_alive_var] is used if [code_id] is used. *)
   add_use_dep t
     ~to_:(Code_id_or_name.code_id code_id)
@@ -571,11 +579,13 @@ let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
           add_parameter_dep t ~to_:(Code_id_or_name.var arg) (Cofield.param i)
             ~base:witness)
         first;
-      add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+      add_constructor_dep t ~base:witness
+        (Field.code_id_of_call_witness ())
         ~from:(Code_id_or_name.code_id code_id);
       match rest with
       | [] ->
-        add_constructor_dep t ~base:witness Field.exn_return_of_call
+        add_constructor_dep t ~base:witness
+          (Field.exn_return_of_call ())
           ~from:(Code_id_or_name.var exn);
         List.iteri
           (fun i return_arg ->
@@ -590,7 +600,8 @@ let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
           (Field.normal_return_of_call 0)
           ~base:witness;
         add_constructor_dep t ~from:next_witness
-          Field.unknown_arity_call_witness ~base:v;
+          (Field.unknown_arity_call_witness ())
+          ~base:v;
         add_deps rest)
   in
   let params = Flambda_arity.group_by_parameter arity params in
@@ -632,9 +643,12 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
           add_argument_dep t ~base:witness (Cofield.param i)
             ~from:(simple_to_node t ~all_constants:(Env.all_constants denv) v))
         first;
-      add_accessor_dep t ~base:witness Field.exn_return_of_call
+      add_accessor_dep t ~base:witness
+        (Field.exn_return_of_call ())
         ~to_:(Code_id_or_name.var exn);
-      add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
+      add_accessor_dep t ~base:witness
+        (Field.code_id_of_call_witness ())
+        ~to_:called;
       match rest with
       | [] ->
         List.iteri
@@ -646,7 +660,8 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
       | (_, next_witness) :: _ ->
         let v = Code_id_or_name.var (Variable.create "partial_apply" K.value) in
         add_accessor_dep t ~base:witness (Field.normal_return_of_call 0) ~to_:v;
-        add_accessor_dep t ~base:v Field.unknown_arity_call_witness
+        add_accessor_dep t ~base:v
+          (Field.unknown_arity_call_witness ())
           ~to_:next_witness;
         add_deps rest)
   in
@@ -700,11 +715,14 @@ let add_closure_dep graph ~analysis_scope
            K.value)
     in
     Graph.add_any_source graph witness;
-    Graph.add_constructor_dep graph ~from:witness Field.known_arity_call_witness
+    Graph.add_constructor_dep graph ~from:witness
+      (Field.known_arity_call_witness ())
       ~base:closure;
     Graph.add_constructor_dep graph ~from:witness
-      Field.unknown_arity_call_witness ~base:closure;
-    Graph.add_constructor_dep graph ~base:witness Field.code_id_of_call_witness
+      (Field.unknown_arity_call_witness ())
+      ~base:closure;
+    Graph.add_constructor_dep graph ~base:witness
+      (Field.code_id_of_call_witness ())
       ~from:closure
   | Some code_dep ->
     Graph.add_propagate_dep graph
@@ -712,10 +730,12 @@ let add_closure_dep graph ~analysis_scope
       ~from:closure
       ~if_used:(Code_id_or_name.code_id code_id);
     Graph.add_constructor_dep graph ~from:code_dep.known_arity_call_witness
-      Field.known_arity_call_witness ~base:closure;
+      (Field.known_arity_call_witness ())
+      ~base:closure;
     Graph.add_constructor_dep graph
       ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-      Field.unknown_arity_call_witness ~base:closure
+      (Field.unknown_arity_call_witness ())
+      ~base:closure
 
 let add_apply_dep graph ~analysis_scope ~(code_deps : Code_dep.t Code_id.Map.t)
     Delayed_deps.

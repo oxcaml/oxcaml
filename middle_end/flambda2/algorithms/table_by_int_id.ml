@@ -64,15 +64,20 @@ struct
 
   let () = assert (E.flags lsr Id.flags_size_in_bits = 0)
 
-  type t = E.t HT.t
+  type t = E.t HT.t ref
 
-  let create () = HT.create 20_000
+  let create () = ref (HT.create 0)
 
   exception Can_add of int
 
   exception Already_added of int
 
   let add t elt =
+    (* Upon the first addition, we allocate a larger table. This has the effect
+       of making the table's allocation lazy, while avoiding the overhead of
+       using a [Lazy.t]. *)
+    if HT.length !t = 0 then t := HT.create 20_000;
+    let t = !t in
     let id = Id.create (E.hash elt) E.flags in
     match HT.find_opt t id with
     | None ->
@@ -108,7 +113,7 @@ struct
 
   let find t id =
     assert (Id.flags id = E.flags);
-    HT.find t id
+    HT.find !t id
 
   (* We serialize a table using the exact same format we use in memory, except
      that we only store the data for the exported elements. *)

@@ -167,7 +167,7 @@ let extra_args_for_const_ctor_of_variant
 let compute_extra_arg_for_number kind unboxer epa rewrite_id ~typing_env_at_use
     arg_being_unboxed : U.decision =
   let extra_arg, _new_arg_being_unboxed =
-    unbox_arg unboxer ~typing_env_at_use arg_being_unboxed
+    unbox_arg (unboxer ()) ~typing_env_at_use arg_being_unboxed
   in
   let epa = Extra_param_and_args.update_param_args epa rewrite_id extra_arg in
   Unbox (Number (kind, epa))

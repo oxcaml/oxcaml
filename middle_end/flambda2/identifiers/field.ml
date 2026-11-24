@@ -161,6 +161,10 @@ let create view = Table.add grand_table_of_fields view
 
 let view t = Table.find grand_table_of_fields t
 
+let create_lazily view =
+  let t = lazy (create view) in
+  fun () -> Lazy.force t
+
 module Column = Datalog.Column.Make (struct
   let name = "field"
 
@@ -194,26 +198,27 @@ let value_slot vs = create (Value_slot vs)
 
 let function_slot fs = create (Function_slot fs)
 
-let is_int = create Is_int
+let is_int = create_lazily Is_int
 
-let get_tag = create Get_tag
+let get_tag = create_lazily Get_tag
 
 let boxed_number bn = create (Boxed_number bn)
 
 let normal_return_of_call n = create (Return_of_call (Normal n))
 
-let exn_return_of_call = create (Return_of_call Exn)
+let exn_return_of_call = create_lazily (Return_of_call Exn)
 
-let code_id_of_call_witness = create Code_id_of_call_witness
+let code_id_of_call_witness = create_lazily Code_id_of_call_witness
 
-let known_arity_call_witness = create (Call_witness Known_arity_code_pointer)
+let known_arity_call_witness =
+  create_lazily (Call_witness Known_arity_code_pointer)
 
 let unknown_arity_call_witness =
-  create (Call_witness Unknown_arity_code_pointer)
+  create_lazily (Call_witness Unknown_arity_code_pointer)
 
 let call_witness = function
-  | Known_arity_code_pointer -> known_arity_call_witness
-  | Unknown_arity_code_pointer -> unknown_arity_call_witness
+  | Known_arity_code_pointer -> known_arity_call_witness ()
+  | Unknown_arity_code_pointer -> unknown_arity_call_witness ()
 
 let kind t =
   match view t with

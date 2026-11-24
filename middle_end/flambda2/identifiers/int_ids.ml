@@ -447,7 +447,7 @@ module Const = struct
 
   let const_unit machine_width = const_zero machine_width
 
-  let const_null = create Null
+  let const_null () = create Null
 
   let const_poison kind name = create (Poison (kind, name))
 
