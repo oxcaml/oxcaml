@@ -18,12 +18,12 @@ let ifarray_local () =
 let marray  : int   array = [|1;2;3;4;5|];;
 let mfarray : float array = [|1.5;2.5;3.5;4.5;5.5|];;
 
-external globalize_float : local_ float -> float = "%obj_dup";;
-external globalize_string : local_ string -> string = "%obj_dup";;
-let globalize_int_iarray (local_ ia) =
+external globalize_float : float @ local -> float = "%obj_dup";;
+external globalize_string : string @ local -> string = "%obj_dup";;
+let globalize_int_iarray (ia @ local) =
   Iarray.map_local_input ~f:(fun x : int -> x) ia;;
 
-let rec list_map_local_input (local_ f) (local_ list) =
+let rec list_map_local_input (f @ local) (list @ local) =
   match list with
   | [] -> []
   | x :: xs -> f x :: list_map_local_input f xs;;
@@ -380,7 +380,7 @@ Iarray.mapi ~f:(fun i x -> i, 10.*.x) ifarray;;
 [:(0, 15.); (1, 25.); (2, 35.); (3, 45.); (4, 55.):]
 |}];;
 
-let globalize_int_float_iarray (local_ ia) =
+let globalize_int_float_iarray (ia @ local) =
   Iarray.map_local_input ~f:(fun ((i : int), f) -> i, globalize_float f) ia;;
 [%%expect{|
 val globalize_int_float_iarray :
@@ -766,11 +766,11 @@ Iarray.find_opt ~f:(fun x -> x*.x > 50.) ifarray;;
 - : int option * float option = (None, None)
 |}];;
 
-let globalize_int_option (local_ opt) = match opt with
+let globalize_int_option (opt @ local) = match opt with
   | None -> None
   | Some (x : int) -> Some x
 
-let globalize_float_option (local_ opt) = match opt with
+let globalize_float_option (opt @ local) = match opt with
   | None -> None
   | Some x -> Some (globalize_float x)
 

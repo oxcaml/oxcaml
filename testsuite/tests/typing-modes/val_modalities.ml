@@ -51,15 +51,15 @@ module type S = sig val x : string @@ many aliased contended end
 
 (* values' comonadic axes must be lower than the module *)
 module M = struct
-    let local_ x = "hello"
+    let x @ local = "hello"
 end
 [%%expect{|
-Line 2, characters 15-16:
-2 |     let local_ x = "hello"
-                   ^
+Line 2, characters 8-9:
+2 |     let x @ local = "hello"
+            ^
 Error: The expression is "local"
        but is expected to be "global"
-         because it is the value "x" in the structure at line 2, characters 4-26
+         because it is the value "x" in the structure at line 2, characters 4-27
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]

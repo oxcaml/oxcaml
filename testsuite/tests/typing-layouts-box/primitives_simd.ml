@@ -69,10 +69,10 @@ let () =
 
 (* Local allocation of a boxed vector. *)
 
-external globalize : local_ 'a -> 'a = "%obj_dup"
+external globalize : 'a @ local -> 'a = "%obj_dup"
 
 let () =
-  let local_ vec = box (int64x2 43L 45L) in
+  let vec @ local = box (int64x2 43L 45L) in
   assert (same_shape (Obj.repr (globalize vec)) (Obj.repr { v128 = int64x2 43L 45L }));
   let r : v128rec = Obj.obj (Obj.repr (globalize vec)) in
   assert (Int64.equal (low r.v128) 43L && Int64.equal (high r.v128) 45L);

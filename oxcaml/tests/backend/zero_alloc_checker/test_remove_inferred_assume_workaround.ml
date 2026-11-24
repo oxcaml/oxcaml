@@ -1,15 +1,15 @@
 module Conv : sig
-  val int64_to_int_exn : local_ int64 -> int
+  val int64_to_int_exn : int64 @ local -> int
 end = struct
   (* code extracted from [Base.Int_conversions] *)
 
-  external globalize_int64 : local_ int64 -> int64 = "%obj_dup"
+  external globalize_int64 : int64 @ local -> int64 = "%obj_dup"
 
   let int64_to_string = Stdlib.Int64.to_string
   let int_to_int64 = Stdlib.Int64.of_int
   let max_value = Stdlib.max_int
   let min_value = Stdlib.min_int
-  type 'a compare__local = local_ 'a -> local_ 'a -> int
+  type 'a compare__local = 'a @ local -> 'a @ local -> int
 
   external poly_compare : ('a[@local_opt]) -> ('a[@local_opt]) -> int = "%compare"
   let compare_int64__local : int64 compare__local = poly_compare
@@ -67,7 +67,7 @@ end
 module Offset : sig
   type t : bits64
 
-  val to_int : local_ t -> int [@@zero_alloc]
+  val to_int : t @ local -> int [@@zero_alloc]
 end = struct
   type t = Int64_u.t
 

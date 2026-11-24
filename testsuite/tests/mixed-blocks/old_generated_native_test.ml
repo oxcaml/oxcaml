@@ -3404,271 +3404,271 @@ let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t1
 
 (* Testing local allocation *)
 let go () =
-  let local_ t0 : t0 = { float0 = create_float (); float_u1 = create_float_u () } in
-  let local_ t1 : t1 = { float0 = create_float (); float_u1 = create_float_u () } in
-  let local_ t2 : t2 = { float0 = create_float (); float_u1 = create_float_u () } in
-  let local_ t3 : t3 = { float0 = create_float (); float_u1 = create_float_u () } in
-  let local_ t4 : t4 = { float_u0 = create_float_u (); float1 = create_float () } in
-  let local_ t5 : t5 = { float_u0 = create_float_u (); float1 = create_float () } in
-  let local_ t6 : t6 = { float_u0 = create_float_u (); float1 = create_float () } in
-  let local_ t7 : t7 = { float_u0 = create_float_u (); float1 = create_float () } in
-  let local_ t8 : t8 = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
-  let local_ t9 : t9 = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
-  let local_ t10 : t10 = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
-  let local_ t11 : t11 = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
-  let local_ t12 : t12 = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t13 : t13 = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t14 : t14 = { float0 = create_float (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t15 : t15 = { float0 = create_float (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t16 : t16 = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t17 : t17 = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
-  let local_ t18 : t18 = { int64x2_u0 = create_int64x2 () } in
-  let local_ t19 : t19 = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
-  let local_ t20 : t20 = { int64x2_u0 = create_int64x2 () } in
-  let local_ t21 : t21 = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
-  let local_ t22 : t22 = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
-  let local_ t23 : t23 = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
-  let local_ t24 : t24 = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
-  let local_ t25 : t25 = { str0 = create_string (); float_u1 = create_float_u () } in
-  let local_ t26 : t26 = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
-  let local_ t27 : t27 = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
-  let local_ t28 : t28 = { str0 = create_string (); float_u1 = create_float_u () } in
-  let local_ t29 : t29 = { str0 = create_string (); float_u1 = create_float_u () } in
-  let local_ t30 : t30 = { float32_u0 = create_float32_u () } in
-  let local_ t31 : t31 = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t32 : t32 = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
-  let local_ t33 : t33 = { str0 = create_string (); float_u1 = create_float_u () } in
-  let local_ t34 : t34 = { str0 = create_string (); float32_u1 = create_float32_u () } in
-  let local_ t35 : t35 = { float32_u0 = create_float32_u () } in
-  let local_ t36 : t36 = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t37 : t37 = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t38 : t38 = { str0 = create_string (); float32_u1 = create_float32_u () } in
-  let local_ t39 : t39 = { str0 = create_string (); float32_u1 = create_float32_u () } in
-  let local_ t40 : t40 = { i32_0 = create_int32_u () } in
-  let local_ t41 : t41 = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t42 : t42 = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t43 : t43 = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t44 : t44 = { float0 = create_float (); float32_u1 = create_float32_u () } in
-  let local_ t45 : t45 = { str0 = create_string (); float32_u1 = create_float32_u () } in
-  let local_ t46 : t46 = { str0 = create_string (); i32_1 = create_int32_u () } in
-  let local_ t47 : t47 = { i32_0 = create_int32_u () } in
-  let local_ t48 : t48 = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t49 : t49 = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t50 : t50 = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t51 : t51 = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t52 : t52 = { float0 = create_float (); float32_u1 = create_float32_u () } in
-  let local_ t53 : t53 = { float0 = create_float (); float32_u1 = create_float32_u () } in
-  let local_ t54 : t54 = { str0 = create_string (); i32_1 = create_int32_u () } in
-  let local_ t55 : t55 = { str0 = create_string (); i32_1 = create_int32_u () } in
-  let local_ t56 : t56 = { i64_0 = create_int64_u () } in
-  let local_ t57 : t57 = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t58 : t58 = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t59 : t59 = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t60 : t60 = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t61 : t61 = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
-  let local_ t62 : t62 = { float0 = create_float (); float32_u1 = create_float32_u () } in
-  let local_ t63 : t63 = { float0 = create_float (); i32_1 = create_int32_u () } in
-  let local_ t64 : t64 = { str0 = create_string (); i32_1 = create_int32_u () } in
-  let local_ t65 : t65 = { str0 = create_string (); i64_1 = create_int64_u () } in
-  let local_ t66 : t66 = { i64_0 = create_int64_u () } in
-  let local_ t67 : t67 = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t68 : t68 = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
-  let local_ t69 : t69 = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t70 : t70 = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
-  let local_ t71 : t71 = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
-  let local_ t72 : t72 = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
-  let local_ t73 : t73 = { float0 = create_float (); i32_1 = create_int32_u () } in
-  let local_ t74 : t74 = { float0 = create_float (); i32_1 = create_int32_u () } in
-  let local_ t75_A : t75 = (A (create_int64x2 ())) in
-  let local_ t76_A : t76 = (A (create_int64x2 ())) in
-  let local_ t76_B : t76 = (B (create_int64x2 ())) in
-  let local_ t77_A : t77 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t78_A : t78 = (A (create_int64x2 ())) in
-  let local_ t78_B : t78 = (B (create_int64x2 ())) in
-  let local_ t78_C : t78 = (C (create_int64x2 ())) in
-  let local_ t79_A : t79 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t79_B : t79 = (B (create_int64x2 ())) in
-  let local_ t80_A : t80 = (A (create_string (), create_int64x2 ())) in
-  let local_ t81_A : t81 = (A (create_int64x2 ())) in
-  let local_ t81_B : t81 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t82_A : t82 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t82_B : t82 = (B (create_int64x2 ())) in
-  let local_ t82_C : t82 = (C (create_int64x2 ())) in
-  let local_ t83_A : t83 = (A (create_string (), create_int64x2 ())) in
-  let local_ t83_B : t83 = (B (create_int64x2 ())) in
-  let local_ t84_A : t84 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t85_A : t85 = (A (create_int64x2 ())) in
-  let local_ t85_B : t85 = (B (create_int64x2 ())) in
-  let local_ t85_C : t85 = (C (create_int64x2 ())) in
-  let local_ t85_D : t85 = (D (create_int64x2 ())) in
-  let local_ t86_A : t86 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t86_B : t86 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t87_A : t87 = (A (create_string (), create_int64x2 ())) in
-  let local_ t87_B : t87 = (B (create_int64x2 ())) in
-  let local_ t87_C : t87 = (C (create_int64x2 ())) in
-  let local_ t88_A : t88 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t88_B : t88 = (B (create_int64x2 ())) in
-  let local_ t89_A : t89 = (A (create_float_u ())) in
-  let local_ t90_A : t90 = (A (create_int64x2 ())) in
-  let local_ t90_B : t90 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t90_C : t90 = (C (create_int64x2 ())) in
-  let local_ t91_A : t91 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t91_B : t91 = (B (create_int64x2 ())) in
-  let local_ t91_C : t91 = (C (create_int64x2 ())) in
-  let local_ t91_D : t91 = (D (create_int64x2 ())) in
-  let local_ t92_A : t92 = (A (create_string (), create_int64x2 ())) in
-  let local_ t92_B : t92 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t93_A : t93 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t93_B : t93 = (B (create_int64x2 ())) in
-  let local_ t93_C : t93 = (C (create_int64x2 ())) in
-  let local_ t94_A : t94 = (A (create_float_u ())) in
-  let local_ t94_B : t94 = (B (create_int64x2 ())) in
-  let local_ t95_A : t95 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t96_A : t96 = (A (create_int64x2 ())) in
-  let local_ t96_B : t96 = (B (create_string (), create_int64x2 ())) in
-  let local_ t97_A : t97 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t97_B : t97 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t97_C : t97 = (C (create_int64x2 ())) in
-  let local_ t98_A : t98 = (A (create_string (), create_int64x2 ())) in
-  let local_ t98_B : t98 = (B (create_int64x2 ())) in
-  let local_ t98_C : t98 = (C (create_int64x2 ())) in
-  let local_ t98_D : t98 = (D (create_int64x2 ())) in
-  let local_ t99_A : t99 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t99_B : t99 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t100_A : t100 = (A (create_float_u ())) in
-  let local_ t100_B : t100 = (B (create_int64x2 ())) in
-  let local_ t100_C : t100 = (C (create_int64x2 ())) in
-  let local_ t101_A : t101 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t101_B : t101 = (B (create_int64x2 ())) in
-  let local_ t102_A : t102 = (A (create_float (), create_int64x2 ())) in
-  let local_ t103_A : t103 = (A (create_int64x2 ())) in
-  let local_ t103_B : t103 = (B (create_int64x2 ())) in
-  let local_ t103_C : t103 = (C { int64x2_u0 = create_int64x2 () }) in
-  let local_ t104_A : t104 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t104_B : t104 = (B (create_string (), create_int64x2 ())) in
-  let local_ t105_A : t105 = (A (create_string (), create_int64x2 ())) in
-  let local_ t105_B : t105 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t105_C : t105 = (C (create_int64x2 ())) in
-  let local_ t106_A : t106 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t106_B : t106 = (B (create_int64x2 ())) in
-  let local_ t106_C : t106 = (C (create_int64x2 ())) in
-  let local_ t106_D : t106 = (D (create_int64x2 ())) in
-  let local_ t107_A : t107 = (A (create_float_u ())) in
-  let local_ t107_B : t107 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t108_A : t108 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t108_B : t108 = (B (create_int64x2 ())) in
-  let local_ t108_C : t108 = (C (create_int64x2 ())) in
-  let local_ t109_A : t109 = (A (create_float (), create_int64x2 ())) in
-  let local_ t109_B : t109 = (B (create_int64x2 ())) in
-  let local_ t110_A : t110 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t111_A : t111 = (A (create_int64x2 ())) in
-  let local_ t111_B : t111 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t111_C : t111 = (C (create_int64x2 ())) in
-  let local_ t111_D : t111 = (D (create_int64x2 ())) in
-  let local_ t112_A : t112 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t112_B : t112 = (B (create_int64x2 ())) in
-  let local_ t112_C : t112 = (C { int64x2_u0 = create_int64x2 () }) in
-  let local_ t113_A : t113 = (A (create_string (), create_int64x2 ())) in
-  let local_ t113_B : t113 = (B (create_string (), create_int64x2 ())) in
-  let local_ t114_A : t114 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t114_B : t114 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t114_C : t114 = (C (create_int64x2 ())) in
-  let local_ t115_A : t115 = (A (create_float_u ())) in
-  let local_ t115_B : t115 = (B (create_int64x2 ())) in
-  let local_ t115_C : t115 = (C (create_int64x2 ())) in
-  let local_ t115_D : t115 = (D (create_int64x2 ())) in
-  let local_ t116_A : t116 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t116_B : t116 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t117_A : t117 = (A (create_float (), create_int64x2 ())) in
-  let local_ t117_B : t117 = (B (create_int64x2 ())) in
-  let local_ t117_C : t117 = (C (create_int64x2 ())) in
-  let local_ t118_A : t118 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t118_B : t118 = (B (create_int64x2 ())) in
-  let local_ t119_A : t119 = (A (create_string (), create_float_u ())) in
-  let local_ t120_A : t120 = (A (create_int64x2 ())) in
-  let local_ t120_B : t120 = (B (create_string (), create_int64x2 ())) in
-  let local_ t120_C : t120 = (C (create_int64x2 ())) in
-  let local_ t121_A : t121 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t121_B : t121 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t121_C : t121 = (C (create_int64x2 ())) in
-  let local_ t121_D : t121 = (D (create_int64x2 ())) in
-  let local_ t122_A : t122 = (A (create_string (), create_int64x2 ())) in
-  let local_ t122_B : t122 = (B (create_int64x2 ())) in
-  let local_ t122_C : t122 = (C { int64x2_u0 = create_int64x2 () }) in
-  let local_ t123_A : t123 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t123_B : t123 = (B (create_string (), create_int64x2 ())) in
-  let local_ t124_A : t124 = (A (create_float_u ())) in
-  let local_ t124_B : t124 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t124_C : t124 = (C (create_int64x2 ())) in
-  let local_ t125_A : t125 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t125_B : t125 = (B (create_int64x2 ())) in
-  let local_ t125_C : t125 = (C (create_int64x2 ())) in
-  let local_ t125_D : t125 = (D (create_int64x2 ())) in
-  let local_ t126_A : t126 = (A (create_float (), create_int64x2 ())) in
-  let local_ t126_B : t126 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t127_A : t127 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t127_B : t127 = (B (create_int64x2 ())) in
-  let local_ t127_C : t127 = (C (create_int64x2 ())) in
-  let local_ t128_A : t128 = (A (create_string (), create_float_u ())) in
-  let local_ t128_B : t128 = (B (create_int64x2 ())) in
-  let local_ t129_A : t129 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t130_A : t130 = (A (create_int64x2 ())) in
-  let local_ t130_B : t130 = (B { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t131_A : t131 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t131_B : t131 = (B (create_string (), create_int64x2 ())) in
-  let local_ t131_C : t131 = (C (create_int64x2 ())) in
-  let local_ t132_A : t132 = (A (create_string (), create_int64x2 ())) in
-  let local_ t132_B : t132 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t132_C : t132 = (C (create_int64x2 ())) in
-  let local_ t132_D : t132 = (D (create_int64x2 ())) in
-  let local_ t133_A : t133 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t133_B : t133 = (B (create_int64x2 ())) in
-  let local_ t133_C : t133 = (C { int64x2_u0 = create_int64x2 () }) in
-  let local_ t134_A : t134 = (A (create_float_u ())) in
-  let local_ t134_B : t134 = (B (create_string (), create_int64x2 ())) in
-  let local_ t135_A : t135 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t135_B : t135 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t135_C : t135 = (C (create_int64x2 ())) in
-  let local_ t136_A : t136 = (A (create_float (), create_int64x2 ())) in
-  let local_ t136_B : t136 = (B (create_int64x2 ())) in
-  let local_ t136_C : t136 = (C (create_int64x2 ())) in
-  let local_ t136_D : t136 = (D (create_int64x2 ())) in
-  let local_ t137_A : t137 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t137_B : t137 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t138_A : t138 = (A (create_string (), create_float_u ())) in
-  let local_ t138_B : t138 = (B (create_int64x2 ())) in
-  let local_ t138_C : t138 = (C (create_int64x2 ())) in
-  let local_ t139_A : t139 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t139_B : t139 = (B (create_int64x2 ())) in
-  let local_ t140_A : t140 = (A (create_float32_u ())) in
-  let local_ t141_A : t141 = (A (create_int64x2 ())) in
-  let local_ t141_B : t141 = (B (create_int64x2 ())) in
-  let local_ t141_C : t141 = (C (create_int64x2 ())) in
-  let local_ t141_D : t141 = (D (create_int64x2 ())) in
-  let local_ t141_E : t141 = (E (create_int64x2 ())) in
-  let local_ t142_A : t142 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t142_B : t142 = (B { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t143_A : t143 = (A (create_string (), create_int64x2 ())) in
-  let local_ t143_B : t143 = (B (create_string (), create_int64x2 ())) in
-  let local_ t143_C : t143 = (C (create_int64x2 ())) in
-  let local_ t144_A : t144 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t144_B : t144 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t144_C : t144 = (C (create_int64x2 ())) in
-  let local_ t144_D : t144 = (D (create_int64x2 ())) in
-  let local_ t145_A : t145 = (A (create_float_u ())) in
-  let local_ t145_B : t145 = (B (create_int64x2 ())) in
-  let local_ t145_C : t145 = (C { int64x2_u0 = create_int64x2 () }) in
-  let local_ t146_A : t146 = (A { int64x2_u0 = create_int64x2 () }) in
-  let local_ t146_B : t146 = (B (create_string (), create_int64x2 ())) in
-  let local_ t147_A : t147 = (A (create_float (), create_int64x2 ())) in
-  let local_ t147_B : t147 = (B { int64x2_u0 = create_int64x2 () }) in
-  let local_ t147_C : t147 = (C (create_int64x2 ())) in
-  let local_ t148_A : t148 = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
-  let local_ t148_B : t148 = (B (create_int64x2 ())) in
-  let local_ t148_C : t148 = (C (create_int64x2 ())) in
-  let local_ t148_D : t148 = (D (create_int64x2 ())) in
-  let local_ t149_A : t149 = (A (create_string (), create_float_u ())) in
-  let local_ t149_B : t149 = (B { int64x2_u0 = create_int64x2 () }) in
+  let t0 : t0 @ local = { float0 = create_float (); float_u1 = create_float_u () } in
+  let t1 : t1 @ local = { float0 = create_float (); float_u1 = create_float_u () } in
+  let t2 : t2 @ local = { float0 = create_float (); float_u1 = create_float_u () } in
+  let t3 : t3 @ local = { float0 = create_float (); float_u1 = create_float_u () } in
+  let t4 : t4 @ local = { float_u0 = create_float_u (); float1 = create_float () } in
+  let t5 : t5 @ local = { float_u0 = create_float_u (); float1 = create_float () } in
+  let t6 : t6 @ local = { float_u0 = create_float_u (); float1 = create_float () } in
+  let t7 : t7 @ local = { float_u0 = create_float_u (); float1 = create_float () } in
+  let t8 : t8 @ local = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
+  let t9 : t9 @ local = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
+  let t10 : t10 @ local = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
+  let t11 : t11 @ local = { float0 = create_float (); float_u1 = create_float_u (); float_u2 = create_float_u () } in
+  let t12 : t12 @ local = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t13 : t13 @ local = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t14 : t14 @ local = { float0 = create_float (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t15 : t15 @ local = { float0 = create_float (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t16 : t16 @ local = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t17 : t17 @ local = { float_u0 = create_float_u (); float1 = create_float (); float_u2 = create_float_u () } in
+  let t18 : t18 @ local = { int64x2_u0 = create_int64x2 () } in
+  let t19 : t19 @ local = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
+  let t20 : t20 @ local = { int64x2_u0 = create_int64x2 () } in
+  let t21 : t21 @ local = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
+  let t22 : t22 @ local = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
+  let t23 : t23 @ local = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
+  let t24 : t24 @ local = { str0 = create_string (); int64x2_u1 = create_int64x2 () } in
+  let t25 : t25 @ local = { str0 = create_string (); float_u1 = create_float_u () } in
+  let t26 : t26 @ local = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
+  let t27 : t27 @ local = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
+  let t28 : t28 @ local = { str0 = create_string (); float_u1 = create_float_u () } in
+  let t29 : t29 @ local = { str0 = create_string (); float_u1 = create_float_u () } in
+  let t30 : t30 @ local = { float32_u0 = create_float32_u () } in
+  let t31 : t31 @ local = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t32 : t32 @ local = { float0 = create_float (); int64x2_u1 = create_int64x2 () } in
+  let t33 : t33 @ local = { str0 = create_string (); float_u1 = create_float_u () } in
+  let t34 : t34 @ local = { str0 = create_string (); float32_u1 = create_float32_u () } in
+  let t35 : t35 @ local = { float32_u0 = create_float32_u () } in
+  let t36 : t36 @ local = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t37 : t37 @ local = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t38 : t38 @ local = { str0 = create_string (); float32_u1 = create_float32_u () } in
+  let t39 : t39 @ local = { str0 = create_string (); float32_u1 = create_float32_u () } in
+  let t40 : t40 @ local = { i32_0 = create_int32_u () } in
+  let t41 : t41 @ local = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t42 : t42 @ local = { str0 = create_string (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t43 : t43 @ local = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t44 : t44 @ local = { float0 = create_float (); float32_u1 = create_float32_u () } in
+  let t45 : t45 @ local = { str0 = create_string (); float32_u1 = create_float32_u () } in
+  let t46 : t46 @ local = { str0 = create_string (); i32_1 = create_int32_u () } in
+  let t47 : t47 @ local = { i32_0 = create_int32_u () } in
+  let t48 : t48 @ local = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t49 : t49 @ local = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t50 : t50 @ local = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t51 : t51 @ local = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t52 : t52 @ local = { float0 = create_float (); float32_u1 = create_float32_u () } in
+  let t53 : t53 @ local = { float0 = create_float (); float32_u1 = create_float32_u () } in
+  let t54 : t54 @ local = { str0 = create_string (); i32_1 = create_int32_u () } in
+  let t55 : t55 @ local = { str0 = create_string (); i32_1 = create_int32_u () } in
+  let t56 : t56 @ local = { i64_0 = create_int64_u () } in
+  let t57 : t57 @ local = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t58 : t58 @ local = { float0 = create_float (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t59 : t59 @ local = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t60 : t60 @ local = { str0 = create_string (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t61 : t61 @ local = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
+  let t62 : t62 @ local = { float0 = create_float (); float32_u1 = create_float32_u () } in
+  let t63 : t63 @ local = { float0 = create_float (); i32_1 = create_int32_u () } in
+  let t64 : t64 @ local = { str0 = create_string (); i32_1 = create_int32_u () } in
+  let t65 : t65 @ local = { str0 = create_string (); i64_1 = create_int64_u () } in
+  let t66 : t66 @ local = { i64_0 = create_int64_u () } in
+  let t67 : t67 @ local = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t68 : t68 @ local = { imm0 = create_int (); str1 = create_string (); int64x2_u2 = create_int64x2 () } in
+  let t69 : t69 @ local = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t70 : t70 @ local = { float0 = create_float (); str1 = create_string (); float_u2 = create_float_u () } in
+  let t71 : t71 @ local = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
+  let t72 : t72 @ local = { str0 = create_string (); str1 = create_string (); float32_u2 = create_float32_u () } in
+  let t73 : t73 @ local = { float0 = create_float (); i32_1 = create_int32_u () } in
+  let t74 : t74 @ local = { float0 = create_float (); i32_1 = create_int32_u () } in
+  let t75_A : t75 @ local = (A (create_int64x2 ())) in
+  let t76_A : t76 @ local = (A (create_int64x2 ())) in
+  let t76_B : t76 @ local = (B (create_int64x2 ())) in
+  let t77_A : t77 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t78_A : t78 @ local = (A (create_int64x2 ())) in
+  let t78_B : t78 @ local = (B (create_int64x2 ())) in
+  let t78_C : t78 @ local = (C (create_int64x2 ())) in
+  let t79_A : t79 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t79_B : t79 @ local = (B (create_int64x2 ())) in
+  let t80_A : t80 @ local = (A (create_string (), create_int64x2 ())) in
+  let t81_A : t81 @ local = (A (create_int64x2 ())) in
+  let t81_B : t81 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t82_A : t82 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t82_B : t82 @ local = (B (create_int64x2 ())) in
+  let t82_C : t82 @ local = (C (create_int64x2 ())) in
+  let t83_A : t83 @ local = (A (create_string (), create_int64x2 ())) in
+  let t83_B : t83 @ local = (B (create_int64x2 ())) in
+  let t84_A : t84 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t85_A : t85 @ local = (A (create_int64x2 ())) in
+  let t85_B : t85 @ local = (B (create_int64x2 ())) in
+  let t85_C : t85 @ local = (C (create_int64x2 ())) in
+  let t85_D : t85 @ local = (D (create_int64x2 ())) in
+  let t86_A : t86 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t86_B : t86 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t87_A : t87 @ local = (A (create_string (), create_int64x2 ())) in
+  let t87_B : t87 @ local = (B (create_int64x2 ())) in
+  let t87_C : t87 @ local = (C (create_int64x2 ())) in
+  let t88_A : t88 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t88_B : t88 @ local = (B (create_int64x2 ())) in
+  let t89_A : t89 @ local = (A (create_float_u ())) in
+  let t90_A : t90 @ local = (A (create_int64x2 ())) in
+  let t90_B : t90 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t90_C : t90 @ local = (C (create_int64x2 ())) in
+  let t91_A : t91 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t91_B : t91 @ local = (B (create_int64x2 ())) in
+  let t91_C : t91 @ local = (C (create_int64x2 ())) in
+  let t91_D : t91 @ local = (D (create_int64x2 ())) in
+  let t92_A : t92 @ local = (A (create_string (), create_int64x2 ())) in
+  let t92_B : t92 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t93_A : t93 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t93_B : t93 @ local = (B (create_int64x2 ())) in
+  let t93_C : t93 @ local = (C (create_int64x2 ())) in
+  let t94_A : t94 @ local = (A (create_float_u ())) in
+  let t94_B : t94 @ local = (B (create_int64x2 ())) in
+  let t95_A : t95 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t96_A : t96 @ local = (A (create_int64x2 ())) in
+  let t96_B : t96 @ local = (B (create_string (), create_int64x2 ())) in
+  let t97_A : t97 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t97_B : t97 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t97_C : t97 @ local = (C (create_int64x2 ())) in
+  let t98_A : t98 @ local = (A (create_string (), create_int64x2 ())) in
+  let t98_B : t98 @ local = (B (create_int64x2 ())) in
+  let t98_C : t98 @ local = (C (create_int64x2 ())) in
+  let t98_D : t98 @ local = (D (create_int64x2 ())) in
+  let t99_A : t99 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t99_B : t99 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t100_A : t100 @ local = (A (create_float_u ())) in
+  let t100_B : t100 @ local = (B (create_int64x2 ())) in
+  let t100_C : t100 @ local = (C (create_int64x2 ())) in
+  let t101_A : t101 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t101_B : t101 @ local = (B (create_int64x2 ())) in
+  let t102_A : t102 @ local = (A (create_float (), create_int64x2 ())) in
+  let t103_A : t103 @ local = (A (create_int64x2 ())) in
+  let t103_B : t103 @ local = (B (create_int64x2 ())) in
+  let t103_C : t103 @ local = (C { int64x2_u0 = create_int64x2 () }) in
+  let t104_A : t104 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t104_B : t104 @ local = (B (create_string (), create_int64x2 ())) in
+  let t105_A : t105 @ local = (A (create_string (), create_int64x2 ())) in
+  let t105_B : t105 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t105_C : t105 @ local = (C (create_int64x2 ())) in
+  let t106_A : t106 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t106_B : t106 @ local = (B (create_int64x2 ())) in
+  let t106_C : t106 @ local = (C (create_int64x2 ())) in
+  let t106_D : t106 @ local = (D (create_int64x2 ())) in
+  let t107_A : t107 @ local = (A (create_float_u ())) in
+  let t107_B : t107 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t108_A : t108 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t108_B : t108 @ local = (B (create_int64x2 ())) in
+  let t108_C : t108 @ local = (C (create_int64x2 ())) in
+  let t109_A : t109 @ local = (A (create_float (), create_int64x2 ())) in
+  let t109_B : t109 @ local = (B (create_int64x2 ())) in
+  let t110_A : t110 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t111_A : t111 @ local = (A (create_int64x2 ())) in
+  let t111_B : t111 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t111_C : t111 @ local = (C (create_int64x2 ())) in
+  let t111_D : t111 @ local = (D (create_int64x2 ())) in
+  let t112_A : t112 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t112_B : t112 @ local = (B (create_int64x2 ())) in
+  let t112_C : t112 @ local = (C { int64x2_u0 = create_int64x2 () }) in
+  let t113_A : t113 @ local = (A (create_string (), create_int64x2 ())) in
+  let t113_B : t113 @ local = (B (create_string (), create_int64x2 ())) in
+  let t114_A : t114 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t114_B : t114 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t114_C : t114 @ local = (C (create_int64x2 ())) in
+  let t115_A : t115 @ local = (A (create_float_u ())) in
+  let t115_B : t115 @ local = (B (create_int64x2 ())) in
+  let t115_C : t115 @ local = (C (create_int64x2 ())) in
+  let t115_D : t115 @ local = (D (create_int64x2 ())) in
+  let t116_A : t116 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t116_B : t116 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t117_A : t117 @ local = (A (create_float (), create_int64x2 ())) in
+  let t117_B : t117 @ local = (B (create_int64x2 ())) in
+  let t117_C : t117 @ local = (C (create_int64x2 ())) in
+  let t118_A : t118 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t118_B : t118 @ local = (B (create_int64x2 ())) in
+  let t119_A : t119 @ local = (A (create_string (), create_float_u ())) in
+  let t120_A : t120 @ local = (A (create_int64x2 ())) in
+  let t120_B : t120 @ local = (B (create_string (), create_int64x2 ())) in
+  let t120_C : t120 @ local = (C (create_int64x2 ())) in
+  let t121_A : t121 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t121_B : t121 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t121_C : t121 @ local = (C (create_int64x2 ())) in
+  let t121_D : t121 @ local = (D (create_int64x2 ())) in
+  let t122_A : t122 @ local = (A (create_string (), create_int64x2 ())) in
+  let t122_B : t122 @ local = (B (create_int64x2 ())) in
+  let t122_C : t122 @ local = (C { int64x2_u0 = create_int64x2 () }) in
+  let t123_A : t123 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t123_B : t123 @ local = (B (create_string (), create_int64x2 ())) in
+  let t124_A : t124 @ local = (A (create_float_u ())) in
+  let t124_B : t124 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t124_C : t124 @ local = (C (create_int64x2 ())) in
+  let t125_A : t125 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t125_B : t125 @ local = (B (create_int64x2 ())) in
+  let t125_C : t125 @ local = (C (create_int64x2 ())) in
+  let t125_D : t125 @ local = (D (create_int64x2 ())) in
+  let t126_A : t126 @ local = (A (create_float (), create_int64x2 ())) in
+  let t126_B : t126 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t127_A : t127 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t127_B : t127 @ local = (B (create_int64x2 ())) in
+  let t127_C : t127 @ local = (C (create_int64x2 ())) in
+  let t128_A : t128 @ local = (A (create_string (), create_float_u ())) in
+  let t128_B : t128 @ local = (B (create_int64x2 ())) in
+  let t129_A : t129 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t130_A : t130 @ local = (A (create_int64x2 ())) in
+  let t130_B : t130 @ local = (B { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t131_A : t131 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t131_B : t131 @ local = (B (create_string (), create_int64x2 ())) in
+  let t131_C : t131 @ local = (C (create_int64x2 ())) in
+  let t132_A : t132 @ local = (A (create_string (), create_int64x2 ())) in
+  let t132_B : t132 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t132_C : t132 @ local = (C (create_int64x2 ())) in
+  let t132_D : t132 @ local = (D (create_int64x2 ())) in
+  let t133_A : t133 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t133_B : t133 @ local = (B (create_int64x2 ())) in
+  let t133_C : t133 @ local = (C { int64x2_u0 = create_int64x2 () }) in
+  let t134_A : t134 @ local = (A (create_float_u ())) in
+  let t134_B : t134 @ local = (B (create_string (), create_int64x2 ())) in
+  let t135_A : t135 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t135_B : t135 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t135_C : t135 @ local = (C (create_int64x2 ())) in
+  let t136_A : t136 @ local = (A (create_float (), create_int64x2 ())) in
+  let t136_B : t136 @ local = (B (create_int64x2 ())) in
+  let t136_C : t136 @ local = (C (create_int64x2 ())) in
+  let t136_D : t136 @ local = (D (create_int64x2 ())) in
+  let t137_A : t137 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t137_B : t137 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t138_A : t138 @ local = (A (create_string (), create_float_u ())) in
+  let t138_B : t138 @ local = (B (create_int64x2 ())) in
+  let t138_C : t138 @ local = (C (create_int64x2 ())) in
+  let t139_A : t139 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t139_B : t139 @ local = (B (create_int64x2 ())) in
+  let t140_A : t140 @ local = (A (create_float32_u ())) in
+  let t141_A : t141 @ local = (A (create_int64x2 ())) in
+  let t141_B : t141 @ local = (B (create_int64x2 ())) in
+  let t141_C : t141 @ local = (C (create_int64x2 ())) in
+  let t141_D : t141 @ local = (D (create_int64x2 ())) in
+  let t141_E : t141 @ local = (E (create_int64x2 ())) in
+  let t142_A : t142 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t142_B : t142 @ local = (B { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t143_A : t143 @ local = (A (create_string (), create_int64x2 ())) in
+  let t143_B : t143 @ local = (B (create_string (), create_int64x2 ())) in
+  let t143_C : t143 @ local = (C (create_int64x2 ())) in
+  let t144_A : t144 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t144_B : t144 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t144_C : t144 @ local = (C (create_int64x2 ())) in
+  let t144_D : t144 @ local = (D (create_int64x2 ())) in
+  let t145_A : t145 @ local = (A (create_float_u ())) in
+  let t145_B : t145 @ local = (B (create_int64x2 ())) in
+  let t145_C : t145 @ local = (C { int64x2_u0 = create_int64x2 () }) in
+  let t146_A : t146 @ local = (A { int64x2_u0 = create_int64x2 () }) in
+  let t146_B : t146 @ local = (B (create_string (), create_int64x2 ())) in
+  let t147_A : t147 @ local = (A (create_float (), create_int64x2 ())) in
+  let t147_B : t147 @ local = (B { int64x2_u0 = create_int64x2 () }) in
+  let t147_C : t147 @ local = (C (create_int64x2 ())) in
+  let t148_A : t148 @ local = (A { str0 = create_string (); int64x2_u1 = create_int64x2 () }) in
+  let t148_B : t148 @ local = (B (create_int64x2 ())) in
+  let t148_C : t148 @ local = (C (create_int64x2 ())) in
+  let t148_D : t148 @ local = (D (create_int64x2 ())) in
+  let t149_A : t149 @ local = (A (create_string (), create_float_u ())) in
+  let t149_B : t149 @ local = (B { int64x2_u0 = create_int64x2 () }) in
   print_endline " - Doing GC";
   Gc.full_major ();
   opaque_ignore t0;

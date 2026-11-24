@@ -181,28 +181,28 @@ let foo4_3 y = (* Can't sneak local out of non-local while loop body region *)
   let mutable x = y in
   let i = ref 1 in
   while !i <= 10 do
-    x <- (local_ (x + !i));
+    x <- (x + !i : @ local);
     i := !i + 1;
   done; x
 
 [%%expect{|
-Line 5, characters 9-26:
-5 |     x <- (local_ (x + !i));
-             ^^^^^^^^^^^^^^^^^
+Line 5, characters 9-27:
+5 |     x <- (x + !i : @ local);
+             ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global".
 |}]
 
 let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
   let mutable x = y in
-  while x <- (local_ (x + 1)); x <= 100 do
+  while x <- (x + 1 : @ local); x <= 100 do
     x <- x + x
   done; x
 
 [%%expect{|
-Line 3, characters 13-29:
-3 |   while x <- (local_ (x + 1)); x <= 100 do
-                 ^^^^^^^^^^^^^^^^
+Line 3, characters 13-30:
+3 |   while x <- (x + 1 : @ local); x <= 100 do
+                 ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global".
 |}]
@@ -320,7 +320,7 @@ let foo5_3 y = (* Assignment of local works in _local_ while body region *)
   let mutable x = y in
   let i = ref 1 in
   while !i <= 10 do exclave_
-    x <- (local_ (x + !i));
+    x <- (x + !i : @ local);
     i := !i + 1;
   done; (x : int)
 [%%expect{|
@@ -329,7 +329,7 @@ val foo5_3 : int -> int = <fun>
 
 let foo5_4 y = (* Assign of local works in _local_ while cond region *)
   let mutable x = y in
-  while exclave_ x <- (local_ (x + 1)); x <= 100 do
+  while exclave_ x <- (x + 1 : @ local); x <= 100 do
     x <- x + x
   done; (x : int)
 
@@ -620,7 +620,7 @@ val x_18_3 : int = 5
 (* Tests 19 and 20: some mode crossing *)
 let f_19 () =
   let mutable x : int = 42 in
-  x <- (local_ 24);
+  x <- (24 : @ local);
   x
 [%%expect{|
 val f_19 : unit -> int = <fun>
@@ -683,7 +683,7 @@ Error: This value is "local" because it is "stack_"-allocated.
 |}]
 
 (* Heap values, and values from the caller's region, are fine. *)
-let baz_22 n (local_ r : r_22) =
+let baz_22 n (r : r_22 @ local) =
   let mutable x = { a_22 = 1 } in
   (try x <- { a_22 = n }; x <- r; raise Exit with Exit -> ());
   x.a_22

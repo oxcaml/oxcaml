@@ -25,7 +25,7 @@
 
 let glob = ref []
 
-let[@inline never] consume (local_ a) (local_ c) =
+let[@inline never] consume (a @ local) (c @ local) =
   (match a with x :: _ -> x | [] -> 0)
   + (match c with y :: _ -> y | [] -> 0)
 

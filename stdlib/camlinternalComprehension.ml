@@ -2,9 +2,9 @@ open! Stdlib
 
 type 'a rev_list =
   | Nil
-  | Snoc of { init : 'a rev_list; global_ last : 'a }
+  | Snoc of { init : 'a rev_list; last : 'a @@ global }
 
-type 'a rev_dlist = local_ 'a rev_list -> local_ 'a rev_list
+type 'a rev_dlist = 'a rev_list @ local -> 'a rev_list @ local
 
 let rec rev_list_to_list' acc = function
   | Nil                 -> acc

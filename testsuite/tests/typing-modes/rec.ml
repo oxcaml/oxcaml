@@ -4,7 +4,7 @@
 
 (* for entirely-function definitions, they will share the same mode that can be
    at any mode *)
-let te (local_ x) =
+let te (x @ local) =
     let use_portable (_ @ portable) = () in
     let rec foo x' y =
         use_portable bar;
@@ -23,7 +23,7 @@ val te : 'a @ local portable -> unit = <fun>
 (* for mixed definitions, they will still share the same mode, but the locality
    must be global. *)
 
-let te (local_ x) =
+let te (x @ local) =
     let rec foo x' y =
         bar x y
     and bar x' y =

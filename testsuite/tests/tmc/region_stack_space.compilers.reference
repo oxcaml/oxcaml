@@ -48,7 +48,7 @@ Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
 
 File "region_stack_space.ml", lines 263-265, characters 33-47:
 263 | .................................n =
-264 |   let local_ p = (n, n) in
+264 |   let p @ local = (n, n) in
 265 |   try n :: try_body (n - 1) with _ -> [ fst p ]
 Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
   but is never applied in TMC position.

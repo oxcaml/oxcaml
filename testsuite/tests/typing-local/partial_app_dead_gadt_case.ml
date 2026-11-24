@@ -17,7 +17,7 @@ let apply (type a) (equ : (a, unit -> unit) eq option) (f : a) =
   | None -> ()
   | Some Refl -> f ()
 
-let fn (local_ x) (local_ y) = ()
+let fn (x @ local) (y @ local) = ()
 
 let bad p = apply p fn
 
@@ -25,5 +25,5 @@ let bad p = apply p fn
 
 let cast (type a b) (Refl : (a, b) eq) (f : a) : b = f
 
-let fn (local_ x) (local_ y) = ()
+let fn (x @ local) (y @ local) = ()
 let bad2 p = cast p fn ()

@@ -32,11 +32,11 @@ type t = int
 type smallrecord = {  a : t; b : t; c : t }
 
 
-external opaque_local : local_ 'a -> local_ 'a = "%opaque"
-let ignore_local : local_ 'a -> unit =
+external opaque_local : 'a @ local -> 'a @ local = "%opaque"
+let ignore_local : 'a @ local -> unit =
   fun x ->
   Gc.minor ();
-  let _ = local_ opaque_local x in
+  let _ @ local = opaque_local x in
   ()
 
 let makesmall n =
@@ -165,7 +165,7 @@ let makefloat n =
   ()
 
 let projfloat n =
-  let local_ r = opaque_local {x=n;y=n;z=n} in
+  let r @ local = opaque_local {x=n;y=n;z=n} in
   ignore_local (r.x,r.y,r.z);
   ()
 
@@ -185,7 +185,7 @@ let makeextension n =
   ignore_local (Foo (n, n, n));
   ()
 
-external add32_local : local_ int32 -> local_ int32 -> local_ int32 =
+external add32_local : int32 @ local -> int32 @ local -> int32 @ local =
   "%int32_add"
 let arithint32 n =
   ignore_local (Int32.add n 1l);
@@ -217,7 +217,7 @@ let mutrecclosure n =
   ignore_local odd;
   ()
 
-let local_arg_fn ~a:(local_ a) ~b:(local_ b) =
+let local_arg_fn ~a:(a @ local) ~b:(b @ local) =
   ignore_local (a, b); ()
 let currylocal1 n =
   ignore_local (local_arg_fn ~a:n); ()
@@ -228,7 +228,7 @@ let currylocal3 n =
   ()
 
 let partprim1 n =
-  let add : local_ int32 -> local_ int32 -> local_ int32 = Int32.add in
+  let add : int32 @ local -> int32 @ local -> int32 @ local = Int32.add in
   ignore_local (add n); ()
 
 let partprim2 n =
@@ -247,7 +247,7 @@ let makefloatarray (n:float) =
   ignore_local [| n |];
   ()
 
-external floatarray_create : int -> local_ floatarray =
+external floatarray_create : int -> floatarray @ local =
   "caml_floatarray_create_local"
 let makeflatfloatarray () =
   ignore_local (floatarray_create 20);
@@ -285,18 +285,18 @@ let makelongarray n =
       n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; |];
   ()
 
-external local_array: int -> 'a -> local_ 'a array = "caml_array_make_local"
+external local_array: int -> 'a -> 'a array @ local = "caml_array_make_local"
 
-external array_concat : local_ 'a array list -> local_ 'a array =
+external array_concat : 'a array list @ local -> 'a array @ local =
   "caml_array_concat_local"
-external array_append : local_ 'a array -> local_ 'a array -> local_ 'a array =
+external array_append : 'a array @ local -> 'a array @ local -> 'a array @ local =
   "caml_array_append_local"
-external array_sub : local_ 'a array -> int -> int -> local_ 'a array =
+external array_sub : 'a array @ local -> int -> int -> 'a array @ local =
   "caml_array_sub_local"
 external array_blit :
-  local_ 'a array -> int -> local_ 'a array -> int -> int -> unit = "caml_array_blit"
+  'a array @ local -> int -> 'a array @ local -> int -> int -> unit = "caml_array_blit"
 external array_fill :
-  local_ 'a array -> int -> int -> 'a -> unit = "caml_array_fill"
+  'a array @ local -> int -> int -> 'a -> unit = "caml_array_fill"
 
 let maniparray0 =
   let l = [42] in
@@ -336,15 +336,15 @@ let makeref n =
   ()
 
 external bytes_create :
-  int -> local_ bytes = "caml_create_local_bytes"
+  int -> bytes @ local = "caml_create_local_bytes"
 external bytes_set :
-  local_ bytes -> int -> char -> unit = "%bytes_unsafe_set"
+  bytes @ local -> int -> char -> unit = "%bytes_unsafe_set"
 external bytes_get :
-  local_ bytes -> int -> char = "%bytes_unsafe_get"
+  bytes @ local -> int -> char = "%bytes_unsafe_get"
 external bytes_fill :
-  local_ bytes -> int -> int -> char -> unit = "caml_fill_bytes"
+  bytes @ local -> int -> int -> char -> unit = "caml_fill_bytes"
 external bytes_blit_string :
-  local_ string -> int -> local_ bytes -> int -> int -> unit =
+  string @ local -> int -> bytes @ local -> int -> int -> unit =
   "caml_blit_string"
 let hello = Bytes.of_string "hello"
 let makebytes () =
@@ -449,11 +449,11 @@ let makeverylong n =
   ignore_local (local_array 100_000 n);
   ()
 
-let fun_with_optional_arg ?(local_ foo = 5) () =
+let fun_with_optional_arg ?(foo @ local = 5) () =
   let _ = foo + 5 in
   ()
 
-let optionalarg ((f : ?foo:local_ int -> unit -> unit), n) =
+let optionalarg ((f : ?foo: int @ local -> unit -> unit), n) =
   let () = f ~foo:n () in
   ()
 

@@ -9,7 +9,7 @@
 [@@@warning "-23"]
 type unit_u : void mod everything
 external unbox_unit : unit -> unit_u = "%unbox_unit"
-external globalize : local_ 'a -> 'a = "%obj_dup";;
+external globalize : 'a @ local -> 'a = "%obj_dup";;
 let int64x2_u_equal (_ : int64x2#) (_ : int64x2#) = failwith "should not be called from bytecode"
 
 open Stdlib_upstream_compatible

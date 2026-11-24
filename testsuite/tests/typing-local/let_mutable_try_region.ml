@@ -12,7 +12,7 @@
 
 type r = { mutable a : int }
 
-let[@inline never] get (local_ r : r) = r.a
+let[@inline never] get (r : r @ local) = r.a
 
 let[@inline never] f n =
   let mutable x = { a = 1 } in

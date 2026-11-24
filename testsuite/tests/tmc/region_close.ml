@@ -24,13 +24,13 @@ let[@tail_mod_cons] rec map2_exn l0 l1 ~f =
    code. In that dps code the result of [List.rev xs] is written to the
    destination, so the call is no longer in tail position of the region of
    the inlined helper [go], and must not close it. *)
-let[@inline never] use_local (local_ _ : int ref) = ()
+let[@inline never] use_local (_ : int ref @ local) = ()
 
 let[@tail_mod_cons] rec rev_after_zero = function
   | [] -> []
   | x :: xs ->
     x :: (let go () =
-            let local_ r = ref x in
+            let r @ local = ref x in
             use_local r;
             if x = 0 then List.rev xs else rev_after_zero xs
           in
@@ -43,7 +43,7 @@ let[@tail_mod_cons] rec send_after_zero (o : < m : int list >) = function
   | [] -> []
   | x :: xs ->
     x :: (let go () =
-            let local_ r = ref x in
+            let r @ local = ref x in
             use_local r;
             if x = 0 then o#m else send_after_zero o xs
           in

@@ -357,7 +357,7 @@ external[@layout_poly] unsafe_blit :
 
 let failwithf fmt = Printf.ksprintf failwith fmt
 
-external globalize : local_ 'a -> 'a = "%obj_dup";;
+external globalize : 'a @ local -> 'a = "%obj_dup";;
 
 (* Redefine iter to infer locality *)
 let rec iter ~f = function
@@ -562,7 +562,7 @@ let test_makearray_dynamic ~uninit ~local ty =
           let lens = "blit_lens ~ofs1 ~ofs2 ~size1:size ~size2" in
           iter lens "len" ~debug_exprs (fun ~debug_exprs ->
             (if to_local then
-              line "let local_ a2 = makearray_dynamic_local size2 %s in" (ty.Ty.value_code 0)
+              line "let a2 @ local = makearray_dynamic_local size2 %s in" (ty.Ty.value_code 0)
             else
               line "let a2 = makearray_dynamic size2 %s in" (ty.Ty.value_code 0));
             line "unsafe_blit a ofs1 a2 ofs2 len;";

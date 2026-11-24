@@ -15,10 +15,10 @@
 
 module M : sig
   (* explicit signature to force return modes *)
-  val part_local : int -> int -> local_ string -> int -> int -> int -> int list
+  val part_local : int -> int -> string @ local -> int -> int -> int -> int list
   val all_heap : int -> int -> string -> int -> int -> int -> int list
 end = struct
-  let part_local a b (local_ c) d e f =
+  let part_local a b (c @ local) d e f =
     (* This function is used to test that its partial applications up
        to the second argument are heap allocated, then further partial
        applications to more arguments are stack allocated. If the 'c'
@@ -32,11 +32,11 @@ end = struct
 end
 
 
-external is_stack : local_ 'a -> bool = "caml_obj_is_stack"
-let loc (local_ x) =
+external is_stack : 'a @ local -> bool = "caml_obj_is_stack"
+let loc (x @ local) =
   if is_stack x then 1 else 0
 
-let[@inline never] flocal (local_ arg) =
+let[@inline never] flocal (arg @ local) =
   let g = M.part_local in
   let a = g 1 in
   let b = a 2 in
@@ -54,7 +54,7 @@ let fopaque () =
   let g = Sys.opaque_identity M.part_local in
   let a = g 1 in
   let b = a 2 in
-  let c = b (local_ "asdf") in
+  let c = b ("asdf" : @ local) in
   let d = c 4 in
   let e = d 5 in
   Gc.minor ();
@@ -66,12 +66,12 @@ let _ = fopaque ()
 
 
 let[@inline never] fheap () =
-  let g = local_ M.all_heap in
-  let a = local_ g 1 in
-  let b = local_ a 2 in
-  let c = local_ b "asdf" in
-  let d = local_ c 4 in
-  let e = local_ d 5 in
+  let g @ local = M.all_heap  in
+  let a @ local = g 1  in
+  let b @ local = a 2  in
+  let c @ local = b "asdf"  in
+  let d @ local = c 4  in
+  let e @ local = d 5  in
   Gc.minor ();
   Printf.printf "%20s: %d%d%d%d%d%d\n"
     "all heap"
@@ -102,7 +102,7 @@ let () = flocal_curry ()
 
 (* partial application of a local function *)
 let[@inline never] f z =
-  let local_ g a b c d e f = [a;b;c;d;e;f;z] in
+  let (g @ local) a b c d e f = [a;b;c;d;e;f;z] in
   let a = g 1 in
   let b = a 2 in
   let c = b 3 in
@@ -115,7 +115,7 @@ let[@inline never] f z =
 
 let () = f 42
 
-let[@inline never] tupled : (string*string) -> local_ string =
+let[@inline never] tupled : (string*string) -> string @ local =
   fun (a,b) -> exclave_ (a^b)
 let () =
   match tupled ("a","b") with
@@ -123,7 +123,7 @@ let () =
   | _ -> assert false
 
 let globalref = ref 42
-type 'a glob = { global_ g : 'a }
+type 'a glob = { g : 'a @@ global }
 let escape x = { g = x }.g
 let[@inline never] prim () =
   let r = stack_ (ref 42) in
@@ -139,7 +139,7 @@ let[@inline never] prim () =
 
 let () = prim ()
 
-let curried (local_ x) = { g = fun () -> 42 }
+let curried (x @ local) = { g = fun () -> 42 }
 let () =
   let _ = (Sys.opaque_identity curried) (stack_ (ref 42)) in
   Gc.minor ()

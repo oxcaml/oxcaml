@@ -49,16 +49,16 @@
 let[@inline never] consume (_ : _ @ local) = ()
 
 let stack_alloc_pair x =
-  let local_ pair = (x, x + 1) in
+  let pair @ local = (x, x + 1) in
   consume pair;
   ()
 
-let use_local (local_ s) = String.length s
+let use_local (s @ local) = String.length s
 
 type box = { mutable v : int }
 
 let mutate_local () =
-  let local_ b = { v = 0 } in
+  let b @ local = { v = 0 } in
   b.v <- 42;
   b.v
 
@@ -135,14 +135,14 @@ end
 module Make_adder (M : sig val base : int end) = struct
   let add x y = M.base + x + y
 
-  let scale_local (local_ x) (local_ y) = add x y
+  let scale_local (x @ local) (y @ local) = add x y
 end
 
 module Five = struct let base = 5 end
 module Five_adder = Make_adder (Five)
 
 module Pipeline (M : Adder) = struct
-  let single_local (local_ x) = M.add x 1
+  let single_local (x @ local) = M.add x 1
 
   let nested xs =
     List.iter

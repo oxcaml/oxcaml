@@ -33,9 +33,9 @@ end
 
 (* compiles: *)
 module External : sig
-  val f : local_ int -> int -> int [@@zero_alloc partial]
+  val f : int @ local -> int -> int [@@zero_alloc partial]
 end = struct
-  external f : local_ int -> int -> int = "test_partial_external"
+  external f : int @ local -> int -> int = "test_partial_external"
   [@@noalloc]
 end
 

@@ -1,5 +1,5 @@
 (* TEST *)
-let[@inline never] f (g : local_ _ -> unit) n =
+let[@inline never] f (g : _ @ local -> unit) n =
   let r = stack_ { contents = ref 0 } in
   g r;
   r.contents <- ref n;

@@ -1632,23 +1632,23 @@ val f : ('a : word mod many aliased). 'a -> 'a = <fun>
 |}]
 
 let f x =
-  let local_ g (type a : value) (x : a) = x in
+  let (g @ local) (type a : value) (x : a) = x in
   g x [@nontail]
 
 let f x =
-  let local_ g (type a : immediate) (x : a) = x in
+  let (g @ local) (type a : immediate) (x : a) = x in
   g x [@nontail]
 
 let f x =
-  let local_ g (type a : value mod global) (x : a) = x in
+  let (g @ local) (type a : value mod global) (x : a) = x in
   g x [@nontail]
 
 let f x =
-  let local_ g (type a : immediate mod global) (x : a) = x in
+  let (g @ local) (type a : immediate mod global) (x : a) = x in
   g x [@nontail]
 
 let f x =
-  let local_ g (type a : word mod external_ many aliased) (x : a) = x in
+  let (g @ local) (type a : word mod external_ many aliased) (x : a) = x in
   g x [@nontail]
 
 [%%expect{|

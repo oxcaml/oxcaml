@@ -5,7 +5,7 @@
 
 (* Mode crossing works on immediate64 types *)
 module F (M : sig type t [@@immediate64] end) = struct
-  let f : local_ M.t -> _ = fun t -> t
+  let f : M.t @ local -> _ = fun t -> t
 end
 
 [%%expect{|

@@ -16,7 +16,7 @@ val escape : 'a -> unit = <fun>
    allocates in caller's region. *)
 let foo () =
   exclave_
-    let local_ y = Some 42 in
+    let y @ local = Some 42 in
     y
 [%%expect{|
 val foo : unit -> int option @ local = <fun>
@@ -31,7 +31,7 @@ val foo : unit -> int option @ local = <fun>
     *)
 let foo () =
   exclave_
-    let local_ _y = Some 42 in
+    let _y @ local = Some 42 in
     let x = Some 42 in
     let _ = escape x in
     x
@@ -55,7 +55,7 @@ val foo : 'a -> int option @ local = <fun>
 (* Below we do some usual testing  *)
 let foo x =
   exclave_
-    let local_ y = None in
+    let y @ local = None in
     (* y is not global *)
     ref y
 [%%expect{|
@@ -67,7 +67,7 @@ Error: This value is "local" but is expected to be "global".
 
 (* following we check error detection *)
 let foo x =
-  let local_ y = "foo" in
+  let y @ local = "foo" in
   exclave_ Some y
 [%%expect{|
 Line 3, characters 16-17:
@@ -77,7 +77,7 @@ Error: The value "y" is local, so it cannot be used inside an exclave_
 |}]
 
 let foo x =
-  let local_ y = "foo" in
+  let y @ local = "foo" in
   let z = exclave_ Some y in
   z
 [%%expect{|
@@ -134,7 +134,7 @@ Error: Exclave expression should only be in tail position of the current region.
 
 type t = { x : int option }
 
-let foo (local_ x) =
+let foo (x @ local) =
   let _ = { x } in
   exclave_ x
 
@@ -148,12 +148,12 @@ val foo : int option @ local -> int option @ local = <fun>
 type data = {mutable a : string}
 
 let foo () =
-  let local_ x : data = {a  = "foo"} in
-  let local_ z = "hello" in
+  let x : data @ local = {a  = "foo"} in
+  let z @ local = "hello" in
   x.a <- z;
   while true do
     exclave_
-      let local_ y = "hello" in
+      let y @ local = "hello" in
       x.a <- y
   done
 
@@ -167,7 +167,7 @@ Error: This value is "local" but is expected to be "global".
 
 let foo x =
   exclave_
-    let local_ y = Some x in
+    let y @ local = Some x in
     y
   ;;
 
@@ -183,7 +183,7 @@ val bar : 'a -> string = <fun>
 |}]
 
 (* Ensure that Alias bindings are not substituted by Simplif (PR1448) *)
-type 'a glob = Glob of global_ 'a
+type 'a glob = Glob of 'a @@ global
 
 let[@inline never] return_local a = exclave_ (Glob a)
 
@@ -236,7 +236,7 @@ let f () =
 val f : unit -> (string -> (string -> unit)) @ local = <fun>
 |}]
 
-let f : local_ string -> string =
+let f : string @ local -> string =
   fun x -> exclave_ s
 [%%expect{|
 Line 2, characters 11-21:

@@ -45,7 +45,7 @@ external[@layout_poly] unsafe_blit :
 
 let failwithf fmt = Printf.ksprintf failwith fmt
 
-external globalize : local_ 'a -> 'a = "%obj_dup";;
+external globalize : 'a @ local -> 'a = "%obj_dup";;
 
 (* Redefine iter to infer locality *)
 let rec iter ~f = function
@@ -511,7 +511,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0.s in
+          let a2 @ local = makearray_dynamic_local size2 #0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -624,7 +624,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0. in
+          let a2 @ local = makearray_dynamic_local size2 #0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -737,7 +737,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0l in
+          let a2 @ local = makearray_dynamic_local size2 #0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -850,7 +850,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0L in
+          let a2 @ local = makearray_dynamic_local size2 #0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -963,7 +963,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0n in
+          let a2 @ local = makearray_dynamic_local size2 #0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1076,7 +1076,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1189,7 +1189,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1302,7 +1302,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1415,7 +1415,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #0l, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #0l, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1528,7 +1528,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1641,7 +1641,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1754,7 +1754,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0.s in
+          let a2 @ local = makearray_dynamic_local size2 0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1867,7 +1867,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0. in
+          let a2 @ local = makearray_dynamic_local size2 0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -1980,7 +1980,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0l in
+          let a2 @ local = makearray_dynamic_local size2 0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2093,7 +2093,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0L in
+          let a2 @ local = makearray_dynamic_local size2 0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2206,7 +2206,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0n in
+          let a2 @ local = makearray_dynamic_local size2 0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2319,7 +2319,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0 in
+          let a2 @ local = makearray_dynamic_local size2 0 in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2432,7 +2432,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 A3_0 in
+          let a2 @ local = makearray_dynamic_local size2 A3_0 in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2545,7 +2545,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = 0 } : ur2) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = 0 } : ur2) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2658,7 +2658,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0, 0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(0, 0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2771,7 +2771,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(None, #(0, 0l, 0.), 0., #(0.s, None), 0l) in
+          let a2 @ local = makearray_dynamic_local size2 #(None, #(0, 0l, 0.), 0., #(0.s, None), 0l) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2884,7 +2884,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0., 0., 0.) in
+          let a2 @ local = makearray_dynamic_local size2 #(0., 0., 0.) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -2997,7 +2997,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0., #(0., 0.), #(0., #(0., 0., 0.))) in
+          let a2 @ local = makearray_dynamic_local size2 #(0., #(0., 0.), #(0., #(0., 0., 0.))) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3110,7 +3110,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., 0, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., 0, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3223,7 +3223,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3336,7 +3336,7 @@ let test_makearray_dynamic size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #((#{ a = #0L; b = 0 } : ur2), (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #((#{ a = #0L; b = 0 } : ur2), (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3452,7 +3452,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0.s in
+          let a2 @ local = makearray_dynamic_local size2 #0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3565,7 +3565,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0. in
+          let a2 @ local = makearray_dynamic_local size2 #0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3678,7 +3678,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0l in
+          let a2 @ local = makearray_dynamic_local size2 #0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3791,7 +3791,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0L in
+          let a2 @ local = makearray_dynamic_local size2 #0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -3904,7 +3904,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0n in
+          let a2 @ local = makearray_dynamic_local size2 #0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4017,7 +4017,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4130,7 +4130,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4243,7 +4243,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4356,7 +4356,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #0l, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #0l, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4469,7 +4469,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4582,7 +4582,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4695,7 +4695,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0.s in
+          let a2 @ local = makearray_dynamic_local size2 0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4808,7 +4808,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0. in
+          let a2 @ local = makearray_dynamic_local size2 0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -4921,7 +4921,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0l in
+          let a2 @ local = makearray_dynamic_local size2 0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5034,7 +5034,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0L in
+          let a2 @ local = makearray_dynamic_local size2 0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5147,7 +5147,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0n in
+          let a2 @ local = makearray_dynamic_local size2 0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5260,7 +5260,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 0 in
+          let a2 @ local = makearray_dynamic_local size2 0 in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5373,7 +5373,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 A3_0 in
+          let a2 @ local = makearray_dynamic_local size2 A3_0 in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5486,7 +5486,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = 0 } : ur2) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = 0 } : ur2) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5599,7 +5599,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0, 0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(0, 0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5712,7 +5712,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(None, #(0, 0l, 0.), 0., #(0.s, None), 0l) in
+          let a2 @ local = makearray_dynamic_local size2 #(None, #(0, 0l, 0.), 0., #(0.s, None), 0l) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5825,7 +5825,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0., 0., 0.) in
+          let a2 @ local = makearray_dynamic_local size2 #(0., 0., 0.) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -5938,7 +5938,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(0., #(0., 0.), #(0., #(0., 0., 0.))) in
+          let a2 @ local = makearray_dynamic_local size2 #(0., #(0., 0.), #(0., #(0., 0., 0.))) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6051,7 +6051,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., 0, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., 0, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6164,7 +6164,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6277,7 +6277,7 @@ let test_makearray_dynamic_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #((#{ a = #0L; b = 0 } : ur2), (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #((#{ a = #0L; b = 0 } : ur2), (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6392,7 +6392,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0.s in
+          let a2 @ local = makearray_dynamic_local size2 #0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6504,7 +6504,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0. in
+          let a2 @ local = makearray_dynamic_local size2 #0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6616,7 +6616,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0l in
+          let a2 @ local = makearray_dynamic_local size2 #0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6728,7 +6728,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0L in
+          let a2 @ local = makearray_dynamic_local size2 #0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6840,7 +6840,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0n in
+          let a2 @ local = makearray_dynamic_local size2 #0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -6952,7 +6952,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7064,7 +7064,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7176,7 +7176,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7288,7 +7288,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #0l, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #0l, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7400,7 +7400,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7512,7 +7512,7 @@ let test_makearray_dynamic_uninit size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7627,7 +7627,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0.s in
+          let a2 @ local = makearray_dynamic_local size2 #0.s in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7739,7 +7739,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0. in
+          let a2 @ local = makearray_dynamic_local size2 #0. in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7851,7 +7851,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0l in
+          let a2 @ local = makearray_dynamic_local size2 #0l in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -7963,7 +7963,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0L in
+          let a2 @ local = makearray_dynamic_local size2 #0L in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8075,7 +8075,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #0n in
+          let a2 @ local = makearray_dynamic_local size2 #0n in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8187,7 +8187,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L; b = #0. } : ur1) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8299,7 +8299,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = #0L } : ur3) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8411,7 +8411,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
+          let a2 @ local = makearray_dynamic_local size2 (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8523,7 +8523,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #0l, #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #0l, #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8635,7 +8635,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =
@@ -8747,7 +8747,7 @@ let test_makearray_dynamic_uninit_local size =
     iter (blit_offsets size) ~f:(fun ofs1 ->
       iter (blit_offsets size2) ~f:(fun ofs2 ->
         iter (blit_lens ~ofs1 ~ofs2 ~size1:size ~size2) ~f:(fun len ->
-          let local_ a2 = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+          let a2 @ local = makearray_dynamic_local size2 #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
           unsafe_blit a ofs1 a2 ofs2 len;
           for i = 0 to size2 - 1 do
             let expected_src_i =

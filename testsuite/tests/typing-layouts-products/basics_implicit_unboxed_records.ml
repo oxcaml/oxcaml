@@ -129,7 +129,7 @@ val add : t# -> int = <fun>
 type ('a, 'b) ab = { left : 'a ; right : 'b }
 type ('a, 'b) ab_u = { left : 'a ; right : 'b }
 
-let f_unboxed_record (local_ left) (local_ right) =
+let f_unboxed_record (left @ local) (right @ local) =
   let t = #{ left; right } in
   let #{ left = left'; _ } = t in
   left'
@@ -139,7 +139,7 @@ type ('a, 'b) ab_u = { left : 'a; right : 'b; }
 val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
-let f_boxed_record (local_ left) (local_ right) =
+let f_boxed_record (left @ local) (right @ local) =
   let t = { left; right } in
   let { left = left'; _ } = t in
   left'

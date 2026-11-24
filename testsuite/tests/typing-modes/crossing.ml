@@ -87,7 +87,7 @@ Error: Signature mismatch:
 |}]
 
 module M : sig
-    val f : local_ int -> int
+    val f : int @ local -> int
 end = struct
     let f (_ @ global) = 42
 end

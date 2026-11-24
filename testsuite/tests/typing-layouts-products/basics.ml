@@ -898,40 +898,40 @@ module type S_coherence_deep =
 (* Test 7: modal kinds for unboxed product types *)
 
 let f_external_utuple_mode_crosses_local_1
-  : local_ #(int * int) -> #(int * int) = fun x -> x
+  : #(int * int) @ local -> #(int * int) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_1 :
   #(int * int) @ local -> #(int * int) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_1
-  : local_ #(int * string) -> #(int * string) = fun x -> x
+  : #(int * string) @ local -> #(int * string) = fun x -> x
 [%%expect{|
-Line 2, characters 57-58:
-2 |   : local_ #(int * string) -> #(int * string) = fun x -> x
-                                                             ^
+Line 2, characters 58-59:
+2 |   : #(int * string) @ local -> #(int * string) = fun x -> x
+                                                              ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f_external_utuple_mode_crosses_local_2
-  : local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = fun x -> x
+  : #(int * #(bool * int)) @ local -> #(int * #(bool * int)) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_2 :
   #(int * #(bool * int)) @ local -> #(int * #(bool * int)) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_2
-  : local_ #(int * #(bool * string)) -> #(int * #(bool * string)) = fun x -> x
+  : #(int * #(bool * string)) @ local -> #(int * #(bool * string)) = fun x -> x
 [%%expect{|
-Line 2, characters 77-78:
-2 |   : local_ #(int * #(bool * string)) -> #(int * #(bool * string)) = fun x -> x
-                                                                                 ^
+Line 2, characters 78-79:
+2 |   : #(int * #(bool * string)) @ local -> #(int * #(bool * string)) = fun x -> x
+                                                                                  ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t = #(int * int)
 let f_external_utuple_mode_crosses_local_3
-  : local_ #(int * #(t * int)) -> #(int * #(t * int)) = fun x -> x
+  : #(int * #(t * int)) @ local -> #(int * #(t * int)) = fun x -> x
 [%%expect{|
 type t = #(int * int)
 val f_external_utuple_mode_crosses_local_3 :
@@ -940,12 +940,12 @@ val f_external_utuple_mode_crosses_local_3 :
 
 type t = #(string * int)
 let f_internal_utuple_does_not_mode_cross_local_3
-  : local_ #(int * #(t * bool)) -> #(int * #(t * bool)) = fun x -> x
+  : #(int * #(t * bool)) @ local -> #(int * #(t * bool)) = fun x -> x
 [%%expect{|
 type t = #(string * int)
-Line 3, characters 67-68:
-3 |   : local_ #(int * #(t * bool)) -> #(int * #(t * bool)) = fun x -> x
-                                                                       ^
+Line 3, characters 68-69:
+3 |   : #(int * #(t * bool)) @ local -> #(int * #(t * bool)) = fun x -> x
+                                                                        ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
@@ -953,7 +953,7 @@ Error: This value is "local" to the parent region but is expected to be "global"
 
 type local_cross1 = #{ i1 : int; i2 : int }
 let f_external_urecord_mode_crosses_local_1
-  : local_ local_cross1 -> local_cross1 = fun x -> x
+  : local_cross1 @ local -> local_cross1 = fun x -> x
 [%%expect{|
 type local_cross1 = #{ i1 : int; i2 : int; }
 val f_external_urecord_mode_crosses_local_1 :
@@ -962,19 +962,19 @@ val f_external_urecord_mode_crosses_local_1 :
 
 type local_nocross1 = #{ i : int; s : string }
 let f_internal_urecord_does_not_mode_cross_local_1
-  : local_ local_nocross1 -> local_nocross1 = fun x -> x
+  : local_nocross1 @ local -> local_nocross1 = fun x -> x
 [%%expect{|
 type local_nocross1 = #{ i : int; s : string; }
-Line 3, characters 55-56:
-3 |   : local_ local_nocross1 -> local_nocross1 = fun x -> x
-                                                           ^
+Line 3, characters 56-57:
+3 |   : local_nocross1 @ local -> local_nocross1 = fun x -> x
+                                                            ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type local_cross2_inner = #{ b : bool; i : int }
 type local_cross2 = #{ i : int; inner : local_cross2_inner }
 let f_external_urecord_mode_crosses_local_2
-  : local_ local_cross2 -> local_cross2 = fun x -> x
+  : local_cross2 @ local -> local_cross2 = fun x -> x
 [%%expect{|
 type local_cross2_inner = #{ b : bool; i : int; }
 type local_cross2 = #{ i : int; inner : local_cross2_inner; }
@@ -985,13 +985,13 @@ val f_external_urecord_mode_crosses_local_2 :
 type local_nocross2_inner = #{ b : bool; s : string }
 type local_nocross2 = #{ i : int; inner : local_nocross2_inner }
 let f_internal_urecord_does_not_mode_cross_local_2
-  : local_ local_nocross2 -> local_nocross2 = fun x -> x
+  : local_nocross2 @ local -> local_nocross2 = fun x -> x
 [%%expect{|
 type local_nocross2_inner = #{ b : bool; s : string; }
 type local_nocross2 = #{ i : int; inner : local_nocross2_inner; }
-Line 4, characters 55-56:
-4 |   : local_ local_nocross2 -> local_nocross2 = fun x -> x
-                                                           ^
+Line 4, characters 56-57:
+4 |   : local_nocross2 @ local -> local_nocross2 = fun x -> x
+                                                            ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
@@ -999,7 +999,7 @@ type t = #{ i1 : int; i2 : int }
 type local_cross3_inner = #{ t : t; i : int }
 type local_cross3 = #{ i : int; inner : local_cross3_inner }
 let f_external_urecord_mode_crosses_local_3
-  : local_ local_cross3 -> local_cross3 = fun x -> x
+  : local_cross3 @ local -> local_cross3 = fun x -> x
 [%%expect{|
 type t = #{ i1 : int; i2 : int; }
 type local_cross3_inner = #{ t : t; i : int; }
@@ -1012,14 +1012,14 @@ type t = #{ s : string; i : int }
 type local_nocross3_inner = #{ t : t; b : bool }
 type local_nocross3 = #{ i : int; inner : local_nocross3_inner }
 let f_internal_urecord_does_not_mode_cross_local_3
-  : local_ local_nocross3 -> local_nocross3 = fun x -> x
+  : local_nocross3 @ local -> local_nocross3 = fun x -> x
 [%%expect{|
 type t = #{ s : string; i : int; }
 type local_nocross3_inner = #{ t : t; b : bool; }
 type local_nocross3 = #{ i : int; inner : local_nocross3_inner; }
-Line 5, characters 55-56:
-5 |   : local_ local_nocross3 -> local_nocross3 = fun x -> x
-                                                           ^
+Line 5, characters 56-57:
+5 |   : local_nocross3 @ local -> local_nocross3 = fun x -> x
+                                                            ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
@@ -1028,7 +1028,7 @@ Error: This value is "local" to the parent region but is expected to be "global"
 
 type t : float64 & float64 mod global
 let f_external_kind_annot_mode_crosses_local_1
-  : local_ t -> t = fun x -> x
+  : t @ local -> t = fun x -> x
 [%%expect{|
 type t : float64 mod global & float64 mod global
 val f_external_kind_annot_mode_crosses_local_1 : t @ local -> t = <fun>
@@ -1036,18 +1036,18 @@ val f_external_kind_annot_mode_crosses_local_1 : t @ local -> t = <fun>
 
 type t : float64 & value
 let f_internal_kind_annot_does_not_mode_cross_local_1
-  : local_ t -> t = fun x -> x
+  : t @ local -> t = fun x -> x
 [%%expect{|
 type t : float64 & value
-Line 3, characters 29-30:
-3 |   : local_ t -> t = fun x -> x
-                                 ^
+Line 3, characters 30-31:
+3 |   : t @ local -> t = fun x -> x
+                                  ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t : immediate & ((float64 mod global) & immediate)
 let f_external_kind_annot_mode_crosses_local_2
-  : local_ t -> t = fun x -> x
+  : t @ local -> t = fun x -> x
 [%%expect{|
 type t
   : value non_pointer mod global
@@ -1057,12 +1057,12 @@ val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 
 type t : immediate & (value & float64)
 let f_internal_kind_annot_does_not_mode_cross_local_2
-  : local_ t -> t = fun x -> x
+  : t @ local -> t = fun x -> x
 [%%expect{|
 type t : value non_pointer & (value & float64)
-Line 3, characters 29-30:
-3 |   : local_ t -> t = fun x -> x
-                                 ^
+Line 3, characters 30-31:
+3 |   : t @ local -> t = fun x -> x
+                                  ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 

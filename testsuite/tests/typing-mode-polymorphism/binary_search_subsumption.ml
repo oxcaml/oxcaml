@@ -47,7 +47,7 @@ module M : S = struct
       | Some i when i = 0 -> None
       | Some i -> Some (i - 1))
 
-  let binary_search t ~(local_ length) ~(local_ get) ~(local_ compare) v
+  let binary_search t ~(length @ local) ~(get @ local) ~(compare @ local) v
     = exclave_
     if compare (get t 0) v > 0
     then find_first_satisfying t ~get ~length ~pred:(fun x -> compare x v >= 0)

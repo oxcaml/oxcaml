@@ -2,7 +2,7 @@
 let[@inline always] const () = 42
 
 let[@inline always] alloc size =
-  let local_ _blah = [size] in
+  let _blah @ local = [size] in
   const ()
 
 type t = { func : unit -> int; foo : int }

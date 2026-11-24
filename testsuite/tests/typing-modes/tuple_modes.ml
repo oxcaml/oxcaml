@@ -230,7 +230,7 @@ Error: This value is "local" to the parent region but is expected to be "global"
 |}]
 
 (* An unboxed tuple is not an allocation, but a regular tuple is *)
-let f_unboxed_tuple (local_ a) (local_ b) =
+let f_unboxed_tuple (a @ local) (b @ local) =
   let t = #(a, b) in
   let #(a', _) = t in
   a'
@@ -238,7 +238,7 @@ let f_unboxed_tuple (local_ a) (local_ b) =
 val f_unboxed_tuple : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
-let f_boxed_tuple (local_ a) (local_ b) =
+let f_boxed_tuple (a @ local) (b @ local) =
   let t = (a, b) in
   let (a', _) = t in
   a'

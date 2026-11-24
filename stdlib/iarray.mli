@@ -32,7 +32,7 @@ open! Stdlib
 type (+'a : any mod separable) t = 'a iarray
 (** An alias for the type of immutable arrays. *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int
+external length : ('a : any mod separable). 'a iarray @ local -> int
   = "%array_length"
 [@@layout_poly]
 (** Return the length (number of elements) of the given immutable array. *)
@@ -49,7 +49,7 @@ external get :
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
 val init : ('a : value_or_null mod separable).
-  int -> local_ (int -> 'a) -> 'a iarray
+  int -> (int -> 'a) @ local -> 'a iarray
 (** [init n f] returns a fresh immutable array of length [n],
    with element number [i] initialized to the result of [f i].
    In other terms, [init n f] tabulates the results of [f]
@@ -105,13 +105,13 @@ val of_array : ('a : value_or_null mod separable). 'a array -> 'a iarray
 (** {1 Comparison} *)
 
 val equal : ('a : value_or_null mod separable).
-  local_ ('a -> 'a -> bool) -> 'a iarray -> 'a iarray -> bool
+  ('a -> 'a -> bool) @ local -> 'a iarray -> 'a iarray -> bool
 (** [eq [|a1; ...; an|] [|b1; ..; bm|]] holds when the two input immutable
     arrays have the same length, and for each pair of elements [ai, bi] at the
     same position we have [eq ai bi]. *)
 
 val compare : ('a : value_or_null mod separable).
-  local_ ('a -> 'a -> int) -> 'a iarray -> 'a iarray -> int
+  ('a -> 'a -> int) @ local -> 'a iarray -> 'a iarray -> int
 (** Provided the function [cmp] defines a preorder on elements,
     [compare cmp a b] compares first [a] and [b] by their length, and then, if
       equal, by their elements according to the lexicographic preorder.
@@ -122,35 +122,35 @@ val compare : ('a : value_or_null mod separable).
 
 val iter
   : ('a : value_or_null mod separable).
-  local_ ('a -> unit) -> 'a iarray -> unit
+  ('a -> unit) @ local -> 'a iarray -> unit
 (** [iter f a] applies function [f] in turn to all
    the elements of [a].  It is equivalent to
    [f (get a 0); f (get a 1); ...; f (get a (length a - 1)); ()]. *)
 
 val iteri
   : ('a : value_or_null mod separable).
-  local_ (int -> 'a -> unit) -> 'a iarray -> unit
+  (int -> 'a -> unit) @ local -> 'a iarray -> unit
 (** Same as {!iter}, but the
    function is applied to the index of the element as first argument,
    and the element itself as second argument. *)
 
 val map
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
-  local_ ('a -> 'b) -> 'a iarray -> 'b iarray
+  ('a -> 'b) @ local -> 'a iarray -> 'b iarray
 (** [map f a] applies function [f] to all the elements of [a],
    and builds an immutable array with the results returned by [f]:
    [[| f (get a 0); f (get a 1); ...; f (get a (length a - 1)) |]]. *)
 
 val mapi
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
-  local_ (int -> 'a -> 'b) -> 'a iarray -> 'b iarray
+  (int -> 'a -> 'b) @ local -> 'a iarray -> 'b iarray
 (** Same as {!map}, but the
    function is applied to the index of the element as first argument,
    and the element itself as second argument. *)
 
 val fold_left
   : ('a : value_or_null) ('b : value_or_null mod separable).
-  local_ ('a -> 'b -> 'a) -> 'a -> 'b iarray -> 'a
+  ('a -> 'b -> 'a) @ local -> 'a -> 'b iarray -> 'a
 (** [fold_left f init a] computes
    [f (... (f (f init (get a 0)) (get a 1)) ...) (get a n-1)],
    where [n] is the length of the immutable array [a]. *)
@@ -158,13 +158,13 @@ val fold_left
 val fold_left_map
   : ('a : value_or_null) ('b : value_or_null mod separable)
     ('c : value_or_null mod separable).
-  local_ ('a -> 'b -> 'a * 'c) -> 'a -> 'b iarray -> 'a * 'c iarray
+  ('a -> 'b -> 'a * 'c) @ local -> 'a -> 'b iarray -> 'a * 'c iarray
 (** [fold_left_map] is a combination of {!fold_left} and {!map} that threads an
     accumulator through calls to [f]. *)
 
 val fold_right
   : ('a : value_or_null) ('b : value_or_null mod separable).
-  local_ ('b -> 'a -> 'a) -> 'b iarray -> 'a -> 'a
+  ('b -> 'a -> 'a) @ local -> 'b iarray -> 'a -> 'a
 (** [fold_right f a init] computes
    [f (get a 0) (f (get a 1) ( ... (f (get a (n-1)) init) ...))],
    where [n] is the length of the immutable array [a]. *)
@@ -175,7 +175,7 @@ val fold_right
 
 val iter2
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
-  local_ ('a -> 'b -> unit) -> 'a iarray -> 'b iarray -> unit
+  ('a -> 'b -> unit) @ local -> 'a iarray -> 'b iarray -> unit
 (** [iter2 f a b] applies function [f] to all the elements of [a]
    and [b].
    @raise Invalid_argument if the immutable arrays are not the same size.
@@ -184,7 +184,7 @@ val iter2
 val map2
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable)
     ('c : value_or_null mod separable).
-  local_ ('a -> 'b -> 'c) -> 'a iarray -> 'b iarray -> 'c iarray
+  ('a -> 'b -> 'c) @ local -> 'a iarray -> 'b iarray -> 'c iarray
 (** [map2 f a b] applies function [f] to all the elements of [a]
    and [b], and builds an immutable array with the results returned by [f]:
    [[| f (get a 0) (get b 0);
@@ -197,54 +197,54 @@ val map2
 
 val for_all
   : ('a : value_or_null mod separable).
-  local_ ('a -> bool) -> 'a iarray -> bool
+  ('a -> bool) @ local -> 'a iarray -> bool
 (** [for_all f [|a1; ...; an|]] checks if all elements
    of the immutable array satisfy the predicate [f]. That is, it returns
    [(f a1) && (f a2) && ... && (f an)]. *)
 
 val exists
   : ('a : value_or_null mod separable).
-  local_ ('a -> bool) -> 'a iarray -> bool
+  ('a -> bool) @ local -> 'a iarray -> bool
 (** [exists f [|a1; ...; an|]] checks if at least one element of
     the immutable array satisfies the predicate [f]. That is, it returns
     [(f a1) || (f a2) || ... || (f an)]. *)
 
 val for_all2
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
-  local_ ('a -> 'b -> bool) -> 'a iarray -> 'b iarray -> bool
+  ('a -> 'b -> bool) @ local -> 'a iarray -> 'b iarray -> bool
 (** Same as {!for_all}, but for a two-argument predicate.
    @raise Invalid_argument if the two immutable arrays have different
    lengths. *)
 
 val exists2
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
-  local_ ('a -> 'b -> bool) -> 'a iarray -> 'b iarray -> bool
+  ('a -> 'b -> bool) @ local -> 'a iarray -> 'b iarray -> bool
 (** Same as {!exists}, but for a two-argument predicate.
    @raise Invalid_argument if the two immutable arrays have different
    lengths. *)
 
 val mem
   : ('a : value_or_null mod separable).
-  local_ 'a -> local_ 'a iarray -> bool
+  'a @ local -> 'a iarray @ local -> bool
 (** [mem a set] is true if and only if [a] is structurally equal
     to an element of [l] (i.e. there is an [x] in [l] such that
     [compare a x = 0]). *)
 
 val memq
   : ('a : value_or_null mod separable).
-  local_ 'a -> local_ 'a iarray -> bool
+  'a @ local -> 'a iarray @ local -> bool
 (** Same as {!mem}, but uses physical equality instead of structural equality
     to compare array elements. *)
 
 val find_opt
   : ('a : value_or_null mod separable).
-  local_ ('a -> bool) -> 'a iarray -> 'a option
+  ('a -> bool) @ local -> 'a iarray -> 'a option
 (** [find_opt f a] returns the first element of the immutable array [a] that
     satisfies the predicate [f], or [None] if there is no value that satisfies
     [f] in the array [a]. *)
 
 val find_index : ('a : value_or_null mod separable).
-  local_ ('a -> bool) -> 'a iarray -> int option
+  ('a -> bool) @ local -> 'a iarray -> int option
 (** [find_index f a] returns [Some i], where [i] is the index of the first
     element of the array [a] that satisfies [f x], if there is such an
     element.
@@ -253,12 +253,12 @@ val find_index : ('a : value_or_null mod separable).
 
 val find_map
   : ('a : value_or_null mod separable) ('b : value_or_null).
-  local_ ('a -> 'b option) -> 'a iarray -> 'b option
+  ('a -> 'b option) @ local -> 'a iarray -> 'b option
 (** [find_map f a] applies [f] to the elements of [a] in order, and returns the
     first result of the form [Some v], or [None] if none exist. *)
 
 val find_mapi : ('a : value_or_null mod separable) ('b : value_or_null).
-  local_ (int -> 'a -> 'b option) -> 'a iarray -> 'b option
+  (int -> 'a -> 'b option) @ local -> 'a iarray -> 'b option
 (** Same as [find_map], but the predicate is applied to the index of
    the element as first argument (counting from 0), and the element
    itself as second argument. *)

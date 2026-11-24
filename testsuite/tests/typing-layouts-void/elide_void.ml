@@ -180,7 +180,7 @@ val weak_over : '_weak2 list ref = {contents = []}
 external and_witness : (unit# [@elide_void]) -> bool -> bool -> bool
   = "%sequand"
 let lhs f =
-  let local_ r = ref 42 in
+  let r @ local = ref 42 in
   and_witness #() (f r) true
 [%%expect{|
 external and_witness : (unit# [@elide_void]) -> bool -> bool -> bool
@@ -189,7 +189,7 @@ val lhs : (int ref @ local -> bool) -> bool = <fun>
 |}]
 
 let rhs f =
-  let local_ r = ref 42 in
+  let r @ local = ref 42 in
   and_witness #() true (f r)
 [%%expect{|
 Line 3, characters 26-27:
@@ -204,7 +204,7 @@ Error: This value is "local"
 external or_mid : bool -> (unit# [@elide_void]) -> bool -> bool
   = "%sequor"
 let witness_not_tail f =
-  let local_ r = ref 42 in
+  let r @ local = ref 42 in
   or_mid false (f r) true
 [%%expect{|
 external or_mid : bool -> (unit# [@elide_void]) -> bool -> bool = "%sequor"
@@ -218,11 +218,11 @@ module Modes : sig
   external poly_w : ((w [@local_opt]) [@elide_void]) -> int -> int
     = "%identity"
 end = struct
-  external local_w : local_ (w [@elide_void]) -> int -> int = "%identity"
+  external local_w : (w [@elide_void]) @ local -> int -> int = "%identity"
   external poly_w : (w [@local_opt] [@elide_void]) -> int -> int
     = "%identity"
 end
-let local_ok (local_ x : w) = Modes.local_w x 1 + Modes.poly_w x 2
+let local_ok (x : w @ local) = Modes.local_w x 1 + Modes.poly_w x 2
 [%%expect{|
 module Modes :
   sig
@@ -233,11 +233,11 @@ module Modes :
 val local_ok : w @ local -> int = <fun>
 |}]
 
-let global_bad (local_ x : w) = add_mid 1 x 2
+let global_bad (x : w @ local) = add_mid 1 x 2
 [%%expect{|
-Line 1, characters 42-43:
-1 | let global_bad (local_ x : w) = add_mid 1 x 2
-                                              ^
+Line 1, characters 43-44:
+1 | let global_bad (x : w @ local) = add_mid 1 x 2
+                                               ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 

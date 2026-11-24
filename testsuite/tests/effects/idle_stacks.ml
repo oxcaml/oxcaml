@@ -218,7 +218,7 @@ let test_locals () =
   let saved : (int, unit) continuation option ref = ref None in
   match_with
     (fun () ->
-      let local_ r = ref 17 in
+      let r @ local = ref 17 in
       let v = perform (E 5) in
       r := !r + v;
       Printf.printf "locals: %d\n" !r)

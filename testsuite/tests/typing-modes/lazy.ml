@@ -20,7 +20,7 @@ Error: This value is "local"
          because it is a lazy expression and thus needs to be allocated on the heap.
 |}]
 
-let foo (local_ x) =
+let foo (x @ local) =
     lazy (let _ = x in ())
 [%%expect{|
 Line 2, characters 18-19:

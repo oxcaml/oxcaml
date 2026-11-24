@@ -311,7 +311,7 @@ Error: This value is "local"
 |}]
 
 (* with exclave_ it works *)
-let foo (local_ x) = exclave_
+let foo (x @ local) = exclave_
   let y = id_local x in
   y
 [%%expect{|

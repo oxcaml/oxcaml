@@ -522,7 +522,7 @@ let () =
   let open struct
     type ('base : value, 'data : any) impl =
       #{ x : 'base or_null
-      ; global_ idx : ('base, 'data) idx_mut
+      ; idx : ('base, 'data) idx_mut @@ global
       }
 
     type ('data : any) t = T : ('base : value) ('data : any). ('base, 'data) impl -> 'data t

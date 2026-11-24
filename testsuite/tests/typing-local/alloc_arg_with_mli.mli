@@ -9,11 +9,11 @@ module M2 : sig
 end
 
 module M3 : sig
-  val take_local : local_ t -> int
+  val take_local : t @ local -> int
 end
 
 module M4 : sig
-  val take_local : local_ t -> int
+  val take_local : t @ local -> int
 end
 
 module M5 : sig

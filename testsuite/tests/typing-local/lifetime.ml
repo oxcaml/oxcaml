@@ -18,7 +18,7 @@ let[@inline never] alloc () =
   ev "live reg";
   r
 
-let[@opaque] use (local_ _) = ()
+let[@opaque] use (_ @ local) = ()
 
 let[@inline never] live_local () =
   if !rtrue then begin
@@ -29,7 +29,7 @@ let[@inline never] live_local () =
         ev "live local";
         use s;
 
-        let rec local_ f x = if x then (use s; ()) else (g (); ())
+        let rec (f @ local) x = if x then (use s; ()) else (g (); ())
         and g () = f true; ()
         in
         g

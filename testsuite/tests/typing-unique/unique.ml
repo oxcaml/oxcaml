@@ -384,7 +384,7 @@ val ul_ret : 'a @ unique -> 'a @ local = <fun>
 |}]
 
 let rec foo =
-  fun (local_ o) ->
+  fun (o @ local) ->
   match (o : @ unique) with
   | Some () -> foo None
   | None -> ()
@@ -401,7 +401,7 @@ let rec bar =
 val bar : unit option @ local unique -> unit = <fun>
 |}]
 
-let foo : string @ local unique -> unit = fun (local_ s) -> ()
+let foo : string @ local unique -> unit = fun (s @ local) -> ()
 [%%expect{|
 val foo : string @ local unique -> unit = <fun>
 |}]
@@ -560,8 +560,8 @@ Line 4, characters 6-7:
 Error: The value "r" has type "int" but an expression was expected of type "string"
 |}]
 
-let return_local : local_ 'a -> local_ 'a = fun x -> x
-let return_global : local_ 'a -> int = fun x -> 0
+let return_local : 'a @ local -> 'a @ local = fun x -> x
+let return_global : 'a @ local -> int = fun x -> 0
 [%%expect{|
 val return_local : 'a @ local -> 'a @ local = <fun>
 val return_global : 'a @ local -> int = <fun>

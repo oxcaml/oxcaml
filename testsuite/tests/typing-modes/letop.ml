@@ -23,23 +23,23 @@ val ( and* ) : 'a option -> 'b option -> ('a * 'b) option = <fun>
 
 (* bindings are required to be legacy *)
 let foo () =
-    let* a = local_ "hello" in
+    let* a = ("hello" : @ local) in
     ()
 [%%expect{|
-Line 2, characters 13-27:
-2 |     let* a = local_ "hello" in
-                 ^^^^^^^^^^^^^^
+Line 2, characters 13-32:
+2 |     let* a = ("hello" : @ local) in
+                 ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let foo () =
     let* a = Some "hello"
-    and* b = local_ "hello" in
+    and* b = ("hello" : @ local) in
     ()
 [%%expect{|
-Line 3, characters 13-27:
-3 |     and* b = local_ "hello" in
-                 ^^^^^^^^^^^^^^
+Line 3, characters 13-32:
+3 |     and* b = ("hello" : @ local) in
+                 ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -76,13 +76,13 @@ Error: This value is "nonportable"
 let foo () =
     let _ =
         let* a = Some (fun x -> x) in
-        local_ "hello"
+        ("hello" : @ local)
     in
     ()
 [%%expect{|
-Line 4, characters 8-22:
-4 |         local_ "hello"
-            ^^^^^^^^^^^^^^
+Line 4, characters 8-27:
+4 |         ("hello" : @ local)
+            ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 

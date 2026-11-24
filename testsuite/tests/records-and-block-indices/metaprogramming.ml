@@ -972,7 +972,7 @@ end
 let preamble ~bytecode =
   {|type unit_u : void mod everything
 external unbox_unit : unit -> unit_u = "%unbox_unit"
-external globalize : local_ 'a -> 'a = "%obj_dup";;
+external globalize : 'a @ local -> 'a = "%obj_dup";;
 |}
   ^
   if bytecode
