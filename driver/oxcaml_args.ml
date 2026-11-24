@@ -597,21 +597,20 @@ let mk_llvm_flags f =
 let mk_fdo_counters f =
   ( "-fdo-counters",
     Arg.Unit f,
-    " Attach FDO counters to function entries, branches, and call sites (no \
-     counters are attached in classic mode), and describe the instructions \
-     that carry them in the FDO metadata section (amd64 only)" )
+    " Attach FDO counters to function entries, branches, and call sites (not \
+     in classic mode) and emit the FDO metadata section (amd64 only)" )
 
 let mk_fdo_names f =
   ( "-fdo-names",
     Arg.Unit f,
-    " With -fdo-counters, also record the names of the counters in the FDO \
-     metadata section, for readable decoder output" )
+    " With -fdo-counters, also record counter names in the FDO metadata section"
+  )
 
 let mk_fdo_dropped_counters f =
   ( "-fdo-dropped-counters",
     Arg.Unit f,
-    " With -fdo-counters, also record the FDO counters dropped by \
-     optimizations in the FDO metadata section, with the reason" )
+    " With -fdo-counters, also record dropped FDO counters and their reasons \
+     in the FDO metadata section" )
 
 let mk_dfdo_dropped_counters f =
   ( "-dfdo-dropped-counters",

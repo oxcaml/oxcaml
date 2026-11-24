@@ -79,8 +79,7 @@ module Reason : sig
         (** The counters of a conditional branch too far from its target, which
             [Branch_relaxation] replaces by branches without counters. *)
     | Peephole_deleted
-        (** The counters of a branch or call that peephole optimization of the
-            emitted code deletes. *)
+        (** The counters of an instruction deleted by peephole optimization. *)
 
   val to_string : t -> string
 

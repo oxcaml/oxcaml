@@ -109,10 +109,14 @@ end
 type t =
   { record_names : bool;
     mutable functions : Function.t list;  (** most recent first *)
-    names : string Hash.Tbl.t;
+    names : string Hash.Tbl.t;  (** empty without -fdo-names *)
     body_hashes : Fdo_counter.Body_hash.t Hash.Tbl.t;
+        (** of every compiled instrumented function, executed or not, so a
+            profile can tell an unexecuted function from one whose body changed
+        *)
     mutable dropped :
       (Fdo_dropped_counters.Reason.t * Fdo_counter.Hashed.t) list
+        (** empty without -fdo-dropped-counters *)
   }
 
 type function_metadata =
@@ -154,8 +158,8 @@ let add_entry fn address action =
 
 let add_counters fn address (action : Fdo_counter.Hashed.t -> Action.t) counters
     =
-  (* Sorting by outermost position first groups the counters sharing inlining
-     contexts, for the sharing in the encoding. *)
+  (* Sort outermost position first to group counters with shared inlining
+     contexts. *)
   List.map List.rev counters
   |> List.sort_uniq (List.compare Hash.compare)
   |> List.iter (function
@@ -262,19 +266,14 @@ let set_dropped t dropped =
                         hashes
 *)
 
-(* The previous counter starts empty in each function, and is that of the
-   previous entry with one, in metadata order, not execution order. The return
-   address of a call is its address plus its length, so returns need no entries.
-   An indirect jump counts only when it lands at its target. An exception
-   handler unwinds the decoder's call stack to the nearest frame of its
-   function, or clears it if there is none: with recursion, that frame may not
-   be the one the exception was raised to. Bodies cover every compiled
-   instrumented function, so a profile can tell an unexecuted function from one
-   whose body changed. Dropped counters (see
-   [Fdo_dropped_counters.Reason.to_int] for the reasons) are only recorded with
-   -fdo-dropped-counters, to assess what dropping them loses. Names are only
-   recorded with -fdo-names. Labels of a function are in one text section, so
-   all offsets are assembler constants. *)
+(* The previous counter starts empty in each function and tracks the last entry
+   that had one (in metadata order, not execution order). A call's return
+   address is its address plus its length, so returns need no entries. An
+   indirect jump counts only when it lands at its target. An exception handler
+   unwinds the decoder's call stack to the nearest frame of its function (or
+   clears it if none); under recursion, that may not be the frame that caught
+   the exception. All labels of a function live in one text section, so offsets
+   are assembler constants. *)
 let version = 19
 
 let section =
@@ -331,8 +330,8 @@ end
 
 let rec uleb_size n = if n < 0x80 then 1 else 1 + uleb_size (n lsr 7)
 
-(* How many innermost hashes of [previous] to drop, and the innermost hashes of
-   [counter] to put in their place, innermost first. *)
+(* Returns [(drop, push)]: how many innermost hashes of [previous] to drop and
+   the hashes of [counter] (innermost first) to prepend in their place. *)
 let unshared ~previous counter =
   let rec drop_common previous counter =
     match previous, counter with

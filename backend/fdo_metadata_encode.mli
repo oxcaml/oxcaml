@@ -26,17 +26,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The FDO metadata section of a compilation unit: for each function, the
-    addresses of the instructions that carry FDO counters, with what executing
-    them means, so that a profile decoder can attribute the branches it samples
-    to counters.
+(** Encodes the [".debug_fdo_metadata"] section for a compilation unit. For each
+    function, records the addresses of instrumented instructions and exception
+    handlers so a profile decoder can attribute sampled branches to FDO
+    counters. *)
 
-    Each entry has a complete counter, with its inlining context within the
-    function. Sharing inlining contexts with the previous entry is purely an
-    encoding: decoding a sample does not depend on earlier branch outcomes. *)
-
-(** What Emit reports about the emitted code, at a label: an instrumented
-    instruction or an exception handler. *)
+(** An instrumented instruction or exception handler recorded at a label. *)
 module Event : sig
   type t =
     | Conditional_branch of
@@ -82,8 +77,6 @@ val record_event :
 
 val end_function : function_metadata -> finish:Asm_targets.Asm_label.t -> unit
 
-(** Record the counters dropped in the unit, with the reason. They have no
-    address: this is for assessing what dropping them loses. *)
 val set_dropped : t -> Fdo_dropped_counters.t -> unit
 
 (** Emit the unit's ".debug_fdo_metadata" section. Nothing is emitted when
