@@ -343,7 +343,11 @@ end = struct
   let pp_var ~witnesses ppf var w =
     Format.fprintf ppf "(%a%a)@," Var.print var (pp_w ~witnesses) w
 
-  let pp_top ~witnesses ppf w = Format.fprintf ppf "(top%a)" (pp_w ~witnesses) w
+  let pp_top ~witnesses ppf ({ allocation_source; witnesses = w } : Top.t) =
+    Format.fprintf ppf "(top %a%a)"
+      (Allocation_source.print Relevant_components_by_argument_index.print)
+        allocation_source
+      (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
   module Vars : sig
@@ -555,8 +559,9 @@ end = struct
       | Args vars ->
         Format.fprintf ppf "(transform:@.%a)@." (Vars.print ~witnesses) vars
       | Args_with_top { top; vars } ->
-        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses)
-          top.witnesses (Vars.print ~witnesses) vars
+        Format.fprintf ppf "(transform:@.%a@.%a)@."
+          (pp_top ~witnesses) top
+          (Vars.print ~witnesses) vars
   end
 
   module Transforms : sig
@@ -1092,7 +1097,7 @@ end = struct
       | Args_with_safe args ->
         Format.fprintf ppf "(join:@.Safe@.%a)@." (Args.print ~witnesses) args
       | Args_with_top { top; args } ->
-        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top.witnesses
+        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top
           (Args.print ~witnesses) args
       | Args args ->
         Format.fprintf ppf "(join:@.%a)@." (Args.print ~witnesses) args
@@ -1130,10 +1135,7 @@ end = struct
   let print ~witnesses ppf t =
     match t with
     | Resolved component ->
-      Component.print
-        ~print_top:(fun ppf ({ witnesses = w; _ } : Top.t) ->
-          pp_top ~witnesses ppf w)
-        ppf component
+      Component.print ~print_top:(pp_top ~witnesses) ppf component
     | Var { var; witnesses = w } -> pp_var ~witnesses ppf var w
     | Join j -> Format.fprintf ppf "(join %a)@," (Join.print ~witnesses) j
     | Transform tr ->
