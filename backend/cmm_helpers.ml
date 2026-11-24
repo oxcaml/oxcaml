@@ -487,9 +487,9 @@ let natint_const_untagged dbg n =
 let cint_const n =
   Cint (Nativeint.add (Nativeint.shift_left (Nativeint.of_int n) 1) 1n)
 
-let add_no_overflow ~mk_add n x c dbg =
+let add_no_overflow ~add_op n x c dbg =
   let d = n + x in
-  if d = 0 then c else mk_add c (Cconst_int (d, dbg))
+  if d = 0 then c else Cop (add_op, [c; Cconst_int (d, dbg)], dbg)
 
 let is_defined_shift n = 0 <= n && n < arch_bits
 
@@ -531,7 +531,7 @@ let[@inline] is_constant = function
   | Cconst_int _ | Cconst_natint _ -> true
   | _ -> false
 
-let rec add_const_gen ~mk_add c n dbg =
+let rec add_const_gen ~add_op c n dbg =
   let c = prefer_add c in
   if n = 0
   then c
@@ -542,24 +542,22 @@ let rec add_const_gen ~mk_add c n dbg =
           Cconst_int (x + n, dbg)
         | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
-          add_no_overflow ~mk_add n x c dbg
+          add_no_overflow ~add_op n x c dbg
         | Cop ((Caddi | Cadda | Caddp), [c; Cconst_int (x, _)], _)
           when Misc.no_overflow_add n x ->
-          add_no_overflow ~mk_add n x c dbg
+          add_no_overflow ~add_op n x c dbg
         | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
           Cop (Csubi, [Cconst_int (n + x, dbg); c], dbg)
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
-          add_const_gen ~mk_add c (n - x) dbg
-        | c -> mk_add c (Cconst_int (n, dbg)))
+          add_const_gen ~add_op c (n - x) dbg
+        | c -> Cop (add_op, [c; Cconst_int (n, dbg)], dbg))
 
-let add_const c n dbg =
-  add_const_gen ~mk_add:(fun x y -> Cop (Caddi, [x; y], dbg)) c n dbg
+let add_const c n dbg = add_const_gen ~add_op:Caddi c n dbg
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
-  let mk_add x y = Cop (Caddi, [x; y], dbg) in
   map_tail1 arg ~f:(fun arg ->
       let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
       let x = P.create_var Int "x" in
@@ -574,12 +572,14 @@ let rec add_const' arg const dbg =
               { pat = Binop (Add, Binop (Add, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
-          => fun env -> add_no_overflow ~mk_add env#.n env#.x env#.c dbg );
+          => fun env ->
+            add_no_overflow ~add_op:Caddi env#.n env#.x env#.c dbg );
           ( Guarded
               { pat = Binop (Add, Binop (Add, Any c, Const_int x), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
-          => fun env -> add_no_overflow ~mk_add env#.n env#.x env#.c dbg );
+          => fun env ->
+            add_no_overflow ~add_op:Caddi env#.n env#.x env#.c dbg );
           ( Guarded
               { pat = Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
@@ -598,8 +598,8 @@ let incr_int c dbg = add_const c 1 dbg
 
 let decr_int c dbg = add_const c (-1) dbg
 
-let add_int_gen ~mk_add c1 c2 dbg =
-  let add_const c n = add_const_gen ~mk_add c n dbg in
+let add_int_gen ~add_op c1 c2 dbg =
+  let add_const c n = add_const_gen ~add_op c n dbg in
   let rec add c1 c2 =
     map_tail2 c1 c2 ~f:(fun c1 c2 ->
         match prefer_add c1, prefer_add c2 with
@@ -609,12 +609,11 @@ let add_int_gen ~mk_add c1 c2 dbg =
           add_const (add c1 c2) n1
         | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
           add_const (add c1 c2) n2
-        | c1, c2 -> mk_add c1 c2)
+        | c1, c2 -> Cop (add_op, [c1; c2], dbg))
   in
   add c1 c2
 
-let add_int c1 c2 dbg =
-  add_int_gen ~mk_add:(fun x y -> Cop (Caddi, [x; y], dbg)) c1 c2 dbg
+let add_int c1 c2 dbg = add_int_gen ~add_op:Caddi c1 c2 dbg
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
@@ -669,7 +668,7 @@ let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
   if ptr_out_of_heap
-  then add_int_gen ~mk_add:(fun x y -> Cop (Caddp, [x; y], dbg)) c1 c2 dbg
+  then add_int_gen ~add_op:Caddp c1 c2 dbg
   else
     match c1, c2 with
     | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
