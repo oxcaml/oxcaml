@@ -37,6 +37,7 @@ type ambiguous_arguments = {
 type error =
   | Ambiguous_constructor_arguments of ambiguous_arguments
   | Tmc_local_returning
+  | Tmc_template_definition
 
 exception Error of Location.t * error
 
@@ -1246,6 +1247,20 @@ and traverse_letrec_binding ctx { id; debug_uid; def } =
     [ { id; debug_uid = debug_uid; def = traverse_lfunction ctx def } ]
 
 and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
+  (* The DPS variant is a copy of [lfun], and the definition of a template
+     ([Ptemplate_env]) must not be copied. *)
+  (* CR layout poly: this restriction goes away once TMC runs before slambda
+     evaluation, since copies of [Ltemplate] are evaluated separately. *)
+  let rec check_no_template_definition lam =
+    match[@warning "-fragile-match"] lam with
+    | Lprim (Ptemplate_env _, _, loc) ->
+        raise
+          (Error
+             ( Debuginfo.Scoped_location.to_location loc,
+               Tmc_template_definition ))
+    | _ -> iter_head_constructor check_no_template_definition lam
+  in
+  check_no_template_definition lfun.body;
   let special = Ident.Map.find var inner_ctx.specialized in
   let fun_choice =
     (* The variables bound outside the body are allocated before the function
@@ -1361,6 +1376,16 @@ let () =
           Some (Location.errorf ~loc
                   "[@tail_mod_cons]: Functions cannot be both local-returning \
                    and [@tail_mod_cons]")
+      | Error (loc, Tmc_template_definition) ->
+          let print_msg ppf =
+            Format_doc.fprintf ppf
+              "%a:@ functions@ cannot@ be@ %a@ if@ they@ contain@ a@ \
+               layout-polymorphic@ or@ static@ definition,@ since@ the@ \
+               transformation@ copies@ them."
+              Style.inline_code "[@tail_mod_cons]"
+              Style.inline_code "[@tail_mod_cons]"
+          in
+          Some (Location.errorf ~loc "%t" print_msg)
       | _ ->
         None
     )

@@ -1084,6 +1084,18 @@ and specialize_continuation_if_needed ~simplify_expr dacc
         (* only a single use, the continuation is already specialized *)
         k dacc data
       | uses ->
+        if DA.templates_defined_since dacc data.dacc_after_body
+        then
+          (* A definition of a template directly in the handler prevents
+             specialisation (see [Simplify_template_env]). One in a continuation
+             nested in the handler that can't be lifted, and so would be copied,
+             is assumed not to happen: such continuations are only created for
+             over-applications, whose bodies only contain simplified code, which
+             never defines templates. *)
+          Misc.fatal_errorf
+            "Continuation %a is being specialised, but its handler defines a \
+             template"
+            Continuation.print cont;
         (* We need to save a few values from the dacc, because the
            specialization can reset the dacc to the one after the traversal of
            the body. For most values in the dacc, this is not a problem since

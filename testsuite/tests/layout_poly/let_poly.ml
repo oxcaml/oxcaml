@@ -799,3 +799,19 @@ let with_float =
 [%%expect {|
 val with_float : float = 42.5
 |}]
+
+(* [@tail_mod_cons] copies the function, and the definition of a template must
+   not be copied. *)
+let[@tail_mod_cons] rec map f l =
+  let poly_ tuple x y = (x, y) in
+  match l with
+  | [] -> []
+  | x :: l -> tuple (f x) #1.0 :: map f l
+[%%expect {|
+Line 2, characters 18-30:
+2 |   let poly_ tuple x y = (x, y) in
+                      ^^^^^^^^^^^^
+Error: "[@tail_mod_cons]": functions cannot be "[@tail_mod_cons]" if they contain
+       a layout-polymorphic or static definition, since the transformation
+       copies them.
+|}]

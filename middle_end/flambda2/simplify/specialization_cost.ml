@@ -18,6 +18,7 @@ type reason =
   | At_toplevel
   | Contains_static_consts
   | Contains_set_of_closures
+  | Contains_template_definition
 
 type cost =
   { primitives : (Bound_var.t * Flambda_primitive.t) list;
@@ -38,6 +39,8 @@ let [@ocamlformat "disable"] print_reason ppf reason =
     Format.fprintf ppf "contains_static_consts"
   | Contains_set_of_closures ->
     Format.fprintf ppf "contains_set_of_closures"
+  | Contains_template_definition ->
+    Format.fprintf ppf "contains_template_definition"
 
 let [@ocamlformat "disable"] print_prim ppf (bound_var, prim) =
   Format.fprintf ppf "@[<hov 1>(%a %a)@]"
@@ -78,6 +81,9 @@ let add_set_of_closures _soc _t =
 
 let add_lifted_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
+
+let add_template_definition _t =
+  Cannot_specialize { reason = Contains_template_definition }
 
 let add_prim bound_var prim t =
   update_cost t ~f:(fun ({ primitives; _ } as cost) ->

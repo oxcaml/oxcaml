@@ -407,36 +407,42 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     Static_const_group.match_against_bound_static static_consts bound_static
       ~init:([], [], dacc)
       ~code:(fun (bound_static, static_consts, dacc) code_id code ->
-        let code, static_const, dacc =
-          if simplified_where_bound code
-          then
-            let dacc, prior_lifted_constants =
-              DA.get_and_clear_lifted_constants dacc
-            in
-            let static_const, dacc_after_function =
-              Simplify_set_of_closures.simplify_code_where_bound dacc code
-                ~all_code ~simplify_function_body
-            in
-            let dacc_after_function =
-              DA.add_to_lifted_constant_accumulator dacc_after_function
-                prior_lifted_constants
-            in
-            match Rebuilt_static_const.to_const static_const with
-            | None ->
-              (* Not rebuilding terms: return the original code *)
-              code, Rebuilt_static_const.create_code' code, dacc
-            | Some static_const_or_code -> (
-              match Static_const_or_code.to_code static_const_or_code with
-              | None -> assert false
-              | Some code -> code, static_const, dacc_after_function)
-          else code, Rebuilt_static_const.create_code' code, dacc
-        in
-        let dacc =
-          DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
-        in
-        ( Bound_static.Pattern.code code_id :: bound_static,
-          static_const :: static_consts,
-          dacc ))
+        match Code.template_key code with
+        | Some template_key
+          when Current_unit.is_current (Symbol.compilation_unit template_key) ->
+          (* The code of an instantiation of one of this unit's templates is
+             simplified, and bound, at the template's definition (see
+             [Simplify_template_env]), where the type of its environments is
+             known. Until then, calls to it see the unsimplified code (see
+             [Call_site_inlining_decision.copies_template_definition]). *)
+          let dacc =
+            DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
+          in
+          bound_static, static_consts, DA.add_instantiation_code dacc code
+        | None | Some _ ->
+          let code, static_const, dacc =
+            if simplified_where_bound code
+            then
+              let static_const, dacc_after_function =
+                Simplify_set_of_closures.simplify_code_where_bound dacc code
+                  ~all_code ~simplify_function_body ~template_env_type:None
+              in
+              match Rebuilt_static_const.to_const static_const with
+              | None ->
+                (* Not rebuilding terms: return the original code *)
+                code, Rebuilt_static_const.create_code' code, dacc
+              | Some static_const_or_code -> (
+                match Static_const_or_code.to_code static_const_or_code with
+                | None -> assert false
+                | Some code -> code, static_const, dacc_after_function)
+            else code, Rebuilt_static_const.create_code' code, dacc
+          in
+          let dacc =
+            DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
+          in
+          ( Bound_static.Pattern.code code_id :: bound_static,
+            static_const :: static_consts,
+            dacc ))
       ~deleted_code:(fun acc _code_id -> acc)
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
       ~block_like:(fun
