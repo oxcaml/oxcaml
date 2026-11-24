@@ -11,14 +11,14 @@ open Zero_alloc_utils;;
 
 type summary =
   Relevant_components_by_argument_index.t
-  Allocation_sources.t
+  Allocation_source.t
   Component.t
   Components.t
 ;;
 [%%expect{|
 type summary =
     Zero_alloc_utils.Relevant_components_by_argument_index.t
-    Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+    Zero_alloc_utils.Allocation_source.t Zero_alloc_utils.Component.t
     Zero_alloc_utils.Components.t
 |}]
 
@@ -47,14 +47,14 @@ val read_cmx_lib : string -> summary = <fun>
 |}]
 
 let print_allocation_sources =
-  Allocation_sources.print Relevant_components_by_argument_index.print
+  Allocation_source.print Relevant_components_by_argument_index.print
 ;;
 
 [%%expect{|
 val print_allocation_sources :
   Format.formatter ->
   Zero_alloc_utils.Relevant_components_by_argument_index.t
-  Zero_alloc_utils.Allocation_sources.t -> unit = <fun>
+  Zero_alloc_utils.Allocation_source.t -> unit = <fun>
 |}]
 
 #install_printer print_allocation_sources;;

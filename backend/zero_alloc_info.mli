@@ -9,13 +9,13 @@ module Encoded : sig
 
     val encode :
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t Component.t) ->
+        Relevant_components_by_argument_index.t Allocation_source.t Component.t) ->
       t
 
     val decode :
       t ->
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t Component.t)
+        Relevant_components_by_argument_index.t Allocation_source.t Component.t)
   end
 
   module Components : sig
@@ -39,14 +39,14 @@ end
 
 val encode :
   Zero_alloc_utils.(
-    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Relevant_components_by_argument_index.t Allocation_source.t Component.t
     Components.t) ->
   Encoded.Components.t
 
 val decode :
   Encoded.Components.t ->
   Zero_alloc_utils.(
-    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Relevant_components_by_argument_index.t Allocation_source.t Component.t
     Components.t)
 
 type t

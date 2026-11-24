@@ -185,7 +185,7 @@ module Relevant_components_by_argument_index = struct
       (Numbers.Int.Map.bindings t)
 end
 
-module Allocation_sources = struct
+module Allocation_source = struct
   type 'args t =
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args
@@ -270,7 +270,7 @@ module type WS = sig
   val compare : t -> t -> int
 end
 
-module type Allocation_sources = sig
+module type Allocation_source = sig
   type t
 
   val top : t
@@ -281,11 +281,11 @@ end
 module type Component = sig
   type t
 
-  type allocation_sources
+  type allocation_source
 
   type witnesses
 
-  val top : allocation_sources:allocation_sources -> witnesses:witnesses -> t
+  val top : allocation_source:allocation_source -> witnesses:witnesses -> t
 
   val safe : t
 
@@ -308,7 +308,7 @@ module Make_component (Witnesses : WS) = struct
 
   let bot = Component.Bot
 
-  let top ~allocation_sources:() ~witnesses = Component.Top witnesses
+  let top ~allocation_source:() ~witnesses = Component.Top witnesses
 
   let safe = Component.Safe
 
@@ -329,11 +329,11 @@ module Make_component (Witnesses : WS) = struct
 end
 
 module Make_value
-    (Allocation_sources : Allocation_sources)
+    (Allocation_source : Allocation_source)
     (Witnesses : WS)
     (V :
       Component
-        with type allocation_sources := Allocation_sources.t
+        with type allocation_source := Allocation_source.t
          and type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
@@ -355,13 +355,13 @@ struct
 
   let safe = Components.create (fun _ignore_tag -> V.safe)
 
-  let top ~allocation_sources ~witnesses =
-    Components.create (fun _ignore_tag -> V.top ~allocation_sources ~witnesses)
+  let top ~allocation_source ~witnesses =
+    Components.create (fun _ignore_tag -> V.top ~allocation_source ~witnesses)
 
   let relaxed ~witnesses : t =
     { nor = V.safe;
-      exn = V.top ~allocation_sources:Allocation_sources.top ~witnesses;
-      div = V.top ~allocation_sources:Allocation_sources.top ~witnesses
+      exn = V.top ~allocation_source:Allocation_source.top ~witnesses;
+      div = V.top ~allocation_source:Allocation_source.top ~witnesses
     }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
@@ -376,7 +376,7 @@ struct
   let compare = Components.compare V.compare
 end
 
-module No_allocation_sources : Allocation_sources with type t = unit = struct
+module No_allocation_source : Allocation_source with type t = unit = struct
   type t = unit
 
   let top = ()
@@ -402,7 +402,7 @@ module Assume_info = struct
   end
 
   module V = Make_component (Witnesses)
-  module Value = Make_value (No_allocation_sources) (Witnesses) (V)
+  module Value = Make_value (No_allocation_source) (Witnesses) (V)
 
   type t =
     | No_assume

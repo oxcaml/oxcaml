@@ -109,7 +109,7 @@ module Relevant_components_by_argument_index : sig
   val print : Format.formatter -> t -> unit
 end
 
-module Allocation_sources : sig
+module Allocation_source : sig
   type 'args t =
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args
@@ -171,7 +171,7 @@ module type WS = sig
   val compare : t -> t -> int
 end
 
-module type Allocation_sources = sig
+module type Allocation_source = sig
   type t
 
   val top : t
@@ -183,12 +183,12 @@ module type Component = sig
   (** Abstract value for each component of the domain. *)
   type t
 
-  type allocation_sources
+  type allocation_source
 
   type witnesses
 
   (** Property may not hold on some paths. *)
-  val top : allocation_sources:allocation_sources -> witnesses:witnesses -> t
+  val top : allocation_source:allocation_source -> witnesses:witnesses -> t
 
   (** Property holds on all paths. *)
   val safe : t
@@ -216,17 +216,17 @@ module Make_component (Witnesses : WS) : sig
 
   include
     Component
-      with type allocation_sources := unit
+      with type allocation_source := unit
        and type witnesses := Witnesses.t
        and type t := t
 end
 
 module Make_value
-    (Allocation_sources : Allocation_sources)
+    (Allocation_source : Allocation_source)
     (Witnesses : WS)
     (V :
       Component
-        with type allocation_sources := Allocation_sources.t
+        with type allocation_source := Allocation_source.t
          and type witnesses := Witnesses.t) : sig
   (** Abstract value associated with each program location in a function. *)
   type t = V.t Components.t
@@ -238,7 +238,7 @@ module Make_value
   val meet : t -> t -> t
 
   val top :
-    allocation_sources:Allocation_sources.t -> witnesses:Witnesses.t -> t
+    allocation_source:Allocation_source.t -> witnesses:Witnesses.t -> t
 
   val bot : t
 
@@ -283,7 +283,7 @@ module Make_value
   val compare : t -> t -> int
 end
 
-module No_allocation_sources : Allocation_sources with type t = unit
+module No_allocation_source : Allocation_source with type t = unit
 
 (** The [Assume_info] module contains an instantiation of the abstract domain
     with trivial witnesses. It is used to propagate assume annotations from the
@@ -337,7 +337,7 @@ module Assume_info : sig
   module V : module type of Make_component (Witnesses)
 
   module Value :
-      module type of Make_value (No_allocation_sources) (Witnesses) (V)
+      module type of Make_value (No_allocation_source) (Witnesses) (V)
 
   val get_value : t -> Value.t option
 end

@@ -245,41 +245,41 @@ end
 
 module Top = struct
   type t =
-    { allocation_sources :
+    { allocation_source :
         Zero_alloc_utils.Relevant_components_by_argument_index.t
-        Zero_alloc_utils.Allocation_sources.t;
+        Zero_alloc_utils.Allocation_source.t;
       witnesses : Witnesses.t
     }
 
-  let compare { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
+  let compare { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
     let c =
-      Zero_alloc_utils.Allocation_sources.compare
+      Zero_alloc_utils.Allocation_source.compare
         ~compare_args:
           Zero_alloc_utils.Relevant_components_by_argument_index.compare a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
 
-  let lessequal { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    Zero_alloc_utils.Allocation_sources.lessequal
+  let lessequal { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    Zero_alloc_utils.Allocation_source.lessequal
       ~lessequal_args:
         Zero_alloc_utils.Relevant_components_by_argument_index.lessequal a1 a2
     && Witnesses.lessequal w1 w2
 
-  let join { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    { allocation_sources =
-        Zero_alloc_utils.Allocation_sources.join
+  let join { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    { allocation_source =
+        Zero_alloc_utils.Allocation_source.join
           ~join_args:
             Zero_alloc_utils.Relevant_components_by_argument_index.join a1 a2;
       witnesses = Witnesses.join w1 w2
     }
 
-  let meet { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    { allocation_sources =
-        Zero_alloc_utils.Allocation_sources.meet
+  let meet { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    { allocation_source =
+        Zero_alloc_utils.Allocation_source.meet
           ~meet_args:
             Zero_alloc_utils.Relevant_components_by_argument_index.meet a1 a2;
       witnesses = Witnesses.meet w1 w2
@@ -324,9 +324,9 @@ module V : sig
   val safe : t
 
   val top :
-    allocation_sources:
+    allocation_source:
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) ->
+        Relevant_components_by_argument_index.t Allocation_source.t) ->
     witnesses:Witnesses.t ->
     t
 
@@ -886,9 +886,9 @@ end = struct
     let args_with_top (top : Top.t) args =
       if
         (not (Args.has_witnesses args)) &&
-        Zero_alloc_utils.Allocation_sources.
+        Zero_alloc_utils.Allocation_source.
           allocates_other_than_calling_arguments
-            top.allocation_sources
+            top.allocation_source
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
@@ -897,9 +897,9 @@ end = struct
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
         if
-          Zero_alloc_utils.Allocation_sources.
+          Zero_alloc_utils.Allocation_source.
             allocates_other_than_calling_arguments
-              top.allocation_sources
+              top.allocation_source
         then
           Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
             top.witnesses
@@ -1120,8 +1120,8 @@ end = struct
 
   let safe = Resolved Safe
 
-  let top ~allocation_sources ~witnesses =
-    Resolved (Top { allocation_sources; witnesses })
+  let top ~allocation_source ~witnesses =
+    Resolved (Top { allocation_source; witnesses })
 
   let is_resolved t =
     match t with Resolved _ -> true | Var _ | Join _ | Transform _ -> false
@@ -1187,7 +1187,7 @@ end = struct
       Resolved
         (Zero_alloc_utils.Component.Top
            { witnesses;
-             allocation_sources = Allocation_other_than_calling_arguments
+             allocation_source = Allocation_other_than_calling_arguments
            })
 
   (* Keep [join] and [lessequal] in sync. *)
@@ -1206,9 +1206,9 @@ end = struct
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
         Witnesses.is_empty witnesses &&
-        Zero_alloc_utils.Allocation_sources.
+        Zero_alloc_utils.Allocation_source.
           allocates_other_than_calling_arguments
-            w.allocation_sources
+            w.allocation_source
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1239,18 +1239,18 @@ end = struct
       if
         Transform.has_witnesses tr
         || not
-             (Zero_alloc_utils.Allocation_sources.
+             (Zero_alloc_utils.Allocation_source.
                 allocates_other_than_calling_arguments
-                  w.allocation_sources)
+                  w.allocation_source)
       then Join (Join.tr_with_top tr w)
       else top
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
         Join.has_witnesses j
         || not
-             (Zero_alloc_utils.Allocation_sources.
+             (Zero_alloc_utils.Allocation_source.
                 allocates_other_than_calling_arguments
-                  w.allocation_sources)
+                  w.allocation_source)
       then Join (Join.add_top j w)
       else top
     | Resolved Safe, Join j | Join j, Resolved Safe -> Join (Join.add_safe j)
@@ -1309,9 +1309,9 @@ end = struct
       if
         (Join.has_safe j || Option.is_some (Join.get_top j)) &&
         (not (Join.has_witnesses j)) &&
-        Zero_alloc_utils.Allocation_sources.
+        Zero_alloc_utils.Allocation_source.
           allocates_other_than_calling_arguments
-             w.allocation_sources
+             w.allocation_source
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
@@ -1327,8 +1327,8 @@ end = struct
 
   let replace_witnesses witnesses t =
     match t with
-    | Resolved (Top { allocation_sources; _ }) ->
-      Resolved (Top { allocation_sources; witnesses })
+    | Resolved (Top { allocation_source; _ }) ->
+      Resolved (Top { allocation_source; witnesses })
     | Resolved (Bot | Safe) -> t
     | Join j -> Join (Join.replace_witnesses j witnesses)
     | Transform tr -> Transform (Transform.replace_witnesses tr witnesses)
@@ -1342,7 +1342,7 @@ end = struct
            { (* CR-soon wsturgeon for wsturgeon: evaluate the conditional
                 guarantee of this call instead of assuming it will allocate
                 (work for the next PR in this split) *)
-             allocation_sources = Allocation_other_than_calling_arguments;
+             allocation_source = Allocation_other_than_calling_arguments;
              witnesses
            })
     | Resolved (Bot | Safe) -> t
@@ -1435,27 +1435,27 @@ end = struct
     aux t
 end
 
-module Allocation_sources :
-  Zero_alloc_utils.Allocation_sources
+module Allocation_source :
+  Zero_alloc_utils.Allocation_source
     with type t =
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) = struct
+        Relevant_components_by_argument_index.t Allocation_source.t) = struct
   type t =
     Zero_alloc_utils.(
-      Relevant_components_by_argument_index.t Allocation_sources.t)
+      Relevant_components_by_argument_index.t Allocation_source.t)
 
   let top =
-    Zero_alloc_utils.Allocation_sources.Allocation_other_than_calling_arguments
+    Zero_alloc_utils.Allocation_source.Allocation_other_than_calling_arguments
 
   let argument ~argument_index ~tag :
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) =
+        Relevant_components_by_argument_index.t Allocation_source.t) =
     Zero_alloc_utils.(
-      Allocation_sources.No_allocation_other_than_calling_arguments
+      Allocation_source.No_allocation_other_than_calling_arguments
         (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
 end
 
-module T = Zero_alloc_utils.Make_value (Allocation_sources) (Witnesses) (V)
+module T = Zero_alloc_utils.Make_value (Allocation_source) (Witnesses) (V)
 
 module Value : sig
   include module type of T
@@ -1699,7 +1699,7 @@ end = struct
   let transl witnesses (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
     match v with
     | Top () ->
-      V.top ~allocation_sources:Allocation_other_than_calling_arguments
+      V.top ~allocation_source:Allocation_other_than_calling_arguments
         ~witnesses
     | Safe -> V.safe
     | Bot -> V.bot
@@ -2163,8 +2163,8 @@ end = struct
     V.match_with v
       ~resolved:
         Zero_alloc_utils.(
-          Component.map ~f:(fun ({ allocation_sources; _ } : Top.t) ->
-              allocation_sources))
+          Component.map ~f:(fun ({ allocation_source; _ } : Top.t) ->
+              allocation_source))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2180,8 +2180,8 @@ end = struct
 
   let decode v =
     match Zero_alloc_info.Encoded.Component.decode v with
-    | Top allocation_sources ->
-      V.top ~allocation_sources ~witnesses:decoded_witnesses
+    | Top allocation_source ->
+      V.top ~allocation_source ~witnesses:decoded_witnesses
     | Safe -> V.safe
     | Bot -> V.bot
 
@@ -2353,7 +2353,7 @@ end = struct
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
-      let v = Value.top ~allocation_sources:Allocation_sources.top ~witnesses in
+      let v = Value.top ~allocation_source:Allocation_source.top ~witnesses in
       let msg = Printf.sprintf "conservative %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v
@@ -2423,7 +2423,7 @@ end = struct
     let effect_ =
       match Metadata.assume_value dbg ~can_raise:true witnesses with
       | Some v -> v
-      | None -> Value.top ~allocation_sources:Allocation_sources.top ~witnesses
+      | None -> Value.top ~allocation_source:Allocation_source.top ~witnesses
     in
     transform t ~next ~exn ~effect_ desc dbg
 
@@ -2454,7 +2454,7 @@ end = struct
         (* Conservatively assume that operation can return normally. *)
         let nor =
           if Arch.operation_allocates s
-          then V.top ~allocation_sources:Allocation_sources.top ~witnesses
+          then V.top ~allocation_source:Allocation_source.top ~witnesses
           else V.safe
         in
         (* Specific operations cannot raise *)
@@ -2674,7 +2674,7 @@ end = struct
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
           Unit_info.record unit_info fun_name
-            (Value.top ~allocation_sources:Allocation_sources.top
+            (Value.top ~allocation_source:Allocation_source.top
                ~witnesses:Witnesses.empty)
             fun_dbg a
         else really_check ()
@@ -2721,8 +2721,8 @@ end = struct
                 | Argument { argument_index } ->
                   Zero_alloc_utils.Components.create (fun tag ->
                       V.top
-                        ~allocation_sources:
-                          (Allocation_sources.argument ~argument_index ~tag)
+                        ~allocation_source:
+                          (Allocation_source.argument ~argument_index ~tag)
                         ~witnesses)
               in
               let effect_ =
@@ -2790,7 +2790,7 @@ end = struct
             | Some effect_ -> effect_
             | None ->
               { nor =
-                  V.top ~allocation_sources:Allocation_sources.top ~witnesses;
+                  V.top ~allocation_source:Allocation_source.top ~witnesses;
                 exn = V.bot;
                 div = V.bot
               }
@@ -2912,7 +2912,7 @@ end = struct
       | Aborted _ -> Misc.fatal_errorf "Analyzing function %s" fd.fun_name ()
       | Max_iterations_reached ->
         let res =
-          Value.top ~allocation_sources:Allocation_sources.top
+          Value.top ~allocation_source:Allocation_source.top
             ~witnesses:Witnesses.empty
         in
         report t res

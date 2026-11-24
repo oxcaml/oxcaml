@@ -18,7 +18,7 @@ module Encoded = struct
     }
 
   module Component = struct
-    type t = int list Allocation_sources.t Component.t
+    type t = int list Allocation_source.t Component.t
 
     let pack_relevant_components (relevant : bool Components.t) =
       pack ~bits_per_component:1
@@ -52,14 +52,14 @@ module Encoded = struct
       |> List.map (fun (i, bits) -> i, unpack_relevant_components bits)
       |> Numbers.Int.Map.of_list
 
-    let encode = Component.map ~f:(Allocation_sources.map ~f:encode_arguments)
+    let encode = Component.map ~f:(Allocation_source.map ~f:encode_arguments)
 
-    let decode = Component.map ~f:(Allocation_sources.map ~f:decode_arguments)
+    let decode = Component.map ~f:(Allocation_source.map ~f:decode_arguments)
 
     let compare =
       Component.compare
         ~compare_top:
-          (Allocation_sources.compare
+          (Allocation_source.compare
              ~compare_args:(List.compare Int.compare))
   end
 
@@ -113,7 +113,7 @@ module Encoded = struct
       Zero_alloc_utils.(
         Components.create (fun _ignore_tag ->
             Component.Top
-              Allocation_sources.Allocation_other_than_calling_arguments))
+              Allocation_source.Allocation_other_than_calling_arguments))
       |> encode ~encode_component:Component.encode
     [@@ocaml.warning "-44"]
 
@@ -167,7 +167,7 @@ module Raw = struct
     Components.print
       (Component.print
          ~print_top:
-           (Allocation_sources.print Relevant_components_by_argument_index.print))
+           (Allocation_source.print Relevant_components_by_argument_index.print))
 
   let print ppf t =
     let print (name, components) =
