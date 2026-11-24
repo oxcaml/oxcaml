@@ -575,6 +575,10 @@ let _ = f_callback ()
 
 (* Test case 8: Running OCaml code on a fiber. The stack trace will show OCaml
    -> caml_runstack -> OCaml, unwinding from the fiber to the parent stack. *)
+
+(* CR mshinwell: There is currently no CI job running the DWARF tests on a
+   frame-pointers build, where the caml_runstack CFA expression uses a different
+   offset on amd64, so that variant is not covered by this test. *)
 let[@inline never] [@local never] f_fiber_inner (x : int) = x + 1
 
 let[@inline never] [@local never] f_fiber () =
