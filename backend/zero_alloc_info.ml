@@ -163,25 +163,16 @@ module Raw = struct
   let entries_to_map (e : entries) =
     List.fold_left (fun acc (k, v) -> String.Map.add k v acc) String.Map.empty e
 
-  let bits ~width n =
-    String.init width (fun i ->
-        if n land (1 lsl (width - 1 - i)) <> 0 then '1' else '0')
-
-  let describe_component : Encoded.Component.t -> string = function
-    | Bot -> "bot"
-    | Safe -> "safe"
-    | Top Allocation_other_than_calling_arguments -> "top"
-    | Top (No_allocation_other_than_calling_arguments arguments) ->
-      "[" ^ String.concat "; " (List.map (bits ~width:3) arguments) ^ "]"
+  let print_summary =
+    Components.print
+      (Component.print
+         ~print_top:
+           (Allocation_sources.print Relevant_components_by_argument_index.print))
 
   let print t =
-    let print (name, (components : Encoded.Components.t)) =
-      match components with
-      | Unconditional tags -> Printf.printf "\t\t%s = %#x\n" name tags
-      | Conditional { nor; exn; div } ->
-        Printf.printf "\t\t%s = nor=%s exn=%s div=%s\n" name
-          (describe_component nor) (describe_component exn)
-          (describe_component div)
+    let print (name, components) =
+      Printf.printf "\t\t%s = %s\n" name
+        (Format.asprintf "%a" print_summary (decode components))
     in
     (* CR gyorsh: move encode/decode here somehow for noalloc *)
     Printf.printf "Function summaries for static checks:\n";
