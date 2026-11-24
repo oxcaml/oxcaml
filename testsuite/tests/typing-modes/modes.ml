@@ -4,27 +4,27 @@
 *)
 
 (* Let bindings *)
-let local_ foo : string @ unique = "hello"
+let foo : string @ local unique = "hello"
 [%%expect{|
-Line 1, characters 4-42:
-1 | let local_ foo : string @ unique = "hello"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 4-41:
+1 | let foo : string @ local unique = "hello"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let local_ foo @ unique = "hello"
+let foo @ local unique = "hello"
 [%%expect{|
-Line 1, characters 4-33:
-1 | let local_ foo @ unique = "hello"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 4-32:
+1 | let foo @ local unique = "hello"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
+let foo : 'a. ('a -> 'a) @ local unique = fun x -> x
 [%%expect{|
-Line 1, characters 4-53:
-1 | let local_ foo : 'a. ('a -> 'a) @ unique = fun x -> x
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 4-52:
+1 | let foo : 'a. ('a -> 'a) @ local unique = fun x -> x
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -67,22 +67,22 @@ Line 2, characters 18-23:
 Error: The locality axis has already been specified.
 |}]
 
-let foo a b @ local = local_ "hello"
+let foo a b @ local = ("hello" : @ local)
 [%%expect{|
-Line 1, characters 22-36:
-1 | let foo a b @ local = local_ "hello"
-                          ^^^^^^^^^^^^^^
+Line 1, characters 22-41:
+1 | let foo a b @ local = ("hello" : @ local)
+                          ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
 
-let foo = fun a b @ local -> local_ "hello"
+let foo = fun a b @ local -> ("hello" : @ local)
 [%%expect{|
-Line 1, characters 29-43:
-1 | let foo = fun a b @ local -> local_ "hello"
-                                 ^^^^^^^^^^^^^^
+Line 1, characters 29-48:
+1 | let foo = fun a b @ local -> ("hello" : @ local)
+                                 ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
@@ -100,29 +100,29 @@ val foo : 'a -> 'b -> string @ local = <fun>
 |}]
 
 
-let foo a b @ local = local_ 42
+let foo a b @ local = (42 : @ local)
 [%%expect{|
-Line 1, characters 22-31:
-1 | let foo a b @ local = local_ 42
-                          ^^^^^^^^^
+Line 1, characters 22-36:
+1 | let foo a b @ local = (42 : @ local)
+                          ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
 
-let foo = fun a b @ local -> local_ 42
+let foo = fun a b @ local -> (42 : @ local)
 [%%expect{|
-Line 1, characters 29-38:
-1 | let foo = fun a b @ local -> local_ 42
-                                 ^^^^^^^^^
+Line 1, characters 29-43:
+1 | let foo = fun a b @ local -> (42 : @ local)
+                                 ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
 
-let foo a b : int @ local = local_ 42
+let foo a b : int @ local = (42 : @ local)
 [%%expect{|
 val foo : 'a -> 'b -> int @ local = <fun>
 |}]
@@ -132,22 +132,22 @@ let foo = fun a b @ local -> exclave_ 42
 val foo : 'a -> 'b -> int @ local = <fun>
 |}]
 
-let foo a b @ local = local_ 42
+let foo a b @ local = (42 : @ local)
 [%%expect{|
-Line 1, characters 22-31:
-1 | let foo a b @ local = local_ 42
-                          ^^^^^^^^^
+Line 1, characters 22-36:
+1 | let foo a b @ local = (42 : @ local)
+                          ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
 
-let foo = fun a b @ local -> local_ 42
+let foo = fun a b @ local -> (42 : @ local)
 [%%expect{|
-Line 1, characters 29-38:
-1 | let foo = fun a b @ local -> local_ 42
-                                 ^^^^^^^^^
+Line 1, characters 29-43:
+1 | let foo = fun a b @ local -> (42 : @ local)
+                                 ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
@@ -262,47 +262,47 @@ Error: Found a aliased value where a unique value was expected
 *)
 
 (* arrow types *)
-type r = local_ string @ unique once -> string @ local unique once
+type r = string @ local unique once -> string @ local unique once
 [%%expect{|
 type r = string @ local once unique -> string @ local once unique
 |}]
 
-type r = local_ string * y:string @ unique once -> local_ string * w:string @ once
+type r = string * y:string @ local unique once -> string * w:string @ local once
 [%%expect{|
 type r =
     string * y:string @ local once unique -> string * w:string @ local once
 |}]
 
-type r = x:local_ string * y:string @ unique once -> local_ string * w:string @ once
+type r = x:string * y:string @ local unique once -> string * w:string @ local once
 [%%expect{|
 type r =
     x:string * y:string @ local once unique -> string * w:string @ local once
 |}]
 
 
-type r = local_ string @ foo -> string
+type r = string @ local foo -> string
 [%%expect{|
-Line 1, characters 25-28:
-1 | type r = local_ string @ foo -> string
-                             ^^^
+Line 1, characters 24-27:
+1 | type r = string @ local foo -> string
+                            ^^^
 Error: Unrecognized mode foo.
 |}]
 
-type r = local_ string @ local -> string
+type r = string @ local local -> string
 [%%expect{|
-Line 1, characters 25-30:
-1 | type r = local_ string @ local -> string
-                             ^^^^^
+Line 1, characters 24-29:
+1 | type r = string @ local local -> string
+                            ^^^^^
 Error: The locality axis has already been specified.
 |}]
 
 (* Mixing legacy and new modes *)
-type r = local_ string @ unique once -> string
+type r = string @ local unique once -> string
 [%%expect{|
 type r = string @ local once unique -> string
 |}]
 
-type r = local_ string @ unique once portable contended -> string
+type r = string @ local unique once portable contended -> string
 [%%expect{|
 type r = string @ local once unique portable contended -> string
 |}]
@@ -320,7 +320,7 @@ type r = string @ local once unique -> string
 
 (* modality on constructor arguments and record fields *)
 
-type t = Foo of string @@ global * global_ string
+type t = Foo of string @@ global * string @@ global
 [%%expect{|
 type t = Foo of string @@ global * string @@ global
 |}]
@@ -333,7 +333,7 @@ Line 1, characters 26-29:
 Error: Unrecognized modality foo.
 |}]
 
-type t = Foo of global_ string @@ global
+type t = Foo of string @@ global global
 [%%expect{|
 type t = Foo of string @@ global
 |}]
@@ -356,7 +356,7 @@ Error: Unrecognized modality foo.
 |}]
 
 type r = {
-  global_ x : string @@ global
+  x : string @@ global global
 }
 [%%expect{|
 type r = { x : string @@ global; }
@@ -364,7 +364,7 @@ type r = { x : string @@ global; }
 
 (* [global] implies [aliased]. *)
 type r = {
-  global_ x : string @@ aliased
+  x : string @@ global aliased
 }
 [%%expect{|
 type r = { x : string @@ global; }
@@ -401,47 +401,47 @@ type r = { mutable x : string; }
 
 (* patterns *)
 
-let foo ?(local_ x @ unique once = 42) () = ()
+let foo ?(x @ local unique once = 42) () = ()
 [%%expect{|
 val foo : ?x:int @ local once unique -> (unit -> unit) @ local = <fun>
 |}, Principal{|
 val foo : ?x:int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?(local_ x : _ @ unique once = 42) () = ()
+let foo ?(x : _ @ local unique once = 42) () = ()
 [%%expect{|
 val foo : ?x:int @ local once unique -> (unit -> unit) @ local = <fun>
 |}, Principal{|
 val foo : ?x:int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
+let foo ?(x : 'a. ('a -> 'a) @ local unique once) = ()
 [%%expect{|
-Line 1, characters 10-49:
-1 | let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 10-48:
+1 | let foo ?(x : 'a. ('a -> 'a) @ local unique once) = ()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Optional parameters cannot be polymorphic
 |}]
 
-let foo ?x:(local_ (x,y) @ unique once = (42, 42)) () = ()
+let foo ?x:((x,y) @ local unique once = (42, 42)) () = ()
 [%%expect{|
 val foo : ?x:int * int @ local once unique -> (unit -> unit) @ local = <fun>
 |}, Principal{|
 val foo : ?x:int * int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?x:(local_ (x,y) : _ @ unique once = (42, 42)) () = ()
+let foo ?x:((x,y) : _ @ local unique once = (42, 42)) () = ()
 [%%expect{|
 val foo : ?x:int * int @ local once unique -> (unit -> unit) @ local = <fun>
 |}, Principal{|
 val foo : ?x:int * int @ local once unique -> unit -> unit = <fun>
 |}]
 
-let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
+let foo ?x:((x,y) : 'a.('a->'a) @ local unique once) () = ()
 [%%expect{|
-Line 1, characters 12-52:
-1 | let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 12-51:
+1 | let foo ?x:((x,y) : 'a.('a->'a) @ local unique once) () = ()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Optional parameters cannot be polymorphic
 |}]
 
@@ -564,12 +564,12 @@ Error: The value "contended_ret" has type "string -> string @ contended"
  * Modification of parameter modes in argument position
  *)
 
-let use_local (local_ f : _ -> _ -> _) x y =
+let use_local (f : (_ -> _ -> _) @ local) x y =
   f x y
 let use_global (f : _ -> _ -> _) x y = f x y
 
 let foo x y = x +. y
-let bar (local_ x) (local_ y) = let _ = x +. y in ()
+let bar (x @ local) (y @ local) = let _ = x +. y in ()
 
 let result = use_local foo 1. 2.
 [%%expect{|

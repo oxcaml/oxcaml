@@ -35,7 +35,7 @@ module Example = struct
   let constr           = longident
   let expression       = parse expression "[x for x = 1 to 10]"
   let pattern          = parse pattern "[:_:]"
-  let core_type        = parse core_type "local_ ('a : value) -> unit"
+  let core_type        = parse core_type "('a : value) @ local -> unit"
   let signature        = parse interface "include functor F"
   let structure        = parse implementation "include functor F"
   let module_expr      = parse module_expr "struct include functor F end"

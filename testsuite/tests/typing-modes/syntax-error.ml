@@ -2,11 +2,11 @@
  toplevel;
 *)
 
-let local_ foo : string @ = "hello";;
+let foo : string @ = "hello";;
 
-let local_ foo @ = "hello";;
+let foo @ = "hello";;
 
-let local_ foo : ('a. 'a -> 'a) @  = fun x -> x;;
+let foo : ('a. 'a -> 'a) @  = fun x -> x;;
 
 let foo : type a. (a -> a) @  = fun x -> x;;
 
@@ -55,32 +55,32 @@ let foo () =
   ~(bar @ ), ~(biz @ )
 ;;
 
-type r = local_ string @  -> string @ ;;
+type r = string @  -> string @ ;;
 
-type r = local_ string * y:string @  -> local_ string * w:string @;;
+type r = string * y:string @  -> string * w:string @;;
 
-type r = x:local_ string * y:string @  -> local_ string * w:string @;;
+type r = x:string * y:string @  -> string * w:string @;;
 
-type r = local_ string @ -> string;;
+type r = string @ -> string;;
 
-type t = Foo of string @@ * global_ string;;
+type t = Foo of string @@ * string;;
 
 type r = {
   x : string @@
 }
 ;;
 
-let foo ?(local_ x @ = 42) () = () ;;
+let foo ?(x @ = 42) () = () ;;
 
-let foo ?(local_ x : _ @ = 42) () = ();;
+let foo ?(x : _ @ = 42) () = ();;
 
-let foo ?(local_ x : ('a. 'a -> 'a) @ ) = ();;
+let foo ?(x : ('a. 'a -> 'a) @ ) = ();;
 
-let foo ?x:(local_ (x,y) @ = (42, 42)) () = ();;
+let foo ?x:((x,y) @ = (42, 42)) () = ();;
 
-let foo ?x:(local_ (x,y) : _ @ = (42, 42)) () = ();;
+let foo ?x:((x,y) : _ @ = (42, 42)) () = ();;
 
-let foo ?x:(local_ (x,y) : ('a.'a->'a) @ ) () = ();;
+let foo ?x:((x,y) : ('a.'a->'a) @ ) () = ();;
 
 let foo ((x @ ), (y@)) = x + y ;;
 

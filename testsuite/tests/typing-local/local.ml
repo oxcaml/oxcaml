@@ -3006,29 +3006,29 @@ Error: The allocation is "local" because it is "stack_"-allocated.
 |}];;
 
 
-type f = local_ local_ string -> string
+type f = string @ local local -> string
 [%%expect{|
-Line 1, characters 16-22:
-1 | type f = local_ local_ string -> string
-                    ^^^^^^
+Line 1, characters 24-29:
+1 | type f = string @ local local -> string
+                            ^^^^^
 Error: The locality axis has already been specified.
 |}]
 
 let foo () =
-  let local_ local_ _x = "hello" in
+  let _x @ local local = "hello" in
   ()
 [%%expect{|
-Line 2, characters 13-19:
-2 |   let local_ local_ _x = "hello" in
-                 ^^^^^^
+Line 2, characters 17-22:
+2 |   let _x @ local local = "hello" in
+                     ^^^^^
 Error: The locality axis has already been specified.
 |}]
 
-let foo (local_ local_ _) = ()
+let foo (_ @ local local) = ()
 [%%expect{|
-Line 1, characters 16-22:
-1 | let foo (local_ local_ _) = ()
-                    ^^^^^^
+Line 1, characters 19-24:
+1 | let foo (_ @ local local) = ()
+                       ^^^^^
 Error: The locality axis has already been specified.
 |}]
 
@@ -3038,8 +3038,8 @@ module M = struct
   type t = M_constructor
 end
 
-let foo (local_ _ : M.t) = ();;
-let foo_f (local_ _ : M.t -> unit) = ();;
+let foo (_ : M.t @ local) = ();;
+let foo_f (_ : (M.t -> unit) @ local) = ();;
 [%%expect{|
 module M : sig type t = M_constructor end
 val foo : M.t @ local -> unit = <fun>
@@ -3054,7 +3054,7 @@ let () = foo_f (fun M_constructor -> ())
 [%%expect{|
 |}]
 
-let () = foo (local_ M_constructor)
+let () = foo (M_constructor : @ local)
 [%%expect{|
 |}]
 
@@ -3077,11 +3077,11 @@ let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
 val _ret : unit -> (M.t -> unit) @ local = <fun>
 |}]
 
-type r = {global_ x : string; y : string}
+type r = {x : string @@ global; y : string}
 
 let foo () =
-  let local_ y = "world" in
-  let local_ r = {x = "hello"; y} in
+  let y @ local = "world" in
+  let r @ local = {x = "hello"; y} in
   (* Only using r.x, which is global. So the whole return is global and OK. *)
   {r with y = "foo!" }
 [%%expect{|

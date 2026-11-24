@@ -348,75 +348,65 @@ val nums : 'a list = []
 (* Modes *)
 
 (* parameters, in the order specified by [labeled_simple_pattern] in [parser.mly] *)
-let f ?(local_ x = 42)
-      ?(local_ x @ once portable = 42)
-      ?(local_ x : int @ once portable = 42)
-      ?(local_ x : ('a -> 'a) @ once portable = fun x -> x)
-      ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
-      ?(local_ x : ('a : any) 'b . 'a -> 'b @ once portable = assert false)
-      ?(local_ x : ('a : any) 'b . ('a -> 'b) @ once portable = assert false)
+let f ?(x @ once portable = 42)
+      ?(x : int @ once portable = 42)
+      ?(x : ('a -> 'a) @ once portable = fun x -> x)
+      ?(x : ('a : any) 'b . 'a @ once portable = assert false)
+      ?(x : ('a : any) 'b . 'a -> 'b @ once portable = assert false)
+      ?(x : ('a : any) 'b . ('a -> 'b) @ once portable = assert false)
 
-      ?x:(local_ (y, z) = 42)
-      ?x:(local_ (y, z) @ once portable = 42)
-      ?x:(local_ (y, z) : int @ once portable = 42)
-      ?x:(local_ (y, z) : ('a -> 'a) @ once portable = 42)
-      ?x:(local_ (y, z) : ('a : any) 'b . 'a @ once portable = 42)
-      ?x:(local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable = 42)
-      ?x:(local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable = 42)
+      ?x:((y, z) @ once portable = 42)
+      ?x:((y, z) : int @ once portable = 42)
+      ?x:((y, z) : ('a -> 'a) @ once portable = 42)
+      ?x:((y, z) : ('a : any) 'b . 'a @ once portable = 42)
+      ?x:((y, z) : ('a : any) 'b . 'a -> 'b @ once portable = 42)
+      ?x:((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable = 42)
 
-      ~(local_ x)
-      ~(local_ x @ once portable)
-      ~(local_ x : int @ once portable)
-      ~(local_ x : ('a -> 'a) @ once portable)
-      ~(local_ x : ('a : any) 'b . 'a @ once portable)
-      ~(local_ x : ('a : any) 'b . 'a -> 'b @ once portable)
-      ~(local_ x : ('a : any) 'b . ('a -> 'b) @ once portable)
+      ~(x @ once portable)
+      ~(x : int @ once portable)
+      ~(x : ('a -> 'a) @ once portable)
+      ~(x : ('a : any) 'b . 'a @ once portable)
+      ~(x : ('a : any) 'b . 'a -> 'b @ once portable)
+      ~(x : ('a : any) 'b . ('a -> 'b) @ once portable)
 
-      ~x:(local_ (y, z))
-      ~x:(local_ (y, z) @ once portable)
-      ~x:(local_ (y, z) : int @ once portable)
-      ~x:(local_ (y, z) : ('a -> 'a) @ once portable)
-      ~x:(local_ (y, z) : ('a : any) 'b . 'a @ once portable)
-      ~x:(local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
-      ~x:(local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
+      ~x:((y, z) @ once portable)
+      ~x:((y, z) : int @ once portable)
+      ~x:((y, z) : ('a -> 'a) @ once portable)
+      ~x:((y, z) : ('a : any) 'b . 'a @ once portable)
+      ~x:((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
+      ~x:((y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
 
-      (local_ (y, z))
-      (local_ (y, z) @ once portable)
-      (local_ (y, z) : int @ once portable)
-      (local_ (y, z) : ('a -> 'a) @ once portable)
-      (local_ (y, z) : ('a : any) 'b . 'a @ once portable)
-      (local_ (y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
-      (local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
+      ((y, z) @ once portable)
+      ((y, z) : int @ once portable)
+      ((y, z) : ('a -> 'a) @ once portable)
+      ((y, z) : ('a : any) 'b . 'a @ once portable)
+      ((y, z) : ('a : any) 'b . ('a -> 'b) @ once portable)
+      ((y, z) : ('a : any) 'b . 'a -> 'b @ once portable)
 
       = ();;
 
 (* This file is only about syntax - type error is fine *)
 [%%expect{|
-Line 5, characters 8-53:
-5 |       ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 8-46:
+4 |       ?(x : ('a : any) 'b . 'a @ once portable = assert false)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Optional parameters cannot be polymorphic
 |}]
 
 (* bindings, in the order specified by [let_binding_body_no_punning] in [parser.mly] *)
 let g () =
-  let local_ f = 42 in
-  let local_ f a b @ once portable = 42 in
-  let local_ f a b : int @ once portable = 42 in
-  let local_ f a b : (int -> int) @ once portable = 42 in
-
   let (f @ local unique) = 42 in
   let (f @ local unique) a b @ once portable = 42 in
   let (f @ local unique) a b : int @ once portable = 42 in
   let (f @ local unique) a b : (int -> int) @ once portable = 42 in
 
-  let local_ a @ once portable = 42 in
-  let local_ a : int @ once portable = 42 in
-  let local_ a : (int -> int) @ once portable = 42 in
+  let a @ once portable = 42 in
+  let a : int @ once portable = 42 in
+  let a : (int -> int) @ once portable = 42 in
 
-  let local_ a : ('a : any) 'b. 'a @ once portable = 42 in
-  let local_ a : ('a : any) 'b. 'a -> 'a @ once portable = 42 in
-  let local_ a : ('a : any) 'b. ('a -> 'a) @ once portable = 42 in
+  let a : ('a : any) 'b. 'a @ once portable = 42 in
+  let a : ('a : any) 'b. 'a -> 'a @ once portable = 42 in
+  let a : ('a : any) 'b. ('a -> 'a) @ once portable = 42 in
 
   let a : type (a : any) b. int @ once portable = 42 in
   let a : type (a : any) b. a -> b @ once portable = 42 in
@@ -429,21 +419,21 @@ let g () =
   () ;;
 
 [%%expect{|
-Line 5, characters 52-54:
-5 |   let local_ f a b : (int -> int) @ once portable = 42 in
-                                                        ^^
+Line 5, characters 62-64:
+5 |   let (f @ local unique) a b : (int -> int) @ once portable = 42 in
+                                                                  ^^
 Error: The constant "42" has type "int" but an expression was expected of type
          "int -> int"
 |}]
 
 (* expressions *)
-let g () = exclave_ local_
+let g () = exclave_
   let _f = (() : _ @ unique once) in
   let _f = (() : @ unique once) in
-  let _f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-  let _f x y @ local unique = exclave_ local_ (x + y : @ once unique) in
-  local_ (() : _ @ unique once);
-  local_ (() : @ unique once);;
+  let _f x y @ local unique = exclave_ (x + y : _ @ once unique) in
+  let _f x y @ local unique = exclave_ (x + y : @ once unique) in
+  (() : _ @ unique once);
+  (() : @ unique once);;
 
 [%%expect{|
 val g : unit -> unit @ local once = <fun>
@@ -451,69 +441,60 @@ val g : unit -> unit @ local once = <fun>
 
 (* type declarations *)
 type record =
-  { global_ field0 : int
-  ; field1 : int @@ global portable contended
-  ; global_ field2 : int @@ portable contended
+  { field1 : int @@ global portable contended
   ; normal_field : int
   };;
 
 [%%expect{|
 type record = {
-  field0 : int @@ global;
   field1 : int @@ global portable contended;
-  field2 : int @@ global portable contended;
   normal_field : int;
 }
 |}]
 
 type 'a parameterized_record =
-  { global_ field0 : 'a
-  ; field1 : 'a @@ global portable contended
-  ; global_ field2 : 'a @@ portable contended
+  { field1 : 'a @@ global portable contended
   ; normal_field : 'a
   };;
 
 type t =
-  | Foo of global_ int * int
-  | Foo1 of global_ int @@ portable contended * int
-  | Foo2 of global_ int * global_ int @@ portable contended
-  | Foo3 of global_ int * int @@ portable contended
-  | Foo4 of global_ (int * int) @@ portable contended
+  | Foo of int @@ global * int
+  | Foo1 of int @@ portable contended * int
+  | Foo2 of int @@ global * int @@ portable contended
+  | Foo3 of int * int @@ portable contended
+  | Foo4 of (int * int) @@ portable contended
 
 [%%expect{|
 type 'a parameterized_record = {
-  field0 : 'a @@ global;
   field1 : 'a @@ global portable contended;
-  field2 : 'a @@ global portable contended;
   normal_field : 'a;
 }
 type t =
     Foo of int @@ global * int
-  | Foo1 of int @@ global portable contended * int
-  | Foo2 of int @@ global * int @@ global portable contended
-  | Foo3 of int @@ global * int @@ portable contended
-  | Foo4 of (int * int) @@ global portable contended
+  | Foo1 of int @@ portable contended * int
+  | Foo2 of int @@ global * int @@ portable contended
+  | Foo3 of int * int @@ portable contended
+  | Foo4 of (int * int) @@ portable contended
 |}]
 
 (* arrow types *)
-type fn = local_ int @ portable contended -> local_ int @ portable contended ;;
-type nested_fn = (local_ int @ portable once -> local_ int @ portable once) @ portable once -> local_ int @ portable once;;
+type fn = int @ portable contended -> int @ portable contended ;;
+type nested_fn = (int @ portable once -> int @ portable once) @ portable once -> int @ portable once;;
 type ('a, 'b) labeled_fn =
-  a:local_ 'a @ unique portable contended -> ?b:local_ 'b @ once portable contended ->  local_ 'a @ contended portable-> (int -> local_ 'b @ unique once) @ portable;;
+  a:'a @ unique portable contended -> ?b:'b @ once portable contended ->  'a @ contended portable-> (int -> 'b @ unique once) @ portable;;
 type typvar_fn =
-  a:local_ ('a 'b. 'a) @ unique portable contended -> unit
+  a:('a 'b. 'a) @ unique portable contended -> unit
 
 [%%expect{|
-type fn = int @ local portable contended -> int @ local portable contended
+type fn = int @ portable contended -> int @ portable contended
 type nested_fn =
-    (int @ local once portable -> int @ local once portable) @ once
-    portable -> int @ local once portable
+    (int @ once portable -> int @ once portable) @ once portable ->
+    int @ once portable
 type ('a, 'b) labeled_fn =
-    a:'a @ local unique portable contended ->
-    ?b:'b @ local once portable contended ->
-    'a @ local portable contended ->
-    (int -> 'b @ local once unique) @ portable
-type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
+    a:'a @ unique portable contended ->
+    ?b:'b @ once portable contended ->
+    'a @ portable contended -> (int -> 'b @ once unique) @ portable
+type typvar_fn = a:('a. 'a) @ unique portable contended -> unit
 |}]
 
 module type S_for_mode_polymorphism = sig
@@ -553,17 +534,16 @@ let f ~(x1 @ many)
       ~(x3 : (string -> string) @ local)
       ~(x4 : 'a. ('a -> 'a) @ local)
       ~(x9 : 'a. 'a @ local)
-      ~(local_ x5)
-      ~x6:(local_ true | false @ many)
-      ~x7:(local_ true | false : bool @ many)
-      ~x8:(local_ ())
+      ~(x5 @ local)
+      ~x6:((true | false) @ many)
+      ~x7:((true | false) : bool @ many)
+      ~x8:(() @ local)
       (_ : string @ global)
       (_ @ local) =
   exclave_
-  local_
   let x9 @ local = "hi" in
   let x10 : string @ global = "hi" in
-  let local_ x11 : int array @ contended = [| |] in
+  let x11 : int array @ contended = [| |] in
   (* This next line actually doesn't pass the round-trip test: the parser
      does not accept [local_] and [type] on the same let. This seems annoying
      to fix, and we're getting rid of [local_] someday anyway. *)
@@ -583,8 +563,8 @@ val f :
   x4:('a. 'a -> 'a) @ local ->
   x9:('a. 'a) @ local ->
   x5:'c @ local ->
-  x6:bool @ local ->
-  x7:bool @ local ->
+  x6:bool ->
+  x7:bool ->
   x8:unit @ local ->
   string ->
   'd @ local ->
@@ -637,7 +617,7 @@ type t =
 
 type t = { x : string @@ global
          ; mutable y : float -> float @@ many
-         ; global_ z : string @@ many }
+         ; z : string @@ many }
 
 type t1 = { mutable x : float
           ; mutable f : float -> float }
@@ -652,7 +632,7 @@ type t =
 type t = {
   x : string @@ global;
   mutable y : float -> float;
-  z : string @@ global many;
+  z : string @@ many;
 }
 type t1 = { mutable x : float; mutable f : float -> float; }
 type t2 = {
