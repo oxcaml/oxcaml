@@ -40,7 +40,8 @@ void caml_accum_heap_stats(struct heap_stats* acc, const struct heap_stats* h)
   acc->extent_words += h->extent_words;
   acc->extent_live_words += h->extent_live_words;
   acc->extent_max_words = intnat_max(acc->extent_max_words, acc->extent_words);
-  acc->extent_max_words = intnat_max(acc->extent_max_words, h->extent_max_words);
+  acc->extent_max_words = intnat_max(acc->extent_max_words,
+                                     h->extent_max_words);
   acc->extent_blocks += h->extent_blocks;
   acc->dependent_bytes += h->dependent_bytes;
 }
