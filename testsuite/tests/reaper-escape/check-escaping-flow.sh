@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eu
+
 # Ensure the check is not vacuous: both allocations were recorded and escaped.
 if test "$(grep -c '^allocated_in(' "$1")" != 2 ||
    test "$(grep -c '^escapes_anywhere(' "$1")" != 2; then
