@@ -132,11 +132,17 @@ let adjust_code_metadata t code_id code_metadata =
     if returns_local t code_id
     then
       (* The result types may say that the values returned are allocated on the
-         heap, which is no longer the case. *)
+         heap, which may no longer be the case for any of them: we do not know
+         which allocations a type describes. *)
       with_nlocal_at_least 1
-        (Code_metadata.with_result_types Unknown
+        (Code_metadata.map_result_types
            (Code_metadata.with_result_mode Lambda.maybe_alloc_stack
-              code_metadata))
+              code_metadata) ~f:(fun ty ->
+             Flambda2_types.map_alloc_modes ty
+               ~f:(fun (alloc_mode : Alloc_mode.For_types.t) ->
+                 match alloc_mode with
+                 | Heap -> Alloc_mode.For_types.unknown ()
+                 | Local | Heap_or_local -> alloc_mode)))
     else code_metadata
   in
   if is_local_closure_code t code_id

@@ -35,6 +35,11 @@ val remove_unused_value_slots_and_shortcut_aliases :
   canonicalise:(Simple.t -> Simple.t) ->
   t
 
+(** Apply [f] to every allocation mode in the type (the types it refers to
+    through aliases are left alone). *)
+val map_alloc_modes :
+  t -> f:(Alloc_mode.For_types.t -> Alloc_mode.For_types.t) -> t
+
 type typing_env
 
 type typing_env_extension

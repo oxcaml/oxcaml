@@ -76,10 +76,10 @@ val local_returned : t -> Code_id.t -> Code_id_or_name.Set.t
 val local_contents : t -> Code_id_or_name.t -> Code_id_or_name.Set.t
 
 (** Adjust the metadata of a function according to the decisions of the
-    analysis: a function made to return at mode local loses its result types
-    (which may describe the values returned as heap allocations) and gets a
-    [result_mode] of kind [Maybe_alloc_stack] (its call sites get a
-    [return_mode] of that kind, see [Escape_rebuild]) and [nlocal >= 1] (see
-    [First_complex_local_param]), and the code of a local closure gets [nlocal]
-    equal to its arity. *)
+    analysis: a function made to return at mode local has the allocation modes
+    of its result types weakened (they may describe the values returned as heap
+    allocations) and gets a [result_mode] of kind [Maybe_alloc_stack] (its call
+    sites get a [return_mode] of that kind, see [Escape_rebuild]) and
+    [nlocal >= 1] (see [First_complex_local_param]), and the code of a local
+    closure gets [nlocal] equal to its arity. *)
 val adjust_code_metadata : t -> Code_id.t -> Code_metadata.t -> Code_metadata.t
