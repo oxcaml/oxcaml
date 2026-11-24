@@ -170,6 +170,9 @@ let flambda_to_flambda0 : type m.
         ~lto_info ) =
     match mode, close_prog_metadata with
     | Classic, Classic (all_code, approxs, free_names, slot_offsets) -> (
+      (* CR gbury: consider running the symbol check here. Currently this cannot
+         be done because from_lambda does not produce code correct wrt that
+         check *)
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = prefixname ^ ".cps_conv" in
@@ -288,6 +291,10 @@ let flambda_to_flambda0 : type m.
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
               ~final_typing_env ~free_names flambda
           in
+          (* CR gbury: this checks current fails. @Ekdohibs should probably take
+             a look at that *)
+          if false && Symbol_check.cli_flag ()
+          then Symbol_check.check (Flambda_unit.body flambda);
           ( flambda,
             ~all_code,
             ~slot_offsets,
