@@ -975,7 +975,8 @@ tail-call. Returns [expected_mode] and [With_regionality.lr] which are backed by
 the same mode variable. We encode extra position information in the former.
 We need the latter to the both left and right mode
 because of how it will be used. *)
-let mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app marg =
+let mode_argument ~funct ~arg_pos ~lbl ~position_and_mode ~partial_app marg =
+  let index, arity = arg_pos in
   let marg_as_regionality =
     let callee : Mode.Hint.pinpoint =
       match funct.exp_desc with
@@ -1038,8 +1039,14 @@ let mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app marg =
           (RTail (Option.get position_and_mode.region_mode, FTail)))
        with return_from_exclave = position_and_mode.return_from_exclave },
      vmode
-  | Texp_ident { kind = Id_prim _; _ }, _ ->
-     (* Other primitives cannot be tail-called *)
+  | Texp_ident { kind = Id_prim _;
+                 desc = { val_kind = Val_prim prim };
+                 _ }, Tail
+       when arity = prim.prim_type_arity ->
+     (* Other primitives cannot be tail-called.
+
+        However, overapplied primitives may result in tail-calls of the value
+        returned by the primitive, so we check the arity first. *)
      mode_default vmode, vmode
   | _, (Nontail | Default) ->
      mode_default vmode, vmode
@@ -11378,12 +11385,12 @@ and type_argument ?explanation ?recarg ~overwrite env mode sarg
   else delayed ()
 
 (* See Note [Type-checking applications] for an overview *)
-and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
+and type_apply_arg env ~app_loc ~funct ~arg_pos ~position_and_mode ~partial_app
       (lbl, arg) =
   match arg with
   | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+        mode_argument ~funct ~arg_pos ~lbl ~position_and_mode ~partial_app
           mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
       (match lbl with
@@ -11398,7 +11405,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
                      mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+        mode_argument ~funct ~arg_pos ~lbl ~position_and_mode ~partial_app
           mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
       let arg, sch =
@@ -11496,7 +11503,7 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let arg_mode, _ =
-        mode_argument ~funct ~index:0 ~lbl:Nolabel ~position_and_mode
+        mode_argument ~funct ~arg_pos:(0,1) ~lbl:Nolabel ~position_and_mode
           ~partial_app:false arg_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
@@ -11576,8 +11583,9 @@ and type_application env app_loc expected_mode position_and_mode
             if partial_app then position_and_mode_default else position_and_mode
           in
           let args =
+            let arity = List.length untyped_args in
             List.mapi (fun index arg ->
-                type_apply_arg env ~app_loc ~funct ~index
+                type_apply_arg env ~app_loc ~funct ~arg_pos:(index,arity)
                   ~position_and_mode ~partial_app arg)
               untyped_args
           in
