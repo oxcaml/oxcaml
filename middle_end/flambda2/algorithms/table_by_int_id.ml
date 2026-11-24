@@ -64,9 +64,10 @@ struct
 
   let () = assert (E.flags lsr Id.flags_size_in_bits = 0)
 
-  (* If flambda is used, this table is likely to be big, so we'd like to initialize it as
-     large. But if flambda is unused, initializing it to be big hurts startup time. So we
-     start with it small, and then grow it once there's enough entries. *)
+  (* If flambda is used, this table is likely to be big, so we'd like to
+     initialize it as large. But if flambda is unused, initializing it to be big
+     hurts startup time. So we start with it small, and then grow it once
+     there's enough entries. *)
   type t =
     { mutable table : E.t HT.t;
       mutable is_small : bool
