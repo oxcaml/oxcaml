@@ -2147,7 +2147,7 @@ end = struct
   let encode (v : V.t) =
     V.match_with v
       ~resolved:
-        (Component.map ~f:(fun ({ allocation_source; _ } : Top.t) ->
+        (Component.map ~f:(fun ({ allocation_source; witnesses = _ } : Top.t) ->
            allocation_source))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
