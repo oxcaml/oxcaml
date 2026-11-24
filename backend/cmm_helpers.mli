@@ -156,8 +156,8 @@ val xor_int : expression -> expression -> Debuginfo.t -> expression
 
 val not_int : expression -> Debuginfo.t -> expression
 
-(** Similar to [add_int] but produces a result with machtype [Addr] iff
-    [ptr_out_of_heap] is [false]. *)
+(** Similar to [add_int]. Produces a result with machtype [Addr] if
+    [ptr_out_of_heap] is [false], else [Out_of_heap_data_pointer]. *)
 val add_int_ptr :
   ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 

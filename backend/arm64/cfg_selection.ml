@@ -117,13 +117,14 @@ let validated_offset chunk n =
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match[@ocaml.warning "-fragile-match"] expr with
-  | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
+  | Cop ((Caddv | Cadda | Caddp), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
     when use_direct_addressing s && is_symbol_offset chunk n ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
-  | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
+  | Cop ((Caddv | Cadda | Caddp), [arg; Cconst_int (n, _)], _)
+    when is_offset chunk n ->
     validated_offset chunk n, arg
   | Cop
-      ( ((Caddv | Cadda) as op),
+      ( ((Caddv | Cadda | Caddp) as op),
         [arg1; Cop (Caddi, [arg2; Cconst_int (n, _)], _)],
         dbg )
     when is_offset chunk n ->
@@ -156,7 +157,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   in
   match op with
   (* Integer addition *)
-  | Caddi | Caddv | Cadda -> (
+  | Caddi | Caddv | Cadda | Caddp -> (
     match[@ocaml.warning "-fragile-match"] args with
     (* Shift-add *)
     | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->

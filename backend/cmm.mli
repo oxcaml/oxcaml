@@ -524,6 +524,7 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)
+  | Caddp
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width

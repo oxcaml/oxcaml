@@ -905,7 +905,7 @@ let operation_supported = function
   | Ccsel _
   | Cbswap _
   | Cclz | Cctz
-  | Ccmpi _ | Caddv | Cadda
+  | Ccmpi _ | Caddv | Cadda | Caddp
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _

@@ -157,7 +157,10 @@ let bigstring_prefetch ~is_write locality args dbg =
                   (* pointer to element "idx" of "ba" of type (char,
                      int8_unsigned_elt, c_layout) Bigarray.Array1.t is simply
                      offset "idx" from "ba_data" *)
-                  return_unit dbg (Cop (op, [add_int ba_data idx dbg], dbg))))))
+                  let addr =
+                    add_int_ptr ~ptr_out_of_heap:true ba_data idx dbg
+                  in
+                  return_unit dbg (Cop (op, [addr], dbg))))))
 
 let prefetch ~is_write locality arg dbg =
   let op = Cprefetch { is_write; locality } in
@@ -168,7 +171,8 @@ let prefetch_offset ~is_write locality (arg1, arg2) dbg =
   (* [arg2], the index, is already untagged. *)
   let op = Cprefetch { is_write; locality } in
   if_operation_supported op ~f:(fun () ->
-      return_unit dbg (Cop (op, [add_int arg1 arg2 dbg], dbg)))
+      let addr = add_int_ptr ~ptr_out_of_heap:false arg1 arg2 dbg in
+      return_unit dbg (Cop (op, [addr], dbg)))
 
 let ext_pointer_prefetch ~is_write locality arg dbg =
   prefetch ~is_write locality (int_as_pointer arg dbg) dbg
@@ -197,7 +201,9 @@ let bigstring_cas size (arg1, arg2, arg3, arg4) dbg =
                              [field_address bs 1 dbg],
                              dbg ))
                         (fun bs_data ->
-                          bind "dst" (add_int bs_data idx dbg) (fun dst ->
+                          bind "dst"
+                            (add_int_ptr ~ptr_out_of_heap:true bs_data idx dbg)
+                            (fun dst ->
                               tag_int
                                 (Cop (op, [compare_with; set_to; dst], dbg))
                                 dbg)))))))
@@ -229,7 +235,9 @@ let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
                          [field_address bs 1 dbg],
                          dbg ))
                     (fun bs_data ->
-                      bind "dst" (add_int bs_data idx dbg) (fun dst ->
+                      bind "dst"
+                        (add_int_ptr ~ptr_out_of_heap:true bs_data idx dbg)
+                        (fun dst ->
                           Cop (op, [src; dst], dbg)))))))
 
 let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =

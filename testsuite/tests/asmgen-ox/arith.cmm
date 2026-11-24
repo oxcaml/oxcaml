@@ -42,15 +42,15 @@
       (addraset r 10 (+ x 1))
       (addraset r 11 (+ x -1))
 
-      (addraset r 12 (+ "R" 8))
-      (addraset r 13 (+ "R" y))
+      (addraset r 12 (+ "R":int 8))
+      (addraset r 13 (+ "R":int y))
 
       (addraset r 14 (- x y))
       (addraset r 15 (- x 1))
       (addraset r 16 (- x -1))
 
-      (addraset r 17 (+ "R" -8))
-      (addraset r 18 (+ "R" (- 0 y)))
+      (addraset r 17 (+ "R":int -8))
+      (addraset r 18 (+ "R":int (- 0 y)))
 
       (addraset r 19 ( * x 2))
       (addraset r 20 ( * 2 x))

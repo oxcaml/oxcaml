@@ -302,14 +302,13 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
     Args
       [ Exactly Cmm.typ_addr;
         Exactly (Cmm.machtype_of_memory_chunk memory_chunk) ]
-  | Caddi -> Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
   | Cand | Ccmpi (Ceq | Cne) ->
     Args [Exactly Cmm.typ_val; Exactly Cmm.typ_val]
   | Csubi | Cor | Cxor
   | Ccmpi (Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge) ->
     Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Cnot -> Args [Exactly Cmm.typ_int]
-  | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
+  | Caddi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
     Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
   | Clsl | Clsr | Casr ->
     Args [Exactly Cmm.typ_int; Exactly Cmm.typ_int]
@@ -327,6 +326,8 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
     Args [ Exactly Cmm.typ_int; Exactly Cmm.typ_int; Exactly Cmm.typ_addr ]
   | Caddv -> Args [Exactly Cmm.typ_val; Exactly Cmm.typ_int]
   | Cadda -> Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
+  | Caddp ->
+    Args [Exactly Cmm.typ_out_of_heap_data_pointer; Exactly Cmm.typ_int]
   | Cnegf width | Cabsf width -> Args [Exactly (machtype_of_float_width width)]
   | Caddf width | Csubf width | Cmulf width | Cdivf width ->
     let ty = machtype_of_float_width width in
@@ -600,8 +601,8 @@ and typecheck_cop env (op : Cmm.operation) (args : Cmm.expression list) dbg
     | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
     | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand
     | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _ | Ccsel _ | Cclz | Cctz
-    | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _
-    | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+    | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda | Caddp
+    | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
     | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Cprobe _
     | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
     | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause

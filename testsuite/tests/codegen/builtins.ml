@@ -530,6 +530,120 @@ do_prefetch_read_high:
   ret
 |}]
 
+let prefetch_static_across_allocation x =
+  Builtins.prefetch_read_high_offset "static prefetch base" 0x80000000;
+  let r = ref x in
+  Builtins.prefetch_read_high_offset "static prefetch base" 0x80000000;
+  r
+[%%expect_asm X86_64{|
+prefetch_static_across_allocation:
+  subq  $8, %rsp
+  movl  $2147483648, %ebx
+  movq  <hidden PC-relative offset>(%rip), %rdi
+  addq  %rdi, %rbx
+  prefetcht0 (%rbx)
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rdi
+  movq  $1024, -8(%rdi)
+  movq  %rax, (%rdi)
+  prefetcht0 (%rbx)
+  movq  %rdi, %rax
+  addq  $8, %rsp
+  ret
+|}]
+
+let prefetch_static_across_poll () =
+  Builtins.prefetch_read_high_offset "static prefetch base" 0x80000000;
+  cpu_relax ();
+  Builtins.prefetch_read_high_offset "static prefetch base" 0x80000000
+[%%expect_asm X86_64{|
+prefetch_static_across_poll:
+  subq  $8, %rsp
+  movl  $2147483648, %eax
+  movq  <hidden PC-relative offset>(%rip), %rbx
+  addq  %rbx, %rax
+  prefetcht0 (%rax)
+  pause
+  cmpq  (%r14), %r15
+  jbe   <hidden GC jump pad>
+.L0:
+  prefetcht0 (%rax)
+  movl  $1, %eax
+  addq  $8, %rsp
+  ret
+|}]
+
+let prefetch_fixed_base i =
+  Builtins.prefetch_read_high_offset (int_as_pointer 0x1000) i
+[%%expect_asm X86_64{|
+prefetch_fixed_base:
+  sarq  $1, %rax
+  prefetcht0 8192(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let prefetch_immediate () =
+  Builtins.prefetch_read_high_offset () 8
+[%%expect_asm X86_64{|
+prefetch_immediate:
+  movl  $9, %eax
+  prefetcht0 (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let prefetch_external_across_poll p =
+  let base = int_as_pointer p in
+  Builtins.prefetch_read_high_offset base 0x1_00000000;
+  cpu_relax ();
+  Builtins.prefetch_read_high_offset base 0x1_00000000
+[%%expect_asm X86_64{|
+prefetch_external_across_poll:
+  subq  $8, %rsp
+  decq  %rax
+  movabsq $4294967296, %rbx
+  addq  %rbx, %rax
+  prefetcht0 (%rax)
+  pause
+  cmpq  (%r14), %r15
+  jbe   <hidden GC jump pad>
+.L0:
+  prefetcht0 (%rax)
+  movl  $1, %eax
+  addq  $8, %rsp
+  ret
+|}]
+
+let prefetch_heap_across_allocation base x =
+  Builtins.prefetch_read_high_offset base 0x80000000;
+  let r = ref x in
+  Builtins.prefetch_read_high_offset base 0x80000000;
+  r
+[%%expect_asm X86_64{|
+prefetch_heap_across_allocation:
+  subq  $8, %rsp
+  movl  $2147483648, %edi
+  addq  %rax, %rdi
+  prefetcht0 (%rdi)
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rdi
+  movq  $1024, -8(%rdi)
+  movq  %rbx, (%rdi)
+  movl  $2147483648, %ebx
+  addq  %rbx, %rax
+  prefetcht0 (%rax)
+  movq  %rdi, %rax
+  addq  $8, %rsp
+  ret
+|}]
+
 let do_prefetch_read_moderate x = Builtins.prefetch_read_moderate x
 [%%expect_asm X86_64{|
 do_prefetch_read_moderate:

@@ -1192,6 +1192,11 @@ module Builtins = struct
     'a -> unit = "" "caml_prefetch_read_high"
     [@@noalloc] [@@builtin]
 
+  external prefetch_read_high_offset :
+    'a -> (int[@untagged]) -> unit
+    = "" "caml_prefetch_read_high_val_offset_untagged"
+    [@@noalloc] [@@builtin]
+
   external prefetch_read_moderate :
     'a -> unit = "" "caml_prefetch_read_moderate"
     [@@noalloc] [@@builtin]

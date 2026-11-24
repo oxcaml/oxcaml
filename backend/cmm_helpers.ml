@@ -487,9 +487,9 @@ let natint_const_untagged dbg n =
 let cint_const n =
   Cint (Nativeint.add (Nativeint.shift_left (Nativeint.of_int n) 1) 1n)
 
-let add_no_overflow n x c dbg =
+let add_no_overflow ~mk_add n x c dbg =
   let d = n + x in
-  if d = 0 then c else Cop (Caddi, [c; Cconst_int (d, dbg)], dbg)
+  if d = 0 then c else mk_add c (Cconst_int (d, dbg))
 
 let is_defined_shift n = 0 <= n && n < arch_bits
 
@@ -531,7 +531,7 @@ let[@inline] is_constant = function
   | Cconst_int _ | Cconst_natint _ -> true
   | _ -> false
 
-let rec add_const c n dbg =
+let rec add_const_gen ~mk_add c n dbg =
   let c = prefer_add c in
   if n = 0
   then c
@@ -542,20 +542,24 @@ let rec add_const c n dbg =
           Cconst_int (x + n, dbg)
         | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
-          add_no_overflow n x c dbg
-        | Cop (Caddi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
-          ->
-          add_no_overflow n x c dbg
+          add_no_overflow ~mk_add n x c dbg
+        | Cop ((Caddi | Cadda | Caddp), [c; Cconst_int (x, _)], _)
+          when Misc.no_overflow_add n x ->
+          add_no_overflow ~mk_add n x c dbg
         | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
           Cop (Csubi, [Cconst_int (n + x, dbg); c], dbg)
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
-          add_const c (n - x) dbg
-        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+          add_const_gen ~mk_add c (n - x) dbg
+        | c -> mk_add c (Cconst_int (n, dbg)))
+
+let add_const c n dbg =
+  add_const_gen ~mk_add:(fun x y -> Cop (Caddi, [x; y], dbg)) c n dbg
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
+  let mk_add x y = Cop (Caddi, [x; y], dbg) in
   map_tail1 arg ~f:(fun arg ->
       let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
       let x = P.create_var Int "x" in
@@ -570,12 +574,12 @@ let rec add_const' arg const dbg =
               { pat = Binop (Add, Binop (Add, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          => fun env -> add_no_overflow ~mk_add env#.n env#.x env#.c dbg );
           ( Guarded
               { pat = Binop (Add, Binop (Add, Any c, Const_int x), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          => fun env -> add_no_overflow ~mk_add env#.n env#.x env#.c dbg );
           ( Guarded
               { pat = Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
@@ -594,22 +598,32 @@ let incr_int c dbg = add_const c 1 dbg
 
 let decr_int c dbg = add_const c (-1) dbg
 
-let rec add_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match prefer_add c1, prefer_add c2 with
-      | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
-        add_const (add_int c1 c2 dbg) n1 dbg
-      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
-        add_const (add_int c1 c2 dbg) n2 dbg
-      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
+let add_int_gen ~mk_add c1 c2 dbg =
+  let add_const c n = add_const_gen ~mk_add c n dbg in
+  let rec add c1 c2 =
+    map_tail2 c1 c2 ~f:(fun c1 c2 ->
+        match prefer_add c1, prefer_add c2 with
+        | Cconst_natint (0n, _), c | c, Cconst_natint (0n, _) -> c
+        | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n
+        | Cop ((Caddi | Cadda | Caddp), [c1; Cconst_int (n1, _)], _), c2 ->
+          add_const (add c1 c2) n1
+        | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
+          add_const (add c1 c2) n2
+        | c1, c2 -> mk_add c1 c2)
+  in
+  add c1 c2
+
+let add_int c1 c2 dbg =
+  add_int_gen ~mk_add:(fun x y -> Cop (Caddi, [x; y], dbg)) c1 c2 dbg
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
       let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
-        [ ( Binop (Add, Const_int n, Any c) => fun env ->
+        [ (Binop (Add, Const_natint_fixed 0n, Any c) => fun env -> env#.c);
+          (Binop (Add, Any c, Const_natint_fixed 0n) => fun env -> env#.c);
+          ( Binop (Add, Const_int n, Any c) => fun env ->
             add_const env#.c env#.n dbg );
           ( Binop (Add, Any c, Const_int n) => fun env ->
             add_const env#.c env#.n dbg );
@@ -654,13 +668,8 @@ let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
-  (* The [add_int_addr] case is only used for string access, and it seems
-     unlikely that the more complicated optimizations done for [add_int] will
-     apply.
-
-     For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
   if ptr_out_of_heap
-  then add_int c1 c2 dbg
+  then add_int_gen ~mk_add:(fun x y -> Cop (Caddp, [x; y], dbg)) c1 c2 dbg
   else
     match c1, c2 with
     | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
@@ -2012,6 +2021,7 @@ let array_indexing ?typ log2size ptr ofs dbg =
     match typ with
     | None | Some Addr -> Cadda
     | Some Int -> Caddi
+    | Some Out_of_heap_data_pointer -> Caddp
     | _ -> assert false
   in
   match ofs with
@@ -4943,7 +4953,7 @@ let entry_point namelist =
   let call i =
     let f =
       Cop
-        ( Cadda,
+        ( Caddp,
           [ cconst_symbol table_symbol;
             Cop (Cmuli, [Cconst_int (Arch.size_addr, dbg ()); i], dbg ()) ],
           dbg () )
@@ -5540,7 +5550,8 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
     load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
   in
   let addr ~ba_data_p ~index =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Out_of_heap_data_pointer (Misc.log2 elt_size) ba_data_p
+      index dbg
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
@@ -5550,7 +5561,7 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
     bind "index" index (fun index ->
         bind "ba_data" ba_data_p (fun ba_data_p ->
             let addr = addr ~ba_data_p ~index in
-            let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+            let addr' = binary Caddp ~dbg addr (int ~dbg (elt_size / 2)) in
             box_complex dbg
               (load ~dbg elt_chunk Mutable ~addr)
               (load ~dbg elt_chunk Mutable ~addr:addr')))
@@ -5572,7 +5583,8 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
     load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
   in
   let addr ~ba_data_p ~index =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Out_of_heap_data_pointer (Misc.log2 elt_size) ba_data_p
+      index dbg
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
@@ -5584,7 +5596,7 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
         bind "index" index (fun index ->
             bind "ba_data" ba_data_p (fun ba_data_p ->
                 let addr = addr ~ba_data_p ~index in
-                let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+                let addr' = binary Caddp ~dbg addr (int ~dbg (elt_size / 2)) in
                 return_unit dbg
                   (sequence
                      (store ~dbg elt_chunk Assignment ~addr
