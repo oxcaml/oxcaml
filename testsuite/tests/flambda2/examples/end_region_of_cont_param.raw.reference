@@ -1,0 +1,28 @@
+let code inline(never) size(50)
+      f_0 (g : val, b : imm tagged, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %untag_imm (b) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k3 =
+       let r1 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region.local[r1] (n) in
+       (apply &my_alloc_region g (blk) -> k5 * k1
+          where k5 (res : imm tagged) =
+            cont k2 (res, r1))
+     where k4 =
+       let r2 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region.local[r2] (n, n) in
+       (apply &my_alloc_region g (blk) -> k6 * k1
+          where k6 (res : imm tagged) =
+            cont k2 (res, r2)))
+    where k2 (res : imm tagged, r : region) =
+      let u = %end_region (r) in
+      cont k (res)
+in
+let $camlFoo__f_0 = closure f_0 @f &toplevel in
+let $camlEnd_region_of_cont_param = Block 0 ($camlFoo__f_0) in
+cont done ($camlEnd_region_of_cont_param)
