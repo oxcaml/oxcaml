@@ -960,6 +960,11 @@ let primitive ppf = function
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
   | Pobj_magic _ -> fprintf ppf "obj_magic"
+  | Ptemplate_env { template; shape; mode } ->
+      fprintf ppf "make%stemplate_env[%a]%a"
+        (locality_mode_if_local mode)
+        (Format_doc.compat Template_id.print) template
+        block_shape (Shape shape)
   | Punbox_unit -> fprintf ppf "unbox_unit"
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
@@ -1199,6 +1204,7 @@ let name_of_primitive = function
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"
+  | Ptemplate_env _ -> "Ptemplate_env"
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
@@ -1414,6 +1420,19 @@ let rec lam ppf = function
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
+  | Lcode _ as expr ->
+      let rec codebody ~sp = function
+        | Lcode ({code_name; code_debug_uid; code_template; code_fun}, body) ->
+           if sp then fprintf ppf "@ ";
+           fprintf ppf "@[<2>%a%a[%a]@ %a@]"
+             Ident.print code_name debug_uid code_debug_uid
+             (Format_doc.compat Template_id.print) code_template
+             lfunction code_fun;
+           codebody ~sp:true body
+        | expr -> expr in
+      fprintf ppf "@[<2>(code@ @[<hv 1>(";
+      let expr = codebody ~sp:false expr in
+      fprintf ppf ")@]@ %a)@]" lam expr
   | Llet _ | Lmutlet _ as expr ->
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->

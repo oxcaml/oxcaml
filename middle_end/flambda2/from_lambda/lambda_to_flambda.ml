@@ -569,8 +569,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (Simple (Var temp_id)) ~body)
           body new_ids_with_kinds temp_id_unarized acc ccenv)
   | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
+  | Lcode
+      ({ code_name = fun_id; code_debug_uid = duid; code_fun = func; _ }, body)
     ->
     (* This case is here to get function names right. *)
+    (* CR layout poly: compile the code of instantiations ([Lcode]) without
+       closures. *)
     let bindings =
       cps_function_bindings env [L.{ id = fun_id; debug_uid = duid; def = func }]
     in
@@ -1748,7 +1752,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
         | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _
         | Lfor _ | Lassign _ | Lsend _ | Levent _ | Lifused _ | Lregion _
-        | Lexclave _ ->
+        | Lexclave _ | Lcode _ ->
           (* The continuations created here (and for failactions) are local. The
              bodies of the let_conts will not modify mutable variables. Hence,
              it is safe to exclude them from passing along the extra arguments

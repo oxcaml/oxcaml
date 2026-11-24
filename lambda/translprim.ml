@@ -2930,6 +2930,10 @@ let lambda_primitive_needs_event_after = function
   | Pmakearray_dynamic (Punspecializedarray, _, _) ->
     Misc.fatal_error
       "Translprim.lambda_primitive_needs_event_after: Punspecializedarray"
+  | Ptemplate_env _ ->
+    Misc.fatal_error
+      "Translprim.lambda_primitive_needs_event_after: [Ptemplate_env] only \
+       exists after slambda evaluation"
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function
