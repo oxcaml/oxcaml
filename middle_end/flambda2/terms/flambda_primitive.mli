@@ -542,7 +542,9 @@ type unary_primitive =
           primitive. The type describes the environments created by this
           definition only, so Simplify must simplify the definition once: it
           must never copy it before simplifying it (see [Template_definitions]).
-          In classic mode, closure conversion doesn't create this primitive. *)
+          In classic mode, closure conversion does the same with the
+          approximation of the environment, and doesn't create this primitive.
+      *)
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"
