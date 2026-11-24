@@ -155,7 +155,7 @@ let rec simple env (s : Fexpr.simple) : Simple.t =
     | Some var -> Simple.var var)
   | Const c -> Simple.const (const c)
   | Symbol sym -> Simple.symbol (get_symbol env sym)
-  | Coerce (s, co) -> Simple.apply_coercion_exn (simple env s) (coercion env co)
+  | Coerce (s, co) -> Simple.apply_coercion (simple env s) (coercion env co)
 
 let field_of_block env (v : Fexpr.field_of_block) =
   let simple =

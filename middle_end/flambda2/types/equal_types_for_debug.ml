@@ -500,7 +500,7 @@ let rec equal_type env t1 t2 =
       else false
     | Some (var1, coercion1), Some (var2, coercion2) -> (
       let coercion =
-        Coercion.compose_exn coercion1 ~then_:(Coercion.inverse coercion2)
+        Coercion.compose coercion1 ~then_:(Coercion.inverse coercion2)
       in
       match
         ( exists_in_parent_env env (Name.var var1),

@@ -40,12 +40,6 @@ let apply_renaming t renaming =
     then t
     else change_depth ~from:new_from ~to_:new_to_
 
-let compose_exn t1 ~then_:t2 =
-  match compose t1 ~then_:t2 with
-  | Some t -> t
-  | None ->
-    Misc.fatal_errorf "Invalid composition: %a@ >>@ %a" print t1 print t2
-
 let ids_for_export t =
   match t with
   | Id -> Ids_for_export.empty

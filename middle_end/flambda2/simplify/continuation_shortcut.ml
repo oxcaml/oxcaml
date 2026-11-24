@@ -51,7 +51,7 @@ let apply { params; continuation; args } shortcut_args =
           ~var:(fun var ~coercion ->
             match Variable.Map.find_or_null var subst with
             | Null -> arg
-            | This simple -> Simple.apply_coercion_exn simple coercion)
+            | This simple -> Simple.apply_coercion simple coercion)
           ~symbol:(fun _ ~coercion:_ -> arg)
           ~const:(fun _ -> arg))
       args )

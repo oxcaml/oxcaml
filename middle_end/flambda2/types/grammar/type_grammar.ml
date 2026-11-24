@@ -27,7 +27,6 @@ module Int32 = Numeric_types.Int32
 module Int64 = Numeric_types.Int64
 module RWC = Reg_width_const
 module TD = Type_descr
-open Or_bottom.Let_syntax
 open Or_unknown.Let_syntax
 
 module Block_size = struct
@@ -1789,119 +1788,120 @@ and ids_for_export_variant_extensions ext =
    coercions are depth changes, so they operate on closures. Thus if we see
    something like [(t1, t2) @ depth 0 -> 3], where [@] is the coerce operator
    and [depth 0 -> 3] is just some non-trivial coercion, _this is a type error_
-   and we should return bottom.
+   and we raise a fatal error.
 
    If we ever need to apply coercions inside (for instance) tuples, this isn't
    hard so long as we introduce tuples _of coercions_. Then [(t1, t2) @ (co1,
    co2)] is just [(t1 @ co1, t2 @ co2)]. Any bit of type syntax should be
    liftable: a coercion on blocks has a coercion for each field, a coercion on
    variants has a coercion for each branch, etc. *)
-(* CR-soon lmaurer Return just [t] from here once we're confident that returning
-   bottom is a genuine error condition. (Currently, there's a wrapper below that
-   checks for bottom and throws a fatal error.) *)
-let rec apply_coercion t coercion : t Or_bottom.t =
+let cannot_apply_coercion coercion =
+  Misc.fatal_errorf "Cannot apply non-identity coercion %a" Coercion.print
+    coercion
+
+let rec apply_coercion t coercion : t =
   if Coercion.is_id coercion
-  then Ok t
+  then t
   else
     match t with
     | Value ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion ~apply_coercion_head:apply_coercion_head_of_kind_value
           coercion ty
       in
       if ty == ty' then t else Value ty'
     | Naked_immediate ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_immediate
           coercion ty
       in
       if ty == ty' then t else Naked_immediate ty'
     | Naked_float32 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_float32
           coercion ty
       in
       if ty == ty' then t else Naked_float32 ty'
     | Naked_float ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_float coercion
           ty
       in
       if ty == ty' then t else Naked_float ty'
     | Naked_int8 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_int8 coercion
           ty
       in
       if ty == ty' then t else Naked_int8 ty'
     | Naked_int16 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_int16 coercion
           ty
       in
       if ty == ty' then t else Naked_int16 ty'
     | Naked_int32 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_int32 coercion
           ty
       in
       if ty == ty' then t else Naked_int32 ty'
     | Naked_int64 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_int64 coercion
           ty
       in
       if ty == ty' then t else Naked_int64 ty'
     | Naked_nativeint ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_nativeint
           coercion ty
       in
       if ty == ty' then t else Naked_nativeint ty'
     | Naked_vec128 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_vec128 coercion
           ty
       in
       if ty == ty' then t else Naked_vec128 ty'
     | Naked_vec256 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_vec256 coercion
           ty
       in
       if ty == ty' then t else Naked_vec256 ty'
     | Naked_vec512 ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_vec512 coercion
           ty
       in
       if ty == ty' then t else Naked_vec512 ty'
     | Naked_mask ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_naked_mask coercion
           ty
       in
       if ty == ty' then t else Naked_mask ty'
     | Rec_info ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_rec_info coercion ty
       in
       if ty == ty' then t else Rec_info ty'
     | Region ty ->
-      let<+ ty' =
+      let ty' =
         TD.apply_coercion
           ~apply_coercion_head:apply_coercion_head_of_kind_region coercion ty
       in
@@ -1909,17 +1909,17 @@ let rec apply_coercion t coercion : t Or_bottom.t =
 
 and apply_coercion_head_of_kind_value ({ non_null; is_null } as head) coercion =
   match non_null with
-  | Unknown | Bottom -> Or_bottom.Ok head
+  | Unknown | Bottom -> head
   | Ok non_null ->
-    let<+ non_null =
+    let non_null =
       apply_coercion_head_of_kind_value_non_null non_null coercion
     in
     { non_null = Ok non_null; is_null }
 
-and apply_coercion_head_of_kind_value_non_null head coercion : _ Or_bottom.t =
+and apply_coercion_head_of_kind_value_non_null head coercion =
   match head with
   | Closures { by_function_slot; alloc_mode } ->
-    let<+ by_function_slot' =
+    let by_function_slot' =
       apply_coercion_row_like_for_closures by_function_slot coercion
     in
     if by_function_slot == by_function_slot'
@@ -1929,17 +1929,17 @@ and apply_coercion_head_of_kind_value_non_null head coercion : _ Or_bottom.t =
     (* See the comment on [apply_coercion]. The situation for variants (sums) is
        similar to that for tuples (products): we would want a coercion for each
        branch. *)
-    if Coercion.is_id coercion then Ok head else Bottom
-  | Mutable_block { alloc_mode = _ } -> Ok head
+    if Coercion.is_id coercion then head else cannot_apply_coercion coercion
+  | Mutable_block { alloc_mode = _ } -> head
   | Boxed_float _ | Boxed_float32 _ ->
     (* Even if we had coercions that would act on float constants, we would want
        to have a [Boxed_float] wrapper that would lift a float coercion to a
        value coercion. *)
-    if Coercion.is_id coercion then Ok head else Bottom
+    if Coercion.is_id coercion then head else cannot_apply_coercion coercion
   | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
   | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | String _ ->
     (* Similarly, we don't have lifted coercions for these. *)
-    if Coercion.is_id coercion then Ok head else Bottom
+    if Coercion.is_id coercion then head else cannot_apply_coercion coercion
   | Array
       { element_kind = _;
         length = _;
@@ -1948,7 +1948,7 @@ and apply_coercion_head_of_kind_value_non_null head coercion : _ Or_bottom.t =
       } ->
     (* This one's a bit more obvious: we wouldn't want to accidentally treat a
        coercion on integers as a coercion on array lengths. *)
-    if Coercion.is_id coercion then Ok head else Bottom
+    if Coercion.is_id coercion then head else cannot_apply_coercion coercion
   | Array
       { element_kind = _;
         length = _;
@@ -1956,102 +1956,86 @@ and apply_coercion_head_of_kind_value_non_null head coercion : _ Or_bottom.t =
         alloc_mode = _
       } ->
     (* Same as the block case (in [Variant]) above. *)
-    if Coercion.is_id coercion then Ok head else Bottom
+    if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_immediate head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_immediate head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_float32 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_float32 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_float head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_float head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_int8 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_int8 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_int16 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_int16 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_int32 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_int32 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_int64 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_int64 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_nativeint head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_nativeint head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_vec128 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_vec128 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_vec256 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_vec256 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_vec512 head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_vec512 head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_naked_mask head coercion : _ Or_bottom.t =
-  if Coercion.is_id coercion then Ok head else Bottom
+and apply_coercion_head_of_kind_naked_mask head coercion =
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_rec_info head coercion : _ Or_bottom.t =
+and apply_coercion_head_of_kind_rec_info head coercion =
   (* Currently no coercion has an effect on a depth variable and
      [Rec_info_expr.t] does not contain any other variety of name. *)
-  if Coercion.is_id coercion then Ok head else Bottom
+  if Coercion.is_id coercion then head else cannot_apply_coercion coercion
 
-and apply_coercion_head_of_kind_region () _coercion : _ Or_bottom.t = Ok ()
+and apply_coercion_head_of_kind_region () _coercion = ()
 
 and apply_coercion_row_like :
     'lattice 'shape 'maps_to 'row_tag 'known.
     apply_coercion_maps_to:
-      ('row_tag option -> 'maps_to -> Coercion.t -> 'maps_to Or_bottom.t) ->
+      ('row_tag option -> 'maps_to -> Coercion.t -> 'maps_to) ->
     known:'known ->
     other:('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t ->
-    is_empty_map_known:('known -> bool) ->
-    filter_map_known:
+    map_known:
       (('row_tag ->
        ('lattice, 'shape, 'maps_to) row_like_case ->
-       ('lattice, 'shape, 'maps_to) row_like_case option) ->
+       ('lattice, 'shape, 'maps_to) row_like_case) ->
       'known ->
       'known) ->
     Coercion.t ->
-    ('known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t)
-    Or_bottom.t =
- fun ~apply_coercion_maps_to ~known ~other ~is_empty_map_known ~filter_map_known
-     coercion ->
+    'known * ('lattice, 'shape, 'maps_to) row_like_case Or_bottom.t =
+ fun ~apply_coercion_maps_to ~known ~other ~map_known coercion ->
+  let apply_coercion_case row_tag { maps_to; index; env_extension } =
+    let maps_to = apply_coercion_maps_to row_tag maps_to coercion in
+    let env_extension = apply_coercion_env_extension env_extension coercion in
+    { maps_to; index; env_extension }
+  in
   let known =
-    filter_map_known
-      (fun row_tag { maps_to; index; env_extension } ->
-        match apply_coercion_maps_to (Some row_tag) maps_to coercion with
-        | Bottom -> None
-        | Ok maps_to -> (
-          match apply_coercion_env_extension env_extension coercion with
-          | Bottom -> None
-          | Ok env_extension -> Some { maps_to; index; env_extension }))
+    map_known
+      (fun row_tag case -> apply_coercion_case (Some row_tag) case)
       known
   in
-  let other : _ Or_bottom.t =
-    match other with
-    | Bottom -> Bottom
-    | Ok { maps_to; index; env_extension } ->
-      let<* maps_to = apply_coercion_maps_to None maps_to coercion in
-      let<+ env_extension =
-        apply_coercion_env_extension env_extension coercion
-      in
-      { maps_to; index; env_extension }
-  in
-  if row_like_is_bottom ~known ~other ~is_empty_map_known
-  then Bottom
-  else Ok (known, other)
+  let other = Or_bottom.map other ~f:(apply_coercion_case None) in
+  known, other
 
 and apply_coercion_row_like_for_closures { known_closures } coercion :
-    row_like_for_closures Or_bottom.t =
-  let<+ known, other =
+    row_like_for_closures =
+  let known, other =
     apply_coercion_row_like
       ~apply_coercion_maps_to:apply_coercion_closures_entry
-      ~known:known_closures ~other:Bottom
-      ~is_empty_map_known:Function_slot.Map.is_empty
-      ~filter_map_known:Function_slot.Map.filter_map coercion
+      ~known:known_closures ~other:Bottom ~map_known:Function_slot.Map.mapi
+      coercion
   in
   (match other with
   | Or_bottom.Bottom -> ()
@@ -2060,9 +2044,7 @@ and apply_coercion_row_like_for_closures { known_closures } coercion :
   { known_closures = known }
 
 and apply_coercion_closures_entry row_tag
-    { function_types; closure_types; value_slot_types } coercion : _ Or_bottom.t
-    =
-  let bottom = ref false in
+    { function_types; closure_types; value_slot_types } coercion =
   let function_coercion =
     (* We're being naughty here. Properly, a coercion acting on a row-like type
        should itself be row-like, with one sub-coercion per row (generalizing
@@ -2099,29 +2081,19 @@ and apply_coercion_closures_entry row_tag
        having row-like types. *)
     Function_slot.Map.map_sharing
       (fun function_type ->
-        match apply_coercion_function_type function_type function_coercion with
-        | Ok function_type -> function_type
-        | Bottom ->
-          bottom := true;
-          (* This [function_type] will never be looked at: *)
-          function_type)
+        apply_coercion_function_type function_type function_coercion)
       function_types
   in
-  if !bottom
-  then Bottom
-  else
-    let<* closure_types =
-      apply_coercion_to_closure_types_in_set closure_types coercion
-    in
-    let<+ value_slot_types =
-      apply_coercion_to_value_slot_types_in_set value_slot_types coercion
-    in
-    { function_types; closure_types; value_slot_types }
+  let closure_types =
+    apply_coercion_to_closure_types_in_set closure_types coercion
+  in
+  let value_slot_types =
+    apply_coercion_to_value_slot_types_in_set value_slot_types coercion
+  in
+  { function_types; closure_types; value_slot_types }
 
 and apply_coercion_to_closure_types_in_set
-    ({ function_slot_components_by_index } as product) coercion : _ Or_bottom.t
-    =
-  let found_bottom = ref false in
+    ({ function_slot_components_by_index } as product) coercion =
   let function_slot_components_by_index' =
     (* Again, just apply the same coercion to everything in the set of closures
        (see comment on [function_types] above).
@@ -2135,38 +2107,28 @@ and apply_coercion_to_closure_types_in_set
        CR-someday lmaurer: Fix this once we fix [apply_coercion_closures_entry]
        (presumably by adding row-like coercions). *)
     Function_slot.Map.map_sharing
-      (fun t ->
-        match apply_coercion t coercion with
-        | Bottom ->
-          found_bottom := true;
-          t
-        | Ok t -> t)
+      (fun t -> apply_coercion t coercion)
       function_slot_components_by_index
   in
-  if !found_bottom
-  then Bottom
-  else if
-    function_slot_components_by_index == function_slot_components_by_index'
-  then Ok product
+  if function_slot_components_by_index == function_slot_components_by_index'
+  then product
   else
-    Ok
-      { function_slot_components_by_index = function_slot_components_by_index' }
+    { function_slot_components_by_index = function_slot_components_by_index' }
 
-and apply_coercion_to_value_slot_types_in_set product _coercion : _ Or_bottom.t
-    =
+and apply_coercion_to_value_slot_types_in_set product _coercion =
   (* The coercion applies only to the function type, not the environment. For
      example, changing the depth of a closure [inner] that refers to some other
      closure [outer] (with which it's not mutually recursive) only changes the
      depth of [inner]. *)
-  Ok product
+  product
 
 and apply_coercion_function_type (function_type : function_type Or_unknown.t)
-    (coercion : Coercion.t) : _ Or_unknown.t Or_bottom.t =
+    (coercion : Coercion.t) : _ Or_unknown.t =
   match coercion with
-  | Id -> Ok function_type
+  | Id -> function_type
   | Change_depth { from; to_ } -> (
     match function_type with
-    | Unknown -> Ok function_type
+    | Unknown -> function_type
     | Known { code_id; rec_info } ->
       (* CR lmaurer: We should really be checking that [from] matches the
          current [rec_info], but that requires either passing in a typing
@@ -2174,25 +2136,24 @@ and apply_coercion_function_type (function_type : function_type Or_unknown.t)
          canonicalized. *)
       ignore (from, rec_info);
       let rec_info = Rec_info (TD.create to_) in
-      Ok (Known { code_id; rec_info }))
+      Known { code_id; rec_info })
 
-and apply_coercion_env_extension { equations } coercion : _ Or_bottom.t =
-  let<+ equations =
-    Name.Map.fold
-      (fun name t result ->
-        let<* result = result in
-        let<+ t = apply_coercion t coercion in
-        Name.Map.add name t result)
-      equations (Or_bottom.Ok Name.Map.empty)
-  in
-  { equations }
+and apply_coercion_env_extension { equations } coercion =
+  { equations =
+      Name.Map.map_sharing (fun t -> apply_coercion t coercion) equations
+  }
 
 let apply_coercion t coercion =
-  match apply_coercion t coercion with
-  | Ok t -> t
-  | Bottom ->
-    Misc.fatal_errorf "Cannot apply coercion %a@ to type %a" Coercion.print
-      coercion print t
+  if Coercion.is_id coercion
+  then t
+  else
+    try apply_coercion t coercion
+    with Misc.Fatal_error ->
+      let bt = Printexc.get_raw_backtrace () in
+      Format.eprintf "\n%tContext is:%t applying coercion@ %a@ to type@ %a\n"
+        Flambda_colours.error Flambda_colours.pop Coercion.print coercion print
+        t;
+      Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 let rec remove_unused_value_slots_and_shortcut_aliases t ~used_value_slots
     ~canonicalise =

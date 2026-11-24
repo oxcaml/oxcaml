@@ -14,8 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Or_bottom.Let_syntax
-
 (* This module conceals the implementation of type ['head t]. Functions such as
    [T.descr] can be inlined with return values unboxed by Flambda 2. *)
 module T : sig
@@ -280,17 +278,11 @@ include T
 let print ~print_head ppf t =
   Or_unknown_or_bottom.print (Descr.print ~print_head) ppf (descr t)
 
-let[@inline always] apply_coercion ~apply_coercion_head coercion t :
-    _ t Or_bottom.t =
+let[@inline always] apply_coercion ~apply_coercion_head coercion t =
   match descr t with
-  | Unknown | Bottom -> Ok t
-  | Ok (Equals simple) -> (
-    match Simple.apply_coercion simple coercion with
-    | None -> Bottom
-    | Some simple -> Ok (create_equals simple))
-  | Ok (No_alias head) ->
-    let<+ head = apply_coercion_head head coercion in
-    create head
+  | Unknown | Bottom -> t
+  | Ok (Equals simple) -> create_equals (Simple.apply_coercion simple coercion)
+  | Ok (No_alias head) -> create (apply_coercion_head head coercion)
 
 let ids_for_export ~ids_for_export_head (t : _ t) =
   match descr t with

@@ -246,142 +246,90 @@ end = struct
       false
 
   let of_non_alias_type ?coercion ty : t =
+    let coerce apply_coercion_head head =
+      match coercion with
+      | None -> head
+      | Some coercion -> (
+        try apply_coercion_head head coercion
+        with Misc.Fatal_error ->
+          let bt = Printexc.get_raw_backtrace () in
+          Format.eprintf
+            "\n%tContext is:%t applying coercion@ %a@ to type@ %a\n"
+            Flambda_colours.error Flambda_colours.pop Coercion.print coercion
+            TG.print ty;
+          Printexc.raise_with_backtrace Misc.Fatal_error bt)
+    in
     match TG.descr ty with
     | Value Unknown -> create_unknown K.value
     | Value Bottom -> create_bottom K.value
-    | Value (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_value head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_value head coercion with
-        | Bottom -> create_bottom K.value
-        | Ok head -> create_value head))
+    | Value (Ok (No_alias head)) ->
+      create_value (coerce TG.apply_coercion_head_of_kind_value head)
     | Naked_immediate Unknown -> create_unknown K.naked_immediate
     | Naked_immediate Bottom -> create_bottom K.naked_immediate
-    | Naked_immediate (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_immediate head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_immediate head coercion with
-        | Bottom -> create_bottom K.naked_immediate
-        | Ok head -> create_naked_immediate head))
+    | Naked_immediate (Ok (No_alias head)) ->
+      create_naked_immediate
+        (coerce TG.apply_coercion_head_of_kind_naked_immediate head)
     | Naked_float32 Unknown -> create_unknown K.naked_float32
     | Naked_float32 Bottom -> create_bottom K.naked_float32
-    | Naked_float32 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_float32 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_float32 head coercion with
-        | Bottom -> create_bottom K.naked_float32
-        | Ok head -> create_naked_float32 head))
+    | Naked_float32 (Ok (No_alias head)) ->
+      create_naked_float32
+        (coerce TG.apply_coercion_head_of_kind_naked_float32 head)
     | Naked_float Unknown -> create_unknown K.naked_float
     | Naked_float Bottom -> create_bottom K.naked_float
-    | Naked_float (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_float head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_float head coercion with
-        | Bottom -> create_bottom K.naked_float
-        | Ok head -> create_naked_float head))
+    | Naked_float (Ok (No_alias head)) ->
+      create_naked_float
+        (coerce TG.apply_coercion_head_of_kind_naked_float head)
     | Naked_vec128 Unknown -> create_unknown K.naked_vec128
     | Naked_vec128 Bottom -> create_bottom K.naked_vec128
-    | Naked_vec128 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_vec128 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_vec128 head coercion with
-        | Bottom -> create_bottom K.naked_vec128
-        | Ok head -> create_naked_vec128 head))
+    | Naked_vec128 (Ok (No_alias head)) ->
+      create_naked_vec128
+        (coerce TG.apply_coercion_head_of_kind_naked_vec128 head)
     | Naked_vec256 Unknown -> create_unknown K.naked_vec256
     | Naked_vec256 Bottom -> create_bottom K.naked_vec256
-    | Naked_vec256 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_vec256 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_vec256 head coercion with
-        | Bottom -> create_bottom K.naked_vec256
-        | Ok head -> create_naked_vec256 head))
+    | Naked_vec256 (Ok (No_alias head)) ->
+      create_naked_vec256
+        (coerce TG.apply_coercion_head_of_kind_naked_vec256 head)
     | Naked_vec512 Unknown -> create_unknown K.naked_vec512
     | Naked_vec512 Bottom -> create_bottom K.naked_vec512
-    | Naked_vec512 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_vec512 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_vec512 head coercion with
-        | Bottom -> create_bottom K.naked_vec512
-        | Ok head -> create_naked_vec512 head))
+    | Naked_vec512 (Ok (No_alias head)) ->
+      create_naked_vec512
+        (coerce TG.apply_coercion_head_of_kind_naked_vec512 head)
     | Naked_mask Unknown -> create_unknown K.naked_mask
     | Naked_mask Bottom -> create_bottom K.naked_mask
-    | Naked_mask (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_mask head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_mask head coercion with
-        | Bottom -> create_bottom K.naked_mask
-        | Ok head -> create_naked_mask head))
+    | Naked_mask (Ok (No_alias head)) ->
+      create_naked_mask (coerce TG.apply_coercion_head_of_kind_naked_mask head)
     | Naked_int8 Unknown -> create_unknown K.naked_int8
     | Naked_int8 Bottom -> create_bottom K.naked_int8
-    | Naked_int8 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_int8 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_int8 head coercion with
-        | Bottom -> create_bottom K.naked_int8
-        | Ok head -> create_naked_int8 head))
+    | Naked_int8 (Ok (No_alias head)) ->
+      create_naked_int8 (coerce TG.apply_coercion_head_of_kind_naked_int8 head)
     | Naked_int16 Unknown -> create_unknown K.naked_int16
     | Naked_int16 Bottom -> create_bottom K.naked_int16
-    | Naked_int16 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_int16 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_int16 head coercion with
-        | Bottom -> create_bottom K.naked_int16
-        | Ok head -> create_naked_int16 head))
+    | Naked_int16 (Ok (No_alias head)) ->
+      create_naked_int16
+        (coerce TG.apply_coercion_head_of_kind_naked_int16 head)
     | Naked_int32 Unknown -> create_unknown K.naked_int32
     | Naked_int32 Bottom -> create_bottom K.naked_int32
-    | Naked_int32 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_int32 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_int32 head coercion with
-        | Bottom -> create_bottom K.naked_int32
-        | Ok head -> create_naked_int32 head))
+    | Naked_int32 (Ok (No_alias head)) ->
+      create_naked_int32
+        (coerce TG.apply_coercion_head_of_kind_naked_int32 head)
     | Naked_int64 Unknown -> create_unknown K.naked_int64
     | Naked_int64 Bottom -> create_bottom K.naked_int64
-    | Naked_int64 (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_int64 head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_int64 head coercion with
-        | Bottom -> create_bottom K.naked_int64
-        | Ok head -> create_naked_int64 head))
+    | Naked_int64 (Ok (No_alias head)) ->
+      create_naked_int64
+        (coerce TG.apply_coercion_head_of_kind_naked_int64 head)
     | Naked_nativeint Unknown -> create_unknown K.naked_nativeint
     | Naked_nativeint Bottom -> create_bottom K.naked_nativeint
-    | Naked_nativeint (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_naked_nativeint head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_naked_nativeint head coercion with
-        | Bottom -> create_bottom K.naked_nativeint
-        | Ok head -> create_naked_nativeint head))
+    | Naked_nativeint (Ok (No_alias head)) ->
+      create_naked_nativeint
+        (coerce TG.apply_coercion_head_of_kind_naked_nativeint head)
     | Rec_info Unknown -> create_unknown K.rec_info
     | Rec_info Bottom -> create_bottom K.rec_info
-    | Rec_info (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_rec_info head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_rec_info head coercion with
-        | Bottom -> create_bottom K.rec_info
-        | Ok head -> create_rec_info head))
+    | Rec_info (Ok (No_alias head)) ->
+      create_rec_info (coerce TG.apply_coercion_head_of_kind_rec_info head)
     | Region Unknown -> create_unknown K.region
     | Region Bottom -> create_bottom K.region
-    | Region (Ok (No_alias head)) -> (
-      match coercion with
-      | None -> create_region head
-      | Some coercion -> (
-        match TG.apply_coercion_head_of_kind_region head coercion with
-        | Bottom -> create_bottom K.region
-        | Ok head -> create_region head))
+    | Region (Ok (No_alias head)) ->
+      create_region (coerce TG.apply_coercion_head_of_kind_region head)
     | Value (Ok (Equals _))
     | Naked_immediate (Ok (Equals _))
     | Naked_float (Ok (Equals _))

@@ -94,7 +94,7 @@ let create_coerced_singleton_let uacc var defining_expr
     match (defining_expr : Named.t) with
     | Simple simple ->
       let defining_expr =
-        Simple.apply_coercion_exn simple coercion_from_defining_expr_to_var
+        Simple.apply_coercion simple coercion_from_defining_expr_to_var
         |> Named.create_simple
       in
       create_let uacc
@@ -351,7 +351,7 @@ let create_let_symbols uacc lifted_constant ~body =
                   coercion_from_var'_to_proj
                 in
                 let coercion_from_proj'_to_var =
-                  Coercion.compose_exn coercion_from_proj'_to_proj
+                  Coercion.compose coercion_from_proj'_to_proj
                     ~then_:coercion_from_proj_to_var
                 in
                 apply_projection proj' coercion_from_proj'_to_var)

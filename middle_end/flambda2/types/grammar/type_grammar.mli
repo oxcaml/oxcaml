@@ -762,61 +762,49 @@ val create_from_head_rec_info : head_of_kind_rec_info -> t
 val create_from_head_region : head_of_kind_region -> t
 
 val apply_coercion_head_of_kind_value :
-  head_of_kind_value -> Coercion.t -> head_of_kind_value Or_bottom.t
+  head_of_kind_value -> Coercion.t -> head_of_kind_value
 
 val apply_coercion_head_of_kind_naked_immediate :
-  head_of_kind_naked_immediate ->
-  Coercion.t ->
-  head_of_kind_naked_immediate Or_bottom.t
+  head_of_kind_naked_immediate -> Coercion.t -> head_of_kind_naked_immediate
 
 val apply_coercion_head_of_kind_naked_float32 :
-  head_of_kind_naked_float32 ->
-  Coercion.t ->
-  head_of_kind_naked_float32 Or_bottom.t
+  head_of_kind_naked_float32 -> Coercion.t -> head_of_kind_naked_float32
 
 val apply_coercion_head_of_kind_naked_float :
-  head_of_kind_naked_float -> Coercion.t -> head_of_kind_naked_float Or_bottom.t
+  head_of_kind_naked_float -> Coercion.t -> head_of_kind_naked_float
 
 val apply_coercion_head_of_kind_naked_int8 :
-  head_of_kind_naked_int8 -> Coercion.t -> head_of_kind_naked_int8 Or_bottom.t
+  head_of_kind_naked_int8 -> Coercion.t -> head_of_kind_naked_int8
 
 val apply_coercion_head_of_kind_naked_int16 :
-  head_of_kind_naked_int16 -> Coercion.t -> head_of_kind_naked_int16 Or_bottom.t
+  head_of_kind_naked_int16 -> Coercion.t -> head_of_kind_naked_int16
 
 val apply_coercion_head_of_kind_naked_int32 :
-  head_of_kind_naked_int32 -> Coercion.t -> head_of_kind_naked_int32 Or_bottom.t
+  head_of_kind_naked_int32 -> Coercion.t -> head_of_kind_naked_int32
 
 val apply_coercion_head_of_kind_naked_int64 :
-  head_of_kind_naked_int64 -> Coercion.t -> head_of_kind_naked_int64 Or_bottom.t
+  head_of_kind_naked_int64 -> Coercion.t -> head_of_kind_naked_int64
 
 val apply_coercion_head_of_kind_naked_nativeint :
-  head_of_kind_naked_nativeint ->
-  Coercion.t ->
-  head_of_kind_naked_nativeint Or_bottom.t
+  head_of_kind_naked_nativeint -> Coercion.t -> head_of_kind_naked_nativeint
 
 val apply_coercion_head_of_kind_naked_vec128 :
-  head_of_kind_naked_vec128 ->
-  Coercion.t ->
-  head_of_kind_naked_vec128 Or_bottom.t
+  head_of_kind_naked_vec128 -> Coercion.t -> head_of_kind_naked_vec128
 
 val apply_coercion_head_of_kind_naked_vec256 :
-  head_of_kind_naked_vec256 ->
-  Coercion.t ->
-  head_of_kind_naked_vec256 Or_bottom.t
+  head_of_kind_naked_vec256 -> Coercion.t -> head_of_kind_naked_vec256
 
 val apply_coercion_head_of_kind_naked_vec512 :
-  head_of_kind_naked_vec512 ->
-  Coercion.t ->
-  head_of_kind_naked_vec512 Or_bottom.t
+  head_of_kind_naked_vec512 -> Coercion.t -> head_of_kind_naked_vec512
 
 val apply_coercion_head_of_kind_naked_mask :
-  head_of_kind_naked_mask -> Coercion.t -> head_of_kind_naked_mask Or_bottom.t
+  head_of_kind_naked_mask -> Coercion.t -> head_of_kind_naked_mask
 
 val apply_coercion_head_of_kind_rec_info :
-  head_of_kind_rec_info -> Coercion.t -> head_of_kind_rec_info Or_bottom.t
+  head_of_kind_rec_info -> Coercion.t -> head_of_kind_rec_info
 
 val apply_coercion_head_of_kind_region :
-  head_of_kind_region -> Coercion.t -> head_of_kind_region Or_bottom.t
+  head_of_kind_region -> Coercion.t -> head_of_kind_region
 
 module Head_of_kind_value : sig
   type t = head_of_kind_value
