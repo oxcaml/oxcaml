@@ -36,7 +36,6 @@ and code inline(never) loopify(never) size(45) newer_version_of(unused_result_1)
         -> k * k1
         : unit =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   (let r_1 =
      %project_value_slot.[unused_result].[unboxed_field_r]
        ($camlEscape_closer_changed_return__unused_result_7)
@@ -65,12 +64,10 @@ and code inline(never) loopify(never) size(45) newer_version_of(unused_result_1)
                    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
                      (r_1, prim_3)
                  in
-                 let region_end = %end_region (`region`) in
-                 let region_end_1 = %end_ghost_region (ghost_region) in
+                 let `unit` = %end_region (`region`) in
                  cont k)))
     where k2 =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
+      let `unit` = %end_region (`region`) in
       cont k
   with { unboxed_field_r = r }
 in
@@ -79,8 +76,7 @@ let code inline(never) loopify(never) size(56) newer_version_of(pair_result_2)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   (let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
    apply direct(sum_pair_0_1 &my_alloc_region)
      ($camlEscape_closer_changed_return__sum_pair_6 : _ -> imm tagged)
@@ -92,8 +88,7 @@ let code inline(never) loopify(never) size(56) newer_version_of(pair_result_2)
           | 0 -> k3
           | 1 -> k4
           where k4 =
-            let region_end = %end_region (`region`) in
-            let region_end_1 = %end_ghost_region (ghost_region) in
+            let `unit` = %end_region (`region`) in
             let Pmakeblock =
               %block.[`0`].my_alloc_region.local[my_region] (s, 1)
             in
@@ -104,18 +99,14 @@ let code inline(never) loopify(never) size(56) newer_version_of(pair_result_2)
                | 0 -> k2 ($camlEscape_closer_changed_return__const_block_0)
                | 1 -> k3
                where k3 =
-                 let region_end = %end_region (`region`) in
-                 let region_end_1 = %end_ghost_region (ghost_region) in
+                 let `unit` = %end_region (`region`) in
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region.local[my_region] (2, s)
                  in
                  cont k (Pmakeblock))))
-    where k2
-            (function_return_0_pair_result_2 :
-               [ 0 of imm tagged * imm tagged ]) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_pair_result_2)
+    where k2 (region_return : [ 0 of imm tagged * imm tagged ]) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_closer_changed_return__pair_result_8 =
   closure pair_result_2_1 @pair_result &toplevel
@@ -125,8 +116,7 @@ let code inline(never) loopify(never) size(46) newer_version_of(opt_result_3)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of imm tagged ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   (let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
    apply direct(sum_pair_0_1 &my_alloc_region)
      ($camlEscape_closer_changed_return__sum_pair_6 : _ -> imm tagged)
@@ -143,16 +133,14 @@ let code inline(never) loopify(never) size(46) newer_version_of(opt_result_3)
                | 0 -> k2 ($camlEscape_closer_changed_return__const_block_1)
                | 1 -> k3
                where k3 =
-                 let region_end = %end_region (`region`) in
-                 let region_end_1 = %end_ghost_region (ghost_region) in
+                 let `unit` = %end_region (`region`) in
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region.local[my_region] (s)
                  in
                  cont k (Pmakeblock))))
-    where k2 (function_return_0_opt_result_3 : [ 0 | 0 of imm tagged ]) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_opt_result_3)
+    where k2 (region_return : [ 0 | 0 of imm tagged ]) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_closer_changed_return__opt_result_9 =
   closure opt_result_3_1 @opt_result &toplevel
@@ -365,10 +353,10 @@ and code inline(never) loopify(never) size(127) newer_version_of(run_4)
                                                 %int_barith.add
                                                   (int_add_7, o3)
                                               in
-                                              let region_end =
+                                              let `unit` =
                                                 %end_region (`region`)
                                               in
-                                              let region_end_1 =
+                                              let unit_1 =
                                                 %end_ghost_region
                                                   (ghost_region)
                                               in

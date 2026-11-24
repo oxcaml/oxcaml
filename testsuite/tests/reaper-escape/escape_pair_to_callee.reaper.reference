@@ -47,16 +47,14 @@ let code inline(never) loopify(never) size(14) newer_version_of(f_2)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   (let p = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
    apply direct(sum_pair_0_1 &my_alloc_region)
      ($camlEscape_pair_to_callee__sum_pair_6 : _ -> imm tagged)
        (p)
        -> k2 * k1)
-    where k2 (function_return_0_f_2 : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_f_2)
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_pair_to_callee__f_8 = closure f_2_1 @f &toplevel in
 apply direct(f_2_1 &toplevel)

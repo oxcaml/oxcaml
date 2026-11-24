@@ -1,0 +1,43 @@
+12c12,13
+< let code inline(never) loopify(never) size(49) newer_version_of(f_1) f_1_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let prim = %int_comp.le (1, n) in 
+---
+> let code inline(never) loopify(never) size(49) newer_version_of(f_1) f_1_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let `region` = %begin_region () in 
+> (let prim = %int_comp.le (1, n) in 
+14,16c15,17
+< | 0 -> k (0)
+< | 1 -> k2
+< where k2 = let prim_1 = %untag_imm (n) in 
+---
+> | 0 -> k2 (0)
+> | 1 -> k3
+> where k3 = let prim_1 = %untag_imm (n) in 
+18,20c19,20
+< (cont k2 (1L, 0)
+< where rec k2 (for_counter_naked : int64, acc_unboxed0 : imm tagged) = let `region` = %begin_region () in 
+< ((let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in 
+---
+> (cont k3 (1L, 0)
+> where rec k3 (for_counter_naked : int64, acc_unboxed0 : imm tagged) = let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in 
+21a22
+> let region_1 = %begin_region (`region`) in 
+23,25c24,27
+< let p = %block.[`0`].my_alloc_region.local[`region`] (i, int_add) in 
+< apply direct(sum_pair_0_1 &my_alloc_region) ($camlTest__sum_pair_4 : _ -> imm tagged) (p) -> k5 * k1
+< where k5 (return_val0 : imm tagged) = let int_add_1 = %int_barith.add (acc_unboxed0, return_val0) in 
+---
+> let p = %block.[`0`].my_alloc_region.local[region_1] (i, int_add) in 
+> (apply direct(sum_pair_0_1 &my_alloc_region) ($camlTest__sum_pair_4 : _ -> imm tagged) (p) -> k4 * k1
+> where k4 (return_val0 : imm tagged) = let int_add_1 = %int_barith.add (acc_unboxed0, return_val0) in 
+> let `unit` = %end_region (region_1) in 
+29,34c31,34
+< | 0 -> k4 (int_add_1)
+< | 1 -> k3 (for_next_naked, int_add_1))
+< where k4 (region_return : imm tagged) = let `unit` = %end_region (`region`) in 
+< cont k (region_return)
+< where k3 (region_return : int64, region_return_1 : imm tagged) = let `unit` = %end_region (`region`) in 
+< cont k2 (region_return, region_return_1))) in 
+---
+> | 0 -> k2 (int_add_1)
+> | 1 -> k3 (for_next_naked, int_add_1))))
+> where k2 (acc_unboxed0 : imm tagged) = let `unit` = %end_region (`region`) in 
+> cont k (acc_unboxed0) in 

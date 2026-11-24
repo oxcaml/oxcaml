@@ -575,7 +575,11 @@ let decision_rules =
        ==> local_closure_code c);
       (let$ [q; s'; c] = ["q"; "s'"; "c"] in
        [call_result_of_code q s' c; local_return c]
-       ==> scope_with_local_call_result s') ]
+       ==> scope_with_local_call_result s');
+      (* A partial application made local is such a result too. *)
+      (let$ [r; s] = ["r"; "s"] in
+       [local_allocation r; indirect_call_result r; allocation r s]
+       ==> scope_with_local_call_result s) ]
 
 let scopes_of_allocation =
   let scopes =

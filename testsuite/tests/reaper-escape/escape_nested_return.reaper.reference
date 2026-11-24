@@ -99,8 +99,8 @@ let code inline(never) loopify(never) size(28) newer_version_of(g_4)
                 let int_add_2 =
                   %int_barith.add (apply_result_1, apply_result)
                 in
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
                 cont k (int_add_2)))
 in
 let $camlEscape_nested_return__g_8 = closure g_4_1 @g &toplevel in

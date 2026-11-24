@@ -95,6 +95,8 @@ type mode =
 type t =
   { modes : mode Continuation.Map.t;
     exclave_applies : Continuation.Set.t;
+    (* Whether the result of some application is allocated in the region. *)
+    receives_call_results : bool;
     (* A fresh continuation standing for the start of the body. *)
     entry : Continuation.t
   }
@@ -109,6 +111,8 @@ let has_mode t k mode =
 let closed_before_jump t k = has_mode t k Close_before_jump
 
 let closed_on_entry t k = has_mode t k Close_on_entry
+
+let receives_call_results t = t.receives_call_results
 
 let closed_before_apply t block =
   Continuation.Set.mem (Option.value block ~default:t.entry) t.exclave_applies
@@ -438,7 +442,21 @@ let compute_exn solution ~continuation_info ~code_id ~return_continuation body =
         Continuation.Map.add k mode modes)
       zone Continuation.Map.empty
   in
-  { modes; exclave_applies; entry }
+  let receives_call_results =
+    Continuation.Map.exists
+      (fun id block ->
+        (not (in_zone id))
+        && (not (Continuation.Set.mem id exclave_applies))
+        && List.exists
+             (fun (k, (kind : edge_kind), _) ->
+               match kind with
+               | Return_of_apply ->
+                 not (Code_id_or_name.Set.is_empty (delivered k))
+               | Jump | Switch_arm -> false)
+             (edges block.terminator))
+      blocks
+  in
+  { modes; exclave_applies; receives_call_results; entry }
 
 let compute solution ~continuation_info ~code_id ~return_continuation body =
   match

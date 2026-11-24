@@ -37,7 +37,6 @@ apply ccall noalloc
             -> k * k1
             : imm tagged =
       let `region` = %begin_region () in
-      let ghost_region = %begin_ghost_region () in
       (let try_region = %begin_try_region () in
        let try_ghost_region = %begin_try_ghost_region () in
        (let prim = %int_comp.gt (x, 0) in
@@ -72,8 +71,7 @@ apply ccall noalloc
                     let int_add_2 =
                       %int_barith.add (apply_result_1, apply_result)
                     in
-                    let region_end = %end_region (`region`) in
-                    let region_end_1 = %end_ghost_region (ghost_region) in
+                    let `unit` = %end_region (`region`) in
                     cont k (int_add_2)))
     in
     let $camlEscape_try_raise_local__f_8 = closure f_1_1 @f &toplevel in

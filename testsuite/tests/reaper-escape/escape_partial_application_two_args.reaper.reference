@@ -126,8 +126,8 @@ let code inline(never) loopify(never) size(102) newer_version_of(g_2)
                    where k2 (apply_result : imm tagged) =
                      let int_add_14 = %int_barith.add (apply_result, s) in
                      let int_add_15 = %int_barith.add (int_add_14, s2) in
-                     let region_end = %end_region (`region`) in
-                     let region_end_1 = %end_ghost_region (ghost_region) in
+                     let `unit` = %end_region (`region`) in
+                     let unit_1 = %end_ghost_region (ghost_region) in
                      cont k (int_add_15))))
 in
 let $camlEscape_partial_application_two_args__g_6 =

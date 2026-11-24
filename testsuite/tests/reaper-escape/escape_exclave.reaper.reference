@@ -246,14 +246,12 @@ let code inline(never) loopify(never) size(23) newer_version_of(after_call_3)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
   apply direct(sum_pair_0_1 &my_alloc_region)
     ($camlEscape_exclave__sum_pair_63 : _ -> imm tagged) (t) -> k2 * k1
     where k2 (s : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
+      let `unit` = %end_region (`region`) in
       let int_add = %int_barith.add (s, 1) in
       let Pmakeblock =
         %block.[`0`].my_alloc_region.local[my_region] (s, int_add)
@@ -268,8 +266,7 @@ let code inline(never) loopify(never) size(68) newer_version_of(branches_4)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   (let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
    apply direct(sum_pair_0_1 &my_alloc_region)
      ($camlEscape_exclave__sum_pair_63 : _ -> imm tagged) (t) -> k3 * k1
@@ -279,8 +276,7 @@ let code inline(never) loopify(never) size(68) newer_version_of(branches_4)
           | 0 -> k3
           | 1 -> k4
           where k4 =
-            let region_end = %end_region (`region`) in
-            let region_end_1 = %end_ghost_region (ghost_region) in
+            let `unit` = %end_region (`region`) in
             let Pmakeblock =
               %block.[`0`].my_alloc_region.local[my_region] (s, 1)
             in
@@ -294,8 +290,7 @@ let code inline(never) loopify(never) size(68) newer_version_of(branches_4)
                | 0 -> k3
                | 1 -> k2 (0)
                where k3 =
-                 let region_end = %end_region (`region`) in
-                 let region_end_1 = %end_ghost_region (ghost_region) in
+                 let `unit` = %end_region (`region`) in
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region.local[my_region] (2, s)
                  in
@@ -303,12 +298,9 @@ let code inline(never) loopify(never) size(68) newer_version_of(branches_4)
                    %block.[`0`].my_alloc_region.local[my_region] (Pmakeblock)
                  in
                  cont k (Pmakeblock_1))))
-    where k2
-            (function_return_0_branches_4 :
-               [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ]) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_branches_4)
+    where k2 (region_return : [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ]) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_exclave__branches_67 =
   closure branches_4_1 @branches &toplevel
@@ -318,14 +310,12 @@ let code inline(never) loopify(never) size(18) newer_version_of(exclave_tail_cal
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   let t = %block.[`0`].my_alloc_region.local[`region`] (x, y, x) in
   apply direct(sum3_1_1 &my_alloc_region)
     ($camlEscape_exclave__sum3_64 : _ -> imm tagged) (t) -> k2 * k1
     where k2 (s : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
+      let `unit` = %end_region (`region`) in
       apply
              direct(after_call_3_1
              &my_alloc_region &my_region &my_ghost_region)
@@ -342,14 +332,12 @@ let code inline(never) loopify(never) size(19) newer_version_of(exclave_call_6)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : val * val stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   let t = %block.[`0`].my_alloc_region.local[`region`] (x, y, x) in
   apply direct(sum3_1_1 &my_alloc_region)
     ($camlEscape_exclave__sum3_64 : _ -> imm tagged) (t) -> k2 * k1
     where k2 (s : imm tagged) =
-      ((let region_end = %end_region (`region`) in
-        let region_end_1 = %end_ghost_region (ghost_region) in
+      ((let `unit` = %end_region (`region`) in
         apply
                direct(after_call_3_1
                &my_alloc_region &my_region &my_ghost_region)
@@ -372,8 +360,8 @@ let code inline(never) loopify(never) size(18) newer_version_of(temporary_call_r
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
+  let ghost_region = %begin_ghost_region (my_ghost_region) in
   apply direct(after_call_3_1 &my_alloc_region &`region` &ghost_region)
     ($camlEscape_exclave__after_call_66
      : _ -> [ 0 of imm tagged * imm tagged ])
@@ -383,8 +371,8 @@ let code inline(never) loopify(never) size(18) newer_version_of(temporary_call_r
       (apply direct(sum_pair_0_1 &my_alloc_region)
          ($camlEscape_exclave__sum_pair_63 : _ -> imm tagged) (p) -> k2 * k1
          where k2 (s : imm tagged) =
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
+           let unit_1 = %end_ghost_region (ghost_region) in
            let Pmakeblock =
              %block.[`0`].my_alloc_region.local[my_region] (s, x)
            in
@@ -442,8 +430,7 @@ and code rec loopify(never) size(55) newer_version_of(build_10)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   let peak_1 =
     %project_value_slot.[build].[unboxed_field_peak]
       ($camlEscape_exclave__build_73)
@@ -457,8 +444,7 @@ and code rec loopify(never) size(55) newer_version_of(build_10)
          ($camlEscape_exclave__used_65 : _ -> imm tagged) (0) -> k3 * k1
          where k3 (apply_result : imm tagged) =
            let Psetfield = %block_set.`imm`.[`0`] (peak_1, apply_result) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            cont k (0))
     where k2 =
       let int_add = %int_barith.add (n, 2) in
@@ -470,8 +456,7 @@ and code rec loopify(never) size(55) newer_version_of(build_10)
          ($camlEscape_exclave__sum3_64 : _ -> imm tagged) (t) -> k2 * k1
          where k2 (s : imm tagged) =
            ((let int_sub = %int_barith.sub (n, 1) in
-             let region_end = %end_region (`region`) in
-             let region_end_1 = %end_ghost_region (ghost_region) in
+             let `unit` = %end_region (`region`) in
              apply
                     direct(build_10_1
                     &my_alloc_region &my_region &my_ghost_region)
@@ -500,8 +485,7 @@ and code rec loopify(never) size(52) newer_version_of(tree_11)
         : [ 0
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
               [ 0 | 0 of val * imm tagged * val ] ] stack =
-  let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
+  let `region` = %begin_region (my_region) in
   (let prim = %phys_eq (n, 0) in
    switch prim
      | 0 -> k3
@@ -516,8 +500,7 @@ and code rec loopify(never) size(52) newer_version_of(tree_11)
           ($camlEscape_exclave__sum3_64 : _ -> imm tagged) (t) -> k3 * k1
           where k3 (s : imm tagged) =
             ((let int_sub = %int_barith.sub (n, 1) in
-              (let region_end = %end_region (`region`) in
-               let region_end_1 = %end_ghost_region (ghost_region) in
+              (let `unit` = %end_region (`region`) in
                apply
                       direct(tree_11_1
                       &my_alloc_region &my_region &my_ghost_region)
@@ -567,13 +550,12 @@ and code rec loopify(never) size(52) newer_version_of(tree_11)
                       in
                       cont k (Pmakeblock)))))
     where k2
-            (function_return_0_tree_11 :
+            (region_return :
                [ 0
                | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
                    [ 0 | 0 of val * imm tagged * val ] ]) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_tree_11)
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_exclave__size_75 =
   closure size_12_1 @`size` &toplevel
@@ -1244,11 +1226,11 @@ and code inline(never) loopify(never) size(228) newer_version_of(run_16)
                                                                     where 
                                                                     k2
                                                                     (full_apply) =
-                                                                    let region_end =
+                                                                    let `unit` =
                                                                     %end_region
                                                                     (`region`)
                                                                     in
-                                                                    let region_end_1 =
+                                                                    let unit_1 =
                                                                     %end_ghost_region
                                                                     (ghost_region)
                                                                     in

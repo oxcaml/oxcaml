@@ -60,7 +60,6 @@ let code inline(never) loopify(never) size(27) newer_version_of(papp_exported_2)
         -> k * k1
         : val =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   let int_add = %int_barith.add (m, 1) in
   let tmp = %block.[`0`].my_alloc_region.local[`region`] (m, int_add) in
   apply direct(sum_pair_0_1 &my_alloc_region)
@@ -78,8 +77,7 @@ let code inline(never) loopify(never) size(27) newer_version_of(papp_exported_2)
          where k3 (function_return : imm tagged) =
            cont k2
          where k2 =
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            cont k (k))
 in
 let $camlEscape_partial_application_region__papp_exported_6 =
@@ -189,9 +187,8 @@ let code inline(never) loopify(never) size(89) newer_version_of(run_4)
                           let int_add_8 =
                             %int_barith.add (int_add_7, apply_result)
                           in
-                          let region_end = %end_region (`region`) in
-                          let region_end_1 = %end_ghost_region (ghost_region)
-                          in
+                          let `unit` = %end_region (`region`) in
+                          let unit_1 = %end_ghost_region (ghost_region) in
                           cont k (int_add_8)))))
 in
 let $camlEscape_partial_application_region__run_8 =

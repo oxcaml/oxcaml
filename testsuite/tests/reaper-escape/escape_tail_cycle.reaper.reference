@@ -42,7 +42,6 @@ and code rec loopify(never) size(56) newer_version_of(pong_2)
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   let peak_1 =
     %project_value_slot.[pong].[unboxed_field_peak]
       ($camlEscape_tail_cycle__pong_9)
@@ -57,8 +56,7 @@ and code rec loopify(never) size(56) newer_version_of(pong_2)
          where k3 (Pccall) =
            let Psetfield = %block_set.`imm`.[`0`] (peak_1, Pccall) in
            let Pmakeblock = %block.[`0`].my_alloc_region (acc, n) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            cont k (Pmakeblock))
     where k2 =
       let tmp = %block.[`0`].my_alloc_region.local[`region`] (acc, n) in
@@ -69,8 +67,7 @@ and code rec loopify(never) size(56) newer_version_of(pong_2)
          where k2 (apply_result : imm tagged) =
            let int_and = %int_barith.`and` (apply_result, 65535) in
            let int_sub = %int_barith.sub (n, 1) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            apply direct(ping_1_1 &my_alloc_region)
              ($camlEscape_tail_cycle__ping_8 ~ depth my_depth -> succ my_depth
               : _ -> [ 0 of imm tagged * imm tagged ])
@@ -82,7 +79,6 @@ and code rec loopify(never) size(56) newer_version_of(ping_1)
         -> k * k1
         : [ 0 of imm tagged * imm tagged ] =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   let peak_1 =
     %project_value_slot.[ping].[unboxed_field_peak]
       ($camlEscape_tail_cycle__ping_8)
@@ -97,8 +93,7 @@ and code rec loopify(never) size(56) newer_version_of(ping_1)
          where k3 (Pccall) =
            let Psetfield = %block_set.`imm`.[`0`] (peak_1, Pccall) in
            let Pmakeblock = %block.[`0`].my_alloc_region (acc, acc) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            cont k (Pmakeblock))
     where k2 =
       let tmp = %block.[`0`].my_alloc_region.local[`region`] (n, acc) in
@@ -109,8 +104,7 @@ and code rec loopify(never) size(56) newer_version_of(ping_1)
          where k2 (apply_result : imm tagged) =
            let int_and = %int_barith.`and` (apply_result, 65535) in
            let int_sub = %int_barith.sub (n, 1) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            apply direct(pong_2_1 &my_alloc_region)
              ($camlEscape_tail_cycle__pong_9 ~ depth my_depth -> succ my_depth
               : _ -> [ 0 of imm tagged * imm tagged ])

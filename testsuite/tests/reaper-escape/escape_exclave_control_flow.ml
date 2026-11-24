@@ -97,6 +97,9 @@ end = struct
 
   let[@inline never] value o = match o with None -> -1 | Some v -> v
 
+  let[@inline never] value_pair o =
+    match o with None -> -1 | Some p -> sum_pair p
+
   let[@inline never] value2 o =
     match o with None -> -1 | Some (p, u) -> sum_pair p + u
 
@@ -121,8 +124,7 @@ end = struct
     (Printf.printf [@inlined never])
       "%d %d %d %d %d %d %d %d %d; count %d; used %d %d\n" (value2 j1)
       (value2 j2) (value2 j3) (value2 j4) (value l) (value l2)
-      (value (Option.map sum_pair t1))
-      (value (Option.map sum_pair t2))
+      (value_pair t1) (value_pair t2)
       (value3 c) !count u1 (u2 - u1)
 end
 

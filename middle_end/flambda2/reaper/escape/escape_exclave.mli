@@ -63,6 +63,10 @@ val closed_before_jump : t -> Continuation.t -> bool
     handler of the continuation. *)
 val closed_on_entry : t -> Continuation.t -> bool
 
+(** Whether the result of some application may be allocated in the region of the
+    function (which then needs its ghost region). *)
+val receives_call_results : t -> bool
+
 (** Whether the region of the function must be closed before the application
     ending the handler of the given continuation ([None] for the start of the
     body of the function), which is outside of the zone. *)

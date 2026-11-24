@@ -34,6 +34,7 @@ type t =
     scopes_needing_region : unit Code_id_or_name.Map.t;
     local_returns : unit Code_id_or_name.Map.t;
     local_closure_code : unit Code_id_or_name.Map.t;
+    scopes_with_local_call_result : unit Code_id_or_name.Map.t;
     db : Datalog.database;
     is_unboxed : Code_id_or_name.t -> bool;
     local_returned : Code_id_or_name.Set.t Code_id_or_name.Map.t Lazy.t;
@@ -63,6 +64,8 @@ let create db ~is_unboxed =
   { candidates = Datalog.get_table Escape_analysis.candidate_tbl db;
     local_allocations;
     scopes_needing_region;
+    scopes_with_local_call_result =
+      Datalog.get_table Escape_analysis.scope_with_local_call_result_tbl db;
     local_returns = Datalog.get_table Escape_analysis.local_return_tbl db;
     local_closure_code =
       Datalog.get_table Escape_analysis.local_closure_code_tbl db;
@@ -80,6 +83,9 @@ let is_local_allocation t var =
 
 let scope_needs_region t scope =
   Code_id_or_name.Map.mem scope t.scopes_needing_region
+
+let scope_has_local_call_result t scope =
+  Code_id_or_name.Map.mem scope t.scopes_with_local_call_result
 
 let returns_local t code_id =
   Code_id_or_name.Map.mem (Code_id_or_name.code_id code_id) t.local_returns

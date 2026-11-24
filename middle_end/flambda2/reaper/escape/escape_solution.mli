@@ -52,6 +52,12 @@ val is_local_allocation : t -> Variable.t -> bool
     region must be introduced. *)
 val scope_needs_region : t -> Code_id_or_name.t -> bool
 
+(** Whether the given region scope contains an application whose result is
+    allocated in the region current at the call (see
+    [Escape_analysis.scope_with_local_call_result_tbl]): such applications are
+    also given the ghost region. *)
+val scope_has_local_call_result : t -> Code_id_or_name.t -> bool
+
 (** Whether the function is to allocate its result in its caller's region (see
     [Escape_analysis.local_return_tbl]). *)
 val returns_local : t -> Code_id.t -> bool

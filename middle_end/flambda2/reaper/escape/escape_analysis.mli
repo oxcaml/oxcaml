@@ -130,8 +130,9 @@ val scope_with_local_allocation_tbl :
     unit )
   Datalog.table
 
-(** Region scopes containing a call to a function that returns at mode local
-    (see [local_return_tbl]), hence needing a region for the result. *)
+(** Region scopes containing an application whose result is allocated in the
+    region current at the call: a call to a function that returns at mode local
+    (see [local_return_tbl]), or a partial application made local. *)
 val scope_with_local_call_result_tbl :
   ( unit Code_id_or_name.Map.t,
     Code_id_or_name.t -> Datalog.nil,

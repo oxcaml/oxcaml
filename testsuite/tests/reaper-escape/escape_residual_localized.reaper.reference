@@ -212,10 +212,9 @@ and code inline(never) loopify(never) size(53) newer_version_of(run_6)
                                          ($camlEscape_residual_localized__const_block_10)
                                          -> k2 * k1
                                        where k2 (full_apply) =
-                                         let region_end =
-                                           %end_region (`region`)
+                                         let `unit` = %end_region (`region`)
                                          in
-                                         let region_end_1 =
+                                         let unit_1 =
                                            %end_ghost_region (ghost_region)
                                          in
                                          apply &my_alloc_region

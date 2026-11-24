@@ -88,8 +88,8 @@ let code inline(never) loopify(never) size(30) newer_version_of(test_3)
               where k2 (apply_result_1 : imm tagged) =
                 let int_add_2 = %int_barith.add (n, apply_result_1) in
                 let int_add_3 = %int_barith.add (int_add_2, apply_result) in
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
                 cont k (int_add_3)))
 in
 let $camlEscape_unboxed_return_field__test_7 =

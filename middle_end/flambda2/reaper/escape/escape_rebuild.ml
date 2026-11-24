@@ -127,6 +127,10 @@ type region_scope =
 type region =
   { region : Variable.t;
     ghost_region : Variable.t;
+    (* The ghost region is only needed by the applications whose result is
+       allocated in the region (see [set_local_return_mode]); as Simplify would,
+       we do not open it otherwise. *)
+    has_ghost_region : bool;
     scope : region_scope
   }
 
@@ -482,7 +486,7 @@ let end_regions t regions (body : RE.t) : RE.t =
     RE.create_let
       (Bound_pattern.singleton
          (Bound_var.create
-            (Variable.create "region_end" K.value)
+            (Variable.create "unit" K.value)
             Flambda_debug_uid.none Name_mode.normal))
       (Named.create_prim end_region Debuginfo.none)
       ~size_of_defining_expr:
@@ -494,12 +498,35 @@ let end_regions t regions (body : RE.t) : RE.t =
      would retain allocations that should have been freed. *)
   match List.rev regions with
   | [] -> body
-  | { region; ghost_region; _ } :: _ ->
-    end_region ~ghost:false region (end_region ~ghost:true ghost_region body)
+  | { region; ghost_region; has_ghost_region; _ } :: _ ->
+    end_region ~ghost:false region
+      (if has_ghost_region
+       then end_region ~ghost:true ghost_region body
+       else body)
 
-let begin_regions t { region; ghost_region; _ } (body : RE.t) : RE.t =
+(* As in [Lambda_to_flambda], a region is given the enclosing one as its
+   parent. *)
+let begin_regions t ({ region; ghost_region; has_ghost_region; _ } as opened)
+    (body : RE.t) : RE.t =
+  let rec parent regions =
+    match regions with
+    | [] -> None
+    | region :: regions -> (
+      if region != opened
+      then parent regions
+      else match regions with [] -> None | parent :: _ -> Some parent)
+  in
+  let parent = parent t.regions in
   let begin_region ~ghost region body =
-    let begin_region : P.t = Variadic (Begin_region { ghost }, []) in
+    let parent =
+      Option.map
+        (fun { region; ghost_region; _ } ->
+          Simple.var (if ghost then ghost_region else region))
+        parent
+    in
+    let begin_region : P.t =
+      Variadic (Begin_region { ghost }, Option.to_list parent)
+    in
     RE.create_let
       (Bound_pattern.singleton
          (Bound_var.create region Flambda_debug_uid.none Name_mode.normal))
@@ -508,7 +535,10 @@ let begin_regions t { region; ghost_region; _ } (body : RE.t) : RE.t =
         (Code_size.prim ~machine_width:t.machine_width begin_region)
       ~body
   in
-  begin_region ~ghost:false region (begin_region ~ghost:true ghost_region body)
+  begin_region ~ghost:false region
+    (if has_ghost_region
+     then begin_region ~ghost:true ghost_region body
+     else body)
 
 let end_regions_before_jump t k body =
   match t with
@@ -564,7 +594,10 @@ let set_local_return_mode t apply =
     | [] ->
       Misc.fatal_errorf "No region for the local result of application %a"
         Apply.print apply
-    | { region; ghost_region; _ } :: _ ->
+    | { has_ghost_region = false; _ } :: _ ->
+      Misc.fatal_errorf "No ghost region for the local result of application %a"
+        Apply.print apply
+    | { region; ghost_region; has_ghost_region = true; _ } :: _ ->
       let alloc_region =
         Alloc_mode.For_applications.alloc_region (Apply.return_mode apply)
       in
@@ -590,7 +623,17 @@ let closer t acc ~params_of_continuation k =
     | Some (k_close, _) -> k_close, acc
     | None ->
       let k_close = Continuation.create () in
-      let params = params_of_continuation k in
+      (* Named as in [Lambda_to_flambda]. *)
+      let params =
+        List.map
+          (fun param ->
+            Bound_parameter.create
+              (Variable.create "region_return"
+                 (Flambda_kind.With_subkind.kind (Bound_parameter.kind param)))
+              (Bound_parameter.kind param)
+              Flambda_debug_uid.none)
+          (params_of_continuation k)
+      in
       let apply_cont =
         Apply_cont_expr.create k
           ~args:(List.map (fun p -> Simple.var (Bound_parameter.var p)) params)
@@ -707,6 +750,8 @@ let enter_region_scope t ~scope =
     let region =
       { region = Variable.create "region" K.region;
         ghost_region = Variable.create "ghost_region" K.region;
+        has_ghost_region =
+          Escape_solution.scope_has_local_call_result t.solution scope;
         scope = Scope scope
       }
     in
@@ -807,6 +852,7 @@ let enter_function t ~code_id ~return_continuation
         let callers_region =
           { region;
             ghost_region;
+            has_ghost_region = true;
             scope =
               Callers_region
                 { returned = Escape_solution.local_returned t.solution code_id }
@@ -830,6 +876,7 @@ let enter_function t ~code_id ~return_continuation
             let own_region =
               { region = Variable.create "region" K.region;
                 ghost_region = Variable.create "ghost_region" K.region;
+                has_ghost_region = Escape_exclave.receives_call_results plan;
                 scope = Before_exclave { scope; plan }
               }
             in

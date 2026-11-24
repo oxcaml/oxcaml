@@ -286,8 +286,8 @@ let code inline(never) loopify(never) size(73) newer_version_of(use_9)
            (apply &my_alloc_region k (5) -> k2 * k1
               where k2 (apply_result : imm tagged) =
                 let int_add_7 = %int_barith.add (apply_result, s) in
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
                 cont k (int_add_7)))
 in
 let $camlEscape_partial_application_argument__use_18 =

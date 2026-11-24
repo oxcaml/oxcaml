@@ -76,16 +76,14 @@ let code inline(never) loopify(never) size(44) newer_version_of(f_2)
                       switch prim_3
                         | 0 -> k3 (int_add)
                         | 1 -> k4 (for_next_naked, int_add)))
-              where k4
-                      (for_counter_naked_1 : int64,
-                       acc_unboxed0_1 : imm tagged) =
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
-                cont k2 (for_counter_naked_1, acc_unboxed0_1)
-              where k3 (function_return_0_f_2 : imm tagged) =
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
-                cont k (function_return_0_f_2)))
+              where k4 (region_return : int64, region_return_1 : imm tagged) =
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
+                cont k2 (region_return, region_return_1)
+              where k3 (region_return : imm tagged) =
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
+                cont k (region_return)))
 in
 let $camlEscape_local_return_loop__f_6 = closure f_2_1 @f &toplevel in
 let $camlEscape_local_return_loop__Pmakeblock_7 =

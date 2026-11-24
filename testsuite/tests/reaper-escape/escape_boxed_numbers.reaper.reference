@@ -35,7 +35,6 @@ let code inline(never) loopify(never) size(29) newer_version_of(f_1)
         -> k * k1
         : float boxed =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   (let prim = %unbox_num.`float` (x) in
    let prim_1 = %bfloat_arith.add (prim, 0x1p+1) in
    let float_add = %box_num.`float`.my_alloc_region.local[`region`] (prim_1)
@@ -49,10 +48,9 @@ let code inline(never) loopify(never) size(29) newer_version_of(f_1)
    in
    apply direct(sum_0_1 &my_alloc_region)
      ($camlEscape_boxed_numbers__sum_8 : _ -> float boxed) (p) -> k2 * k1)
-    where k2 (function_return_0_f_1 : float boxed) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_f_1)
+    where k2 (region_return : float boxed) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_boxed_numbers__f_9 = closure f_1_1 @f &toplevel in
 apply direct(f_1_1 &toplevel)

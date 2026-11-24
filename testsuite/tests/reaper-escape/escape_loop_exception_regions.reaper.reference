@@ -46,7 +46,6 @@ let code inline(never) loopify(never) size(36) newer_version_of(boom_1)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   (let Pfield = %block_load.[`1`] (p) in
    let int_add = %int_barith.add (Pfield, 2) in
    let Pfield_1 = %block_load.[`0`] (p) in
@@ -63,10 +62,9 @@ let code inline(never) loopify(never) size(36) newer_version_of(boom_1)
        switch prim
          | 0 -> k2 (value)
          | 1 -> k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1460_42))
-    where k2 (function_return_0_boom_1 : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_boom_1)
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
 in
 let $camlEscape_loop_exception_regions__boom_10 =
   closure boom_1_1 @boom &toplevel
@@ -86,7 +84,6 @@ let code inline(never) loopify(never) size(93) newer_version_of(inside_2)
       (cont k2 (1L, 0)
          where rec k2 (for_counter_naked : int64, acc_unboxed0 : imm tagged) =
            let `region` = %begin_region () in
-           let ghost_region = %begin_ghost_region () in
            ((let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
              let i = %tag_imm (prim_2) in
              let p = %block.[`0`].my_alloc_region.local[`region`] (i, i) in
@@ -151,16 +148,12 @@ let code inline(never) loopify(never) size(93) newer_version_of(inside_2)
                  switch prim_3
                    | 0 -> k3 (acc_unboxed0_1)
                    | 1 -> k4 (for_next_naked, acc_unboxed0_1))
-              where k4
-                      (for_counter_naked_1 : int64,
-                       acc_unboxed0_1 : imm tagged) =
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
-                cont k2 (for_counter_naked_1, acc_unboxed0_1)
-              where k3 (function_return_0_inside_2 : imm tagged) =
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
-                cont k (function_return_0_inside_2)))
+              where k4 (region_return : int64, region_return_1 : imm tagged) =
+                let `unit` = %end_region (`region`) in
+                cont k2 (region_return, region_return_1)
+              where k3 (region_return : imm tagged) =
+                let `unit` = %end_region (`region`) in
+                cont k (region_return)))
 in
 let $camlEscape_loop_exception_regions__inside_11 =
   closure inside_2_1 @inside &toplevel

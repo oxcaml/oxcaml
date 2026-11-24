@@ -46,7 +46,6 @@ let code inline(never) loopify(never) size(61) newer_version_of(f_2)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   (let try_region = %begin_try_region () in
    let try_ghost_region = %begin_try_ghost_region () in
    cont k4 push(k3)
@@ -86,8 +85,7 @@ let code inline(never) loopify(never) size(61) newer_version_of(f_2)
            -> k2 * k1
          where k2 (apply_result : imm tagged) =
            let int_add_2 = %int_barith.add (apply_result, r) in
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
+           let `unit` = %end_region (`region`) in
            cont k (int_add_2))
 in
 let $camlEscape_try_body_local__f_8 = closure f_2_1 @f &toplevel in

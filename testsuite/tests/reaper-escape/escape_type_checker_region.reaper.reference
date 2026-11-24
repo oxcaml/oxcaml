@@ -43,7 +43,6 @@ let code inline(always) loopify(never) size(39) newer_version_of(after_2)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   let int_add = %int_barith.add (n, 1) in
   let r = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
   let int_add_1 = %int_barith.add (n, 3) in
@@ -69,8 +68,7 @@ let code inline(always) loopify(never) size(39) newer_version_of(after_2)
                   %int_barith.add (apply_result_2, apply_result_1)
                 in
                 let int_add_4 = %int_barith.add (int_add_3, apply_result) in
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
                 cont k (int_add_4)))
 in
 let $camlEscape_type_checker_region__after_6 =
@@ -82,7 +80,6 @@ let code inline(never) loopify(never) size(63) newer_version_of(f_3)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let ghost_region = %begin_ghost_region () in
   let region_1 = %begin_region () in
   let l = %block.[`0`].my_alloc_region.local[region_1] (x, x) in
   apply direct(sum_local_1_1 &my_alloc_region)
@@ -125,8 +122,7 @@ let code inline(never) loopify(never) size(63) newer_version_of(f_3)
                      let int_add_6 =
                        %int_barith.add (int_add_5, apply_result)
                      in
-                     let region_end = %end_region (`region`) in
-                     let region_end_1 = %end_ghost_region (ghost_region) in
+                     let unit_1 = %end_region (`region`) in
                      cont k (int_add_6))))
 in
 let $camlEscape_type_checker_region__f_7 = closure f_3_1 @f &toplevel in

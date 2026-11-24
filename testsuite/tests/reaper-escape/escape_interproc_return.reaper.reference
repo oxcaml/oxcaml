@@ -48,10 +48,10 @@ let code inline(never) loopify(never) size(11) newer_version_of(f_2)
         ($camlEscape_interproc_return__sum_pair_4 : _ -> imm tagged)
           (p)
           -> k2 * k1
-    where k2 (function_return_0_f_2 : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_f_2)
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
+      cont k (region_return)
 in
 let $camlEscape_interproc_return__f_6 = closure f_2_1 @f &toplevel in
 let $camlEscape_interproc_return__Pmakeblock_7 =

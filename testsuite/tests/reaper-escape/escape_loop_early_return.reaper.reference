@@ -93,7 +93,6 @@ let code loopify(done) size(50) newer_version_of(loop_4)
   cont `self` (i, acc)
     where rec `self` (i_1 : imm tagged, acc_1 : imm tagged) =
       let `region` = %begin_region () in
-      let ghost_region = %begin_ghost_region () in
       ((let n = %project_value_slot.[loop_1].[unboxed_field_n_1] (my_closure)
         in
         let prim = %int_comp.gt (i_1, n) in
@@ -123,15 +122,11 @@ let code loopify(done) size(50) newer_version_of(loop_4)
                              %int_barith.add (acc_1, apply_result_1)
                            in
                            let int_add_1 = %int_barith.add (i_1, 1) in
-                           let region_end = %end_region (`region`) in
-                           let region_end_1 =
-                             %end_ghost_region (ghost_region)
-                           in
+                           let `unit` = %end_region (`region`) in
                            cont `self` (int_add_1, int_add)))))
-         where k2 (function_return_0_loop_4 : imm tagged) =
-           let region_end = %end_region (`region`) in
-           let region_end_1 = %end_ghost_region (ghost_region) in
-           cont k (function_return_0_loop_4))
+         where k2 (region_return : imm tagged) =
+           let `unit` = %end_region (`region`) in
+           cont k (region_return))
 in
 let code inline(never) loopify(never) size(63) newer_version_of(count_3)
       count_3_1 (n : imm tagged)

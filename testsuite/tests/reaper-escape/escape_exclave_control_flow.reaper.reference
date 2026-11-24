@@ -11,8 +11,9 @@ let code with_try_8 deleted in
 let code make_9 deleted in
 let code temporary_to_callee_10 deleted in
 let code value_11 deleted in
-let code value2_12 deleted in
-let code value3_13 deleted in
+let code value_pair_12 deleted in
+let code value2_13 deleted in
+let code value3_14 deleted in
 let $camlEscape_exclave_control_flow__immstring_2 = "; count " in
 let $camlEscape_exclave_control_flow__immstring_3 = "; used " in
 let $camlEscape_exclave_control_flow__const_block_4 = Block 12 (10, 0) in
@@ -94,7 +95,7 @@ let $camlEscape_exclave_control_flow__const_block_29 =
   Block 0 ($camlEscape_exclave_control_flow__const_block_27,
            $camlEscape_exclave_control_flow__immstring_28)
 in
-let code run_14 deleted in
+let code run_15 deleted in
 let $camlEscape_exclave_control_flow__immstring_0 =
   "Escape_exclave_control_flow.Negative"
 in
@@ -181,8 +182,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : [ 0 | 0 of [ 0 of val * imm tagged ] ] stack =
-      let `region` = %begin_region () in
-      let ghost_region = %begin_ghost_region () in
+      let `region` = %begin_region (my_region) in
       let count_1 =
         %project_value_slot.[join].[unboxed_field_count]
           ($camlEscape_exclave_control_flow__join_35)
@@ -198,8 +198,7 @@ apply ccall noalloc
               | 0 -> k3
               | 1 -> k4
               where k4 =
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
                 let Pmakeblock =
                   %block.[`0`].my_alloc_region.local[my_region] (s, 1)
                 in
@@ -213,8 +212,7 @@ apply ccall noalloc
                   %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
                     (count_1, prim_2)
                 in
-                let region_end = %end_region (`region`) in
-                let region_end_1 = %end_ghost_region (ghost_region) in
+                let `unit` = %end_region (`region`) in
                 cont k2 ($camlEscape_exclave_control_flow__const_block_1))
              where k2 (p : [ 0 of imm tagged * imm tagged ]) =
                (apply direct(sum_pair_1_1 &my_alloc_region)
@@ -277,8 +275,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : [ 0 | 0 of imm tagged ] stack =
-      let `region` = %begin_region () in
-      let ghost_region = %begin_ghost_region () in
+      let `region` = %begin_region (my_region) in
       let t = %block.[`0`].my_alloc_region.local[`region`] (x, n, 1) in
       (let prim = %int_comp.le (1, n) in
        switch prim
@@ -314,8 +311,7 @@ apply ccall noalloc
                        | 0 -> k2 (int_add_1)
                        | 1 -> k3 (for_next_naked, int_add_1))))
         where k2 (acc_unboxed0 : imm tagged) =
-          let region_end = %end_region (`region`) in
-          let region_end_1 = %end_ghost_region (ghost_region) in
+          let `unit` = %end_region (`region`) in
           let Pmakeblock =
             %block.[`0`].my_alloc_region.local[my_region] (acc_unboxed0)
           in
@@ -329,8 +325,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : [ 0 | 0 of imm tagged ] stack =
-      let `region` = %begin_region () in
-      let ghost_region = %begin_ghost_region () in
+      let `region` = %begin_region (my_region) in
       let t = %block.[`0`].my_alloc_region.local[`region`] (x, n, 1) in
       (let prim = %int_comp.le (1, n) in
        switch prim
@@ -343,8 +338,7 @@ apply ccall noalloc
               where rec k3
                           (for_counter_naked : int64,
                            acc_unboxed0 : imm tagged) =
-                let region_1 = %begin_region () in
-                let ghost_region_1 = %begin_ghost_region () in
+                let region_1 = %begin_region (`region`) in
                 ((let prim_2 =
                     %num_conv.[`int64`].[`imm`] (for_counter_naked)
                   in
@@ -376,21 +370,18 @@ apply ccall noalloc
                                (for_next_naked, for_stop_naked)
                            in
                            switch prim_3
-                             | 0 -> k5 (int_and)
-                             | 1 -> k4 (for_next_naked, int_and)))
-                   where k5 (acc_unboxed0_1 : imm tagged) =
-                     let region_end = %end_region (region_1) in
-                     let region_end_1 = %end_ghost_region (ghost_region_1) in
-                     cont k2 (acc_unboxed0_1)
-                   where k4
-                           (for_counter_naked_1 : int64,
-                            acc_unboxed0_1 : imm tagged) =
-                     let region_end = %end_region (region_1) in
-                     let region_end_1 = %end_ghost_region (ghost_region_1) in
-                     cont k3 (for_counter_naked_1, acc_unboxed0_1))))
+                             | 0 -> k4 (int_and)
+                             | 1 -> k5 (for_next_naked, int_and)))
+                   where k5
+                           (region_return : int64,
+                            region_return_1 : imm tagged) =
+                     let `unit` = %end_region (region_1) in
+                     cont k3 (region_return, region_return_1)
+                   where k4 (region_return : imm tagged) =
+                     let `unit` = %end_region (region_1) in
+                     cont k2 (region_return))))
         where k2 (acc_unboxed0 : imm tagged) =
-          let region_end = %end_region (`region`) in
-          let region_end_1 = %end_ghost_region (ghost_region) in
+          let `unit` = %end_region (`region`) in
           let Pmakeblock =
             %block.[`0`].my_alloc_region.local[my_region] (acc_unboxed0)
           in
@@ -521,8 +512,28 @@ apply ccall noalloc
     let $camlEscape_exclave_control_flow__value_42 =
       closure value_11_1 @value &toplevel
     in
-    let code inline(never) loopify(never) size(21) newer_version_of(value2_12)
-          value2_12_1 (o : [ 0 | 0 of [ 0 of val * imm tagged ] ])
+    let code inline(never) loopify(never) size(14) newer_version_of(value_pair_12)
+          value_pair_12_1
+            (Pmakeblock_into_o_field_0, Pmakeblock_into_o_field_is_int : imm)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = Pmakeblock_into_o_field_is_int in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (-1)
+        where k2 =
+          let Pfield = Pmakeblock_into_o_field_0 in
+          apply direct(sum_pair_1_1 &my_alloc_region)
+            ($camlEscape_exclave_control_flow__sum_pair_31 : _ -> imm tagged)
+              (Pfield)
+              -> k * k1
+    in
+    let $camlEscape_exclave_control_flow__value_pair_43 =
+      closure value_pair_12_1 @value_pair &toplevel
+    in
+    let code inline(never) loopify(never) size(21) newer_version_of(value2_13)
+          value2_13_1 (o : [ 0 | 0 of [ 0 of val * imm tagged ] ])
             my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
@@ -543,11 +554,11 @@ apply ccall noalloc
                let int_add = %int_barith.add (apply_result, Pmixedfield) in
                cont k (int_add))
     in
-    let $camlEscape_exclave_control_flow__value2_43 =
-      closure value2_12_1 @value2 &toplevel
+    let $camlEscape_exclave_control_flow__value2_44 =
+      closure value2_13_1 @value2 &toplevel
     in
-    let code inline(never) loopify(never) size(27) newer_version_of(value3_13)
-          value3_13_1
+    let code inline(never) loopify(never) size(27) newer_version_of(value3_14)
+          value3_14_1
             (Pmakeblock_into_o_field_0_field_0_field_0,
              Pmakeblock_into_o_field_0_field_0_field_is_int : imm,
              Pmakeblock_into_o_field_0_field_1,
@@ -592,13 +603,13 @@ apply ccall noalloc
                     in
                     cont k (int_add)))
     in
-    let $camlEscape_exclave_control_flow__value3_44 =
-      closure value3_13_1 @value3 &toplevel
+    let $camlEscape_exclave_control_flow__value3_45 =
+      closure value3_14_1 @value3 &toplevel
     in
-    let $camlEscape_exclave_control_flow__run_45 =
-      closure run_14_1 @run &toplevel
-    and code inline(never) loopify(never) size(153) newer_version_of(run_14)
-          run_14_1 (n : imm tagged)
+    let $camlEscape_exclave_control_flow__run_46 =
+      closure run_15_1 @run &toplevel
+    and code inline(never) loopify(never) size(111) newer_version_of(run_15)
+          run_15_1 (n : imm tagged)
             my_closure &my_alloc_region my_depth
             -> k * k1
             : imm tagged =
@@ -606,11 +617,11 @@ apply ccall noalloc
       let ghost_region = %begin_ghost_region () in
       let count_1 =
         %project_value_slot.[run].[count]
-          ($camlEscape_exclave_control_flow__run_45)
+          ($camlEscape_exclave_control_flow__run_46)
       in
       let base_1 =
         %project_value_slot.[run].[base_1]
-          ($camlEscape_exclave_control_flow__run_45)
+          ($camlEscape_exclave_control_flow__run_46)
       in
       apply ccall
         ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
@@ -737,9 +748,9 @@ apply ccall noalloc
                                                                     (count_1)
                                                                  in
                                                                  (apply
-                                                                     direct(value3_13_1
+                                                                     direct(value3_14_1
                                                                     &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value3_44
+                                                                    ($camlEscape_exclave_control_flow__value3_45
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
@@ -754,104 +765,32 @@ apply ccall noalloc
                                                                     k2
                                                                     (apply_result :
                                                                     imm tagged) =
-                                                                    ((let prim =
-                                                                    Pmakeblock_into_t2_field_is_int
-                                                                    in
-                                                                    switch prim
-                                                                    | 0 -> k4
-                                                                    | 1 ->
-                                                                    k3 (0)
-                                                                    where 
-                                                                    k4 =
-                                                                    ((let Pfield_1 =
-                                                                    Pmakeblock_into_t2_field_0
-                                                                    in
-                                                                    apply
-                                                                     direct(sum_pair_1_1
+                                                                    (apply
+                                                                     direct(value_pair_12_1
                                                                     &my_alloc_region)
-                                                                    inlining_state(depth(10))
-                                                                    $camlEscape_exclave_control_flow__sum_pair_31
-                                                                    (Pfield_1)
-                                                                    -> k4
-                                                                    * k1)
-                                                                    where 
-                                                                    k4
-                                                                    (apply_result_1) =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region.local[`region`]
-                                                                    (apply_result_1)
-                                                                    in
-                                                                    cont 
-                                                                    k3
-                                                                    (Pmakeblock)))
-                                                                    where 
-                                                                    k3
-                                                                    (apply_result_1 :
-                                                                    [ 0
-                                                                    | 
-                                                                    0 of imm tagged
-                                                                    ]) =
-                                                                    apply
-                                                                     direct(value_11_1
-                                                                    &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    ($camlEscape_exclave_control_flow__value_pair_43
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
                                                                     )
-                                                                    (apply_result_1)
+                                                                    (Pmakeblock_into_t2_field_0,
+                                                                    Pmakeblock_into_t2_field_is_int)
                                                                     -> k2
                                                                     * k1
                                                                     where 
                                                                     k2
                                                                     (apply_result_1 :
                                                                     imm tagged) =
-                                                                    ((let prim =
-                                                                    Pmakeblock_into_t1_field_is_int
-                                                                    in
-                                                                    switch prim
-                                                                    | 0 -> k4
-                                                                    | 1 ->
-                                                                    k3 (0)
-                                                                    where 
-                                                                    k4 =
-                                                                    ((let Pfield_1 =
-                                                                    Pmakeblock_into_t1_field_0
-                                                                    in
-                                                                    apply
-                                                                     direct(sum_pair_1_1
+                                                                    (apply
+                                                                     direct(value_pair_12_1
                                                                     &my_alloc_region)
-                                                                    inlining_state(depth(10))
-                                                                    $camlEscape_exclave_control_flow__sum_pair_31
-                                                                    (Pfield_1)
-                                                                    -> k4
-                                                                    * k1)
-                                                                    where 
-                                                                    k4
-                                                                    (apply_result_2) =
-                                                                    let Pmakeblock =
-                                                                    %block.[`0`].my_alloc_region.local[`region`]
-                                                                    (apply_result_2)
-                                                                    in
-                                                                    cont 
-                                                                    k3
-                                                                    (Pmakeblock)))
-                                                                    where 
-                                                                    k3
-                                                                    (apply_result_2 :
-                                                                    [ 0
-                                                                    | 
-                                                                    0 of imm tagged
-                                                                    ]) =
-                                                                    apply
-                                                                     direct(value_11_1
-                                                                    &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    ($camlEscape_exclave_control_flow__value_pair_43
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
                                                                     )
-                                                                    (apply_result_2)
+                                                                    (Pmakeblock_into_t1_field_0,
+                                                                    Pmakeblock_into_t1_field_is_int)
                                                                     -> k2
                                                                     * k1
                                                                     where 
@@ -889,9 +828,9 @@ apply ccall noalloc
                                                                     (apply_result_4 :
                                                                     imm tagged) =
                                                                     (apply
-                                                                     direct(value2_12_1
+                                                                     direct(value2_13_1
                                                                     &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    ($camlEscape_exclave_control_flow__value2_44
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
@@ -904,9 +843,9 @@ apply ccall noalloc
                                                                     (apply_result_5 :
                                                                     imm tagged) =
                                                                     (apply
-                                                                     direct(value2_12_1
+                                                                     direct(value2_13_1
                                                                     &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    ($camlEscape_exclave_control_flow__value2_44
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
@@ -919,9 +858,9 @@ apply ccall noalloc
                                                                     (apply_result_6 :
                                                                     imm tagged) =
                                                                     (apply
-                                                                     direct(value2_12_1
+                                                                     direct(value2_13_1
                                                                     &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    ($camlEscape_exclave_control_flow__value2_44
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
@@ -934,9 +873,9 @@ apply ccall noalloc
                                                                     (apply_result_7 :
                                                                     imm tagged) =
                                                                     (apply
-                                                                     direct(value2_12_1
+                                                                     direct(value2_13_1
                                                                     &my_alloc_region)
-                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    ($camlEscape_exclave_control_flow__value2_44
                                                                     : 
                                                                     _ ->
                                                                     imm tagged
@@ -959,11 +898,11 @@ apply ccall noalloc
                                                                     where 
                                                                     k2
                                                                     (full_apply) =
-                                                                    let region_end =
+                                                                    let `unit` =
                                                                     %end_region
                                                                     (`region`)
                                                                     in
-                                                                    let region_end_1 =
+                                                                    let unit_1 =
                                                                     %end_ghost_region
                                                                     (ghost_region)
                                                                     in
@@ -986,11 +925,11 @@ apply ccall noalloc
                                                                     -> k * k1)))))))))))))))))))))
       with { count = count; base_1 = base }
     in
-    let $camlEscape_exclave_control_flow__Pmakeblock_46 =
-      Block 0 ($camlEscape_exclave_control_flow__run_45)
+    let $camlEscape_exclave_control_flow__Pmakeblock_47 =
+      Block 0 ($camlEscape_exclave_control_flow__run_46)
     in
-    (apply direct(run_14_1 &toplevel)
-       ($camlEscape_exclave_control_flow__run_45 : _ -> imm tagged)
+    (apply direct(run_15_1 &toplevel)
+       ($camlEscape_exclave_control_flow__run_46 : _ -> imm tagged)
          (10)
          -> k2 * error
        where k2 (function_return : imm tagged) =
@@ -1006,6 +945,6 @@ apply ccall noalloc
                     count,
                     base,
                     $camlEscape_exclave_control_flow__used_34,
-                    $camlEscape_exclave_control_flow__Pmakeblock_46)
+                    $camlEscape_exclave_control_flow__Pmakeblock_47)
          in
          cont done ($camlEscape_exclave_control_flow))
