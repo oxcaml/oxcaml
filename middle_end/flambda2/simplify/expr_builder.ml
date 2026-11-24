@@ -101,7 +101,8 @@ let create_coerced_singleton_let uacc var defining_expr
         (Bound_pattern.singleton var)
         defining_expr ~free_names_of_defining_expr ~body
         ~cost_metrics_of_defining_expr
-    | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
+    | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ | Template_env _
+      ->
       let uncoerced_var =
         let name = "uncoerced_" ^ Variable.canonical_name (VB.var var) in
         Variable.create name (Variable.kind (VB.var var))
@@ -146,7 +147,8 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
       RE.notify_removed ~operation:(Removed_operations.prim prim) expr
     | Some (Set_of_closures _) ->
       RE.notify_removed ~operation:Removed_operations.alloc expr
-    | Some (Simple _ | Static_consts _ | Rec_info _) | None -> expr
+    | Some (Simple _ | Static_consts _ | Rec_info _ | Template_env _) | None ->
+      expr
   in
   ListLabels.fold_left (List.rev bindings_outermost_first) ~init:(body, uacc)
     ~f:(fun (expr, uacc) binding ->

@@ -684,6 +684,8 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       in
       cmm, free_vars, symbol_inits, res)
   | Singleton _, Rec_info _ -> expr env res body
+  | _, Template_env _ ->
+    Misc.fatal_error "[Template_env] should have been removed by Simplify"
   | Singleton _, (Set_of_closures _ | Static_consts _)
   | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
   | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->

@@ -54,6 +54,11 @@ let create ~machine_width (named : Named.t) =
          lifted constant infrastructure instead:@ %a"
         Named.print named
     | Rec_info rec_info_expr -> Rec_info rec_info_expr, Cost_metrics.zero
+    | Template_env _ ->
+      Misc.fatal_errorf
+        "Cannot create [Simplified_named] from [Template_env], which Simplify \
+         always removes:@ %a"
+        Named.print named
   in
   { named = simplified_named;
     cost_metrics;
@@ -78,6 +83,11 @@ let create_with_known_free_names ~machine_width ~find_code_characteristics
          lifted constant infrastructure instead:@ %a"
         Named.print named
     | Rec_info rec_info_expr -> Rec_info rec_info_expr, Cost_metrics.zero
+    | Template_env _ ->
+      Misc.fatal_errorf
+        "Cannot create [Simplified_named] from [Template_env], which Simplify \
+         always removes:@ %a"
+        Named.print named
   in
   { named = simplified_named; cost_metrics; free_names }
 

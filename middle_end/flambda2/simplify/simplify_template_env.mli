@@ -25,16 +25,14 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Simplify the definition of a template (see
-    [Flambda_primitive.Template_env]): record the type of its environments, then
-    simplify the code of this unit's instantiations of it, which only ever
-    receive those environments, using that type. The primitive is removed. *)
+(** Simplify the definition of a template (see [Template_env]): record the type
+    of its environments, then simplify the code of this unit's instantiations of
+    it, which only ever receive those environments, using that type. The
+    definition is replaced by the environment. *)
 val simplify_template_env :
   Downwards_acc.t ->
   Bound_pattern.t ->
   Flambda.Named.t ->
-  template_key:Symbol.t ->
-  instantiations:Code_id.t list ->
-  arg:Simple.t ->
+  Template_env.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
   Simplify_named_result.t

@@ -25,10 +25,10 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Finding the definitions of templates (see [Flambda_primitive.Template_env])
-    in terms that Simplify hasn't simplified yet. Each definition must only be
-    simplified once, so Simplify must not copy such terms. Simplified terms
-    never contain definitions of templates. *)
+(** Finding the definitions of templates (see [Template_env]) in terms that
+    Simplify hasn't simplified yet. Each definition must only be simplified
+    once, so Simplify must not copy such terms. Simplified terms never contain
+    definitions of templates. *)
 
 (** Whether the body of [code], or of any function it defines, contains the
     definition of a template. The code of those functions is looked up in the

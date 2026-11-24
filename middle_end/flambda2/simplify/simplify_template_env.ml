@@ -43,15 +43,18 @@ let simplify_instantiation ~simplify_function_body ~env_type dacc code_id =
   in
   DA.instantiation_simplified dacc code_id
 
-let simplify_template_env dacc bound_pattern named ~template_key ~instantiations
-    ~arg ~simplify_function_body =
+let simplify_template_env dacc bound_pattern named template_env
+    ~simplify_function_body =
+  let template_key = Template_env.template_key template_env in
   if not (Current_unit.is_current (Symbol.compilation_unit template_key))
   then
     Misc.fatal_errorf "Template %a is defined outside its compilation unit"
       Symbol.print template_key;
   let bound_var = Bound_pattern.must_be_singleton bound_pattern in
-  let arg_ty, arg =
-    S.simplify_simple dacc arg ~min_name_mode:(Bound_var.name_mode bound_var)
+  let env_ty, env =
+    S.simplify_simple dacc
+      (Template_env.env template_env)
+      ~min_name_mode:(Bound_var.name_mode bound_var)
   in
   let env_type =
     let typing_env = DA.typing_env dacc in
@@ -60,13 +63,14 @@ let simplify_template_env dacc bound_pattern named ~template_key ~instantiations
        become an alias of the environment, since only the latter has a value. *)
     T.make_suitable_for_environment typing_env
       (All_variables_except Variable.Set.empty)
-      [Name.symbol template_key, T.remove_outermost_alias typing_env arg_ty]
+      [Name.symbol template_key, T.remove_outermost_alias typing_env env_ty]
   in
   let dacc = DA.define_template dacc template_key env_type in
   let dacc =
     List.fold_left
       (simplify_instantiation ~simplify_function_body ~env_type)
-      dacc instantiations
+      dacc
+      (Template_env.instantiations template_env)
   in
   let dacc =
     (* Specialising a continuation copies its handler, which would make a copy
@@ -76,12 +80,12 @@ let simplify_template_env dacc bound_pattern named ~template_key ~instantiations
         (DE.map_specialization_cost
            ~f:Specialization_cost.add_template_definition)
   in
-  let dacc = DA.add_variable dacc bound_var arg_ty in
+  let dacc = DA.add_variable dacc bound_var env_ty in
   let machine_width = DE.machine_width (DA.denv dacc) in
   Simplify_named_result.create dacc
     (Keep_binding
        { let_bound = bound_pattern;
          simplified_defining_expr =
-           Simplified_named.create ~machine_width (Named.create_simple arg);
+           Simplified_named.create ~machine_width (Named.create_simple env);
          original_defining_expr = Some named
        })

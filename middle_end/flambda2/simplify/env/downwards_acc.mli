@@ -93,7 +93,7 @@ val used_value_slots : t -> Name_occurrences.t
 val with_used_value_slots : t -> used_value_slots:Name_occurrences.t -> t
 
 (** What Simplify knows about this unit's templates and their instantiations
-    (see [Flambda_primitive.Template_env]). *)
+    (see [Template_env]). *)
 type templates
 
 val templates : t -> templates

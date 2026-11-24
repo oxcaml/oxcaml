@@ -88,7 +88,7 @@ module type Code_metadata_accessors_result_type = sig
 
   (** For the code of an instantiation of a template, the template's key. The
       code takes the template's environment as its first parameter (see
-      [Flambda_primitive.Template_env]). *)
+      [Template_env]). *)
   val template_key : 'a t -> Symbol.t option
 
   val function_slot_size : 'a t -> int

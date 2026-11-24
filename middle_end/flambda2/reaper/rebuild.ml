@@ -722,6 +722,8 @@ let rebuild_named_default_case env (named : Named.t) =
       "[rebuild_named_default_case] called on static consts:@ %a@."
       Static_const_group.print sc
   | Rec_info r -> Named.create_rec_info r, Code_size.zero
+  | Template_env _ ->
+    Misc.fatal_error "[Template_env] should have been removed by Simplify"
 
 let rewrite_apply_cont_expr env ac =
   let cont = Apply_cont_expr.continuation ac in
@@ -1834,7 +1836,9 @@ let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
   let is_begin_region =
     match defining_expr with
     | Prim (prim, _) -> P.is_begin_region prim
-    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
+    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _
+    | Template_env _ ->
+      false
   in
   if not (is_begin_region || is_var_used env (Bound_var.var bv))
   then hole, res

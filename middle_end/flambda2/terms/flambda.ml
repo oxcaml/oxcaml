@@ -49,6 +49,7 @@ and named =
   | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
   | Static_consts of static_const_group
   | Rec_info of Rec_info_expr.t
+  | Template_env of Template_env.t
 
 and let_cont_expr =
   | Non_recursive of
@@ -152,6 +153,9 @@ and apply_renaming_named (named : named) renaming : named =
   | Rec_info rec_info_expr ->
     let rec_info_expr' = Rec_info_expr.apply_renaming rec_info_expr renaming in
     if rec_info_expr == rec_info_expr' then named else Rec_info rec_info_expr'
+  | Template_env template_env ->
+    let template_env' = Template_env.apply_renaming template_env renaming in
+    if template_env == template_env' then named else Template_env template_env'
 
 and apply_renaming_let_expr_t0
     ({ body; num_normal_occurrences_of_bound_vars } as t) renaming =
@@ -356,6 +360,7 @@ and ids_for_export_named t =
       (Alloc_mode.For_allocations.ids_for_export alloc_mode)
   | Static_consts consts -> ids_for_export_static_const_group consts
   | Rec_info rec_info_expr -> Rec_info_expr.ids_for_export rec_info_expr
+  | Template_env template_env -> Template_env.ids_for_export template_env
 
 and ids_for_export_let_cont_expr t =
   match t with
@@ -429,7 +434,7 @@ let _shape_colour descr =
 let rec named_must_be_static_consts (named : named) =
   match named with
   | Static_consts consts -> consts
-  | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ ->
+  | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ | Template_env _ ->
     Misc.fatal_errorf "Must be [Static_consts], but is not: %a" print_named
       named
 
@@ -807,7 +812,8 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
     else
       match (defining_expr : named) with
       | Rec_info _ -> Flambda_colours.depth_variable
-      | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
+      | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Template_env _
+        ->
         Flambda_colours.variable
   in
   let print_num_occurrences bound_pattern ppf num_occurrences =
@@ -882,6 +888,7 @@ and print_named ppf (t : named) =
       @ [a "alloc_mode" alloc_mode Alloc_mode.For_allocations.print])
   | Static_consts consts -> print_static_const_group ppf consts
   | Rec_info rec_info_expr -> Rec_info_expr.print ppf rec_info_expr
+  | Template_env template_env -> Template_env.print ppf template_env
 
 and print_static_const_group ppf static_const_group =
   Format.fprintf ppf "@[<hov 1>(%a)@]"
@@ -1131,6 +1138,7 @@ module Let_expr = struct
     | Prim _, Singleton _
     | Simple _, Singleton _
     | Rec_info _, Singleton _
+    | Template_env _, Singleton _
     | Set_of_closures _, Set_of_closures _ ->
       ()
     | Set_of_closures _, Singleton _ ->
@@ -1146,7 +1154,8 @@ module Let_expr = struct
       Misc.fatal_errorf
         "Cannot bind a [Static_const] to a [Singleton]:@ %a =@ %a"
         Bound_pattern.print bound_pattern print_named defining_expr
-    | (Simple _ | Prim _ | Set_of_closures _ | Rec_info _), Static _ ->
+    | ( (Simple _ | Prim _ | Set_of_closures _ | Rec_info _ | Template_env _),
+        Static _ ) ->
       Misc.fatal_errorf
         "Cannot bind a non-[Static_const] to [Symbols]:@ %a =@ %a"
         Bound_pattern.print bound_pattern print_named defining_expr);
@@ -1377,6 +1386,8 @@ module Named = struct
 
   let create_rec_info rec_info_expr = Rec_info rec_info_expr
 
+  let create_template_env template_env = Template_env template_env
+
   let free_names t =
     match t with
     | Simple simple -> Simple.free_names simple
@@ -1387,6 +1398,7 @@ module Named = struct
         (Alloc_mode.For_allocations.free_names alloc_mode)
     | Static_consts consts -> Static_const_group.free_names consts
     | Rec_info rec_info_expr -> Rec_info_expr.free_names rec_info_expr
+    | Template_env template_env -> Template_env.free_names template_env
 
   let print = print_named
 
@@ -1401,6 +1413,7 @@ module Named = struct
     | Set_of_closures _ -> true
     | Static_consts _ -> true
     | Rec_info _ -> true
+    | Template_env _ -> true
 
   let dummy_value ~machine_width (kind : K.t) : t =
     let simple =
@@ -1450,25 +1463,27 @@ module Named = struct
     | Simple s -> Simple.kind s
     | Prim (p, _dbg) -> Flambda_primitive.result_kind' p
     | Rec_info _ -> K.rec_info
+    | Template_env _ -> K.value
     | Set_of_closures _ | Static_consts _ ->
       Misc.fatal_errorf "No valid kind for non-singleton named %a" print t
 
   let is_dynamically_allocated_set_of_closures t =
     match t with
     | Set_of_closures _ -> true
-    | Simple _ | Prim _ | Static_consts _ | Rec_info _ -> false
+    | Simple _ | Prim _ | Static_consts _ | Rec_info _ | Template_env _ -> false
 
   let is_static_consts t =
     match t with
     | Static_consts _ -> true
-    | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ -> false
+    | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ | Template_env _ ->
+      false
 
   let must_be_static_consts = named_must_be_static_consts
 
   let fold_code_and_sets_of_closures t ~init ~f_code ~f_set =
     match t with
     | Set_of_closures (s, _alloc_mode) -> f_set init s
-    | Rec_info _ | Simple _ | Prim _ -> init
+    | Rec_info _ | Simple _ | Prim _ | Template_env _ -> init
     | Static_consts group ->
       Static_const_group.to_list group
       |> List.fold_left

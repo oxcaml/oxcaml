@@ -229,7 +229,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
         | Reinterpret_boxed_vector | Untag_immediate | Tag_immediate
         | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-        | Obj_dup _ | Get_header | Peek _ | Make_lazy _ | Template_env _ ),
+        | Obj_dup _ | Get_header | Peek _ | Make_lazy _ ),
         _ )
   | Binary
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
@@ -542,7 +542,9 @@ let rec traverse_let denv acc let_expr : rev_expr =
   | Simple s ->
     default_bp (fun to_ ->
         Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
-  | Rec_info _ -> default acc);
+  | Rec_info _ -> default acc
+  | Template_env _ ->
+    Misc.fatal_error "[Template_env] should have been removed by Simplify");
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
     let value_slots = Set_of_closures.value_slots set_of_closures in
@@ -587,6 +589,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
     | Prim _ -> Named defining_expr
     | Simple _ -> Named defining_expr
     | Rec_info _ as defining_expr -> Named defining_expr
+    | Template_env _ ->
+      Misc.fatal_error "[Template_env] should have been removed by Simplify"
   in
   let let_acc =
     Let { bound_pattern; defining_expr = named; parent = Env.parent denv }

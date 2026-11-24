@@ -459,9 +459,9 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
 
 (* Inlining copies the callee's code. Code that hasn't been simplified yet must
    not be copied if it contains the definition of a template, which must only be
-   simplified once (see [Flambda_primitive.Template_env]). Speculative inlining
-   only considers code that has already been simplified, so only the final
-   decision needs checking. *)
+   simplified once (see [Template_env]). Speculative inlining only considers
+   code that has already been simplified, so only the final decision needs
+   checking. *)
 let copies_template_definition dacc code_id =
   match DE.find_code_exn (DA.denv dacc) code_id with
   | exception Not_found -> false

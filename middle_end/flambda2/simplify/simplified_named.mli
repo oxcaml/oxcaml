@@ -17,7 +17,8 @@
 open! Flambda.Import
 
 (** Unlike [Named.t], this type does not include [Static_consts] because such
-    constants are propagated separately after simplification. *)
+    constants are propagated separately after simplification, nor [Template_env]
+    because Simplify always removes it. *)
 type simplified_named = private
   | Simple of Simple.t
   | Prim of Flambda_primitive.t * Debuginfo.t

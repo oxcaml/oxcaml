@@ -57,8 +57,7 @@ module IR = struct
         }
     | Template_env of
         { template : Template_id.t;
-          block : Ident.t;
-          loc : Lambda.scoped_location
+          block : Ident.t
         }
 
   type apply_kind =
@@ -134,7 +133,7 @@ module IR = struct
                (Format.pp_print_list ~pp_sep:Format.pp_print_space print_simple)
                arg))
         args
-    | Template_env { template; block; loc = _ } ->
+    | Template_env { template; block } ->
       fprintf ppf "@[<2>(Template_env[%a]@ %a)@]"
         (Format_doc.compat Template_id.print)
         template Ident.print block
@@ -1181,7 +1180,9 @@ module Let_with_acc = struct
     let has_no_effects =
       match (named : Named.t) with
       | Prim (prim, _) -> Flambda_primitive.at_most_generative_effects prim
-      | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ -> true
+      | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _
+      | Template_env _ ->
+        true
     in
     let keep_bindings_for_simplify =
       (* When using Simplify, we don't delete unused bindings here, to increase
@@ -1207,7 +1208,7 @@ module Let_with_acc = struct
                 function_slot_size = Code.function_slot_size code
               })
             set_of_closures
-        | Rec_info _ -> Cost_metrics.zero
+        | Rec_info _ | Template_env _ -> Cost_metrics.zero
       in
       let acc =
         Acc.increment_metrics

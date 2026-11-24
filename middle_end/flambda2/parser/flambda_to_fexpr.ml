@@ -368,6 +368,10 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
       in
       defining_exprs, value_slots
     | Rec_info ri -> ([Rec_info (rec_info env ri)] : Fexpr.named list), None
+    | Template_env _ ->
+      (* Simplify always removes these, so only unsimplified terms contain them,
+         and fexpr has no way to refer to their symbol, which has no value. *)
+      Misc.fatal_error "[Template_env] is not supported in fexpr"
     | Static_consts _ -> assert false
   in
   if List.compare_lengths vars defining_exprs <> 0
@@ -791,7 +795,7 @@ module Iter = struct
 
   and named let_expr (bound_pattern : Bound_pattern.t) f_c f_s n =
     match (n : Named.t) with
-    | Simple _ | Prim _ | Rec_info _ -> ()
+    | Simple _ | Prim _ | Rec_info _ | Template_env _ -> ()
     | Set_of_closures (s, _alloc_mode) ->
       let is_phantom =
         Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
