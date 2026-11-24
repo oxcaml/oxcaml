@@ -88,7 +88,10 @@ module Tag = struct
 
   let compare = Stdlib.compare
 
-  let print = function N -> "nor" | E -> "exn" | D -> "div"
+  let print ppf = function
+    | N -> Format.fprintf ppf "nor"
+    | E -> Format.fprintf ppf "exn"
+    | D -> Format.fprintf ppf "div"
 end
 
 module Components = struct

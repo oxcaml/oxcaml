@@ -32,7 +32,7 @@ module Tag : sig
 
   val compare : t -> t -> int
 
-  val print : t -> string
+  val print : Format.formatter -> t -> unit
 end
 
 (** Three fields, [nor], [exn], & [div], meaning "control flow that returns

@@ -240,7 +240,7 @@ end = struct
   let create name tag = { name; tag }
 
   let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%s@ " name (Zero_alloc_utils.Tag.print tag)
+    Format.fprintf ppf "%s.%a@ " name Zero_alloc_utils.Tag.print tag
 end
 
 module Top = struct

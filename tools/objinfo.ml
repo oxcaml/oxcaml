@@ -382,7 +382,7 @@ let print_cmx_infos (uir, sections, crc) =
     (Format_doc.compat Slambdaeval.CU_data.print)
     (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
-    Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
+    Format.printf "%a%!" Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
   end
 
 let print_cmxa_infos (lib : Cmx_format.library_infos) =

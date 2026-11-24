@@ -69,7 +69,7 @@ val iter : f:(string -> Encoded.Components.t -> unit) -> t -> unit
 module Raw : sig
   type t
 
-  val print : t -> unit
+  val print : Format.formatter -> t -> unit
 end
 
 val to_raw : t -> Raw.t

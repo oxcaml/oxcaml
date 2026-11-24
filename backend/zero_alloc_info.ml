@@ -169,16 +169,15 @@ module Raw = struct
          ~print_top:
            (Allocation_sources.print Relevant_components_by_argument_index.print))
 
-  let print t =
+  let print ppf t =
     let print (name, components) =
-      Printf.printf "\t\t%s = %s\n" name
-        (Format.asprintf "%a" print_summary (decode components))
+      Format.fprintf ppf "\t\t%s = %a@\n" name print_summary (decode components)
     in
     (* CR gyorsh: move encode/decode here somehow for noalloc *)
-    Printf.printf "Function summaries for static checks:\n";
+    Format.fprintf ppf "Function summaries for static checks:@\n";
     List.iter print t
 
-  let print = function None -> () | Some t -> print t
+  let print ppf = function None -> () | Some t -> print ppf t
 end
 
 let to_raw (t : t) : Raw.t =
