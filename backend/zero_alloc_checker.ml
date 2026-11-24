@@ -1319,7 +1319,7 @@ end = struct
 
   let replace_witnesses witnesses t =
     match t with
-    | Resolved (Top { allocation_source; _ }) ->
+    | Resolved (Top { allocation_source; witnesses = _ }) ->
       Resolved (Top { allocation_source; witnesses })
     | Resolved (Bot | Safe) -> t
     | Join j -> Join (Join.replace_witnesses j witnesses)
