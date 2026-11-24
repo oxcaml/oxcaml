@@ -56,19 +56,9 @@ let warn_unchecked_zero_alloc_attribute () =
 
 let compiler_stops_before_attributes_consumed () =
   let stops_before_lambda =
-<<<<<<< Merlin:layout-poly/stop-after-tlambda
     (* Clflags.stop_after is not a flag that Merlin consumes, so default to the
        None behavior. *)
     false
-||||||| Compiler:last-imported
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
-=======
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Transl) < 0
->>>>>>> Compiler:HEAD
   in
   stops_before_lambda || !Clflags.print_types
 
