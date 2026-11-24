@@ -64,9 +64,27 @@ struct
 
   let () = assert (E.flags lsr Id.flags_size_in_bits = 0)
 
-  type t = E.t HT.t
+  (* If flambda is used, this table is likely to be big, so we'd like to initialize it as
+     large. But if flambda is unused, initializing it to be big hurts startup time. So we
+     start with it small, and then grow it once there's enough entries. *)
+  type t =
+    { mutable table : E.t HT.t;
+      mutable is_small : bool
+    }
 
-  let create () = HT.create 20_000
+  (* Chosen to be small enough to fit on the minor heap. *)
+  let small_size = 256
+
+  let create () = { table = HT.create small_size; is_small = true }
+
+  let add_new t id elt =
+    HT.add t.table id elt;
+    if t.is_small && HT.length t.table >= small_size
+    then (
+      let table = HT.create 20_000 in
+      HT.iter (fun id elt -> HT.add table id elt) t.table;
+      t.table <- table;
+      t.is_small <- false)
 
   exception Can_add of int
 
@@ -74,9 +92,9 @@ struct
 
   let add t elt =
     let id = Id.create (E.hash elt) E.flags in
-    match HT.find_opt t id with
+    match HT.find_opt t.table id with
     | None ->
-      HT.add t id elt;
+      add_new t id elt;
       id
     | Some existing_elt -> (
       if E.equal elt existing_elt
@@ -89,7 +107,7 @@ struct
              not to alter the flags bits. *)
           while !id <> starting_id do
             assert (Id.flags !id = E.flags);
-            match HT.find t !id with
+            match HT.find t.table !id with
             | exception Not_found -> raise (Can_add !id)
             | existing_elt ->
               if E.equal elt existing_elt
@@ -99,7 +117,7 @@ struct
           Misc.fatal_errorf "No hash values left for@ %a" E.print elt
         with
         | Can_add id ->
-          HT.add t id elt;
+          add_new t id elt;
           assert (Id.flags id = E.flags);
           id
         | Already_added id ->
@@ -108,7 +126,7 @@ struct
 
   let find t id =
     assert (Id.flags id = E.flags);
-    HT.find t id
+    HT.find t.table id
 
   (* We serialize a table using the exact same format we use in memory, except
      that we only store the data for the exported elements. *)
