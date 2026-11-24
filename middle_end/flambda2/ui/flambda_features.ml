@@ -94,16 +94,6 @@ let enable_reaper () =
   !Oxcaml_flags.Flambda2.enable_reaper
   |> with_default ~f:(fun d -> d.enable_reaper)
 
-type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
-  | Never
-  | Always
-  | Zero_alloc
-  | Auto
-
-let reaper_preserve_direct_calls () =
-  !Oxcaml_flags.Flambda2.reaper_preserve_direct_calls
-  |> with_default ~f:(fun d -> d.reaper_preserve_direct_calls)
-
 let reaper_local_fields () =
   !Oxcaml_flags.Flambda2.reaper_local_fields
   |> with_default ~f:(fun d -> d.reaper_local_fields)
