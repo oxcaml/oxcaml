@@ -1,0 +1,234 @@
+let code sum3_0 deleted in
+let code sum_pair_1 deleted in
+let code first_2 deleted in
+let code used_3 deleted in
+let code plain_4 deleted in
+let code containing_5 deleted in
+let $camlEscape_residual__immstring_0 = "; used " in
+let $camlEscape_residual__const_block_1 = Block 12 (10, 0) in
+let $camlEscape_residual__const_block_2 =
+  Block 4 (0, 0, 0, $camlEscape_residual__const_block_1)
+in
+let $camlEscape_residual__const_block_3 =
+  Block 12 (32, $camlEscape_residual__const_block_2)
+in
+let $camlEscape_residual__const_block_4 =
+  Block 4 (0, 0, 0, $camlEscape_residual__const_block_3)
+in
+let $camlEscape_residual__const_block_5 =
+  Block 11 ($camlEscape_residual__immstring_0,
+            $camlEscape_residual__const_block_4)
+in
+let $camlEscape_residual__const_block_6 =
+  Block 4 (0, 0, 0, $camlEscape_residual__const_block_5)
+in
+let $camlEscape_residual__const_block_7 =
+  Block 12 (32, $camlEscape_residual__const_block_6)
+in
+let $camlEscape_residual__const_block_8 =
+  Block 4 (0, 0, 0, $camlEscape_residual__const_block_7)
+in
+let $camlEscape_residual__immstring_9 = "%d %d; used %d %d\n" in
+let $camlEscape_residual__const_block_10 =
+  Block 0 ($camlEscape_residual__const_block_8,
+           $camlEscape_residual__immstring_9)
+in
+let code run_6 deleted in
+let code inline(never) loopify(never) size(8) newer_version_of(sum3_0)
+      sum3_0_1 (t : [ 0 of imm tagged * imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`2`] (t) in
+  let Pfield_1 = %block_load.[`1`] (t) in
+  let Pfield_2 = %block_load.[`0`] (t) in
+  let int_add = %int_barith.add (Pfield_2, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  cont k (int_add_1)
+in
+let $camlEscape_residual__sum3_11 = closure sum3_0_1 @sum3 &toplevel in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_1)
+      sum_pair_1_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_residual__sum_pair_12 =
+  closure sum_pair_1_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(6) newer_version_of(first_2)
+      first_2_1 (p : [ 0 of [ 0 of imm tagged * imm tagged ] * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let Pfield_2 = %block_load.[`0`] (Pfield_1) in
+  let int_add = %int_barith.add (Pfield_2, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_residual__first_13 = closure first_2_1 @first &toplevel in
+let base = %block.mut.[`0`].`toplevel` (0) in
+let $camlEscape_residual__used_14 =
+  closure used_3_1 @used &toplevel
+and code inline(never) loopify(never) size(15) newer_version_of(used_3)
+      used_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let base_1 =
+    %project_value_slot.[used].[base] ($camlEscape_residual__used_14)
+  in
+  let Pfield = %block_load.mut.[`0`] (base_1) in
+  apply ccall
+    ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
+    where k2 (Pccall) =
+      let int_sub = %int_barith.sub (Pccall, Pfield) in
+      cont k (int_sub)
+  with { base = base }
+in
+let code inline(never) loopify(never) size(43) newer_version_of(plain_4)
+      plain_4_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] stack =
+  let r = %block.[`0`].my_alloc_region.local[my_region] (x, y) in
+  apply direct(sum_pair_1_1 &my_alloc_region)
+    ($camlEscape_residual__sum_pair_12 : _ -> imm tagged) (r) -> k2 * k1
+    where k2 (s : imm tagged) =
+      let t = %block.[`0`].my_alloc_region (s, y, x) in
+      (apply direct(sum3_0_1 &my_alloc_region)
+         ($camlEscape_residual__sum3_11 : _ -> imm tagged) (t) -> k2 * k1
+         where k2 (u : imm tagged) =
+           let prim = %int_comp.gt (u, 0) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k (r)
+              where k2 =
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region.local[my_region] (y, x)
+                in
+                cont k (Pmakeblock)))
+in
+let $camlEscape_residual__plain_15 = closure plain_4_1 @plain &toplevel in
+let code inline(never) loopify(never) size(38) newer_version_of(containing_5)
+      containing_5_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] stack =
+  let r = %block.[`0`].my_alloc_region.local[my_region] (x, y) in
+  let t = %block.[`0`].my_alloc_region.local[my_region] (r, x) in
+  apply direct(first_2_1 &my_alloc_region)
+    ($camlEscape_residual__first_13 : _ -> imm tagged) (t) -> k2 * k1
+    where k2 (s : imm tagged) =
+      let prim = %int_comp.gt (s, 0) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (r)
+         where k2 =
+           let Pmakeblock =
+             %block.[`0`].my_alloc_region.local[my_region] (y, x)
+           in
+           cont k (Pmakeblock))
+in
+let $camlEscape_residual__containing_16 =
+  closure containing_5_1 @containing &toplevel
+in
+let $camlEscape_residual__run_17 =
+  closure run_6_1 @run &toplevel
+and code inline(never) loopify(never) size(53) newer_version_of(run_6)
+      run_6_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  let base_1 =
+    %project_value_slot.[run].[base_1] ($camlEscape_residual__run_17)
+  in
+  apply ccall
+    ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
+    where k2 (Pccall) =
+      let Psetfield = %block_set.`imm`.[`0`] (base_1, Pccall) in
+      (apply direct(plain_4_1 &my_alloc_region &`region` &ghost_region)
+         ($camlEscape_residual__plain_15
+          : _ -> [ 0 of imm tagged * imm tagged ])
+           (n, 1)
+           -> k2 * k1
+         where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+           (apply direct(used_3_1 &my_alloc_region)
+              ($camlEscape_residual__used_14 : _ -> imm tagged)
+                (0)
+                -> k2 * k1
+              where k2 (u1 : imm tagged) =
+                (apply
+                        direct(containing_5_1
+                        &my_alloc_region &`region` &ghost_region)
+                   ($camlEscape_residual__containing_16
+                    : _ -> [ 0 of imm tagged * imm tagged ])
+                     (n, 2)
+                     -> k2 * k1
+                   where k2 (q : [ 0 of imm tagged * imm tagged ]) =
+                     (apply direct(used_3_1 &my_alloc_region)
+                        ($camlEscape_residual__used_14 : _ -> imm tagged)
+                          (0)
+                          -> k2 * k1
+                        where k2 (u2 : imm tagged) =
+                          let int_sub = %int_barith.sub (u2, u1) in
+                          (apply direct(sum_pair_1_1 &my_alloc_region)
+                             ($camlEscape_residual__sum_pair_12
+                              : _ -> imm tagged)
+                               (q)
+                               -> k2 * k1
+                             where k2 (apply_result : imm tagged) =
+                               (apply direct(sum_pair_1_1 &my_alloc_region)
+                                  ($camlEscape_residual__sum_pair_12
+                                   : _ -> imm tagged)
+                                    (p)
+                                    -> k2 * k1
+                                  where k2 (apply_result_1 : imm tagged) =
+                                    (apply direct(printf_13 &my_alloc_region)
+                                            inlined(never)
+                                       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+                                         ($camlEscape_residual__const_block_10)
+                                         -> k2 * k1
+                                       where k2 (full_apply) =
+                                         let region_end =
+                                           %end_region (`region`)
+                                         in
+                                         let region_end_1 =
+                                           %end_ghost_region (ghost_region)
+                                         in
+                                         apply &my_alloc_region
+                                                inlined(never)
+                                           full_apply
+                                             (apply_result_1,
+                                              apply_result,
+                                              u1,
+                                              int_sub)
+                                             -> k * k1)))))))
+  with { base_1 = base }
+in
+let $camlEscape_residual__Pmakeblock_18 =
+  Block 0 ($camlEscape_residual__run_17)
+in
+apply direct(run_6_1 &toplevel)
+  ($camlEscape_residual__run_17 : _ -> imm tagged) (10) -> k2 * error
+  where k2 (function_return : imm tagged) =
+    cont k1
+  where k1 =
+    cont k
+  where k =
+    let $camlEscape_residual =
+      Block 0 ($camlEscape_residual__sum3_11,
+               $camlEscape_residual__sum_pair_12,
+               $camlEscape_residual__first_13,
+               base,
+               $camlEscape_residual__used_14,
+               $camlEscape_residual__Pmakeblock_18)
+    in
+    cont done ($camlEscape_residual)

@@ -1,0 +1,112 @@
+let code mk_0 deleted in
+let code maybe_1 deleted in
+let $camlEscape_escape_return__immstring_6 = "none" in
+let $camlEscape_escape_return__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_escape_return__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_escape_return__const_block_0)
+in
+let $camlEscape_escape_return__const_block_2 =
+  Block 12 (32, $camlEscape_escape_return__const_block_1)
+in
+let $camlEscape_escape_return__const_block_3 =
+  Block 4 (0, 0, 0, $camlEscape_escape_return__const_block_2)
+in
+let $camlEscape_escape_return__immstring_4 = "%d %d\n" in
+let $camlEscape_escape_return__const_block_5 =
+  Block 0 ($camlEscape_escape_return__const_block_3,
+           $camlEscape_escape_return__immstring_4)
+in
+let code inline(never) loopify(never) size(8) newer_version_of(mk_0)
+      mk_0_1 (x, y)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  let Pmakeblock = %block.[`0`].my_alloc_region (x, y) in
+  cont k (Pmakeblock)
+in
+let $camlEscape_escape_return__mk_7 = closure mk_0_1 @mk &toplevel in
+let code inline(never) loopify(never) size(26) newer_version_of(maybe_1)
+      maybe_1_1 (x : imm tagged, y)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 | 0 of [ 0 of imm tagged * val ] ] =
+  let p = %block.[`0`].my_alloc_region (x, y) in
+  let prim = %int_comp.gt (x, 0) in
+  switch prim
+    | 0 -> k (0)
+    | 1 -> k2
+    where k2 =
+      let Pmakeblock = %block.[`0`].my_alloc_region (p) in
+      cont k (Pmakeblock)
+in
+let $camlEscape_escape_return__maybe_8 = closure maybe_1_1 @maybe &toplevel
+in
+apply direct(mk_0_1 &toplevel)
+  ($camlEscape_escape_return__mk_7 : _ -> [ 0 of imm tagged * imm tagged ])
+    (1, 2)
+    -> k1 * error
+  where k1 (`*match*` : [ 0 of imm tagged * imm tagged ]) =
+    ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
+      let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+      apply direct(maybe_1_1 &toplevel)
+        ($camlEscape_escape_return__maybe_8
+         : _ -> [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ])
+          (Pmixedfield_1, Pmixedfield)
+          -> k1 * error)
+       where k1 (`*match*_1` : [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ]) =
+         let prim = %is_int (`*match*_1`) in
+         (switch prim
+            | 0 -> k1
+            | 1 -> k2
+            where k2 =
+              let stdout =
+                %project_value_slot.[print_endline].[stdout]
+                  ($Stdlib.camlStdlib__print_endline_47_98)
+              in
+              (apply ccall inlining_state(depth(20))
+                 ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+                   (stdout, $camlEscape_escape_return__immstring_6, 0, 4)
+                   -> k4 * error
+                 where k4 (function_return) =
+                   cont k3
+                 where k3 =
+                   cont k2
+                 where k2 =
+                   (apply ccall inlining_state(depth(10))
+                      ($`*extern*`.caml_ml_output_char : val * val -> val)
+                        (stdout, 10)
+                        -> k4 * error
+                      where k4 (function_return) =
+                        cont k3
+                      where k3 =
+                        cont k2
+                      where k2 =
+                        (apply ccall inlining_state(depth(10))
+                           ($`*extern*`.caml_ml_flush : val -> val)
+                             (stdout)
+                             -> k3 * error
+                           where k3 (function_return) =
+                             cont k2
+                           where k2 =
+                             cont k)))
+            where k1 =
+              let `*match*_2` = %block_load.[`0`] (`*match*_1`) in
+              let Pmixedfield = %block_load.[`1`] (`*match*_2`) in
+              let Pmixedfield_1 = %block_load.[`0`] (`*match*_2`) in
+              (apply direct(printf_13 &toplevel) inlined(never)
+                 $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+                   ($camlEscape_escape_return__const_block_5)
+                   -> k1 * error
+                 where k1 (full_apply) =
+                   (apply &toplevel inlined(never)
+                      full_apply (Pmixedfield_1, Pmixedfield) -> k2 * error
+                      where k2 (function_return : imm tagged) =
+                        cont k1
+                      where k1 =
+                        cont k))))
+  where k =
+    let $camlEscape_escape_return =
+      Block 0 ($camlEscape_escape_return__mk_7,
+               $camlEscape_escape_return__maybe_8)
+    in
+    cont done ($camlEscape_escape_return)

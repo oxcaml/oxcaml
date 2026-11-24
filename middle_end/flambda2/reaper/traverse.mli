@@ -61,7 +61,9 @@ module Skeleton : sig
   val apply_renaming : t -> Renaming.t -> t
 end
 
+(** The facts for the escape analysis are recorded in [escape], if given. *)
 val run :
+  ?escape:Escape_graph.t ->
   Flambda_unit.t ->
   final_typing_env:('f, typing_env) With_types.t ->
   free_names:Name_occurrences.t ->

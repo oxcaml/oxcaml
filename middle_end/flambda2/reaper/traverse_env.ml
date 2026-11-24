@@ -27,19 +27,27 @@ type t =
     should_preserve_direct_calls : should_preserve_direct_calls;
     all_constants : Name.t;
     function_slots_to_keep : Function_slot.Set.t;
-    value_slots_to_keep : Value_slot.Set.t
+    value_slots_to_keep : Value_slot.Set.t;
+    escape : Escape_env.t
   }
 
 let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
-    ~all_constants ~function_slots_to_keep ~value_slots_to_keep =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep ~escape =
   { parent;
     conts;
     current_code_id;
     should_preserve_direct_calls;
     all_constants;
     function_slots_to_keep;
-    value_slots_to_keep
+    value_slots_to_keep;
+    escape
   }
+
+let escape t = t.escape
+
+let with_escape t escape = { t with escape }
+
+let conts t = t.conts
 
 let parent t = t.parent
 

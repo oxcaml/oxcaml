@@ -1,0 +1,106 @@
+let code sum_0 deleted in
+let code f_1 deleted in
+let $camlEscape_big_record__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_big_record__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_big_record__const_block_0)
+in
+let $camlEscape_big_record__immstring_2 = "%d\n" in
+let $camlEscape_big_record__const_block_3 =
+  Block 0 ($camlEscape_big_record__const_block_1,
+           $camlEscape_big_record__immstring_2)
+in
+let code inline(never) loopify(never) size(35) newer_version_of(sum_0)
+      sum_0_1
+        (r :
+           [ 0 of imm tagged * imm tagged * imm tagged * imm tagged *
+               imm tagged * imm tagged * imm tagged * imm tagged *
+               imm tagged * imm tagged * imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`11`] (r) in
+  let Pfield_1 = %block_load.[`10`] (r) in
+  let Pfield_2 = %block_load.[`9`] (r) in
+  let Pfield_3 = %block_load.[`8`] (r) in
+  let Pfield_4 = %block_load.[`7`] (r) in
+  let Pfield_5 = %block_load.[`6`] (r) in
+  let Pfield_6 = %block_load.[`5`] (r) in
+  let Pfield_7 = %block_load.[`4`] (r) in
+  let Pfield_8 = %block_load.[`3`] (r) in
+  let Pfield_9 = %block_load.[`2`] (r) in
+  let Pfield_10 = %block_load.[`1`] (r) in
+  let Pfield_11 = %block_load.[`0`] (r) in
+  let int_add = %int_barith.add (Pfield_11, Pfield_10) in
+  let int_add_1 = %int_barith.add (int_add, Pfield_9) in
+  let int_add_2 = %int_barith.add (int_add_1, Pfield_8) in
+  let int_add_3 = %int_barith.add (int_add_2, Pfield_7) in
+  let int_add_4 = %int_barith.add (int_add_3, Pfield_6) in
+  let int_add_5 = %int_barith.add (int_add_4, Pfield_5) in
+  let int_add_6 = %int_barith.add (int_add_5, Pfield_4) in
+  let int_add_7 = %int_barith.add (int_add_6, Pfield_3) in
+  let int_add_8 = %int_barith.add (int_add_7, Pfield_2) in
+  let int_add_9 = %int_barith.add (int_add_8, Pfield_1) in
+  let int_add_10 = %int_barith.add (int_add_9, Pfield) in
+  cont k (int_add_10)
+in
+let $camlEscape_big_record__sum_4 = closure sum_0_1 @sum &toplevel in
+let code inline(never) loopify(never) size(46) newer_version_of(f_1)
+      f_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let int_add = %int_barith.add (x, 11) in
+   let int_add_1 = %int_barith.add (x, 10) in
+   let int_add_2 = %int_barith.add (x, 9) in
+   let int_add_3 = %int_barith.add (x, 8) in
+   let int_add_4 = %int_barith.add (x, 7) in
+   let int_add_5 = %int_barith.add (x, 6) in
+   let int_add_6 = %int_barith.add (x, 5) in
+   let int_add_7 = %int_barith.add (x, 4) in
+   let int_add_8 = %int_barith.add (x, 3) in
+   let int_add_9 = %int_barith.add (x, 2) in
+   let int_add_10 = %int_barith.add (x, 1) in
+   let r =
+     %block.[`0`].my_alloc_region.local[`region`]
+       (x,
+        int_add_10,
+        int_add_9,
+        int_add_8,
+        int_add_7,
+        int_add_6,
+        int_add_5,
+        int_add_4,
+        int_add_3,
+        int_add_2,
+        int_add_1,
+        int_add)
+   in
+   apply direct(sum_0_1 &my_alloc_region)
+     ($camlEscape_big_record__sum_4 : _ -> imm tagged) (r) -> k2 * k1)
+    where k2 (function_return_0_f_1 : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_f_1)
+in
+let $camlEscape_big_record__f_5 = closure f_1_1 @f &toplevel in
+apply direct(f_1_1 &toplevel)
+  ($camlEscape_big_record__f_5 : _ -> imm tagged) (1) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_big_record__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_big_record =
+      Block 0 ($camlEscape_big_record__sum_4, $camlEscape_big_record__f_5)
+    in
+    cont done ($camlEscape_big_record)
