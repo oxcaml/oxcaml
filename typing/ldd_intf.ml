@@ -84,4 +84,8 @@ module type S = sig
   val pp : node -> string
 
   val pp_debug : node -> string
+
+  (** Solving a variable is logged if the variable was created before the latest
+      snapshot (see {!With_backtracking.Stamp}). *)
+  include With_backtracking.S
 end
