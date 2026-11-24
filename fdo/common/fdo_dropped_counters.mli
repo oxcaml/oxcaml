@@ -89,20 +89,24 @@ end
    it. Counting that jump as the call would keep the counter instead of dropping
    it ([Cfg_self_tail_call_to_jump], [Ssa_self_tail_call_to_jump]).
    [Tailcall_self] in Cfg would need a counter, and so would the jump to the
-   entry block that [Ssa_tail_call] makes in SSA. The self tail calls that
-   Simplify turns into loops ([Self_tail_call_to_jump]) become back edges to a
-   continuation instead: keeping their counters would need counters on jumps
-   ([Apply_cont], then [Cexit]). *)
+   entry block that [Ssa_tail_call] makes in SSA.
+
+   The self tail calls that Simplify turns into loops ([Self_tail_call_to_jump])
+   become back edges to a continuation instead: keeping their counters would
+   need counters on jumps ([Apply_cont], then [Cexit]). *)
 
 (* CR-someday yusumez: Most counters are dropped because the branch or call they
    are on goes away while the code it leads to stays (e.g. a branch whose
    outcome is known, or an inlined call). A primitive that marks a counter at a
-   point of straight-line code would let it keep a count. Each LBR entry is a
-   taken branch and its target, and the code from that target to the next taken
-   branch runs straight through, so the profile counts every address in such a
-   range, not only branches and calls. The marker must generate no instruction
-   (only a label in the metadata) and must not stop optimizations, such as
-   merging blocks, or the code would differ from the code without counters. *)
+   point of straight-line code would let it keep a count.
+
+   Each LBR entry is a taken branch and its target, and the code from that
+   target to the next taken branch runs straight through, so the profile counts
+   every address in such a range, not only branches and calls.
+
+   The marker must generate no instruction (only a label in the metadata) and
+   must not stop optimizations, such as merging blocks, or the code would differ
+   from the code without counters. *)
 
 (** Dropped counters, mapped to the reason each was first dropped. *)
 type t
