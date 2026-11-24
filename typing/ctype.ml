@@ -5473,10 +5473,26 @@ let unify3_var uenv jkind1 t1' t2 t2' =
 let at_current_levels f =
   let level = !current_level and nongen = !nongen_level in
   fun x ->
-    saved_level := (!current_level, !nongen_level) :: !saved_level;
+    (* Like [begin_def] (without allocating a tuple or cons-cell) *)
+    let saved_current = !current_level and saved_nongen = !nongen_level in
     current_level := level;
     nongen_level := nongen;
-    wrap_end_def (fun () -> f x)
+    (* This is equivalent to [wrap_end_def (fun () -> f x)]
+       (without allocating a closure) *)
+    match f x with
+    | result ->
+      current_level := saved_current;
+      nongen_level := saved_nongen;
+      result
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      current_level := saved_current;
+      nongen_level := saved_nongen;
+      Printexc.raise_with_backtrace exn bt
+
+let wait_for_ivar ivar ~run ~default ~scheduler =
+  Typing_ivar.upon ivar ~run ~cancel:default ~scheduler;
+  add_to_ivar_pool ~level:!current_level ivar
 
 let upon_shape env ty ~run ~default =
   let run = at_current_levels run in
@@ -5485,19 +5501,14 @@ let upon_shape env ty ~run ~default =
   if get_level ty = generic_level
   then Misc.fatal_error "Ctype.upon_shape: generic type";
   let ty = expand_head_ignoring_local_constraints env ty in
-  let head = Type_head.of_expanded_type env ty in
-  let wait ivar =
-    Typing_ivar.upon ivar ~run ~cancel:default ~scheduler;
-    add_to_ivar_pool ~level:!current_level ivar
-  in
-  match head with
+  match Type_head.of_expanded_type env ty with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
     Typing_scheduler.add scheduler default
   | Var ->
     let ivar = Typing_ivar.create () in
     transfer_ivar ivar ty;
-    wait ivar
-  | Ivar ivar -> wait ivar
+    wait_for_ivar ivar ~run ~default ~scheduler
+  | Ivar ivar -> wait_for_ivar ivar ~run ~default ~scheduler
   | Shape s ->
     (* Fast path: [ty] is not a variable, so behaves as if its ivar
        were already filled, or defaulted if [ty] has no shape. *)

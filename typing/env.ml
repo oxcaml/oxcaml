@@ -2253,8 +2253,29 @@ let iter_types f =
             f (Path.unboxed_version p1) (Path.unboxed_version p2, du))
          tda.tda_declaration.type_unboxed_version)
 
+(* Lookups by identifier ([find_same]) skip locks, and the innermost ones,
+   which bind nothing, are added for every closure: skip them too. *)
+let rec idtbl_without_locks (tbl : _ IdTbl.t) =
+  match tbl.layer with
+  | Lock { next; _ } when tbl.current == Ident.empty -> idtbl_without_locks next
+  | Open _ | Map _ | Lock _ | Nothing -> tbl
+
+let rec tycomptbl_without_locks (tbl : _ TycompTbl.t) =
+  match tbl.layer with
+  | Lock { next; _ } when tbl.current == Ident.empty ->
+      tycomptbl_without_locks next
+  | Open _ | Lock _ | Nothing -> tbl
+
 let same_types env1 env2 =
-  env1.types == env2.types && env1.modules == env2.modules
+  env1 == env2
+  || idtbl_without_locks env1.types == idtbl_without_locks env2.types
+     && idtbl_without_locks env1.modules == idtbl_without_locks env2.modules
+     && tycomptbl_without_locks env1.constrs
+        == tycomptbl_without_locks env2.constrs
+     && env1.jkinds == env2.jkinds
+     && env1.local_constraints == env2.local_constraints
+     && Int.equal env1.stage env2.stage
+     && Int.equal env1.persistent_scope env2.persistent_scope
 
 let used_persistent () =
   Persistent_env.fold !persistent_env

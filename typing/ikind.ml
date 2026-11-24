@@ -175,6 +175,62 @@ module Solver = struct
   (* Hash table for caching constructor kinds. *)
   module ConstrTbl = Path.Tbl
 
+  module Constr_cache = struct
+    (** Constructor kinds are kept across contexts, unlike [ty_to_kind]: a
+        constructor's kind only depends on the environment's declarations (if
+        any) and on whether [rigid_name] rounds up.
+
+        There is one cache per mode family, with and without an environment,
+        cleared when the declarations change. *)
+    type t =
+      { coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t;
+        mutable cache_env : Env.t;
+            (** The environment [coeffs] were computed in. Only used by the
+                caches used with an environment. *)
+        mutable valid : bool
+            (** [false] once [coeffs] may be stale: they met types that may
+                since have been unified or backtracked. *)
+      }
+
+    let create () =
+      { coeffs = ConstrTbl.create 64; cache_env = Env.empty; valid = false }
+
+    let normal_in_env = create ()
+
+    let round_up_in_env = create ()
+
+    let normal_no_env = create ()
+
+    let round_up_no_env = create ()
+
+    let of_mode_in_env = function
+      | Normal | Normal_except_vars _ -> normal_in_env
+      | Round_up | Round_up_except_vars _ -> round_up_in_env
+
+    let of_mode_no_env = function
+      | Normal | Normal_except_vars _ -> normal_no_env
+      | Round_up | Round_up_except_vars _ -> round_up_no_env
+
+    let validate_in_env t ~env =
+      if t.valid && Env.same_types t.cache_env env
+      then
+        (* Remember [env], so that the next check in it is a physical
+           equality. *)
+        t.cache_env <- env
+      else (
+        ConstrTbl.clear t.coeffs;
+        t.cache_env <- env;
+        t.valid <- true)
+
+    let validate_no_env t =
+      if not t.valid
+      then (
+        ConstrTbl.clear t.coeffs;
+        t.valid <- true)
+
+    let invalidate t = t.valid <- false
+  end
+
   (** Kind function for constructors: computes a kind from a context. This is
       used because many kinds don't make sense outside of a context, e.g., the
       kind of a type containing a constructor depends on the context telling us
@@ -200,31 +256,111 @@ module Solver = struct
 
   and ctx =
     { env : Env.t option;
-      lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
       provenance : provenance_ctx option;
       ty_to_kind : Ldd.node TyTbl.t;
-      constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
+      constr_cache : Constr_cache.t
     }
+
+  let lookup_of_env_later : (Env.t -> Path.t -> constr_decl) Defined_later.Fun.t
+      =
+    Defined_later.Fun.create ~name:"Ikind.lookup_of_env"
+
+  let lookup_of_env env path =
+    Defined_later.Fun.get lookup_of_env_later env path
 
   let global_ty_to_kind : Ldd.node TyTbl.t = TyTbl.create 1
 
-  let global_constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t =
-    ConstrTbl.create 1
+  module Ctx_memo = struct
+    (** The last context created with each [Constr_cache.t], reused when the
+        mode and the environment are physically the same, so that creating a
+        context usually does not allocate. *)
+    type t = ctx option ref
 
-  let create_ctx ~(mode : mode) ~(env : Env.t option)
-      ~(lookup_of_env : Env.t -> Path.t -> constr_decl) =
+    let normal_in_env : t = ref None
+
+    let round_up_in_env : t = ref None
+
+    let normal_no_env : t = ref None
+
+    let round_up_no_env : t = ref None
+
+    let of_mode_in_env = function
+      | Normal | Normal_except_vars _ -> normal_in_env
+      | Round_up | Round_up_except_vars _ -> round_up_in_env
+
+    let of_mode_no_env = function
+      | Normal | Normal_except_vars _ -> normal_no_env
+      | Round_up | Round_up_except_vars _ -> round_up_no_env
+
+    let create_ctx (t : t) ~mode ~env ~constr_cache =
+      let ctx =
+        { env;
+          mode;
+          provenance = None;
+          ty_to_kind = global_ty_to_kind;
+          constr_cache
+        }
+      in
+      t := Some ctx;
+      ctx
+
+    let get_in_env ~mode env =
+      let t = of_mode_in_env mode in
+      match !t with
+      | Some ({ env = Some env'; mode = mode'; _ } as ctx)
+        when env == env' && mode == mode' ->
+        ctx
+      | Some _ | None ->
+        create_ctx t ~mode ~env:(Some env)
+          ~constr_cache:(Constr_cache.of_mode_in_env mode)
+
+    let get_no_env ~mode =
+      let t = of_mode_no_env mode in
+      match !t with
+      | Some ({ mode = mode'; _ } as ctx) when mode == mode' -> ctx
+      | Some _ | None ->
+        create_ctx t ~mode ~env:None
+          ~constr_cache:(Constr_cache.of_mode_no_env mode)
+  end
+
+  let create_ctx_in_env ~mode env =
+    Constr_cache.validate_in_env (Constr_cache.of_mode_in_env mode) ~env;
     TyTbl.clear global_ty_to_kind;
-    ConstrTbl.clear global_constr_to_coeffs;
-    { env;
-      lookup_of_env;
-      mode;
-      provenance = None;
-      ty_to_kind = global_ty_to_kind;
-      constr_to_coeffs = global_constr_to_coeffs
-    }
+    Ctx_memo.get_in_env ~mode env
 
-  let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
+  let create_ctx_no_env ~mode =
+    Constr_cache.validate_no_env (Constr_cache.of_mode_no_env mode);
+    TyTbl.clear global_ty_to_kind;
+    Ctx_memo.get_no_env ~mode
+
+  let create_ctx ~mode ~(env : Env.t option) =
+    match env with
+    | Some env -> create_ctx_in_env ~mode env
+    | None -> create_ctx_no_env ~mode
+
+  (** [ctx] in [mode]. Constructor kinds and type kinds depend on the mode
+      family, so switching family switches cache and [ty_to_kind]. *)
+  let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx =
+    let constr_cache =
+      match ctx.env with
+      | Some _ -> Constr_cache.of_mode_in_env mode
+      | None -> Constr_cache.of_mode_no_env mode
+    in
+    if constr_cache == ctx.constr_cache
+    then { ctx with mode }
+    else (
+      (match ctx.env with
+      | Some env -> Constr_cache.validate_in_env constr_cache ~env
+      | None -> Constr_cache.validate_no_env constr_cache);
+      { ctx with mode; constr_cache; ty_to_kind = TyTbl.create 1 })
+
+  (* The number of [constr_kind] computations in progress: types met during
+     them belong to declarations. *)
+  let constr_kind_depth = ref 0
+
+  let with_fresh_ty_to_kind (ctx : ctx) : ctx =
+    { ctx with ty_to_kind = TyTbl.create 1 }
 
   let with_on_var (ctx : ctx) ~(on_var : Types.type_expr -> unit) : ctx =
     { ctx with mode = Normal_except_vars on_var; ty_to_kind = TyTbl.create 1 }
@@ -313,31 +449,36 @@ module Solver = struct
     | Expanded_to_kconstr of Path.t
     | Expanded_to_layout of { implied_externality : Jkind_axis.Externality.t }
 
+  (* [expand_jkind_desc] of a [jkind_desc] that does not expand further. *)
+  let expanded_jkind_desc : type a l r.
+      implied_externality:(a -> Jkind_axis.Externality.t) ->
+      (a, l * r) Types.base_and_axes ->
+      Axis_lattice.t * (l * r) Types.with_bounds * expansion_resolution =
+   fun ~implied_externality jkind_desc ->
+    let lat = Jkind.Mod_bounds.to_axis_lattice jkind_desc.mod_bounds in
+    match jkind_desc.base with
+    | Types.Layout l ->
+      let implied_externality = implied_externality l in
+      let lat = Axis_lattice.meet_externality implied_externality lat in
+      lat, jkind_desc.with_bounds, Expanded_to_layout { implied_externality }
+    | Types.Kconstr (path, _, _) ->
+      lat, jkind_desc.with_bounds, Expanded_to_kconstr path
+
   let rec expand_jkind_desc : type a l r.
       implied_externality:(a -> Jkind_axis.Externality.t) ->
       ctx ->
       (a, l * r) Types.base_and_axes ->
       Axis_lattice.t * (l * r) Types.with_bounds * expansion_resolution =
    fun ~implied_externality ctx jkind_desc ->
-    let terminal () =
-      let lat = Jkind.Mod_bounds.to_axis_lattice jkind_desc.mod_bounds in
-      match jkind_desc.base with
-      | Types.Layout l ->
-        let implied_externality = implied_externality l in
-        let lat = Axis_lattice.meet_externality implied_externality lat in
-        lat, jkind_desc.with_bounds, Expanded_to_layout { implied_externality }
-      | Types.Kconstr (path, _, _) ->
-        lat, jkind_desc.with_bounds, Expanded_to_kconstr path
-    in
     match ctx.env with
-    | None -> terminal ()
+    | None -> expanded_jkind_desc ~implied_externality jkind_desc
     | Some env -> (
       match Jkind.Const.expand_once env jkind_desc with
       | Some jkind_const ->
         expand_jkind_desc
           ~implied_externality:Jkind_types.Layout.Const.implied_externality ctx
           jkind_const
-      | None -> terminal ())
+      | None -> expanded_jkind_desc ~implied_externality jkind_desc)
 
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
@@ -353,14 +494,32 @@ module Solver = struct
   let lookup_constr (ctx : ctx) ~(min_arity : int) (path : Path.t) : constr_decl
       =
     match ctx.env with
-    | Some env -> ctx.lookup_of_env env path
+    | Some env -> lookup_of_env env path
     | None -> identity_constr_decl ~arity:min_arity path
 
   (** Fetch or compute the polynomial for constructor [c]. *)
   let rec constr_kind (ctx : ctx) ~(min_arity : int) (path : Path.t) :
       Ldd.node * Ldd.node array =
-    (* Return placeholder nodes stored in [constr_to_coeffs] for recursion. *)
-    match ConstrTbl.find_opt ctx.constr_to_coeffs path with
+    incr constr_kind_depth;
+    match constr_kind_untracked ctx ~min_arity path with
+    | base_and_coeffs ->
+      decr constr_kind_depth;
+      (* Solve the greatest fixpoints of abstract types before anything can
+         take a snapshot, so that solving them is never undone and the
+         constructor kinds can be kept. *)
+      if !constr_kind_depth = 0 then Ldd.solve_pending ();
+      base_and_coeffs
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      decr constr_kind_depth;
+      Constr_cache.invalidate ctx.constr_cache;
+      Printexc.raise_with_backtrace exn bt
+
+  (* [constr_kind], without updating [constr_kind_depth]. *)
+  and constr_kind_untracked (ctx : ctx) ~(min_arity : int) (path : Path.t) :
+      Ldd.node * Ldd.node array =
+    (* Return placeholder nodes stored in [constr_cache] for recursion. *)
+    match ConstrTbl.find_opt ctx.constr_cache.coeffs path with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
       match lookup_constr ctx ~min_arity path with
@@ -374,7 +533,7 @@ module Solver = struct
         in
         let base_poly = Ldd.node_of_var base_var in
         let coeffs_poly = Array.map Ldd.node_of_var coeff_vars in
-        ConstrTbl.add ctx.constr_to_coeffs path (base_poly, coeffs_poly);
+        ConstrTbl.add ctx.constr_cache.coeffs path (base_poly, coeffs_poly);
         (* Replace rigid atoms that refer to other constructors with the
            corresponding cached placeholders.  Atoms that refer back to
            [c] are kept rigid to avoid infinite expansion. *)
@@ -389,10 +548,13 @@ module Solver = struct
               | exception Not_found -> rigid_name ctx name
               | { jkind_manifest = None; _ } -> rigid_name ctx name
               | { jkind_manifest = Some jkind_const; _ } ->
+                (* Like [Ty] bodies, independent of the enclosing
+                   computation. *)
                 ckind_of_jkind_desc
                   ~implied_externality:
-                    Jkind_types.Layout.Const.implied_externality ctx jkind_const
-              ))
+                    Jkind_types.Layout.Const.implied_externality
+                  (with_fresh_ty_to_kind ctx)
+                  jkind_const))
           | Atom { constr = other_path; arg_index } ->
             if Path.same other_path path
             then rigid_name ctx name
@@ -415,16 +577,21 @@ module Solver = struct
           ( Ldd.inline_solved_vars base_poly,
             Array.map Ldd.inline_solved_vars coeffs_poly )
         in
-        ConstrTbl.replace ctx.constr_to_coeffs path res;
+        ConstrTbl.replace ctx.constr_cache.coeffs path res;
         res
       | Ty { args = params; kind = body; abstract } ->
+        (* The body's kind must not depend on the enclosing computation's
+           [ty_to_kind], which may give other kinds to [params] (e.g. those of
+           an unboxed version, which shares them), so that it can be kept in
+           [constr_cache]. *)
+        let ctx = with_fresh_ty_to_kind ctx in
         let base_var = Ldd.new_var () in
         let coeff_vars =
           Array.init (List.length params) (fun _ -> Ldd.new_var ())
         in
         let base_poly = Ldd.node_of_var base_var in
         let coeffs_poly = Array.map Ldd.node_of_var coeff_vars in
-        ConstrTbl.add ctx.constr_to_coeffs path (base_poly, coeffs_poly);
+        ConstrTbl.add ctx.constr_cache.coeffs path (base_poly, coeffs_poly);
         let rigid_vars =
           List.map
             (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
@@ -514,17 +681,22 @@ module Solver = struct
       constr_kind constr_ctx ~min_arity:(List.length args) path
     in
     let base = self_provenance base in
-    let rec loop acc remaining i =
-      if i = Array.length coeffs
-      then acc
-      else
-        match remaining with
-        | arg :: rest ->
-          let arg_kind = kind ~use_tables:true arg_ctx arg in
-          loop (Ldd.join acc (Ldd.meet arg_kind coeffs.(i))) rest (i + 1)
-        | [] -> failwith "Missing arg"
-    in
-    loop base args 0
+    constr_args_kind ~arg_ctx coeffs base args 0
+
+  (* [acc] joined with each argument's kind, met with its coefficient, from
+     the [i]-th. *)
+  and constr_args_kind ~arg_ctx (coeffs : Ldd.node array) (acc : Ldd.node)
+      (args : Types.type_expr list) (i : int) : Ldd.node =
+    if i = Array.length coeffs
+    then acc
+    else
+      match args with
+      | arg :: rest ->
+        let arg_kind = kind ~use_tables:true arg_ctx arg in
+        constr_args_kind ~arg_ctx coeffs
+          (Ldd.join acc (Ldd.meet arg_kind coeffs.(i)))
+          rest (i + 1)
+      | [] -> Misc.fatal_error "Ikind.constr_args_kind: missing arg"
 
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc : type a l r.
@@ -545,13 +717,16 @@ module Solver = struct
         Ldd.meet base_mod_bounds atom
     in
     let result =
-      Jkind.With_bounds.to_seq with_bounds
-      |> Seq.fold_left
-           (fun acc (ty, bound_info) ->
-             let mask = bound_info.Types.With_bounds_type_info.bounds_mask in
-             let ty_kind = kind ~use_tables:true ctx ty in
-             Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
-           base
+      match with_bounds with
+      | Types.No_with_bounds -> base
+      | Types.With_bounds _ ->
+        Jkind.With_bounds.to_seq with_bounds
+        |> Seq.fold_left
+             (fun acc (ty, bound_info) ->
+               let mask = bound_info.Types.With_bounds_type_info.bounds_mask in
+               let ty_kind = kind ~use_tables:true ctx ty in
+               Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+             base
     in
     (* The with-bounds join can raise externality above the bound implied by
        the layout. *)
@@ -587,6 +762,8 @@ module Solver = struct
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
       (ty : Types.type_expr) : Ldd.node =
+    if !constr_kind_depth > 0 && Types.get_level ty <> Btype.generic_level
+    then Constr_cache.invalidate ctx.constr_cache;
     let check_principality =
       match ctx.mode with
       | Normal | Normal_except_vars _ | Round_up -> check_principality
@@ -638,13 +815,21 @@ module Solver = struct
        Provenance is attached only to the contribution introduced by this
        node, not to recursive child contributions. *)
     let desc = Types.get_desc ty in
-    let self_provenance, child_ctx =
-      match desc with
-      | Types.Tlink _ | Types.Tsubst _ | Types.Trepr _ | Types.Tpoly _
-      | Types.Tmod _ | Types.Tfield _ | Types.Tnil ->
-        Fun.id, ctx
-      | _ -> provenance_and_child_ctx ctx ty
-    in
+    match ctx.provenance with
+    | None -> kind_of_desc ctx ty desc ~self_provenance:Fun.id ~child_ctx:ctx
+    | Some _ ->
+      let self_provenance, child_ctx =
+        match desc with
+        | Types.Tlink _ | Types.Tsubst _ | Types.Trepr _ | Types.Tpoly _
+        | Types.Tmod _ | Types.Tfield _ | Types.Tnil ->
+          Fun.id, ctx
+        | _ -> provenance_and_child_ctx ctx ty
+      in
+      kind_of_desc ctx ty desc ~self_provenance ~child_ctx
+
+  (* [kind_uncached] for [ty], whose description is [desc]. *)
+  and kind_of_desc (ctx : ctx) (ty : Types.type_expr) (desc : Types.type_desc)
+      ~(self_provenance : Ldd.node -> Ldd.node) ~(child_ctx : ctx) : Ldd.node =
     match desc with
     | Types.Tvar { name = _name; jkind }
     | Types.Tivar { name = _name; jkind; ivar = _ } ->
@@ -757,7 +942,9 @@ module Solver = struct
   let constr_kind_poly (ctx : ctx) (c : Path.t) : Ldd.node * Ldd.node array =
     let base, coeffs = constr_kind ctx ~min_arity:0 c in
     Ldd.solve_pending ();
-    base, coeffs
+    (* [coeffs] may be kept in the constructor cache, and callers such as
+       [constructor_ikind] update the result in place. *)
+    base, Array.copy coeffs
 
   let round_up (k : Ldd.node) : Axis_lattice.t = Ldd.round_up k
 end
@@ -1447,10 +1634,13 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
          path ikind_msg);
     ikind
 
-(* Package the above into a full evaluation context. *)
-let create_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
-  Solver.create_ctx ~mode ~env ~lookup_of_env:(fun env path ->
+let () =
+  Defined_later.Fun.define_exn Solver.lookup_of_env_later (fun env path ->
       lookup_of_env ~env path)
+
+let create_ctx = Solver.create_ctx
+
+let create_ctx_in_env = Solver.create_ctx_in_env
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   let ctx = create_ctx ~mode:Solver.Normal ~env in
@@ -1780,12 +1970,12 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
     | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
       Jkind.get_mode_crossing ~context env jkind
     | _ ->
-      let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+      let ctx = create_ctx_in_env ~mode:Solver.Round_up env in
       let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
       Axis_lattice.to_mode_crossing lat
 
 let rounded_up_kind env ty =
-  let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+  let ctx = create_ctx_in_env ~mode:Solver.Round_up env in
   Solver.normalize (Solver.kind ~use_tables:false ctx ty)
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
@@ -1850,9 +2040,11 @@ let round_up_except_placeholders =
   Solver.Round_up_except_vars placeholder_kind_of_var
 
 (* [kind_with_placeholders env ty] is [ty]'s kind with each unsolved type
-   variable's kind replaced by a new placeholder. The caller must take those
-   placeholders with [Placeholder.Ctx.take_placeholders] straight away. They
-   are not registered or solved yet. *)
+   variable's kind replaced by a new placeholder.
+
+   Safety: The caller must take those placeholders with
+   [Placeholder.Ctx.take_placeholders] straight away. They are not registered
+   or solved yet. *)
 let kind_with_placeholders env (ty : Types.type_expr) =
   Placeholder.Ctx.reset ();
   let ctx = create_ctx ~mode:round_up_except_placeholders ~env:(Some env) in
@@ -1860,53 +2052,103 @@ let kind_with_placeholders env (ty : Types.type_expr) =
 
 let crossing_of_kind kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind)
 
-let rec when_crossing_known env ~kind ~(placeholders : Placeholder.t list)
-    ~known =
-  match placeholders with
-  | [] -> known (crossing_of_kind kind)
-  | p :: placeholders ->
-    let solve kind_of_p ~new_placeholders =
-      Ldd.solve_lfp p.ldd_var kind_of_p;
-      when_crossing_known env ~kind
-        ~placeholders:(List.rev_append new_placeholders placeholders)
-        ~known
-    in
-    let[@inline always] default () =
-      solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
-    in
-    (* Because we don't have guards of type variables, a placeholder
-       variable may be generalized *before* we solve the placeholder.
+let rec when_crossing_of_kind_known env ~kind
+    ~(placeholders : Placeholder.t list) ~known =
+  let crossing = crossing_of_kind kind in
+  if
+    Mode.Crossing.equal crossing
+      (Axis_lattice.to_mode_crossing (Ldd.round_down kind))
+  then
+    (* Crossing is monotone in placeholders. *)
+    known crossing
+  else
+    match placeholders with
+    | [] -> known crossing
+    | p :: placeholders ->
+      let[@inline always] solve kind_of_p ~new_placeholders =
+        Ldd.solve_lfp p.ldd_var kind_of_p;
+        when_crossing_of_kind_known env ~kind
+          ~placeholders:(List.rev_append new_placeholders placeholders)
+          ~known
+      in
+      let[@inline always] default () =
+        solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
+      in
+      (* Because we don't have guards of type variables, a placeholder
+         variable may be generalized *before* we solve the placeholder.
 
-       In this case, it is consistent to default it with lazy defaulting. *)
-    if Types.get_level p.type_var = Btype.generic_level
-    then default ()
-    else
-      upon_shape env p.type_var
-        ~run:(fun _ ->
-          let kind_of_p = kind_with_placeholders env p.type_var in
-          solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
-        ~default
+         In this case, it is consistent to default it with lazy defaulting. *)
+      if Types.get_level p.type_var = Btype.generic_level
+      then default ()
+      else
+        upon_shape env p.type_var
+          ~run:(fun _ ->
+            let kind_of_p = kind_with_placeholders env p.type_var in
+            solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
+          ~default
 
-let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+(* Like [when_crossing_of_kind_known], but avoids allocating a result via
+   [later] (i.e. a mode variable) *)
+let[@inline always] when_crossing_of_kind_known_eager env ~kind ~placeholders
+    ~known ~later =
+  let known_now = ref None in
+  let run_later = ref None in
+  when_crossing_of_kind_known env ~kind ~placeholders ~known:(fun crossing ->
+      match !run_later with
+      | None -> known_now := Some crossing
+      | Some run -> run (known crossing));
+  match !known_now with
+  | Some crossing -> known crossing
+  | None ->
+    let result, ~run = later () in
+    run_later := Some run;
+    result
+
+let[@inline always] when_crossing_of_type_known env ty ~known
+    ~when_crossing_of_kind_known =
   let kind = kind_with_placeholders env ty in
   match Placeholder.Ctx.take () with
-  | [] -> cross (crossing_of_kind kind)
-  | _ :: _ as placeholders -> (
-    (* Fast-path optimization: if the crossing is immediately known,
-       we can return [cross crossing] instead of allocating a temporary
-       mode variable via [later ()]. *)
-    let known_now = ref None in
-    let run_later = ref None in
-    when_crossing_known env ~kind ~placeholders ~known:(fun crossing ->
-        match !run_later with
-        | None -> known_now := Some crossing
-        | Some run -> run (cross crossing));
-    match !known_now with
-    | Some crossing -> cross crossing
-    | None ->
-      let result, ~run = later () in
-      run_later := Some run;
-      result)
+  | [] -> known (crossing_of_kind kind)
+  | _ :: _ as placeholders ->
+    when_crossing_of_kind_known env ~kind ~placeholders ~known
+
+(* An unconstrained variable is one whose jkind bounds no axis. Thus, its modal
+   kind is exactly that of whatever it is eventually unified with. *)
+let is_unconstrained_var (ty : Types.type_expr) =
+  match Types.get_desc ty with
+  | Tvar { jkind; _ } | Tivar { jkind; _ } -> (
+    Types.get_level ty <> Btype.generic_level
+    &&
+    match jkind.jkind with
+    | { base = Layout layout; mod_bounds; with_bounds = No_with_bounds } ->
+      Axis_lattice.equal
+        (Axis_lattice.meet_externality
+           (Jkind.Layout.implied_externality layout)
+           (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+        Axis_lattice.top
+    | { base = Layout _ | Kconstr _; _ } -> false)
+  | _ -> false
+
+(* For an unconstrained [ty], we delay immediately instead of allocating
+   a placeholder via [kind_with_placeholders]. *)
+let upon_crossing_of_type_fast env ty ~cross ~later =
+  let result, ~run = later () in
+  let known crossing = run (cross crossing) in
+  upon_shape env ty
+    ~run:(fun _ ->
+      when_crossing_of_type_known env ty ~known ~when_crossing_of_kind_known)
+    ~default:(fun () -> known (crossing_of_type env ty));
+  result
+
+let upon_crossing_of_type_slow env ty ~cross ~later =
+  when_crossing_of_type_known env ty ~known:cross
+    ~when_crossing_of_kind_known:(fun env ~kind ~placeholders ~known ->
+      when_crossing_of_kind_known_eager env ~kind ~placeholders ~known ~later)
+
+let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+  if is_unconstrained_var ty
+  then upon_crossing_of_type_fast env ty ~cross ~later
+  else upon_crossing_of_type_slow env ty ~cross ~later
 
 type sub_or_intersect = Jkind.sub_or_intersect
 

@@ -400,7 +400,7 @@ let set_staticity (s : Mode.Staticity.const) (x : t) : t =
 let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
   set_axis x ~axis:10 ~level:(Levels.level_of_externality e)
 
-let to_mode_crossing (x : t) : Mode.Crossing.t =
+let to_mode_crossing_uncached (x : t) : Mode.Crossing.t =
   let open Mode.Crossing in
   let monadic =
     Monadic.create
@@ -439,6 +439,29 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
   in
   { monadic; comonadic }
+
+(* A direct-mapped cache of [to_mode_crossing_uncached]. Crossings are
+   immutable and few distinct lattice values occur, so converting each once
+   avoids allocating a crossing per kind. *)
+module Crossing_cache = struct
+  let size = 256
+
+  let keys = Array.make size (-1)
+
+  let values = Array.make size Mode.Crossing.max
+
+  let[@inline] index (x : t) = x lxor (x lsr 8) land (size - 1)
+end
+
+let to_mode_crossing (x : t) : Mode.Crossing.t =
+  let i = Crossing_cache.index x in
+  if Crossing_cache.keys.(i) = x
+  then Crossing_cache.values.(i)
+  else
+    let crossing = to_mode_crossing_uncached x in
+    Crossing_cache.keys.(i) <- x;
+    Crossing_cache.values.(i) <- crossing;
+    crossing
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
     ~yielding ~statefulness ~visibility ~staticity ~externality =

@@ -4,7 +4,12 @@ module Make () = struct
       value : 'a
     }
 
-  type 'a t = 'a node ref
+  type 'a t =
+    { mutable node : 'a node;
+      stamp : int
+          (** See {!With_backtracking.Stamp}: changes to [node] are only logged
+              if a snapshot was taken since [t] was created. *)
+    }
 
   and 'a node =
     | Root of 'a root
@@ -15,18 +20,21 @@ module Make () = struct
   module Change = struct
     type t = T : 'a union_find * 'a node -> t
 
-    let undo (T (t, node)) = t := node
+    let undo (T (t, node)) = t.node <- node
   end
 
   include With_backtracking.Make (Change)
 
-  let create value = ref (Root { rank = 0; value })
+  let create value =
+    { node = Root { rank = 0; value };
+      stamp = With_backtracking.Stamp.fresh ()
+    }
 
-  let node t = !t
+  let node t = t.node
 
   let set_node t node' =
-    log (T (t, node t));
-    t := node'
+    if With_backtracking.Stamp.needs_log t.stamp then log (T (t, node t));
+    t.node <- node'
 
   (** [compress t ~imm_desc ~imm_desc_node ~prop_descs] compresses the path from
       [t] upwards to the root of [t]'s tree, where:
