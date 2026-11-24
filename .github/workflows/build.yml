@@ -393,9 +393,9 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
-      - name: Check that `make hacking` builds
+      - name: Check that `make hacking` and `make testing` build
         if: matrix.check_hacking == true && steps.build.conclusion == 'success'
-        run: make check-hacking
+        run: make check-hacking-testing
 
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()

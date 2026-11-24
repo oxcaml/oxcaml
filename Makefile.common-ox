@@ -528,12 +528,23 @@ hacking_targets = @@merlin-support $(merlin_index_target) $(boot_targets)
 hacking: _build/_bootinstall
 	$(dune) build -w $(merlin_index_flags) $(hacking_targets)
 
+# This target runs tests with the boot compiler under a polling build
+.PHONY: testing
+testing:
+	$(dune) build -w $(merlin_index_flags) @@merlin-support $(merlin_index_target) \
+	  @testsuite/gen/test_dirs \
+	  $(if $(TEST),@@testsuite/run/$(TEST:testsuite/tests/%=%), \
+	  $(if $(DIR), @testsuite/run/$(DIR:testsuite/tests/%=%)/test, \
+	    @testsuite/run/test))
+
+
 # A one-shot build of what `make hacking` builds, for CI. It always restricts
 # dune to $(merlin_index_packages), even without ocaml-index on PATH, so that
 # it catches libraries those packages leave out.
-.PHONY: check-hacking
-check-hacking: _build/_bootinstall
-	$(dune) build --only-packages $(merlin_index_packages) $(hacking_targets)
+.PHONY: check-hacking-testing
+check-hacking-testing: _build/_bootinstall
+	$(dune) build --only-packages $(merlin_index_packages) $(hacking_targets) \
+	  @testsuite/gen/test_dirs @testsuite/run/test
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run

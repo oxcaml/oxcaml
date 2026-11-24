@@ -775,6 +775,42 @@
  (dynamic_include ../../gen/cxx-api/rules.dune))
 
 (subdir
+ gen/dash-Hx
+ (rule
+  (target rules.dune)
+  (enabled_if (<> "%{context_name}" main))
+  (deps (source_tree ../../tests/dash-Hx))
+  (action
+   (with-stdout-to
+    "%{target}"
+    (run
+     "%{project_root}/ocamltest/ocamltest.native"
+     -no-ocamlsrcdir
+     -dune
+     -list-tests
+     ../../tests/dash-Hx))))
+ (rule
+  (target rules.dune)
+  (enabled_if (= "%{context_name}" main))
+  (action (write-file "%{target}" ""))))
+(subdir
+ run/dash-Hx
+ (copy_files (only_sources true) (files "../../tests/dash-Hx/*"))
+ (dynamic_include ../../gen/dash-Hx/rules.dune)
+ (subdir
+  liba
+  (copy_files (only_sources true) (files "../../../tests/dash-Hx/liba/*")))
+ (subdir
+  libb
+  (copy_files (only_sources true) (files "../../../tests/dash-Hx/libb/*")))
+ (subdir
+  libc
+  (copy_files (only_sources true) (files "../../../tests/dash-Hx/libc/*")))
+ (subdir
+  libd
+  (copy_files (only_sources true) (files "../../../tests/dash-Hx/libd/*"))))
+
+(subdir
  gen/dash-Ix
  (rule
   (target rules.dune)
@@ -7891,6 +7927,30 @@
   (only_sources true)
   (files "../../../tests/tool-toplevel/known-bugs/*"))
  (dynamic_include ../../../gen/tool-toplevel/known-bugs/rules.dune))
+
+(subdir
+ gen/trace-pc-guard
+ (rule
+  (target rules.dune)
+  (enabled_if (<> "%{context_name}" main))
+  (deps (source_tree ../../tests/trace-pc-guard))
+  (action
+   (with-stdout-to
+    "%{target}"
+    (run
+     "%{project_root}/ocamltest/ocamltest.native"
+     -no-ocamlsrcdir
+     -dune
+     -list-tests
+     ../../tests/trace-pc-guard))))
+ (rule
+  (target rules.dune)
+  (enabled_if (= "%{context_name}" main))
+  (action (write-file "%{target}" ""))))
+(subdir
+ run/trace-pc-guard
+ (copy_files (only_sources true) (files "../../tests/trace-pc-guard/*"))
+ (dynamic_include ../../gen/trace-pc-guard/rules.dune))
 
 (subdir
  gen/translprim
