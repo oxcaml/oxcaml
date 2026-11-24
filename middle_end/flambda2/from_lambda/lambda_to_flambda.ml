@@ -680,7 +680,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           | Ptemplate_env { template; shape; mode } ->
             (* Allocating the environment as an ordinary block lets closure
                conversion lift it and record its approximation. *)
-            let block = Ident.create_local "template_env" in
+            let block = Ident.rename id in
             CC.close_let acc ccenv
               [ ( block,
                   Flambda_debug_uid.none,
