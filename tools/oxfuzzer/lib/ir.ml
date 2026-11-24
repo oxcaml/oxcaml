@@ -22,6 +22,8 @@ module Name = struct
       else name
 
   let to_string s = s
+
+  let equal = String.equal
 end
 
 module NumberTy = struct
@@ -155,12 +157,14 @@ end
 module Ty = struct
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
     | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
     | Or_null of t
     | Bool
+    | String
+    | Arrow of t * t
 
   and record =
     { id : int; (* Unique record ID. *)
@@ -187,17 +191,29 @@ module Ty = struct
   let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
-    | Array (l, ls), Array (r, rs) ->
-      NumberTy.equal l r && List.equal Int.equal ls rs
+    | Array (l, ls), Array (r, rs) -> equal l r && List.equal Int.equal ls rs
     | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
     | Or_null l, Or_null r -> equal l r
-    | Bool, Bool -> true
+    | Bool, Bool | String, String -> true
+    | Arrow (l, l_result), Arrow (r, r_result) ->
+      equal l r && equal l_result r_result
     | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
-        | Or_null _ | Bool ),
+        | Or_null _ | Bool | String | Arrow _ ),
         _ ) ->
       false
+
+  let curry params result =
+    List.fold_right (fun param result -> Arrow (param, result)) params result
+
+  let rec uncurry = function
+    | Arrow (param, result) ->
+      let params, result = uncurry result in
+      param :: params, result
+    | ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+      | Bool | String ) as ty ->
+      [], ty
 
   let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
 
@@ -213,10 +229,10 @@ module Ty = struct
 
   let rec to_code = function
     | Number nty -> NumberTy.to_code nty
-    | Array (nty, dimensions) ->
+    | Array (element_ty, dimensions) ->
       List.fold_left
         (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
-        (NumberTy.to_code nty) dimensions
+        (to_code element_ty) dimensions
     | Unboxed_tuple components ->
       Ast_helper.Typ.unboxed_tuple
         (List.map (fun ty -> None, to_code ty) components)
@@ -224,6 +240,9 @@ module Ty = struct
     | Variant variant -> Ast_helper.Typ.constr (lid (variant_name variant)) []
     | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
     | Bool -> Ast_helper.Typ.constr (lid "bool") []
+    | String -> Ast_helper.Typ.constr (lid "string") []
+    | Arrow (param, result) ->
+      Ast_helper.Typ.arrow Nolabel (to_code param) (to_code result) [] []
 end
 
 module Sum = struct
@@ -281,23 +300,39 @@ end
 
 module Exn = struct
   type t =
-    { id : int;
-      payload : Ty.t option
-    }
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option
+        }
 
-  let equal left right = Int.equal left.id right.id
+  let equal left right =
+    match left, right with
+    | Division_by_zero, Division_by_zero -> true
+    | Generated left, Generated right -> Int.equal left.id right.id
+    | Division_by_zero, Generated _ | Generated _, Division_by_zero -> false
 
-  let name { id; _ } = Format.sprintf "Exn_%d" id
+  let name = function
+    | Division_by_zero -> "Division_by_zero"
+    | Generated { id; _ } -> Format.sprintf "Exn_%d" id
 
-  let to_code t =
-    let args =
-      match t.payload with
-      | None -> []
-      | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
-    in
-    Ast_helper.Str.exception_
-      (Ast_helper.Te.mk_exception
-         (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args) (loc (name t))))
+  let payload = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } -> payload
+
+  let to_code = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } as t ->
+      let args =
+        match payload with
+        | None -> []
+        | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
+      in
+      Some
+        (Ast_helper.Str.exception_
+           (Ast_helper.Te.mk_exception
+              (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args)
+                 (loc (name t)))))
 end
 
 module Handler = struct
@@ -317,7 +352,7 @@ module Handler = struct
     | Catch_all -> Ast_helper.Pat.any ()
     | Exn { exn; payload } ->
       let payload =
-        match exn.payload, payload with
+        match Exn.payload exn, payload with
         | None, None -> None
         | Some _, None -> Some ([], Ast_helper.Pat.any ())
         | Some ty, Some (binding : Binding.t) ->
@@ -339,14 +374,69 @@ module Handler = struct
     Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
 end
 
-(* CR-someday xclerc: Add unary operations as well. *)
+module Un_op = struct
+  type t =
+    | Neg
+    | Abs
+    | Succ
+    | Pred
+    | Sqrt
+    | Round
+    | Trunc
+    | Ceil
+    | Floor
+    | Bit_not
+    | Not
+
+  let ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      let numeric = [Neg; Abs; Succ; Pred] in
+      if NumberTy.is_floating_point nty
+      then numeric @ [Sqrt; Round; Trunc; Ceil; Floor]
+      else numeric @ [Bit_not]
+    | Bool -> [Not]
+    | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+    | Arrow _ ->
+      Misc.fatal_errorf "Un_op.ops_for_ty: expected a numeric or boolean type"
+
+  let to_code ty unop ~arg =
+    let module_name =
+      match ty with
+      | Ty.Number nty -> NumberTy.to_module nty
+      | Ty.Bool -> "Bool"
+      | Ty.String | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ | Ty.Arrow _ ->
+        Misc.fatal_errorf "Un_op.to_code: expected a numeric or boolean type"
+    in
+    let name =
+      match unop with
+      | Neg -> "neg"
+      | Abs -> "abs"
+      | Succ -> "succ"
+      | Pred -> "pred"
+      | Sqrt -> "sqrt"
+      | Round -> "round"
+      | Trunc -> "trunc"
+      | Ceil -> "ceil"
+      | Floor -> "floor"
+      | Bit_not -> "lognot"
+      | Not -> "not"
+    in
+    apply (qualified_ident module_name name) [arg]
+end
+
 module Bin_op = struct
-  (* CR-soon xclerc: Add more operators. Especially division and modulo (with
-     safe wrappers). *)
   type t =
     | Add
     | Sub
     | Mul
+    | Div
+    | Rem
+    | Min
+    | Max
+    | Min_num
+    | Max_num
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -361,7 +451,11 @@ module Bin_op = struct
     | And
     | Or
 
-  let num_binops = [Add; Sub; Mul]
+  let num_binops = [Add; Sub; Mul; Div; Rem]
+
+  (* CR-soon xclerc: Add FMA and copy_sign. FMA needs a ternary expression;
+     copy_sign must avoid NaN sign arguments, whose results are unspecified. *)
+  let floating_point_binops = num_binops @ [Min; Max; Min_num; Max_num]
 
   let integral_binops =
     num_binops
@@ -370,8 +464,11 @@ module Bin_op = struct
   let ops_for_ty (ty : Ty.t) =
     match ty with
     | Number nty ->
-      if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
+      if NumberTy.is_floating_point nty
+      then floating_point_binops
+      else integral_binops
+    | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
+    | Or_null _ | Arrow _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -379,8 +476,9 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
+      | Ty.String -> "String"
       | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
-      | Ty.Or_null _ ->
+      | Ty.Or_null _ | Ty.Arrow _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -388,6 +486,12 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Div -> call "div"
+    | Rem -> call "rem"
+    | Min -> call "min"
+    | Max -> call "max"
+    | Min_num -> call "min_num"
+    | Max_num -> call "max_num"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
@@ -404,13 +508,56 @@ module Bin_op = struct
     | Or -> op "||" [lhs; rhs]
 end
 
+module Inline = struct
+  type t =
+    | Never
+    | Always
+    | Default
+
+  let to_attributes inline =
+    let attribute payload =
+      [ Ast_helper.Attr.mk (loc "inline")
+          (PStr [Ast_helper.Str.eval (ident payload)]) ]
+    in
+    match inline with
+    | Default -> []
+    | Never -> attribute "never"
+    | Always -> attribute "always"
+end
+
+let typed_param ({ name; ty; _ } : Binding.t) =
+  value_param
+    (Ast_helper.Pat.constraint_
+       (Ast_helper.Pat.var (loc (Name.to_string name)))
+       (Some (Ty.to_code ty))
+       [])
+
 module Expr = struct
   (* CR-soon xclerc: Currently this type is constructed manually, but that is a
      mistake, as we can create for example a [Bin_op] with invalid types. To
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
+    | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
     | Assert_false
+    | Let of
+        { name : Name.t;
+          expr : t;
+          body : t
+        }
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of
@@ -438,6 +585,11 @@ module Expr = struct
           cases : case list
         }
     | Opaque of t
+    | Un_op of
+        { ty : Ty.t;
+          op : Un_op.t;
+          arg : t
+        }
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;
@@ -458,6 +610,20 @@ module Expr = struct
         { ty : Ty.t;
           body : t;
           handlers : t Handler.t list
+        }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }
+    | Apply of
+        { func : t;
+          args : t list
+        }
+    | Let_rec of
+        { functions : (Name.t * t) list;
+          body : t
         }
 
   and raise =
@@ -522,8 +688,30 @@ module Expr = struct
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
+    | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
+    | String_const s -> Ast_helper.Exp.constant (Ast_helper.Const.string s)
+    | String_length expr ->
+      apply (qualified_ident "String" "length") [to_code expr]
+    | Bounded_string_concat { lhs; rhs; result_name; max_length } ->
+      bind result_name
+        (apply (qualified_ident "String" "cat") [to_code lhs; to_code rhs])
+        (fun result ->
+          Ast_helper.Exp.ifthenelse
+            (op "<="
+               [ apply (qualified_ident "String" "length") [result];
+                 int max_length ])
+            result
+            (Some
+               (apply
+                  (qualified_ident "String" "sub")
+                  [result; int 0; int max_length])))
     | Assert_false ->
       Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
+    | Let { name; expr; body } ->
+      bind name (to_code expr) (fun _ -> to_code body)
+    | If { condition; if_true; if_false } ->
+      Ast_helper.Exp.ifthenelse (to_code condition) (to_code if_true)
+        (Some (to_code if_false))
     | Read place -> place_to_code place
     | Array_literal elements ->
       Ast_helper.Exp.array Mutable (List.map to_code elements)
@@ -616,6 +804,7 @@ module Expr = struct
            cases)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
+    | Un_op { ty; op; arg } -> Un_op.to_code ty op ~arg:(to_code arg)
     | Bin_op { ty; op; lhs; rhs } ->
       Bin_op.to_code ty op ~lhs:(to_code lhs) ~rhs:(to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
@@ -628,10 +817,34 @@ module Expr = struct
       constrain ty
         (Ast_helper.Exp.try_ (to_code body)
            (List.map (Handler.to_case to_code) handlers))
+    | Lambda { params; inline; body; result_ty } ->
+      if List.is_empty params then Misc.fatal_errorf "Lambda: no parameters";
+      let lambda =
+        function_
+          (List.map typed_param params)
+          (constrain result_ty (to_code body))
+      in
+      { lambda with pexp_attributes = Inline.to_attributes inline }
+    | Apply { func; args } ->
+      if List.is_empty args then Misc.fatal_errorf "Apply: no arguments";
+      apply (to_code func) (List.map to_code args)
+    | Let_rec { functions; body } ->
+      if List.is_empty functions then Misc.fatal_errorf "Let_rec: no functions";
+      let binding (name, lambda) =
+        match lambda with
+        | Lambda _ ->
+          Ast_helper.Vb.mk
+            (Ast_helper.Pat.var (loc (Name.to_string name)))
+            (to_code lambda)
+        | _ -> Misc.fatal_errorf "Let_rec: expected a function"
+      in
+      Ast_helper.Exp.let_ Immutable Recursive
+        (List.map binding functions)
+        (to_code body)
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
-      match exn.payload, payload with
+      match Exn.payload exn, payload with
       | None, None -> None
       | Some _, Some payload -> Some (to_code payload)
       | Some _, None | None, Some _ ->
@@ -782,23 +995,6 @@ module Statement = struct
         (List.map (Handler.to_case to_code) handlers)
 end
 
-module Inline = struct
-  type t =
-    | Never
-    | Always
-    | Default
-
-  let to_attributes inline =
-    let attribute payload =
-      [ Ast_helper.Attr.mk (loc "inline")
-          (PStr [Ast_helper.Str.eval (ident payload)]) ]
-    in
-    match inline with
-    | Default -> []
-    | Never -> attribute "never"
-    | Always -> attribute "always"
-end
-
 module Function = struct
   type t =
     { name : Name.t;
@@ -811,17 +1007,10 @@ module Function = struct
     }
 
   let to_code { name; params; inline; body; return_ty; result; raises = _ } =
-    let to_param ({ name; ty; _ } : Binding.t) =
-      value_param
-        (Ast_helper.Pat.constraint_
-           (Ast_helper.Pat.var (loc (Name.to_string name)))
-           (Some (Ty.to_code ty))
-           [])
-    in
     let function_params =
       match params with
       | [] -> [value_param (Ast_helper.Pat.construct (lid "()") None)]
-      | _ -> List.map to_param params
+      | _ -> List.map typed_param params
     in
     let body =
       Ast_helper.Exp.sequence (Statement.to_code body)

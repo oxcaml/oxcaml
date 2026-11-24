@@ -1,0 +1,105 @@
+let code go_1 deleted in
+let code go2_2 deleted in
+let $camlUnbox_dead__immstring_2 = "x" in
+let  in
+let $camlUnbox_dead__immstring_4 = "y" in
+let code f_0 deleted in
+let $camlUnbox_dead__immstring_5 = "z" in
+let code inline(never) loopify(never) size(1) newer_version_of(go2_2)
+      go2_2_1 (a_into_b_field_unboxed_float : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  cont k (a_into_b_field_unboxed_float)
+in
+let $camlUnbox_dead__go2_8 = closure go2_2_1 @go2 &toplevel in
+let code inline(never) loopify(never) size(1) newer_version_of(go_1)
+      go_1_1 my_closure &my_alloc_region my_depth -> k * k1 : unit =
+  cont k
+in
+let $camlUnbox_dead__go_7 = closure go_1_1 @go &toplevel in
+let code inline(never) loopify(never) size(65) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply ccall noalloc ($`*extern*`.sqrt : float -> float) (0x1p+1) -> k2 * k1
+    where k2 (a : float) =
+      let a_into_a_field_unboxed_float = a in
+      (apply direct(go2_2_1 &my_alloc_region)
+         ($camlUnbox_dead__go2_8 : _ -> float)
+           (a_into_a_field_unboxed_float)
+           -> k2 * k1
+         where k2 (a_into_r1_field_unboxed_float : float) =
+           ((let prim = a_into_r1_field_unboxed_float in
+             let prim_1 = %float_comp.gt (prim, 0x1p+0) in
+             switch prim_1
+               | 0 -> k2
+               | 1 -> k3
+               where k3 =
+                 let stdout =
+                   %project_value_slot.[print_string].[stdout]
+                     ($Stdlib.camlStdlib__print_string_43_94)
+                 in
+                 (apply ccall inlining_state(depth(20))
+                    ($`*extern*`.caml_ml_output
+                     : val * val * val * val -> val)
+                      (stdout, $camlUnbox_dead__immstring_2, 0, 1)
+                      -> k4 * k1
+                    where k4 (function_return) =
+                      cont k3
+                    where k3 =
+                      cont k2))
+              where k2 =
+                ((let untagged = %untag_imm (x) in
+                  switch untagged
+                    | 0 -> k4
+                    | 1 -> k3)
+                   where k4 =
+                     (apply direct(go2_2_1 &my_alloc_region)
+                        ($camlUnbox_dead__go2_8 : _ -> float)
+                          (a_into_a_field_unboxed_float)
+                          -> k4 * k1
+                        where k4
+                                (a_into_function_return_0_go2_2_field_unboxed_float :
+                                   float) =
+                          cont k3)
+                   where k3 =
+                     (apply direct(go_1_1 &my_alloc_region)
+                        ($camlUnbox_dead__go_7 : _ -> unit) -> k3 * k1
+                        where k3 =
+                          cont k2)
+                   where k2 =
+                     let stdout =
+                       %project_value_slot.[print_string].[stdout]
+                         ($Stdlib.camlStdlib__print_string_43_94)
+                     in
+                     apply ccall inlining_state(depth(20))
+                       ($`*extern*`.caml_ml_output
+                        : val * val * val * val -> imm tagged)
+                         (stdout, $camlUnbox_dead__immstring_4, 0, 1)
+                         -> k * k1)))
+in
+let $camlUnbox_dead__f_6 = closure f_0_1 @f &toplevel in
+apply direct(f_0_1 &toplevel)
+  ($camlUnbox_dead__f_6 : _ -> imm tagged) (0) -> k3 * error
+  where k3 (function_return : imm tagged) =
+    cont k2
+  where k2 =
+    cont k1
+  where k1 =
+    let stdout =
+      %project_value_slot.[print_string].[stdout]
+        ($Stdlib.camlStdlib__print_string_43_94)
+    in
+    (apply ccall inlining_state(depth(20))
+       ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+         (stdout, $camlUnbox_dead__immstring_5, 0, 1)
+         -> k2 * error
+       where k2 (function_return) =
+         cont k1
+       where k1 =
+         cont k)
+  where k =
+    let $camlUnbox_dead = Block 0 ($camlUnbox_dead__f_6) in
+    cont done ($camlUnbox_dead)

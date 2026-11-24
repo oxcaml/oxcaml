@@ -1,0 +1,40 @@
+;; End-to-end test of [-gated-trace-pc-guard] against LLVM's own tooling: the
+;; program is linked with the coverage runtime of compiler-rt, which writes a
+;; [.sancov] file, and that file is then read by the [sancov] tool. Both come
+;; from the LLVM installation that $OXCAML_CLANG, the path of its clang, belongs
+;; to.
+
+(rule
+ (alias runtest-sancov)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{env:OXCAML_CLANG=} "")))
+ (action
+  (progn
+   (echo
+    "ERROR: OXCAML_CLANG environment variable not set.\n\
+     The sancov tests require an LLVM installation with clang, compiler-rt \
+     and sancov. Please set OXCAML_CLANG to the path of its clang.\n")
+   (bash "exit 1"))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets sancov_test.output.corrected)
+ (deps sancov_lib.ml sancov_test.ml stubs.c run.sh)
+ (action
+  (with-stdout-to
+   sancov_test.output.corrected
+   (run sh ./run.sh %{bin:ocamlopt.opt}))))
+
+(rule
+ (alias runtest-sancov)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (action
+  (diff sancov_test.output sancov_test.output.corrected)))

@@ -18,6 +18,8 @@ val max_array_axis_size : int
 
 val max_array_elements : int
 
+val max_string_length : int
+
 val max_record_types : int
 
 val max_record_fields : int
@@ -40,7 +42,25 @@ val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
 
-(* Percentages. *)
+val max_closure_param_count : int
+
+val max_closure_call_count : int
+
+val max_let_rec_count : int
+
+val max_recursive_functions : int
+
+val max_recursive_param_count : int
+
+val max_recursive_calls : int
+
+val max_recursion_fuel : int
+
+val unused_recursive_functions : bool
+
+val max_probability : int
+
+(* Probabilities out of [max_probability]. *)
 val record_probability : int
 
 val variant_probability : int
@@ -51,6 +71,8 @@ val unboxed_tuple_probability : int
 
 val match_in_match_probability : int
 
+val assert_false_probability : int
+
 val nested_record_probability : int
 
 val mutable_binding_probability : int
@@ -58,6 +80,10 @@ val mutable_binding_probability : int
 val mutable_field_probability : int
 
 val array_probability : int
+
+val bool_probability : int
+
+val string_probability : int
 
 val array_literal_probability : int
 
@@ -78,6 +104,12 @@ val catch_all_probability : int
 val raise_notrace_probability : int
 
 val callee_raises_probability : int
+
+val closure_probability : int
+
+val curried_lambda_probability : int
+
+val opaque_recursive_call_probability : int
 
 type assertion_mode =
   | Disabled
@@ -111,7 +143,10 @@ module Swarm : sig
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   val create : Random.State.t -> t

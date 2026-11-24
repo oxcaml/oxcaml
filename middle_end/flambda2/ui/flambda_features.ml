@@ -31,11 +31,18 @@ type 'a mode =
 
 type any_mode = Mode : _ mode -> any_mode
 
+let lto_support () =
+  !Oxcaml_flags.Flambda2.lto_support |> with_default ~f:(fun d -> d.lto_support)
+
 let classic_mode () =
   !Oxcaml_flags.Flambda2.classic_mode
   |> with_default ~f:(fun d -> d.classic_mode)
 
 let mode () = if classic_mode () then Mode Classic else Mode Normal
+
+(* Ignore classic mode since inlined functions don't get their counters
+   updated. *)
+let fdo_counters () = !Oxcaml_flags.fdo_counters && not (classic_mode ())
 
 let join_points () =
   !Oxcaml_flags.Flambda2.join_points |> with_default ~f:(fun d -> d.join_points)
@@ -174,6 +181,12 @@ let dump_fexpr_annot () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot
 
 let dump_fexpr_annot_after () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot_after
 
+let fexpr_print_branch_annotations () =
+  !Oxcaml_flags.Flambda2.Dump.fexpr_print_branch_annotations
+
+let fexpr_print_fdo_counters () =
+  !Oxcaml_flags.Flambda2.Dump.fexpr_print_fdo_counters
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string
@@ -188,6 +201,8 @@ let dump_fexpr pass =
 let dump_slot_offsets () = !Oxcaml_flags.Flambda2.Dump.slot_offsets
 
 let dump_flow () = !Oxcaml_flags.Flambda2.Dump.flow
+
+let dump_simplified () = !Oxcaml_flags.Flambda2.Dump.simplified
 
 let dump_simplify () = !Oxcaml_flags.Flambda2.Dump.simplify
 

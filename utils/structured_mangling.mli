@@ -39,18 +39,34 @@
     {2 Mangled symbol format}
 
     A mangled symbol has the form [_Caml<path>] where [<path>] is a sequence of
-    tagged, length-prefixed identifiers:
+    tagged items. Named scopes are tags followed by a length-prefixed
+    identifier:
     - [U] - compilation Unit
-    - [I] - Inline marker
     - [M] - Module
-    - [S] - anonymous Struct
     - [O] - class (O for object)
     - [F] - Function
+
+    Anonymous scopes and compiler-generated stamps are tags followed by a
+    decimal number terminated by [_] (e.g. [L0_]), which cannot be confused with
+    a length-prefixed identifier:
     - [L] - anonymous function (L for lambda)
-    - [P] - Partial application
+    - [S] - anonymous Struct
+    - [Z] - lazy expression (Z for the last letter of lazy)
+    - [D] - stamp (D for disambiguator)
+
+    The number of an anonymous function, module or lazy expression is its
+    ordinal among the items of the same kind directly enclosed in the same
+    scope, so it only changes when the enclosing scope itself is edited. The
+    stamps make otherwise identically-named symbols unique; keeping them out of
+    the identifiers lets a demangler omit them.
+
+    Finally, [I] is a payload-free inline marker and [P], a partial application,
+    carries a position encoded as an identifier.
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
-    [_CamlU3FooM3BarF3baz]. *)
+    [_CamlU3FooM3BarF3baz], and the code of the second lambda directly inside
+    it, with function slot stamp 0 and code ID stamp 3, to
+    [_CamlU3FooM3BarF3bazL1_D0_D3_]. *)
 
 (** A path item represents a single lexical scope in the mangling path. *)
 type 'cu path_item =
@@ -58,19 +74,22 @@ type 'cu path_item =
   | Inline_marker
       (** A separator (between destination and source) to track inlining *)
   | Module of string  (** A named module *)
-  | Anonymous_module of int * int * string option
-      (** [struct ... end] at (line, col, file) *)
+  | Anonymous_module of int
+      (** [struct ... end], numbered among the anonymous modules of its scope *)
   | Class of string  (** A class definition *)
   | Function of string  (** A named function *)
-  | Anonymous_function of int * int * string option
-      (** [fun ... -> ...] at (line, col, file) *)
+  | Anonymous_function of int
+      (** [fun ... -> ...], numbered among the anonymous functions of its scope
+      *)
+  | Lazy of int
+      (** [lazy ...], numbered among the lazy expressions of its scope *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
+  | Stamp of int
+      (** A compiler-generated stamp (of a function slot or a code ID) *)
 
-(* CR sspies: Support for lazy expressions (they do not appear in the mangling
-   path at all) and object methods (they appear as regular functions) is still
-   missing; adding a construct for lazy expressions would allow us to make sure
-   there is always a mangling path item for every [Debuginfo] scope *)
+(* CR sspies: Support for object methods (they appear as regular functions) is
+   still missing. *)
 
 (** A mangling path is a list of path items representing the full lexical
     context of an identifier. *)
@@ -93,11 +112,10 @@ module Parse : sig
       [__Caml] variant). *)
   val starts_with_prefix : string -> bool
 
-  (** [parse sym] returns the structured path encoded by [sym] together with any
-      trailing suffix (e.g. [_<n>] ids appended by the compiler after the
-      mangled path). Returns [None] if [sym] is not a valid structured mangled
-      symbol. *)
-  val parse : string -> (string path * string) option
+  (** [parse sym] returns the structured path encoded by [sym]. Returns [None]
+      if [sym] is not a valid structured mangled symbol, in particular if it has
+      trailing characters after the last item. *)
+  val parse : string -> string path option
 
   (** [decode str pos] reverse {!encode}: decode a single length-prefixed
       identifier at [pos] in [str], returning the decoded string and the number

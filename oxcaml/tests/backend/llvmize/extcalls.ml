@@ -29,8 +29,8 @@ let[@inline never] [@local never] call_print_and_add () = print_and_add 9 10
 let[@inline never] [@local never] call_int_and_float () =
   int_and_float 1 2.0 3 4.0
 
-(* This test checks that [Call_no_return] is handled properly - copied from
-   ../zero_alloc_checker/test_flambda2_invalid.ml *)
+(* This test checks that [External_call_no_return] is handled properly - copied
+   from ../zero_alloc_checker/test_flambda2_invalid.ml *)
 
 (* CR yusumez: This test gives a different result in CI (involving ANSI escape
    codes for colour?!). *)

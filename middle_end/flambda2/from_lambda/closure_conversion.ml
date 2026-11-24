@@ -105,13 +105,15 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     ( acc,
       reg_width
         (RWC.tagged_immediate
-           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+           (Target_ocaml_int.of_int (Acc.machine_width acc)
+              (Numbers.Int8.to_int c))),
       "int8" )
   | Const_base (Const_int16 c) ->
     ( acc,
       reg_width
         (RWC.tagged_immediate
-           (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
+           (Target_ocaml_int.of_int (Acc.machine_width acc)
+              (Numbers.Int16.to_int c))),
       "int16" )
   | Const_base (Const_char c) ->
     ( acc,
@@ -140,13 +142,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   | Const_base (Const_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
     let c =
-      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Targetint.to_int64 c)
     in
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
   | Const_base (Const_untagged_char c) ->
-    ( acc,
-      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
-      "untagged_char" )
+    let c = Numeric_types.Int8.of_int_exn (Numbers.Int8.to_int c) in
+    acc, reg_width (RWC.naked_int8 c), "untagged_char"
   | Const_base (Const_untagged_int c) ->
     ( acc,
       reg_width
@@ -154,13 +155,11 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
            (Target_ocaml_int.of_int (Acc.machine_width acc) c)),
       "untagged_int" )
   | Const_base (Const_untagged_int8 c) ->
-    ( acc,
-      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
-      "untagged_int8" )
+    let c = Numeric_types.Int8.of_int_exn (Numbers.Int8.to_int c) in
+    acc, reg_width (RWC.naked_int8 c), "untagged_int8"
   | Const_base (Const_untagged_int16 c) ->
-    ( acc,
-      reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)),
-      "untagged_int16" )
+    let c = Numeric_types.Int16.of_int_exn (Numbers.Int16.to_int c) in
+    acc, reg_width (RWC.naked_int16 c), "untagged_int16"
   | Const_base (Const_unboxed_int32 c) ->
     acc, reg_width (RWC.naked_int32 c), "unboxed_int32"
   | Const_base (Const_unboxed_int64 c) ->
@@ -168,7 +167,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
   | Const_base (Const_unboxed_nativeint c) ->
     (* CR pchambart: this should be pushed further to lambda *)
     let c =
-      Targetint_32_64.of_int64 (Acc.machine_width acc) (Int64.of_nativeint c)
+      Targetint_32_64.of_int64 (Acc.machine_width acc) (Targetint.to_int64 c)
     in
     acc, reg_width (RWC.naked_nativeint c), "unboxed_nativeint"
   | Const_immstring c ->
@@ -1001,9 +1000,11 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
           ~args_arity:param_arity ~return_arity ~call_kind
-          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
+          ~return_mode:alloc_mode_app dbg
+          ~callsite_counter:None (* C calls don't have counters. *)
+          ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
-          ~probe:None ~position:Normal
+          ~probe:None ~position:Normal ~yielding:May_yield
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
       in
       Expr_with_acc.create_apply acc apply
@@ -1241,9 +1242,10 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
              ~alloc_region:current_alloc_region)
-        dbg ~inlined:Never_inlined
+        dbg ~callsite_counter:None (* Effects don't have counters. *)
+        ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe:None ~position:Normal
+        ~probe:None ~position:Normal ~yielding:May_yield
         ~relative_history:Inlining_history.Relative.empty
       |> Expr_with_acc.create_apply acc
     in
@@ -1426,8 +1428,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
       | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
-      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
-      | Patomic_load_mixed_field _ | Patomic_set_field _
+      | Ptls_get | Pdomain_index | Pthread_self_id | Ppoll
+      | Patomic_load_field _ | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax | Pbox _ | Punbox _ ->
@@ -1921,6 +1923,7 @@ let close_exact_or_unknown_apply acc env
        probe;
        mode;
        region_close;
+       yielding;
        region;
        ghost_region;
        alloc_region;
@@ -2018,14 +2021,18 @@ let close_exact_or_unknown_apply acc env
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    let yielding = Apply.Yielding.from_lambda yielding in
     let apply =
       Apply.create
         ~callee:(if can_erase_callee then None else Some callee)
         ~continuation:(Return continuation) apply_exn_continuation ~args
         ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
+        ~callsite_counter:None
+          (* CR yusumez: the counter of the source call, once calls have FDO
+             ids. *)
         ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe ~position
+        ~probe ~position ~yielding
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
     in
     if Flambda_features.classic_mode ()
@@ -2630,9 +2637,10 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
         Debuginfo.none
+        ~callsite_counter:None (* Only calls to the wrapper have counters. *)
         ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe:None ~position:Normal
+        ~probe:None ~position:Normal ~yielding:May_yield
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
     in
     let projection =
@@ -2779,8 +2787,12 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
-      ~absolute_history ~relative_history ~loopify:Never_loopify
+      ~dbg
+      ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+        (* The wrapper isn't in the source: the function's entry counter is on
+           [main_code]. *)
+      ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
+      ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -2811,6 +2823,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
   let dbg = Debuginfo.from_location loc in
+  let fdo_entry_annotation = Function_decl.fdo_entry_annotation decl in
   let unarized_params = Function_decl.params decl in
   let params_arity = Function_decl.params_arity decl in
   let unarized_param_modes =
@@ -3200,7 +3213,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled:main_code_is_tupled
+      ~dbg ~fdo_entry_annotation ~is_tupled:main_code_is_tupled
       ~is_my_closure_used:
         (Function_params_and_body.is_my_closure_used params_and_body)
       ~inlining_decision ~absolute_history ~relative_history ~loopify
@@ -3309,7 +3322,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
         let code_id =
           Code_id.create
-            ~name:(Function_slot.to_string function_slot)
+            ~name:(Function_slot.name function_slot)
+            ~slot_stamp:(Some (Function_slot.stamp function_slot))
             ~debug:function_dbg compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
@@ -3351,6 +3365,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         in
         let cost_metrics = Cost_metrics.zero in
         let dbg = Debuginfo.from_location (Function_decl.loc decl) in
+        let fdo_entry_annotation = Function_decl.fdo_entry_annotation decl in
         let is_tupled =
           match Function_decl.kind decl with
           | Curried _ -> false
@@ -3370,7 +3385,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~recursive:(Function_decl.recursive decl)
             ~newer_version_of:None ~cost_metrics
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
-            ~dbg ~is_tupled ~is_my_closure_used:true
+            ~dbg ~fdo_entry_annotation ~is_tupled ~is_my_closure_used:true
             ~inlining_decision:Recursive
             ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
             ~relative_history:Inlining_history.Relative.empty
@@ -3718,6 +3733,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     else Some (Ident.create_local "my_ghost_region")
   in
   let fbody acc env =
+    (* CR yusumez: this call should carry the counter of the source partial
+       application [apply], as in
+       [Simplify_apply_expr.simplify_direct_partial_application]. *)
     close_exact_or_unknown_apply acc env
       { apply with
         kind = Function;
@@ -3726,6 +3744,10 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         continuation = return_continuation;
         exn_continuation;
         inlined = Lambda.forward_inlined_attribute ();
+        (* The full application inside the wrapper also receives the missing
+           arguments, whose modes are unknown here, so it may yield even if the
+           partial application itself cannot. *)
+        yielding = May_yield;
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -3791,9 +3813,11 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~params ~params_arity ~removed_params:Ident.Set.empty
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
-          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc ~free_idents_of_body
-          ~closure_alloc_mode ~first_complex_local_param ~result_mode
-          Recursive.Non_recursive ]
+          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
+          ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+            (* The wrapper isn't in the source: it has no entry counter. *)
+          ~free_idents_of_body ~closure_alloc_mode ~first_complex_local_param
+          ~result_mode Recursive.Non_recursive ]
     in
     let body acc env =
       let arg = find_simple_from_id env wrapper_id in
@@ -3853,6 +3877,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
+    (* [apply.yielding] covers the whole over-application, so it holds for both
+       the full application and this remaining one. *)
+    let yielding = Apply.Yielding.from_lambda apply.yielding in
     let return_mode =
       Alloc_mode.For_applications.from_lambda apply.mode
         ~current_alloc_region:apply_alloc_region ~current_region:apply_region
@@ -3869,9 +3896,13 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~continuation apply_exn_continuation ~args:remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
-        apply_dbg ~inlined
+        apply_dbg
+        ~callsite_counter:None
+          (* The source call has a single counter, on [full_call] (see
+             [Simplify_common.split_direct_over_application]). *)
+        ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
-        ~probe ~position
+        ~probe ~position ~yielding
         ~relative_history:(Env.relative_history_from_scoped ~loc:apply.loc env)
     in
     match needs_region with
@@ -3975,7 +4006,7 @@ type call_args_split =
         result_mode : Lambda.return_mode
       }
 
-let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
+let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
   let callee = find_simple_from_id env apply.func in
   let approx = find_value_approximation_through_symbol acc env callee in
   let code_info =
@@ -3991,7 +4022,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           Code_metadata.result_mode metadata )
     | Unknown _ -> None
     | Value_symbol _ | Value_const _ | Block_approximation _ ->
-      if Flambda_features.check_invariants ()
+      if Flambda_features.kind_checks ()
       then
         Misc.fatal_errorf
           "Unexpected approximation for callee %a in [Closure_conversion], \
@@ -4127,6 +4158,12 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
         in
         wrap_over_application acc env full_args_call apply ~remaining
           ~remaining_arity ~result_mode)
+
+let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
+  match apply.kind with
+  | Function -> close_apply_function acc env apply
+  | Method _ ->
+    close_exact_or_unknown_apply acc env apply None ~replace_region:None
 
 module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map

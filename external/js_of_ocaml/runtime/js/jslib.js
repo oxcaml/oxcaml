@@ -306,6 +306,15 @@ function caml_list_of_js_array(a) {
   return l;
 }
 
+//Provides: caml_list_of_js_array_with_tail const (mutable, mutable)
+function caml_list_of_js_array_with_tail(a, l) {
+  for (var i = a.length - 1; i >= 0; i--) {
+    var e = a[i];
+    l = [0, e, l];
+  }
+  return l;
+}
+
 //Provides: caml_list_to_js_array const (mutable)
 function caml_list_to_js_array(l) {
   var a = [];

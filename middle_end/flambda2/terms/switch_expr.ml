@@ -14,16 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let scale_for_printing arms =
-  let likelihoods =
-    Target_ocaml_int.Map.fold
-      (fun _ arm likelihoods -> Switch_arm.likelihood arm :: likelihoods)
-      arms []
-  in
-  let uniform = Likelihood.is_uniform likelihoods in
-  let total_likelihood = Likelihood.sum_list likelihoods in
-  total_likelihood, ~uniform
-
 type t =
   { condition_dbg : Debuginfo.t;
     scrutinee : Simple.t;
@@ -32,29 +22,26 @@ type t =
 
 let fprintf = Format.fprintf
 
-let print_probability ~uniform ppf (probability : Likelihood.classification) =
-  match probability with
-  | Cold -> Format.fprintf ppf "[cold]"
-  | Weight p -> if not uniform then Format.fprintf ppf "[p = %f]" p
-
 let print_arms ppf arms =
-  let total, ~uniform = scale_for_printing arms in
+  let scale =
+    Branch_annotations.likelihood_printing_scale
+      (List.map
+         (fun (_, arm) -> Switch_arm.annotations arm)
+         (Target_ocaml_int.Map.bindings arms))
+  in
   let arms =
     Target_ocaml_int.Map.fold
       (fun discr arm arms_inverse ->
-        let probability =
-          Likelihood.rescale ~total (Switch_arm.likelihood arm)
-          |> Likelihood.classify
-        in
+        let annotations = Switch_arm.annotations arm in
         let action = Switch_arm.action arm in
         match Apply_cont_expr.Map.find action arms_inverse with
         | exception Not_found ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Map.singleton discr probability)
+            (Target_ocaml_int.Map.singleton discr annotations)
             arms_inverse
         | discrs ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Map.add discr probability discrs)
+            (Target_ocaml_int.Map.add discr annotations discrs)
             arms_inverse)
       arms Apply_cont_expr.Map.empty
   in
@@ -78,11 +65,11 @@ let print_arms ppf arms =
       fprintf ppf "@[<hov 2>@[<hov 0>| %a %t\u{21a6}%t@ @]%a@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ | ")
-           (fun ppf (discr, probability) ->
+           (fun ppf (discr, annotations) ->
              Format.fprintf ppf "%a%t%a%t" Target_ocaml_int.print discr
                Flambda_colours.continuation_annotation
-               (print_probability ~uniform)
-               probability Flambda_colours.pop))
+               (Branch_annotations.print scale)
+               annotations Flambda_colours.pop))
         discrs Flambda_colours.elide Flambda_colours.pop Apply_cont_expr.print
         action)
     arms

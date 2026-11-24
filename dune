@@ -139,6 +139,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  action_trace
   json
   arrayset
   config
@@ -186,6 +187,7 @@
   fdo_prehash
   fdo_counter_identity
   fdo_counter
+  fdo_annotation
   file_sections
   lru
   id_counter
@@ -597,6 +599,8 @@
   dsl_helpers
   binary_emitter_helpers
   emit
+  emit_sancov
+  emit_sancov_common
   emitaux
   fdo_info
   generic_fns
@@ -675,6 +679,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_trace_pc_guard
   cfg_z3
   cfg_prologue
   cfg_merge_blocks
@@ -719,6 +724,8 @@
   ;; backend/ssa/
   ssa
   ssa_print
+  ssa_loops
+  ssa_post_dominators
   ssa_reducer
   ssa_simplify
   ssa_tail_call
@@ -772,6 +779,7 @@
   flambda2_identifiers
   flambda2_cmx
   flambda2_datalog
+  flambda2_reaper
   jsoo_imports
   compiler_owee
   gc_timings
@@ -899,6 +907,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.a}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.a}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.a}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.a}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.a}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.a}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.a}
@@ -942,6 +951,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.cma}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cma}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.cma}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.cma}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.cma}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.cma}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.cma}
@@ -985,6 +995,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.cmxa}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cmxa}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.cmxa}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.cmxa}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.cmxa}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.cmxa}
@@ -1182,6 +1193,8 @@
    (middle_end/flambda2/compare/.flambda2_compare.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
   (glob_files
    (middle_end/flambda2/datalog/.flambda2_datalog.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/fdo/.flambda2_fdo.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
   (glob_files
    (middle_end/flambda2/from_lambda/.flambda2_from_lambda.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
   (glob_files

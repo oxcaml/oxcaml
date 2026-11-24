@@ -273,8 +273,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
       | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Poll | Pause | Alloc _
-        )
+      | End_region | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll
+      | Pause | Trace_pc_guard_gate | Trace_pc_guard _ | Alloc _ )
   | Op
       (Reinterpret_cast
          (Int_of_value | Value_of_int | Mask_of_int64 | Int64_of_mask))
@@ -310,7 +310,7 @@ let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
        the operands). *)
     May_still_have_spilled_registers
   | Always _ | Return | Raise _ | Switch _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Invalid _
+  | Call_no_return _ | External_call_no_return _ | Invalid _
   | Prim { op = External _; _ }
   | Call { op = Indirect _ | Direct _; _ } ->
     (* no rewrite *)

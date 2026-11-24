@@ -202,7 +202,7 @@ let rec eval_address = function
       end
 
 let eval_path find env path =
-  match find path env with
+  match find ~loc:Location.none path env with
   | addr -> eval_address addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))
@@ -435,7 +435,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg sort;
+      val_kind = Val_reg (Representable sort);
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -811,7 +811,7 @@ let set_paths () =
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
-  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
+  let expand_entry (e : Clflags.include_dir) : Clflags.include_dir =
     { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
   in
   let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
@@ -826,7 +826,7 @@ let set_paths () =
     ]
   in
   let hidden = List.concat [
-      List.map expand (List.rev !Clflags.hidden_include_dirs);
+      List.map expand_entry (List.rev !Clflags.hidden_include_dirs);
       hidden
     ]
   in

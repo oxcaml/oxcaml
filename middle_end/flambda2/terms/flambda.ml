@@ -115,14 +115,7 @@ and static_const_or_code =
 and static_const_group = static_const_or_code list
 
 let apply_renaming_num_occurrences num_occurrences renaming =
-  let num_occurrences', is_identity =
-    Variable.Map.fold
-      (fun var num (all_occurrences, is_identity) ->
-        let var' = Renaming.apply_variable renaming var in
-        Variable.Map.add var' num all_occurrences, is_identity && var == var')
-      num_occurrences (Variable.Map.empty, true)
-  in
-  if is_identity then num_occurrences else num_occurrences'
+  Renaming.apply_variable_map Renaming.not_renamed renaming num_occurrences
 
 let rec descr expr = expr
 
@@ -352,13 +345,10 @@ and ids_for_export_continuation_handlers t =
 
 and ids_for_export_continuation_handlers_t0
     { continuation_handlers; num_occurrences_of_invariant_params = _ } =
-  Continuation.Lmap.fold
-    (fun k handler ids ->
-      Ids_for_export.union ids
-        (Ids_for_export.add_continuation
-           (ids_for_export_continuation_handler handler)
-           k))
-    continuation_handlers Ids_for_export.empty
+  Ids_for_export.ids_for_export_map ~fold:Continuation.Lmap.fold
+    ~add_ids_key:Ids_for_export.add_continuation
+    ~ids_for_export_value:ids_for_export_continuation_handler
+    continuation_handlers
 
 and ids_for_export t =
   match descr t with

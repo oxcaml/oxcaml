@@ -747,12 +747,20 @@ and functor_components = {
 and address_unforced =
   | Projection of
     { parent : address_lazy;
-      module_repr: module_representation;
+      module_repr: module_repr_lazy;
       pos : int }
   | ModAlias of { env : t ref; path : Path.t; }
       (** Same lazy-env pattern as [components_maker.cm_env]. *)
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
+
+and module_repr_unforced = {
+  inner_full_env : t ref;
+  items : Subst.Lazy.signature_item list
+}
+
+and module_repr_lazy =
+  (module_repr_unforced, module_representation) Lazy_backtrack.t
 
 and value_data =
   { vda_description : Subst.Lazy.value_description;
@@ -904,6 +912,14 @@ type lookup_error =
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
       none_in_quotations_context * Longident.t * Location.t * stage * stage
+  | Module_projection_unrepresentable of
+      {
+        unrep_loc : Location.t;
+        unrep_id : Ident.t;
+        unrep_ty : type_expr;
+        unrep_env : t;
+        violation : Jkind.Violation.t
+      }
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -1089,6 +1105,16 @@ let scrape_alias =
   (* to be filled with Mtype.scrape_alias *)
   ref ((fun _env _mty -> assert false) :
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
+
+let type_sort =
+  (* to be filled with Ctype.type_sort *)
+  ref
+    (fun ~why:_ ~allow_mutation:_ _env _ty -> assert false
+      : why:Jkind_intf.History.concrete_creation_reason ->
+        allow_mutation:bool ->
+        t ->
+        type_expr ->
+        (Jkind_types.Sort.t, Jkind.Violation.t) result)
 
 let md md_type =
   {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
@@ -1727,6 +1753,38 @@ let find_jkind p env =
     (NameMap.find s sc.comp_jkinds).jkda_declaration
   | Papply _ | Pextra_ty _ -> raise Not_found
 
+type unrepresentable_item =
+  { item : Ident.t;
+    item_desc : Subst.Lazy.value_description;
+    item_type : type_expr;
+    violation : Jkind.Violation.t }
+
+let sort_of_signature_item ~why env item
+  : (Jkind_types.Sort.t option, unrepresentable_item) result =
+  match Subst.Lazy.sort_of_signature_item item with
+  | Subst.Lazy.Fixed sort -> Ok (Some sort)
+  | Subst.Lazy.Absent_at_runtime -> Ok None
+  | Subst.Lazy.Unknown (item, item_desc) ->
+    let item_type = Subst.Lazy.force_type_expr item_desc.val_type in
+    match !type_sort ~why ~allow_mutation:false env item_type with
+    | Ok sort -> Ok (Some sort)
+    | Error violation -> Error { item; item_desc; item_type; violation }
+
+let sorts_of_signature_items ~why env items
+  : (module_representation, unrepresentable_item) result =
+  let rec loop sorts = function
+    | [] -> Ok (Array.of_list (List.rev sorts))
+    | item :: items ->
+      match sort_of_signature_item ~why env item with
+      | Ok None -> loop sorts items
+      | Ok (Some sort) -> loop (sort :: sorts) items
+      | Error unrep -> Result.Error unrep
+  in
+  loop [] items
+
+exception Unrepresentable_type of
+    Location.t * Ident.t * type_expr * t * Jkind.Violation.t
+
 let rec find_module_address path env =
   match path with
   | Pident id -> find_ident_module_address id env
@@ -1738,9 +1796,22 @@ let rec find_module_address path env =
 and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
+and force_module_repr { inner_full_env; items } =
+  match
+    sorts_of_signature_items ~why:Module_projection !inner_full_env items
+  with
+  | Ok repr -> repr
+  | Error { item; item_desc; item_type; violation } ->
+    raise
+      (Unrepresentable_type
+         (item_desc.val_loc, item, item_type, !inner_full_env, violation))
+
+and get_module_repr mr =
+  Lazy_backtrack.force force_module_repr mr
+
 and force_address = function
   | Projection { parent; module_repr; pos } ->
-    Adot(get_address parent, module_repr, pos)
+    Adot(get_address parent, get_module_repr module_repr, pos)
   | ModAlias { env; path } -> find_module_address path !env
 
 and get_address a =
@@ -1771,6 +1842,20 @@ let find_constructor_address path env =
       let c = find_structure_components p env in
       get_constrs_address (NameMap.find s c.comp_constrs)
   | Papply _ | Pextra_ty _ -> raise Not_found
+
+let error_if_unrepresentable find ~loc path env =
+  match find path env with
+  | address -> address
+  | exception Unrepresentable_type (unrep_loc, id, ty, unrep_env, violation) ->
+    lookup_error loc env
+      (Module_projection_unrepresentable
+         {
+           unrep_loc;
+           unrep_id = id;
+           unrep_ty = ty;
+           unrep_env;
+           violation
+         })
 
 let find_hash_type path env =
   match path with
@@ -1909,35 +1994,6 @@ let add_required_ident id env =
 let add_required_global path env =
   add_required_ident (Path.head path) env
 
-let add_required_global_for_quote path env =
-  begin match Ident.to_global (Path.head path) with
-  | None -> ()
-  | Some global ->
-    let name = Compilation_unit.Name.of_head_of_global_name global in
-    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
-    then begin
-      (* The current compilation unit appears in quotes.
-         [find_module_address] would [raise Not_found] in this case. *)
-      match Current_unit.get_cu () with
-      | Some cu ->
-        Persistent_env.require_impl_for_quote !persistent_env cu
-      | None ->
-        Misc.fatal_error
-          "the current compilation unit was required for a quote \
-          but is unavailable"
-      end
-    else begin
-      (* Any other compilation unit *)
-      let address = find_module_address path env in
-      match address_head address with
-      | AHlocal _ -> ()
-      | AHunit cu ->
-        add_required_unit cu;
-        Persistent_env.require_impl_for_quote !persistent_env cu
-      end;
-    Persistent_env.require_intf_for_quote !persistent_env name
-  end
-
 let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
 
 let loaded_transitive_dependencies intfs =
@@ -1984,6 +2040,40 @@ let normalize_module_path oloc env path =
   | Some loc ->
       Error.log_and_raise
         (Missing_module(loc, path, normalize_module_path true env path))
+
+let find_module_address_head loc path env =
+  let path = normalize_module_path (Some loc) env path in
+  let root = Path.Pident (Path.head path) in
+  let address = error_if_unrepresentable find_module_address ~loc root env in
+  address_head address
+
+let add_required_global_for_quote loc path env =
+  begin match Ident.to_global (Path.head path) with
+  | None -> ()
+  | Some global ->
+    let name = Compilation_unit.Name.of_head_of_global_name global in
+    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
+    then begin
+      (* The current compilation unit appears in quotes.
+         [find_module_address] would [raise Not_found] in this case. *)
+      match Current_unit.get_cu () with
+      | Some cu ->
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      | None ->
+        Misc.fatal_error
+          "the current compilation unit was required for a quote \
+          but is unavailable"
+      end
+    else begin
+      (* Any other compilation unit *)
+      match find_module_address_head loc path env with
+      | AHlocal _ -> ()
+      | AHunit cu ->
+        add_required_unit cu;
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      end;
+    Persistent_env.require_intf_for_quote !persistent_env name
+  end
 
 let rec normalize_path_prefix oloc env path =
   match path with
@@ -2328,7 +2418,23 @@ let prefix_idents root prefixing_sub sg =
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
-  prefix_idents root [] prefixing_sub sg
+  let items_and_paths, prefixing_sub =
+    prefix_idents root [] prefixing_sub sg
+  in
+  (* We could compute [values] eagerly as part of computing [prefix_idents],
+     which already does a recursive traversal of the signature. We make the
+     computation lazy for efficiency reasons. If values are never looked up,
+     then keeping the signature [sg] alive (captured by the lazy) tends to be
+     better than allocating a list of [Pdot] entries eagerly. See #7854. *)
+  let values =
+    lazy
+      (List.filter_map
+         (function
+           | Sig_value (id, _, _) -> Some (id, Pdot (root, Ident.name id))
+           | _ -> None)
+         sg)
+  in
+  items_and_paths, Subst.add_lazy_values values prefixing_sub
 
 (* Compute structure descriptions *)
 
@@ -2390,10 +2496,8 @@ let rec components_of_module_maker
       let inner_full_env = ref cm_env in
       let pos = ref 0 in
       let module_repr =
-        List.filter_map
-          (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
-          items_and_paths
-        |> Array.of_list
+        Lazy_backtrack.create {inner_full_env ;
+                               items = List.map fst items_and_paths}
       in
       let next_address () =
         let addr : address_unforced =
@@ -2575,12 +2679,13 @@ let rec components_of_module_maker
             let decl' = Subst.jkind_declaration sub decl in
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
-            c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+            c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds;
+            env := store_jkind ~check:false id decl shape !env
       )
         items_and_paths;
       inner_full_env := !env;
       Ok (Structure_comps c)
-  | Mty_functor(arg, ty_res, _) ->
+  | Mty_functor(arg, ty_res, _, _) ->
       let sub = cm_prefixing_subst in
       let scoping = Subst.Rescope (Path.scope cm_path) in
       let open Subst.Lazy in
@@ -2910,7 +3015,7 @@ and store_cltype id desc shape env =
     cltypes = IdTbl.add id cltda env.cltypes;
     summary = Env_cltype(env.summary, id, desc) }
 
-let store_jkind ~check id decl shape env =
+and store_jkind ~check id decl shape env =
   let loc = decl.jkind_loc in
   if check then
     check_usage loc id decl.jkind_uid
@@ -3399,7 +3504,8 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   let pers_sig =
     Persistent_env.Persistent_signature.{
       filename; cmi;
-      visibility = Visible { cmx_guaranteed = false }
+      include_flags =
+        { visibility = Visible; cmx_guaranteed = false }
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
@@ -4320,7 +4426,9 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
       | cstrs ->
           List.map
             (fun cda ->
-               let use_fun () = use_constructor ~use ~loc usage env cda in
+               let use_fun () =
+                 use_constructor ~use ~loc usage env cda;
+               in
                ((cda.cda_description, locks), use_fun))
             cstrs
 
@@ -4452,9 +4560,9 @@ let open_pers_signature name env =
   in
   path, env
 
-let open_pers_signature_cmi filename env =
+let open_pers_signature_cmi ~cmx_guaranteed filename env =
   let global_name, _sign =
-    Persistent_env.read_cmi_file !persistent_env filename
+    Persistent_env.read_cmi_file !persistent_env ~cmx_guaranteed filename
   in
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
@@ -4823,6 +4931,12 @@ let lookup_modtype ?(use=true) ~loc lid env =
 
 let lookup_modtype_path ?(use=true) ~loc lid env =
   fst (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
+
+let find_value_address = error_if_unrepresentable find_value_address
+let find_module_address = error_if_unrepresentable find_module_address
+let find_class_address = error_if_unrepresentable find_class_address
+let find_constructor_address =
+  error_if_unrepresentable find_constructor_address
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in
@@ -5367,6 +5481,9 @@ let report_lookup_error_doc loc env = function
                 "To project an unboxed record field, use %a instead of %a."
                 (Style.as_inline_code print_projection) (".#", lid)
                 (Style.as_inline_code print_projection) (".", lid) ]
+          | Legacy, Mutation ->
+            [ Location.msg
+                "Only mutable fields of boxed records can be mutated." ]
           | _ -> [])
        | None -> []
      in
@@ -5602,6 +5719,18 @@ let report_lookup_error_doc loc env = function
         print_unbound_in_quotation context
         quoted_longident lid
         print_stage avail_stage
+  | Module_projection_unrepresentable
+      { unrep_loc; unrep_id; unrep_ty; unrep_env; violation } ->
+    let sub = [
+      Location.msg ~loc:unrep_loc "%a is not representable.@ %a"
+        Style.inline_code (Ident.name unrep_id)
+        (fun ppf v -> !report_jkind_violation_with_offender
+            ~offender:(fun ppf -> !print_type_expr ppf unrep_ty)
+            unrep_env ppf v) violation
+    ] in
+    Location.errorf ~loc ~sub
+      "This path projects from a module that contains unrepresentable \
+       items."
 
 let report_error_doc = function
   | Missing_module(loc, path1, path2) ->

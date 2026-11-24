@@ -485,6 +485,12 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       in
       let is_tupled = Code.is_tupled code in
       let stub = Code.stub code in
+      let fdo_entry_annotation =
+        let annotation = Code.fdo_entry_annotation code in
+        if Flambda_features.fexpr_print_fdo_counters ()
+        then Some annotation
+        else None
+      in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
@@ -567,7 +573,8 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
           code_size;
           is_tupled;
           stub;
-          result_mode
+          result_mode;
+          fdo_entry_annotation
         }
     | Code code_id, Deleted_code ->
       Deleted_code (code_id |> Env.find_code_id_exn env)
@@ -770,6 +777,11 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       | Never_inlined -> Some Never_inlined
   in
   let inlining_state = inlining_state (Apply_expr.inlining_state app) in
+  let callsite_counter =
+    if Flambda_features.fexpr_print_fdo_counters ()
+    then Apply_expr.callsite_counter app
+    else None
+  in
   Apply
     { func;
       continuation;
@@ -779,7 +791,8 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       alloc_mode;
       inlined;
       inlining_state;
-      arities
+      arities;
+      callsite_counter
     }
 
 and apply_cont_expr env app_cont : Fexpr.expr =
@@ -816,8 +829,13 @@ and switch_expr env switch : Fexpr.expr =
           |> Target_ocaml_int.to_targetint machine_width
           |> Targetint_32_64.to_int
         in
-        let app_cont = apply_cont env app_cont in
-        tag, Fexpr.Named_cont app_cont)
+        let action = Fexpr.Named_cont (apply_cont env app_cont) in
+        let annotations =
+          if Flambda_features.fexpr_print_branch_annotations ()
+          then Switch_arm.annotations arm
+          else Branch_annotations.default
+        in
+        ({ tag; action; annotations } : Fexpr.switch_case))
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }

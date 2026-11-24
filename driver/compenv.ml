@@ -56,8 +56,22 @@ let warn_once =
       prerr_endline ("Warning: " ^ message)
     end
 
-let warn_jsir_ignore what =
-  warn_once ("ignoring " ^ what ^ " when targeting js_of_ocaml")
+let warn_jsir_ignore target what =
+  warn_once ("ignoring " ^ what ^ " when targeting "
+             ^ Jsir_target.program_name target)
+
+(* The files given on the command line that are recorded like C stubs and
+   passed to [js_of_ocaml build-runtime] or [wasm_of_ocaml build-runtime] (to
+   [compile] with [-link-jsir]). *)
+let is_jsir_stub name =
+  match jsir_target () with
+  | None -> false
+  | Some Js -> Filename.check_suffix name ".js"
+  | Some Wasm ->
+    Filename.check_suffix name ".js"
+    || Filename.check_suffix name ".wat"
+    || Filename.check_suffix name ".wast"
+    || Filename.check_suffix name ".wasm"
 
 let default_output = function
   | Some s -> s
@@ -313,6 +327,11 @@ let read_one_param ppf position name v =
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v
   | "afl-inst-ratio" ->
       int_setter ppf "afl-inst-ratio" afl_inst_ratio v
+  | "gated-trace-pc-guard" ->
+      set "gated-trace-pc-guard" [ Clflags.gated_trace_pc_guard ] v
+  | "gated-trace-pc-guard-define-gate" ->
+      set "gated-trace-pc-guard-define-gate"
+        [ Clflags.gated_trace_pc_guard_define_gate ] v
   | "annot" -> set "annot" [ Clflags.annotations ] v
   | "absname" -> set "absname" [ Clflags.absname ] v
   | "compat-32" -> set "compat-32" [ bytecode_compatible_32 ] v
@@ -359,10 +378,13 @@ let read_one_param ppf position name v =
       let names = String.split_on_char ',' v in
       open_args :=
         List.rev_append (List.map (fun n -> Open n) names) !open_args
-  | "open-cmi" ->
+  | "open-cmi" | "open-cmi-x" ->
+      let cmx_guaranteed = String.equal name "open-cmi-x" in
       let names = String.split_on_char ',' v in
       open_args :=
-        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
+        List.rev_append
+          (List.map (fun path -> Open_cmi { path; cmx_guaranteed }) names)
+          !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
@@ -508,7 +530,7 @@ let read_one_param ppf position name v =
 
   | "I" | "Ix" ->
     let cmx_guaranteed = String.equal name "Ix" in
-    let entry : Clflags.visible_include = { path = v; cmx_guaranteed } in
+    let entry : Clflags.include_dir = { path = v; cmx_guaranteed } in
     begin match position with
     | Before_args -> first_include_dirs := entry :: !first_include_dirs
     | Before_link | Before_compile _ ->
@@ -617,6 +639,10 @@ let read_one_param ppf position name v =
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "enable-action-trace" ->
+      set "enable-action-trace" [ Clflags.enable_action_trace ] v
+  | "debug-action-trace" ->
+      set "debug-action-trace" [ Clflags.debug_action_trace ] v
   | "profile-output" ->
     (check_relative_path ~on_error:(print_error ppf) "profile-output" v)
     |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
@@ -766,15 +792,20 @@ let readenv ppf position =
   (match position with
    | Before_args -> ()
    | Before_compile _ | Before_link ->
-     if Clflags.target_is_jsir () && !all_ccopts <> [] then begin
-       warn_jsir_ignore "-ccopt";
-       all_ccopts := []
-     end;
+     (match Clflags.jsir_target () with
+      | Some target when !all_ccopts <> [] ->
+        warn_jsir_ignore target "-ccopt";
+        all_ccopts := []
+      | Some _ | None -> ());
+     if not (Clflags.target_is_jsir ()) && !Clflags.link_jsir then
+       warn_once "ignoring -link-jsir, which is only used when \
+                  targeting js_of_ocaml or wasm_of_ocaml";
      if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then
              warn_once ("ignoring " ^ Clflags.Jsoo_phase.flag phase
-                        ^ ", which is only used when targeting js_of_ocaml"))
+                        ^ ", which is only used when targeting js_of_ocaml \
+                           or wasm_of_ocaml"))
          Clflags.Jsoo_phase.all);
   all_ppx := !last_ppx @ !first_ppx
 
@@ -821,9 +852,9 @@ let process_action
       if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
-      if Clflags.target_is_jsir () then
-        warn_jsir_ignore ("C source file " ^ name)
-      else begin
+      begin match Clflags.jsir_target () with
+      | Some target -> warn_jsir_ignore target ("C source file " ^ name)
+      | None ->
         Location.input_name := name;
         let obj_name = match !output_name with
           | None -> c_object_of_filename name
@@ -834,10 +865,13 @@ let process_action
         ccobjs := obj_name :: !ccobjs
       end
   | ProcessObjects names ->
-      if Clflags.target_is_jsir () then
-        List.iter (fun name -> warn_jsir_ignore ("-cclib " ^ name)) names
-      else
+      begin match Clflags.jsir_target () with
+      | Some target ->
+        List.iter (fun name -> warn_jsir_ignore target ("-cclib " ^ name))
+          names
+      | None ->
         ccobjs := names @ !ccobjs
+      end
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
@@ -852,19 +886,17 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if Clflags.target_is_jsir () && Filename.check_suffix name ".js"
-      then begin
+      else if is_jsir_stub name then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
-        if Clflags.target_is_jsir () then
-          warn_jsir_ignore ("object file " ^ name)
-        else begin
+        match Clflags.jsir_target () with
+        | Some target -> warn_jsir_ignore target ("object file " ^ name)
+        | None ->
           has_linker_inputs := true;
           ccobjs := name :: !ccobjs
-        end
       end
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then

@@ -184,6 +184,15 @@ end
 
 include T
 
+type law_declaration =
+  { plaw_name : string loc
+  ; plaw_params : (string loc * core_type option) list
+  ; plaw_assumptions : expression list
+  ; plaw_conclusion : expression
+  ; plaw_attributes : attributes
+  ; plaw_loc : Location.t
+  }
+
 module Type_declaration = struct
   type t =
     { ptype_name : string loc
@@ -513,6 +522,7 @@ module Pattern_desc = struct
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -569,6 +579,10 @@ module Pattern_desc = struct
         ~loc
         "Immutable [Ppat_array] cannot be converted to an usptream [pattern_desc]"
     (* new constructors *)
+    | Ppat_addr _ ->
+      Location.raise_errorf
+        ~loc
+        "[Ppat_addr] cannot be converted to an upstream [pattern_desc]"
     | Ppat_unboxed_unit -> Ppat_construct ({ loc; txt = Lident "()" }, None)
     | Ppat_unboxed_bool b ->
       Ppat_construct ({ loc; txt = Lident (if b then "true" else "false") }, None)
@@ -906,6 +920,7 @@ module Signature_item_desc = struct
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
     | Psig_jkind of jkind_declaration
+    | Psig_law of law_declaration
 
   let of_parsetree (sig_desc : signature_item_desc) =
     match sig_desc with
@@ -945,7 +960,7 @@ module Signature_item_desc = struct
     | Psig_class_type a -> Psig_class_type a
     | Psig_attribute a -> Psig_attribute a
     | Psig_extension (a, b) -> Psig_extension (a, b)
-    | Psig_jkind _ ->
+    | Psig_jkind _ | Psig_law _ ->
       (* erase to [include sig end] *)
       Psig_include
         { pincl_loc = Location.none
@@ -989,6 +1004,7 @@ module Structure_item_desc = struct
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
     | Pstr_jkind of jkind_declaration
+    | Pstr_law of law_declaration
 
   let of_parsetree : structure_item_desc -> t = function
     | Pstr_eval (a, b) -> Pstr_eval (a, b)
@@ -1024,7 +1040,7 @@ module Structure_item_desc = struct
     | Pstr_include a -> Pstr_include a
     | Pstr_attribute a -> Pstr_attribute a
     | Pstr_extension (a, b) -> Pstr_extension (a, b)
-    | Pstr_jkind _ ->
+    | Pstr_jkind _ | Pstr_law _ ->
       (* erase to [include struct end] *)
       Pstr_include
         { pincl_loc = Location.none

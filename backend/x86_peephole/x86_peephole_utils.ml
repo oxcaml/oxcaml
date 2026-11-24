@@ -29,13 +29,71 @@ let is_hard_barrier = function
     | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ ->
       true
     | Align _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
-    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
-    | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
-    | Indirect_symbol _ | Loc _ | New_line | Private_extern _ | Size _
-    | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _ | Weak _
-    | External _ | Reloc _ | Delta_uleb128 _ ->
+    | Cfi_rel_offset _ | Cfi_remember_state | Cfi_restore_state
+    | Cfi_def_cfa_register _ | Comment _ | Const _ | Direct_assignment _
+    | File _ | Global _ | Indirect_symbol _ | Loc _ | New_line
+    | Private_extern _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
+    | Protected _ | Hidden _ | Weak _ | External _ | Reloc _ | Delta_uleb128 _
+      ->
       false)
   | Ins instr -> is_control_flow instr
+
+(* Directives that only carry debugging information: source locations,
+   comments, and labels that only delimit DWARF ranges. Rules see the
+   instructions on either side of them as adjacent, so that the generated code
+   does not depend on whether debugging information is emitted. *)
+(* CR-someday mshinwell: this could be extended to CFI directives, whose
+   presence also depends on the configuration, but there are tricky details:
+
+   - [Cfi_startproc] and [Cfi_endproc] delimit functions and must remain
+   barriers.
+
+   - a CFI directive describes the state at its position, so a rule that merges
+   or deletes instructions across one must make sure that it still describes
+   the right position.
+
+   - [combine_add_rsp] matches on [Cfi_adjust_cfa_offset] and rewrites it.
+
+   - after [Cfi_def_cfa_register] unwinding relies on the run-time value of a
+   register, and after [Cfi_offset] on the contents of a stack slot. The rules
+   would have to track which register holds the CFA and which slots hold saved
+   registers, and treat these as read: [reg64_is_never_read] knows nothing of
+   them, so [remove_mov_to_dead_register] could forward or remove the move that
+   sets up the CFA register, leaving correct code with wrong unwinding
+   information.
+
+   - [Cfi_remember_state] and [Cfi_restore_state] save and restore all of the
+   above. *)
+(* CR mshinwell: looking through DWARF-only labels keeps the generated code
+   independent of the debugging information, but those labels delimit the
+   ranges over which variables are described as being in a register, which
+   were computed before this pass. A rule that removes or forwards the
+   definition of a register across such a label (for example
+   [remove_mov_to_dead_register]) can leave a variable described as being in a
+   register that no longer holds it, until that register is next written.
+
+   This is one case of a more general problem: the ranges are computed on
+   Linear, before the code is final. They should probably be computed on the
+   x86 and arm64 DSLs instead. Operations such as allocation could then be
+   expanded in those representations before the ranges are computed, rather
+   than being opaque to the DWARF analyses, which in some cases makes them
+   invalidate register information prematurely. *)
+let is_debug_directive = function
+  | Directive d -> (
+    match d with
+    | New_label (Label label, _) ->
+      Asm_targets.Asm_label.is_dwarf_only_label label
+    | Loc _ | File _ | Comment _ | New_line -> true
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ | Align _
+    | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
+    | Cfi_rel_offset _ | Cfi_remember_state | Cfi_restore_state
+    | Cfi_def_cfa_register _ | Const _ | Direct_assignment _ | Global _
+    | Indirect_symbol _ | Private_extern _ | Size _ | Sleb128 _ | Space _
+    | Type _ | Uleb128 _ | Protected _ | Hidden _ | Weak _ | External _
+    | Reloc _ | Delta_uleb128 _ ->
+      false)
+  | Ins _ -> false
 
 let get_cells cell n =
   let rec loop acc remaining current_opt =
@@ -44,9 +102,12 @@ let get_cells cell n =
     else
       match current_opt with
       | None -> List.rev acc
-      | Some current -> loop (current :: acc) (remaining - 1) (DLL.next current)
+      | Some current ->
+        if is_debug_directive (DLL.value current)
+        then loop acc remaining (DLL.next current)
+        else loop (current :: acc) (remaining - 1) (DLL.next current)
   in
-  loop [] n (Some cell)
+  if n <= 0 then [] else loop [cell] (n - 1) (DLL.next cell)
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true

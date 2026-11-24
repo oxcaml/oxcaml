@@ -20,6 +20,8 @@ let max_array_axis_size = 10
 
 let max_array_elements = 256
 
+let max_string_length = 64
+
 let max_record_types = 3
 
 let max_record_fields = 4
@@ -42,44 +44,77 @@ let max_unboxed_tuple_arity = 4
 
 let max_unboxed_tuple_depth = 2
 
-(* Probabilities in percent, conditional on reaching each choice. *)
-let record_probability = 25
+let max_closure_param_count = 3
 
-let variant_probability = 25
+let max_closure_call_count = 8
 
-let or_null_probability = 25
+let max_let_rec_count = 4
 
-let unboxed_tuple_probability = 25
+let max_recursive_functions = 3
 
-let match_in_match_probability = 50
+let max_recursive_param_count = 2
 
-let nested_record_probability = 15
+let max_recursive_calls = 2
 
-let mutable_binding_probability = 75
+let max_recursion_fuel = 3
 
-let mutable_field_probability = 50
+(* Off by default to avoid generating tests that tend to trigger a known
+   compiler bug (https://github.com/oxcaml/oxcaml/issues/8139) *)
+let unused_recursive_functions = false
 
-let array_probability = 25
+let max_probability = 10_000
 
-let array_literal_probability = 50
+(* Probabilities out of [max_probability], conditional on reaching each
+   choice. *)
+let record_probability = 2_500
 
-let bounded_index_probability = 75
+let variant_probability = 2_500
 
-let opaque_initializer_probability = 50
+let or_null_probability = 2_500
 
-let opaque_leaf_probability = 5
+let unboxed_tuple_probability = 2_500
 
-let opaque_loop_bound_probability = 50
+let match_in_match_probability = 5_000
 
-let exception_payload_probability = 50
+let assert_false_probability = 1
 
-let payload_binding_probability = 75
+let nested_record_probability = 1_500
 
-let catch_all_probability = 25
+let mutable_binding_probability = 7_500
 
-let raise_notrace_probability = 50
+let mutable_field_probability = 5_000
 
-let callee_raises_probability = 50
+let array_probability = 2_500
+
+let bool_probability = 2_000
+
+let string_probability = 2_000
+
+let array_literal_probability = 5_000
+
+let bounded_index_probability = 7_500
+
+let opaque_initializer_probability = 5_000
+
+let opaque_leaf_probability = 500
+
+let opaque_loop_bound_probability = 5_000
+
+let exception_payload_probability = 5_000
+
+let payload_binding_probability = 7_500
+
+let catch_all_probability = 2_500
+
+let raise_notrace_probability = 5_000
+
+let callee_raises_probability = 5_000
+
+let closure_probability = 1_500
+
+let curried_lambda_probability = 2_500
+
+let opaque_recursive_call_probability = 2_500
 
 type assertion_mode =
   | Disabled
@@ -113,7 +148,10 @@ module Swarm = struct
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool
     }
 
   let create random_state =
@@ -127,9 +165,11 @@ module Swarm = struct
       variants = Random.State.bool random_state;
       or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
-      (* Reachable assertion generation is not enabled yet. *)
       assertions =
-        (if Random.State.bool random_state then Unreachable_only else Disabled);
+        (match Random.State.int random_state 3 with
+        | 0 -> Disabled
+        | 1 -> Unreachable_only
+        | _ -> May_raise);
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -144,7 +184,10 @@ module Swarm = struct
       opaque_initializers = Random.State.bool random_state;
       opaque_leaves = Random.State.bool random_state;
       opaque_loop_bounds = Random.State.bool random_state;
-      exceptions = Random.State.bool random_state
+      exceptions = Random.State.bool random_state;
+      closures = Random.State.bool random_state;
+      partial_applications = Random.State.bool random_state;
+      recursive_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -172,7 +215,10 @@ module Swarm = struct
       "opaque_initializers", t.opaque_initializers;
       "opaque_leaves", t.opaque_leaves;
       "opaque_loop_bounds", t.opaque_loop_bounds;
-      "exceptions", t.exceptions ]
+      "exceptions", t.exceptions;
+      "closures", t.closures;
+      "partial_applications", t.partial_applications;
+      "recursive_functions", t.recursive_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"

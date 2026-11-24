@@ -85,12 +85,15 @@
   target_system
   identifiable
   numbers
+  targetint
   arg_helper
   zero_alloc_annotations
   clflags
   debug
   language_extension_kernel
   language_extension
+  json
+  action_trace
   profile
   consistbl
   terminfo
@@ -247,6 +250,8 @@
 
 (copy_files ../../utils/numbers.ml)
 
+(copy_files ../../utils/targetint.ml)
+
 (copy_files ../../utils/arg_helper.ml)
 
 (copy_files ../../utils/zero_alloc_annotations.ml)
@@ -256,6 +261,10 @@
 (copy_files ../../utils/debug.ml)
 
 (copy_files ../../utils/language_extension_kernel.ml)
+
+(copy_files ../../utils/json.ml)
+
+(copy_files ../../utils/action_trace.ml)
 
 (copy_files ../../utils/profile.ml)
 
@@ -456,6 +465,8 @@
 
 (copy_files ../../utils/numbers.mli)
 
+(copy_files ../../utils/targetint.mli)
+
 (copy_files ../../utils/arg_helper.mli)
 
 (copy_files ../../utils/zero_alloc_annotations.mli)
@@ -465,6 +476,10 @@
 (copy_files ../../utils/debug.mli)
 
 (copy_files ../../utils/language_extension_kernel.mli)
+
+(copy_files ../../utils/json.mli)
+
+(copy_files ../../utils/action_trace.mli)
 
 (copy_files ../../utils/profile.mli)
 
@@ -744,8 +759,11 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Arg_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Identifiable.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Numbers.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Targetint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Clflags.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Warnings.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Json.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Action_trace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile.cmo
   ; .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile_counters_functions.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debug.cmo
@@ -887,8 +905,11 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Arg_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Identifiable.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Numbers.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Targetint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Clflags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Warnings.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Json.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Action_trace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile.cmx
   ; .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile_counters_functions.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debug.cmx

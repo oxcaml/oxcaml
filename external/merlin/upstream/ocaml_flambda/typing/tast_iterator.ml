@@ -317,7 +317,7 @@ let pat
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
-  | Tpat_lazy p -> sub.pat sub p
+  | Tpat_addr (_, _, p) | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
   | Tpat_or (p1, p2, _) ->

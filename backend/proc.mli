@@ -69,6 +69,15 @@ val destroyed_at_basic : Cfg_intf.S.basic -> Reg.t array
 
 val destroyed_at_terminator : Cfg_intf.S.terminator -> Reg.t array
 
+(** Whether a C function may clobber, in whole or in part, the hardware register
+    that the given register is in, according to the C calling convention. This
+    is unlike the registers destroyed at an external call, which also include
+    those used by the code sequence for such calls. The answer may be [true] for
+    a register that C functions preserve under some calling conventions of the
+    target. It is [false] for a register whose location is not a hardware
+    register. *)
+val may_be_destroyed_by_c_function : Reg.t -> bool
+
 val is_destruction_point :
   more_destruction_points:bool -> Cfg_intf.S.terminator -> bool
 

@@ -285,10 +285,10 @@ let variant_declarations variants =
 let rec print_value path ty expr =
   match ty with
   | Ty.Number nty -> print_number nty expr
-  | Ty.Array (nty, dimensions) ->
+  | Ty.Array (element_ty, dimensions) ->
     let rec print_elements depth dimensions array =
       match dimensions with
-      | [] -> print_number nty array
+      | [] -> print_value path element_ty array
       | _ :: rest ->
         let index = path ^ "_index_" ^ string_of_int depth in
         Ast_helper.Exp.for_
@@ -340,6 +340,11 @@ let rec print_value path ty expr =
     apply
       (qualified_ident "Printf" "printf")
       [Ast_helper.Exp.constant (Ast_helper.Const.string "%b "); expr]
+  | Ty.String ->
+    apply
+      (qualified_ident "Printf" "printf")
+      [Ast_helper.Exp.constant (Ast_helper.Const.string "%S "); expr]
+  | Ty.Arrow _ -> unit_
 
 and print_sum path sum expr =
   let cases =
@@ -507,7 +512,7 @@ let to_code
   let structure =
     opens
     @ record_declarations record_types
-    @ List.map Exn.to_code exceptions
+    @ List.filter_map Exn.to_code exceptions
     @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions

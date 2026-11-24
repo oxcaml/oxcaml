@@ -887,7 +887,7 @@ let is_immediate_float bits =
   && Int64.equal (Int64.logand mant 0xF_0000_0000_0000L) mant
 
 let is_immediate_float32 bits =
-  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0x7F) - 63 in
+  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0xFF) - 127 in
   let mant = Int32.logand bits 0x7F_FFFFl in
   exp >= -3 && exp <= 4 && Int32.equal (Int32.logand mant 0x78_0000l) mant
 
@@ -1494,6 +1494,13 @@ let emit_condbranch arg tst lbl =
   | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
   | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
+(* The guards of the coverage probes of the unit *)
+
+(* CR mshinwell: remove this global state. [begin_assembly] should return the
+   state of the emission of the unit, for [fundecl] and [end_assembly] to take
+   as an argument, which requires passing it through [Asmgen]. *)
+let sancov = ref (Emit_sancov.create ())
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr env i =
@@ -1977,6 +1984,8 @@ let emit_instr env i =
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
+  | Lop Thread_self_id ->
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_thread_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -2093,6 +2102,9 @@ let emit_instr env i =
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:i.res.(0)
+  | Lop (Trace_pc_guard index) ->
+    Emit_sancov.emit_call !sancov ~live:i.live ~move:(move env) ~index
 
 let emit_instr env i =
   try emit_instr env i
@@ -2253,6 +2265,7 @@ let rec emit_all env i =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.start_function !sancov;
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2332,9 +2345,11 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
+  sancov := Emit_sancov.create ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   (* Set up binary emitter if JIT hook is registered or save_binary_sections is
      set *)
   let binary_emitter_callback = Binary_emitter_helpers.begin_emission () in
@@ -2377,6 +2392,7 @@ let register_expect_asm_callback (_ : string -> unit) = ()
 let expect_asm_whole_function = ref false
 
 let end_assembly () =
+  Emit_sancov.emit_data !sancov;
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
   emit_named_text_section code_end;

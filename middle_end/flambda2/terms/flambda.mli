@@ -131,6 +131,8 @@ module Invalid : sig
     | Application_never_returns of Apply_expr.t
     | Over_application_never_returns of Apply_expr.t
     | Message of string
+
+  val to_string : t -> string
 end
 
 module Expr : sig

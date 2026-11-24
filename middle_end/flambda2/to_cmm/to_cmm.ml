@@ -38,7 +38,7 @@ let flush_cmm_helpers_state res =
   let aux name cst (res, acc) =
     match (cst : Cmmgen_state.constant) with
     | Const_table (global, l) ->
-      let res, sym = R.raw_symbol res ~global name in
+      let res, sym = R.raw_symbol res ~ty:Cmm.typ_int ~global name in
       res, C.cdata (C.define_symbol sym @ l) :: acc
   in
   (* reset the structured constants, just in case *)
@@ -124,7 +124,9 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     else body
   in
   let entry_name = Cmm_helpers.entry_symbol_name () in
-  let res, entry_sym = R.raw_symbol res ~global:Global entry_name in
+  let res, entry_sym =
+    R.raw_symbol res ~ty:Cmm.typ_int ~global:Global entry_name
+  in
   let entry =
     let fun_codegen =
       let fun_codegen = [Cmm.Reduce_code_size; Cmm.Use_linscan_regalloc] in

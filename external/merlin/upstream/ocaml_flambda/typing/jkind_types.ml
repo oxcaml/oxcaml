@@ -68,7 +68,9 @@ module Sort = struct
       id : int
     }
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible
@@ -356,6 +358,8 @@ module Sort = struct
     let for_effect = scannable
 
     let for_continuation = scannable
+
+    let for_primitive = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
@@ -1160,6 +1164,44 @@ module Layout = struct
     let apply_operator c : Kind_operator.t -> t = function
       | Id -> c
       | Addressable -> addressable c
+
+    (* Mirrors [Jkind.Layout.sub] on [of_const c1] and [of_const c2], but
+       without mutation. *)
+    let rec less_or_equal c1 c2 : Misc.Le_result.t =
+      match c1, c2 with
+      | Addressable c1, Addressable c2 -> less_or_equal c1 c2
+      | Addressable c1, Any _ ->
+        Misc.Le_result.combine (less_or_equal c1 c2) Less
+      | Addressable c1, _ ->
+        if is_surely_addressable c2 then less_or_equal c1 c2 else Not_le
+      | _, Addressable c2 ->
+        if is_surely_addressable c1 then less_or_equal c1 c2 else Not_le
+      | Box (c1, sa1), Box (c2, sa2) ->
+        Misc.Le_result.combine (less_or_equal c1 c2)
+          (Scannable_axes.less_or_equal sa1 sa2)
+      | Box (_, sa1), (Base (Scannable, sa2) | Any sa2) ->
+        Misc.Le_result.combine (Scannable_axes.less_or_equal sa1 sa2) Less
+      | Box _, _ | _, Box _ -> Not_le
+      | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
+      | (Base (Scannable, sa1) | Genvar (_, sa1)), Any sa2 -> (
+        match Scannable_axes.less_or_equal sa1 sa2 with
+        | Equal | Less -> Less
+        | Not_le -> Not_le)
+      | (Base _ | Product _ | Univar _), Any _ -> Less
+      | Any _, _ -> Not_le
+      | Base (Scannable, sa1), Base (Scannable, sa2) ->
+        Scannable_axes.less_or_equal sa1 sa2
+      | Base (b1, _), Base (b2, _) ->
+        if Sort.equal_base b1 b2 then Equal else Not_le
+      | Product cs1, Product cs2 ->
+        if List.compare_lengths cs1 cs2 = 0
+        then Misc.Le_result.combine_list (List.map2 less_or_equal cs1 cs2)
+        else Not_le
+      | Univar (uv1, _), Univar (uv2, _) ->
+        if Sort.equal_univar_univar uv1 uv2 then Equal else Not_le
+      | Genvar (v1, sa1), Genvar (v2, sa2) ->
+        if v1.id = v2.id then Scannable_axes.less_or_equal sa1 sa2 else Not_le
+      | (Base _ | Product _ | Univar _ | Genvar _), _ -> Not_le
 
     let rec has_unknown_sort = function
       | Any _ | Univar _ | Genvar _ -> true

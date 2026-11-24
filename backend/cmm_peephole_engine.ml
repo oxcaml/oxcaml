@@ -252,10 +252,6 @@ module Cmm_comparator = struct
     (* Use structural equality *)
     x = y
 
-  let equal_symbol (s1 : Cmm.symbol) (s2 : Cmm.symbol) =
-    String.equal s1.sym_name s2.sym_name
-    && Cmm.equal_is_global s1.sym_global s2.sym_global
-
   let equal_vec128_bits (v1 : Cmm.vec128_bits) (v2 : Cmm.vec128_bits) =
     Int64.equal v1.word0 v2.word0 && Int64.equal v1.word1 v2.word1
 
@@ -291,7 +287,7 @@ module Cmm_comparator = struct
     | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
     | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
     | Cconst_mask (n1, _), Cconst_mask (n2, _) -> Int64.equal n1 n2
-    | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
+    | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> Cmm.equal_symbol s1 s2
     | Cvar v1, Cvar v2 -> V.equal v1 v2
     | Clet (v1, def1, body1), Clet (v2, def2, body2) ->
       (* No alpha-equivalence for now *)
@@ -355,7 +351,7 @@ module Cmm_comparator = struct
       && List.equal equal_trap_action traps1 traps2
     | ( Cinvalid { message = m1; symbol = s1 },
         Cinvalid { message = m2; symbol = s2 } ) ->
-      String.equal m1 m2 && equal_symbol s1 s2
+      String.equal m1 m2 && Cmm.equal_symbol s1 s2
     | ( ( Cconst_int (_, _)
         | Cconst_natint (_, _)
         | Cconst_float32 (_, _)

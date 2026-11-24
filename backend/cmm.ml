@@ -324,13 +324,9 @@ let equal_is_global g g' =
 
 type symbol =
   { sym_name : string;
-    sym_global : is_global
+    sym_global : is_global;
+    sym_type : machtype
   }
-
-let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
-    { sym_name = right_sym_name; sym_global = right_sym_global } =
-  String.equal left_sym_name right_sym_name
-  && equal_is_global left_sym_global right_sym_global
 
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
@@ -568,7 +564,8 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
+        returns : bool
       }
   | Cextcall of
       { func : string;
@@ -646,6 +643,7 @@ type operation =
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
 
@@ -672,7 +670,10 @@ type vec512_bits =
     word7 : int64
   }
 
-let global_symbol sym_name = { sym_name; sym_global = Global }
+let global_symbol ~ty sym_name =
+  { sym_name; sym_global = Global; sym_type = ty }
+
+let local_symbol ~ty sym_name = { sym_name; sym_global = Local; sym_type = ty }
 
 type ccatch_flag =
   | Normal
@@ -820,8 +821,8 @@ let iter_shallow_tail f = function
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
         | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
         | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
-        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-        | Capply _ | Cextcall _ | Cload _
+        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+        | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
         | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -858,8 +859,8 @@ let map_shallow_tail f = function
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
-          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-          | Capply _ | Cextcall _ | Cload _
+          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+          | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
           | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
@@ -960,6 +961,11 @@ let equal_machtype_component
 
 let equal_machtype left right =
   Misc.Stdlib.Array.equal equal_machtype_component left right
+
+let equal_symbol left right =
+  String.equal left.sym_name right.sym_name
+  && equal_is_global left.sym_global right.sym_global
+  && equal_machtype left.sym_type right.sym_type
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128

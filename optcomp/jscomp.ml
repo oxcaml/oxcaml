@@ -27,89 +27,266 @@
  ******************************************************************************)
 
 type error =
-  | Js_of_ocaml_not_found of string
-  | Js_of_ocaml_error of
-      { subcommand : string;
+  | Program_not_found of
+      { target : Clflags.Jsir_target.t;
+        program : string
+      }
+  | Program_error of
+      { target : Clflags.Jsir_target.t;
+        subcommand : string;
         exit_code : int;
         input_left_in : string option
       }
-  | Unsupported of string
+  | Unsupported of
+      { target : Clflags.Jsir_target.t;
+        option : string
+      }
+  | Jsir_file_not_found of string
+  | Unit_not_in_object_file of
+      { compilation_unit : string;
+        object_file : string
+      }
 
 exception Error of error
 
-let js_of_ocaml_env_var = "OXCAML_JS_OF_OCAML"
+let env_var : Clflags.Jsir_target.t -> string = function
+  | Js -> "OXCAML_JS_OF_OCAML"
+  | Wasm -> "OXCAML_WASM_OF_OCAML"
 
-let js_of_ocaml_program () =
-  match Sys.getenv_opt js_of_ocaml_env_var with
+let program target =
+  match Sys.getenv_opt (env_var target) with
   | Some path -> path
   | None ->
-    let in_bindir = Filename.concat Config.bindir "js_of_ocaml" in
-    if Sys.file_exists in_bindir then in_bindir else "js_of_ocaml"
+    let name = Clflags.Jsir_target.program_name target in
+    let in_bindir = Filename.concat Config.bindir name in
+    if Sys.file_exists in_bindir then in_bindir else name
 
-let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
-    args =
-  let args =
-    subcommand
-    :: (args
-       @ List.rev !(Clflags.jsoo_opts All)
-       @ List.rev !(Clflags.jsoo_opts phase))
+let target_args : Clflags.Jsir_target.t -> string list = function
+  | Js -> []
+  | Wasm -> ["--enable=portable-int"]
+
+let effects_args ~target ~(phase : Clflags.Jsoo_phase.t) passthrough_args =
+  match phase with
+  | Archive | Link | All -> []
+  | Compile | Runtime ->
+    let effects =
+      match Clflags.jsoo_effects () with
+      | Some effects -> effects
+      | None ->
+        Misc.fatal_error "Jscomp.effects_args: the target is not a JSIR one"
+    in
+    (* [Optmaindriver] checks this too, but [OCAMLPARAM] can set [jsoo-effects]
+       after the backend has been chosen. *)
+    if not (List.mem effects (Clflags.Jsoo_effects.supported_by target))
+    then
+      raise
+        (Error
+           (Unsupported
+              { target;
+                option =
+                  "-jsoo-effects " ^ Clflags.Jsoo_effects.to_string effects
+              }));
+    if List.exists (String.starts_with ~prefix:"--effects") passthrough_args
+    then []
+    else ["--effects=" ^ Clflags.Jsoo_effects.to_string effects]
+
+let run ?input_left_in ~target ~(phase : Clflags.Jsoo_phase.t) subcommand args =
+  let passthrough_args =
+    List.rev !(Clflags.jsoo_opts All) @ List.rev !(Clflags.jsoo_opts phase)
   in
-  let program = js_of_ocaml_program () in
+  let args =
+    (subcommand :: args) @ target_args target
+    @ effects_args ~target ~phase passthrough_args
+    @ passthrough_args
+  in
+  let program = program target in
   let cmdline = Filename.quote_command program args in
   match Ccomp.command cmdline with
   | 0 -> ()
   | exit_code ->
-    raise (Error (Js_of_ocaml_error { subcommand; exit_code; input_left_in }))
-  | exception Sys_error _ -> raise (Error (Js_of_ocaml_not_found program))
+    raise
+      (Error (Program_error { target; subcommand; exit_code; input_left_in }))
+  | exception Sys_error _ ->
+    raise (Error (Program_not_found { target; program }))
 
-let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
+(* The files of a target that correspond to the native backend's. *)
+type extensions =
+  { obj : string;
+    lib : string;
+    flambda_obj : string;
+    flambda_lib : string;
+    ir : string;
+    ir_lib : string;
+    runtime : string
+  }
 
-let write_cmj ~filename ~compilation_unit ~required_globals
-    ({ program; imported_compilation_units } : Optcomp_intf.jsir_program) =
-  let imported_compilation_units =
-    Compilation_unit.Set.union imported_compilation_units required_globals
+let extensions : Clflags.Jsir_target.t -> extensions = function
+  | Js ->
+    { obj = ".cmo-js";
+      lib = ".cma-js";
+      flambda_obj = ".cmx-js";
+      flambda_lib = ".cmxa-js";
+      ir = ".cm-jsir-js";
+      ir_lib = ".cma-jsir-js";
+      runtime = ".runtime.js"
+    }
+  | Wasm ->
+    { obj = ".cmo-wasm";
+      lib = ".cma-wasm";
+      flambda_obj = ".cmx-wasm";
+      flambda_lib = ".cmxa-wasm";
+      ir = ".cm-jsir-wasm";
+      ir_lib = ".cma-jsir-wasm";
+      runtime = ".runtime.wasma"
+    }
+
+(* JSIR files (.cm-jsir-js or .cm-jsir-wasm) and archives of them (.cma-jsir-js
+   or .cma-jsir-wasm): a magic number followed by a marshaled value. *)
+
+(* [Config] has no magic number for JSIR archives. This one has the version of
+   the one for JSIR files. *)
+let jsir_archive_magic_number =
+  let version_length = 3 in
+  "Caml1999K"
+  ^ String.sub Config.cmj_magic_number
+      (String.length Config.cmj_magic_number - version_length)
+      version_length
+
+let jsir_target : Clflags.Jsir_target.t -> Jsoo_imports.Code.jsir_target =
+  function
+  | Js -> Js
+  | Wasm -> Wasm
+
+(* [Var] also keeps the names of variables in mutable state. This returns those
+   of the variables from [first_var] on. *)
+let var_names ~first_var =
+  let open Jsoo_imports.Code in
+  let rec names i acc =
+    if i < first_var
+    then acc
+    else
+      let var = Var.of_idx i in
+      match Variable_name.of_var var with
+      | Some name -> names (i - 1) ((var, name) :: acc)
+      | None -> names (i - 1) acc
   in
+  names (Var.idx (Var.last ())) []
+
+(* [first_var] is the first variable that [program] may use: the variables
+   before it belong to the units compiled earlier by this process. *)
+let jsir_file ~target ~whole_program ~compilation_unit
+    ~imported_compilation_units ~symbol_imports ~symbol_exports ~first_var
+    program : Jsoo_imports.Code.jsir_file =
+  { target = jsir_target target;
+    program = Jsoo_imports.Code.Marshalable_program.of_program program;
+    (* [Var] numbers variables with mutable state. js_of_ocaml needs to know the
+       highest number used so that the variables it creates do not clash with
+       these. *)
+    last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
+    var_names = var_names ~first_var;
+    imported_compilation_units;
+    exported_compilation_unit = compilation_unit;
+    force_link = !Clflags.link_everything;
+    whole_program;
+    symbol_imports;
+    symbol_exports
+  }
+
+let write_marshaled ~magic_number ~filename value =
   let oc = open_out_bin filename in
   Misc.try_finally
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> Misc.remove_file filename)
     (fun () ->
-      output_string oc Config.cmj_magic_number;
-      let body : Jsoo_imports.Code.cmj_body =
-        { program = Jsoo_imports.Code.Marshalable_program.of_program program;
-          (* [Var] numbers variables with mutable state. js_of_ocaml needs to
-             know the highest number used so that the variables it creates do
-             not clash with these. *)
-          last_var = Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ());
-          imported_compilation_units =
-            Compilation_unit.Set.elements imported_compilation_units
-            |> List.map Compilation_unit.full_path_as_string;
-          exported_compilation_unit =
-            Compilation_unit.full_path_as_string compilation_unit;
-          force_link = !Clflags.link_everything
-        }
-      in
-      output_value oc body)
+      output_string oc magic_number;
+      output_value oc value)
 
-let make
+let read_jsir_files ~filename : Jsoo_imports.Code.jsir_file list =
+  if not (Sys.file_exists filename)
+  then raise (Error (Jsir_file_not_found filename));
+  let ic = open_in_bin filename in
+  Misc.try_finally
+    ~always:(fun () -> close_in ic)
+    (fun () ->
+      let magic =
+        try really_input_string ic (String.length Config.cmj_magic_number)
+        with End_of_file -> ""
+      in
+      if String.equal magic Config.cmj_magic_number
+      then [(input_value ic : Jsoo_imports.Code.jsir_file)]
+      else if String.equal magic jsir_archive_magic_number
+      then (input_value ic : Jsoo_imports.Code.jsir_file list)
+      else raise (Linkenv.Error (Not_an_object_file filename)))
+
+let write_jsir_file ~filename (file : Jsoo_imports.Code.jsir_file) =
+  write_marshaled ~magic_number:Config.cmj_magic_number ~filename file
+
+let write_jsir_archive ~filename (files : Jsoo_imports.Code.jsir_file list) =
+  write_marshaled ~magic_number:jsir_archive_magic_number ~filename files
+
+(* In wasm_of_ocaml, linking an executable creates a directory that we should
+   clean up after. *)
+let remove_link_outputs ~(target : Clflags.Jsir_target.t) output_name =
+  Misc.remove_file output_name;
+  match target with
+  | Js -> ()
+  | Wasm ->
+    let base =
+      try Filename.chop_extension output_name
+      with Invalid_argument _ -> output_name
+    in
+    Misc.remove_dir_contents (base ^ ".assets")
+
+let program_unit_name output_name =
+  Filename.basename output_name
+  |> Filename.remove_extension
+  |> String.map (fun c ->
+      match c with 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' -> c | _ -> '_')
+
+(* The stubs to pass to [build-runtime], or to [compile] for a whole program. As
+   with C stubs, stub names are passed on exactly as they were recorded in the
+   library files or given on the command line. Several libraries may record the
+   same stub file; js_of_ocaml accepts duplicates but there is no point in
+   passing them. The first occurrence is kept. *)
+let stubs () =
+  List.rev !Clflags.ccobjs
+  |> List.fold_left
+       (fun (seen, acc) stub ->
+         if Misc.Stdlib.String.Set.mem stub seen
+         then seen, acc
+         else Misc.Stdlib.String.Set.add stub seen, stub :: acc)
+       (Misc.Stdlib.String.Set.empty, [])
+  |> snd |> List.rev
+
+let linkall_args () = if !Clflags.link_everything then ["--linkall"] else []
+
+let make (target : Clflags.Jsir_target.t) ~link_jsir
     ~(lambda_to_jsir :
        ppf_dump:Format.formatter ->
        prefixname:string ->
        keep_symbol_tables:bool ->
        Lambda.program ->
-       Optcomp_intf.jsir_program) =
+       Optcomp_intf.jsir_program)
+    ~(jsir_linker :
+       register_globals:bool ->
+       Jsoo_imports.Code.jsir_file list ->
+       Jsoo_imports.Code.program) =
+  let extensions = extensions target in
+  let program_name = Clflags.Jsir_target.program_name target in
   (module Optcompile.Make (struct
-    let backend = Compile_common.Js_of_ocaml
+    let backend : Compile_common.opt_backend =
+      match target with Js -> Js_of_ocaml | Wasm -> Wasm_of_ocaml
 
     let supports_metaprogramming = false
 
-    let ext_obj = ".cmjo"
+    (* When linking whole programs, the object files are the JSIR files. *)
+    let ext_obj = if link_jsir then extensions.ir else extensions.obj
 
-    let ext_lib = ".cmja"
+    let ext_lib = if link_jsir then extensions.ir_lib else extensions.lib
 
-    let ext_flambda_obj = ".cmjx"
+    let ext_flambda_obj = extensions.flambda_obj
 
-    let ext_flambda_lib = ".cmjxa"
+    let ext_flambda_lib = extensions.flambda_lib
 
     let default_executable_name = Config.default_executable_name ^ ".js"
 
@@ -119,7 +296,14 @@ let make
         ~ppf_dump (program : Lambda.program) =
       Compilation_unit.Set.iter Compilenv.require_global
         program.required_globals;
-      let jsir =
+      let first_var =
+        Jsoo_imports.Code.Var.idx (Jsoo_imports.Code.Var.last ()) + 1
+      in
+      let { Optcomp_intf.program = jsir;
+            imported_compilation_units;
+            symbol_imports;
+            symbol_exports
+          } =
         lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables program
         |> Misc.print_if ppf_dump Clflags.dump_jsir
              (fun ppf ({ program; _ } : Optcomp_intf.jsir_program) ->
@@ -128,66 +312,146 @@ let make
       if Clflags.(should_stop_after Compiler_pass.Middle_end)
       then ()
       else
-        let cmj = prefixname ^ ".cmj" in
-        let cmjo = prefixname ^ ext_obj in
-        write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit
-          ~required_globals:program.required_globals jsir;
-        let remove_cmj () =
-          if not !Clflags.keep_asm_file then Misc.remove_file cmj
+        let imported_compilation_units =
+          Compilation_unit.Set.union imported_compilation_units
+            program.required_globals
+          |> Compilation_unit.Set.elements
+          |> List.map Compilation_unit.full_path_as_string
         in
-        Misc.try_finally
-          ~exceptionally:(fun () -> Misc.remove_file cmjo)
-          (fun () ->
-            Profile.record_call "js_of_ocaml" (fun () ->
-                run_js_of_ocaml "compile" ~phase:Compile ~input_left_in:cmj
-                  (debuginfo_args () @ ["-o"; cmjo; cmj]));
-            remove_cmj ())
+        let ir_file = prefixname ^ extensions.ir in
+        write_jsir_file ~filename:ir_file
+          (jsir_file ~target ~whole_program:false
+             ~compilation_unit:
+               (Compilation_unit.full_path_as_string program.compilation_unit)
+             ~imported_compilation_units ~symbol_imports ~symbol_exports
+             ~first_var jsir);
+        if not link_jsir
+        then
+          let obj = prefixname ^ extensions.obj in
+          Misc.try_finally
+            ~exceptionally:(fun () -> Misc.remove_file obj)
+            (fun () ->
+              Profile.record_call program_name (fun () ->
+                  run ~target "compile" ~phase:Compile ~input_left_in:ir_file
+                    ["-o"; obj; ir_file]);
+              if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
 
     let create_archive archive_name objfiles =
-      let linkall = if !Clflags.link_everything then ["--linkall"] else [] in
-      run_js_of_ocaml "link" ~phase:Archive
-        (linkall @ ["-a"; "-o"; archive_name] @ objfiles)
+      if link_jsir
+      then
+        List.concat_map (fun filename -> read_jsir_files ~filename) objfiles
+        |> write_jsir_archive ~filename:archive_name
+      else
+        run ~target "link" ~phase:Archive
+          (linkall_args () @ ["-a"; "-o"; archive_name] @ objfiles)
 
     (* JSOO cannot yet link packed units. *)
-    let link_partial _target _objfiles = raise (Error (Unsupported "-pack"))
+    let link_partial _target _objfiles =
+      raise (Error (Unsupported { target; option = "-pack" }))
 
-    let link _linkenv (objfiles : Linkenv.objfile_to_link list) output_name
-        ~cached_genfns_imports:_ ~genfns:_ ~units_tolink:_ ~uses_eval:_
-        ~quoted_cmi:_ ~quoted_cmx:_ ~ppf_dump:_ =
-      (* As with C stubs, stub names are passed on exactly as they were recorded
-         in the [.cmjxa] files or given on the command line. Several libraries
-         may record the same stub file; js_of_ocaml accepts duplicates but there
-         is no point in passing them. The first occurrence is kept. *)
-      let stubs =
-        List.rev !Clflags.ccobjs
-        |> List.fold_left
-             (fun (seen, acc) stub ->
-               if Misc.Stdlib.String.Set.mem stub seen
-               then seen, acc
-               else Misc.Stdlib.String.Set.add stub seen, stub :: acc)
-             (Misc.Stdlib.String.Set.empty, [])
-        |> snd |> List.rev
-      in
+    (* Separate compilation: js_of_ocaml links the JavaScript (WebAssembly) of
+       the units. *)
+    let link_separately (objfiles : Linkenv.objfile_to_link list) output_name =
       let objfiles =
         List.map (fun ({ path; _ } : Linkenv.objfile_to_link) -> path) objfiles
       in
-      let runtime = output_name ^ ".runtime.js" in
+      let runtime = output_name ^ extensions.runtime in
       Misc.try_finally
         ~always:(fun () ->
           if not !Clflags.keep_startup_file then Misc.remove_file runtime)
-        ~exceptionally:(fun () -> Misc.remove_file output_name)
+        ~exceptionally:(fun () -> remove_link_outputs ~target output_name)
         (fun () ->
-          run_js_of_ocaml "build-runtime" ~phase:Runtime
-            (debuginfo_args () @ ["-o"; runtime] @ stubs);
-          let linkall =
-            if !Clflags.link_everything then ["--linkall"] else []
+          run ~target "build-runtime" ~phase:Runtime (["-o"; runtime] @ stubs ());
+          run ~target "link" ~phase:Link
+            (linkall_args () @ ["-o"; output_name; runtime] @ objfiles))
+
+    (* Whole program: the JSIR of the units is linked into one program, which
+       js_of_ocaml compiles to an executable, with the parts of the runtime and
+       of the stubs that it uses. *)
+    let link_jsir_units (objfiles : Linkenv.objfile_to_link list) output_name
+        ~(units_tolink : Linkenv.unit_link_info list) =
+      (* The JSIR of the units to link: those of the object files, and the
+         required members of the archives. *)
+      let files = Hashtbl.create 64 in
+      (* The object file or archive that should have the JSIR of each unit. *)
+      let object_files = Hashtbl.create 64 in
+      List.iter
+        (fun ({ path; units } : Linkenv.objfile_to_link) ->
+          let units =
+            List.map Compilation_unit.full_path_as_string units
+            |> Misc.Stdlib.String.Set.of_list
           in
-          run_js_of_ocaml "link" ~phase:Link
-            (linkall @ ["-o"; output_name; runtime] @ objfiles))
+          Misc.Stdlib.String.Set.iter
+            (fun unit -> Hashtbl.replace object_files unit path)
+            units;
+          List.iter
+            (fun (file : Jsoo_imports.Code.jsir_file) ->
+              if Misc.Stdlib.String.Set.mem file.exported_compilation_unit units
+              then Hashtbl.replace files file.exported_compilation_unit file)
+            (read_jsir_files ~filename:path))
+        objfiles;
+      (* In initialisation order. *)
+      let files =
+        List.map
+          (fun ({ name; file_name; _ } : Linkenv.unit_link_info) ->
+            let compilation_unit = Compilation_unit.full_path_as_string name in
+            match Hashtbl.find_opt files compilation_unit with
+            | Some file -> file
+            | None ->
+              (* [file_name] is the [.cmx-js] or [.cmxa-js] of the unit, for a
+                 unit that no object file was given for. *)
+              let object_file =
+                Hashtbl.find_opt object_files compilation_unit
+                |> Option.value ~default:file_name
+              in
+              raise
+                (Error
+                   (Unit_not_in_object_file { compilation_unit; object_file })))
+          units_tolink
+      in
+      let program =
+        Profile.record_call "jsir_link" (fun () ->
+            jsir_linker ~register_globals:!Clflags.link_everything files)
+      in
+      let imported_compilation_units =
+        List.fold_left
+          (fun imports (file : Jsoo_imports.Code.jsir_file) ->
+            Misc.Stdlib.String.Set.add_seq
+              (List.to_seq file.imported_compilation_units)
+              imports)
+          Misc.Stdlib.String.Set.empty files
+      in
+      let imported_compilation_units =
+        List.fold_left
+          (fun imports (file : Jsoo_imports.Code.jsir_file) ->
+            Misc.Stdlib.String.Set.remove file.exported_compilation_unit imports)
+          imported_compilation_units files
+        |> Misc.Stdlib.String.Set.elements
+      in
+      let ir_file = output_name ^ extensions.ir in
+      (* The JSIR file is left in place when js_of_ocaml fails on it. *)
+      Misc.try_finally
+        ~exceptionally:(fun () -> remove_link_outputs ~target output_name)
+        (fun () ->
+          write_jsir_file ~filename:ir_file
+            (jsir_file ~target ~whole_program:true
+               ~compilation_unit:(program_unit_name output_name)
+               ~imported_compilation_units ~symbol_imports:[] ~symbol_exports:[]
+               ~first_var:0 program);
+          Profile.record_call program_name (fun () ->
+              run ~target "compile" ~phase:Compile ~input_left_in:ir_file
+                (linkall_args () @ ["-o"; output_name] @ stubs () @ [ir_file]));
+          if not !Clflags.keep_asm_file then Misc.remove_file ir_file)
+
+    let link _linkenv objfiles output_name ~cached_genfns_imports:_ ~genfns:_
+        ~units_tolink ~uses_eval:_ ~quoted_cmi:_ ~quoted_cmx:_ ~ppf_dump:_ =
+      if link_jsir
+      then link_jsir_units objfiles output_name ~units_tolink
+      else link_separately objfiles output_name
 
     let link_shared _objfiles _output_name ~genfns:_ ~units_tolink:_ ~ppf_dump:_
         =
-      raise (Error (Unsupported "-shared"))
+      raise (Error (Unsupported { target; option = "-shared" }))
 
     let support_files_for_eval () = []
 
@@ -195,23 +459,33 @@ let make
   end) : Optcompile.S)
 
 let report_error_doc ppf = function
-  | Js_of_ocaml_not_found program ->
+  | Program_not_found { target; program } ->
     Format_doc.fprintf ppf
-      "@[<hov>Cannot run js_of_ocaml (%a):@ it must be in %a or in the PATH,@ \
-       or the %s environment variable must give its path@]"
+      "@[<hov>Cannot run %s (%a):@ it must be in %a or in the PATH,@ or the %s \
+       environment variable must give its path@]"
+      (Clflags.Jsir_target.program_name target)
       Location.Doc.quoted_filename program Location.Doc.quoted_filename
-      Config.bindir js_of_ocaml_env_var
-  | Js_of_ocaml_error { subcommand; exit_code; input_left_in } -> (
-    Format_doc.fprintf ppf "Error while running js_of_ocaml %s (exit code %d)"
+      Config.bindir (env_var target)
+  | Program_error { target; subcommand; exit_code; input_left_in } -> (
+    Format_doc.fprintf ppf "Error while running %s %s (exit code %d)"
+      (Clflags.Jsir_target.program_name target)
       subcommand exit_code;
     match input_left_in with
     | None -> ()
     | Some file ->
       Format_doc.fprintf ppf ",@ input left in file %a"
         Location.Doc.quoted_filename file)
-  | Unsupported option ->
-    Format_doc.fprintf ppf "%s is not supported when targeting js_of_ocaml"
-      option
+  | Unsupported { target; option } ->
+    Format_doc.fprintf ppf "%s is not supported when targeting %s" option
+      (Clflags.Jsir_target.program_name target)
+  | Jsir_file_not_found file ->
+    Format_doc.fprintf ppf
+      "@[<hov>Cannot find JSIR file %a@ (was it built with -link-jsir?)@]"
+      Location.Doc.quoted_filename file
+  | Unit_not_in_object_file { compilation_unit; object_file } ->
+    Format_doc.fprintf ppf
+      "@[<hov>The object file %a@ does not contain the compilation unit %s@]"
+      Location.Doc.quoted_filename object_file compilation_unit
 
 let () =
   Location.register_error_of_exn (function

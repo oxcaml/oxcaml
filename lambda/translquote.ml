@@ -464,15 +464,15 @@ module Constant : sig
 
   val float32 : Debuginfo.Scoped_location.t -> string -> t'
 
-  val int8 : Debuginfo.Scoped_location.t -> int -> t'
+  val int8 : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
-  val int16 : Debuginfo.Scoped_location.t -> int -> t'
+  val int16 : Debuginfo.Scoped_location.t -> Numbers.Int16.t -> t'
 
   val int32 : Debuginfo.Scoped_location.t -> int32 -> t'
 
   val int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
-  val nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+  val nativeint : Debuginfo.Scoped_location.t -> Targetint.t -> t'
 
   val unboxed_float : Debuginfo.Scoped_location.t -> string -> t'
 
@@ -482,15 +482,15 @@ module Constant : sig
 
   val unboxed_int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
-  val unboxed_nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+  val unboxed_nativeint : Debuginfo.Scoped_location.t -> Targetint.t -> t'
 
-  val untagged_char : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_char : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
   val untagged_int : Debuginfo.Scoped_location.t -> int -> t'
 
-  val untagged_int8 : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_int8 : Debuginfo.Scoped_location.t -> Numbers.Int8.t -> t'
 
-  val untagged_int16 : Debuginfo.Scoped_location.t -> int -> t'
+  val untagged_int16 : Debuginfo.Scoped_location.t -> Numbers.Int16.t -> t'
 end = struct
   type s = lambda
 
@@ -520,10 +520,12 @@ end = struct
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
   let int8 loc x =
-    apply1 "Constant" "int8" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "int8" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let int16 loc x =
-    apply1 "Constant" "int16" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "int16" loc
+      (Lconst (Const_base (Const_int (Numbers.Int16.to_int x))))
 
   let int32 loc x =
     apply1 "Constant" "int32" loc (Lconst (Const_base (Const_int32 x)))
@@ -553,16 +555,19 @@ end = struct
       (Lconst (Const_base (Const_nativeint x)))
 
   let untagged_char loc x =
-    apply1 "Constant" "untagged_char" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_char" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let untagged_int loc x =
     apply1 "Constant" "untagged_int" loc (Lconst (Const_base (Const_int x)))
 
   let untagged_int8 loc x =
-    apply1 "Constant" "untagged_int8" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_int8" loc
+      (Lconst (Const_base (Const_int (Numbers.Int8.to_int x))))
 
   let untagged_int16 loc x =
-    apply1 "Constant" "untagged_int16" loc (Lconst (Const_base (Const_int x)))
+    apply1 "Constant" "untagged_int16" loc
+      (Lconst (Const_base (Const_int (Numbers.Int16.to_int x))))
 end
 
 module Modes : sig
@@ -1415,6 +1420,8 @@ module Pat : sig
 
   val or_ : Debuginfo.Scoped_location.t -> t -> t -> t'
 
+  val addr : Debuginfo.Scoped_location.t -> t -> bool -> t'
+
   val lazy_ : Debuginfo.Scoped_location.t -> t -> t'
 
   val any_module : t'
@@ -1477,6 +1484,8 @@ end = struct
     apply1 "Pat" "array" loc (mk_list ~loc (List.map extract a1))
 
   let or_ loc a1 a2 = apply2 "Pat" "or_" loc (extract a1) (extract a2)
+
+  let addr loc a1 a2 = apply2 "Pat" "addr" loc (extract a1) (transl_bool a2)
 
   let lazy_ loc a1 = apply1 "Pat" "lazy_" loc (extract a1)
 
@@ -2252,7 +2261,7 @@ let quote_arg_label loc = function
       Location.print_loc (to_location loc)
 
 let module_for_path_opt loc env path =
-  Env.add_required_global_for_quote path env;
+  Env.add_required_global_for_quote (to_location loc) path env;
   let rec go path =
     match path with
     | Path.Pident id ->
@@ -2474,7 +2483,7 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> with_new_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
@@ -2507,7 +2516,7 @@ let rec without_idents_pat pat =
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
-  | Tpat_lazy pat -> without_idents_pat pat
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
@@ -2864,6 +2873,9 @@ and quote_value_pattern ~scopes p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+    | Tpat_addr (mut, _, pat) ->
+      let pat = quote_value_pattern ~scopes pat in
+      Pat.addr loc pat (Types.is_mutable mut)
     | Tpat_lazy pat ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.lazy_ loc pat

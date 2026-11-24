@@ -311,6 +311,8 @@ type error =
   | Wrong_expected_record_boxing of
       wrong_kind_context * record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
+  | Unboxed_label_assignment of
+      { lid : Longident.t; mutability : mutability }
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
@@ -358,6 +360,8 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Non_generalizable_escape of
+      { var : type_expr; mty: Types.module_type; kind : Path.t }
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -1290,11 +1294,11 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_unboxed_nativeint _ -> instance Predef.type_nativeint_u
 
 type constant_integer_result =
-  | Int8 of int
-  | Int16 of int
+  | Int8 of Numbers.Int8.t
+  | Int16 of Numbers.Int16.t
   | Int32 of int32
   | Int64 of int64
-  | Nativeint of nativeint
+  | Nativeint of Targetint.t
   | Int of int
 
 type constant_integer_error =
@@ -1314,15 +1318,17 @@ let constant_integer i ~suffix :
   | Some 's' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int8 (Misc.Int_literal_converter.int8 i))
-      with Failure _ -> Error Int8_literal_overflow
+      match Misc.Int_literal_converter.int8 i with
+      | i -> Ok (Int8 (Numbers.Int8.of_int_exn i))
+      | exception Failure _ -> Error Int8_literal_overflow
     end
     else Error (Int8_literal_not_enabled)
   | Some 'S' ->
     if Language_extension.is_enabled Small_numbers then
     begin
-      try Ok (Int16 (Misc.Int_literal_converter.int16 i))
-      with Failure _ -> Error Int16_literal_overflow
+      match Misc.Int_literal_converter.int16 i with
+      | i -> Ok (Int16 (Numbers.Int16.of_int_exn i))
+      | exception Failure _ -> Error Int16_literal_overflow
     end
     else Error (Int16_literal_not_enabled)
   | Some 'l' ->
@@ -1337,7 +1343,7 @@ let constant_integer i ~suffix :
     end
   | Some 'n' ->
     begin
-      try Ok (Nativeint (Misc.Int_literal_converter.nativeint i))
+      try Ok (Nativeint (Targetint.of_string i))
       with Failure _ -> Error Nativeint_literal_overflow
     end
   | Some 'm' | None ->
@@ -1374,7 +1380,9 @@ let constant_desc
       if Language_extension.is_enabled Small_numbers
       then
         let extra_bits = Sys.int_size - 8 in
-        Ok (Const_untagged_char ((Char.code c lsl extra_bits) asr extra_bits))
+        Ok (Const_untagged_char
+              (Numbers.Int8.of_int_exn
+                 ((Char.code c lsl extra_bits) asr extra_bits)))
       else Error (Untagged_char_literal c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -1485,7 +1493,7 @@ let src_pos loc attrs env =
 
 type 'rep record_extraction_result =
   | Record_type of Path.t * Path.t * Types.label_declaration list * 'rep
-  | Record_type_of_other_form
+  | Record_type_of_other_form of Types.label_declaration list
   | Not_a_record_type
   | Maybe_a_record_type
 
@@ -1500,9 +1508,10 @@ let extract_concrete_record (type rep) (record_form : rep record_form) env ty
   | Unboxed_product,
     Typedecl(p0, p, {type_kind=Type_record_unboxed_product (fields, repres, _)}) ->
     Record_type (p0, p, fields, repres)
-  | Legacy, Typedecl(_, _, {type_kind=Type_record_unboxed_product _})
-  | Unboxed_product, Typedecl(_, _, {type_kind=Type_record _}) ->
-    Record_type_of_other_form
+  | Legacy,
+    Typedecl(_, _, {type_kind=Type_record_unboxed_product (fields, _, _)})
+  | Unboxed_product, Typedecl(_, _, {type_kind=Type_record (fields, _, _)}) ->
+    Record_type_of_other_form fields
   | _, Has_no_typedecl | _, Typedecl(_, _, _) -> Not_a_record_type
   | _, May_have_typedecl -> Maybe_a_record_type
 
@@ -1523,7 +1532,7 @@ let extract_concrete_variant env ty =
 let extract_label_names record_form env ty =
   match extract_concrete_record record_form env ty with
   | Record_type (_, _,fields, _) -> List.map (fun l -> l.Types.ld_id) fields
-  | Record_type_of_other_form | Not_a_record_type | Maybe_a_record_type ->
+  | Record_type_of_other_form _ | Not_a_record_type | Maybe_a_record_type ->
     assert false
 
 let has_poly_constraint spat =
@@ -1837,7 +1846,9 @@ let type_continuation_pat env expected_ty sp =
       let id = Ident.create_local name.txt in
       let desc =
         { val_type = expected_ty;
-          val_kind = Val_reg (Jkind.Sort.(of_const Const.for_continuation));
+          val_kind =
+            Val_reg
+              (Representable Jkind.Sort.(of_const Const.for_continuation));
           val_lpoly = Lpoly.determined [];
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
@@ -2402,7 +2413,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -2818,6 +2829,21 @@ let solve_Ppat_lazy loc env expected_ty =
     (generic_instance expected_ty);
   nv
 
+let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
+  let addr_type =
+    match mutability with
+    | Mutable -> Predef.type_addr
+    | Immutable -> Predef.type_addr_imm
+  in
+  let jkind, arg_sort =
+    Jkind.of_new_sort_var ~why:Address_contents
+      ~level:(Ctype.get_current_level ())
+  in
+  let ty_arg = newgenvar jkind in
+  unify_pat_types_penv loc env (addr_type ty_arg)
+    (generic_instance expected_ty);
+  ty_arg, arg_sort
+
 let solve_Ppat_constraint tps loc env mode sty expected_ty =
   let cty, ty, force =
     with_local_level_generalize_structure
@@ -2924,6 +2950,9 @@ let build_or_pat env loc lid =
           pat pats in
       (path, rp { r with pat_loc = loc })
 
+let min_except_staticity =
+  With_regionality.min_with_monadic Staticity (Staticity.of_const Dynamic)
+
 (* When typing a for-loop index or similar, we need to restrict ourselves to the
    [Ppat_any] and [Ppat_var] cases, and construct a [pattern_variable] with
    consistent fields.  However, in the case where we're reifying a name for
@@ -2938,8 +2967,10 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
     any (Ident.create_local "_for",
          Uid.mk ~current_unit:(Env.get_current_unit ()))
   | Ppat_var name ->
+      (* We use [min_except_staticity] since [int] is [mod everything],
+         which does not include staticity. *)
       var ~name
-          ~pv_mode:With_regionality.(min |> disallow_right)
+          ~pv_mode:min_except_staticity
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
           ~pv_as_var:false
@@ -2969,7 +3000,9 @@ let type_for_loop_index ~loc ~env ~param =
             let pv =
               { pv_id; pv_uid; pv_mode;
                 pv_value_kind =
-                  Val_reg Jkind.Sort.(of_const Const.for_loop_index);
+                  Val_reg
+                    (Representable
+                       Jkind.Sort.(of_const Const.for_loop_index));
                 pv_type; pv_loc;
                 pv_kind = if pv_as_var then As_var else Std_var;
                 pv_attributes;
@@ -2992,7 +3025,9 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
+            ~kind:
+              (Val_reg
+                 (Representable Jkind.Sort.(of_const Const.for_loop_index)))
             tps
             pv_loc
             name
@@ -3655,6 +3690,7 @@ let rec has_literal_pattern p =
   | Ppat_construct (_, Some (_, p))
   | Ppat_constraint (p, _, _)
   | Ppat_alias (p, _)
+  | Ppat_addr (_, p)
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -3861,7 +3897,7 @@ and type_pat_aux
         | Record_type(p0, p, _, _) ->
             let ty = generic_instance expected_ty in
             Some (p0, p, is_principal expected_ty), ty
-        | Record_type_of_other_form ->
+        | Record_type_of_other_form _ ->
           let error =
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
           Error.log_and_raise loc !!penv error
@@ -3952,7 +3988,7 @@ and type_pat_aux
       in
       let var_mode, kind =
         match mutable_flag with
-        | Immutable -> mode, Val_reg sort
+        | Immutable -> mode, Val_reg (Representable sort)
         | Mutable ->
             let m0 =
               With_regionality.Comonadic.newvar
@@ -4016,7 +4052,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v pat_mode.mode t ~is_module:true
-              ~kind:(Val_reg sort) sp.ppat_attributes sort
+              ~kind:(Val_reg (Representable sort)) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var { id; name = v; uid; sort;
@@ -4034,7 +4070,7 @@ and type_pat_aux
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
         enter_variable ~is_as_variable:true
-          ~kind:(Val_reg sort) tps name.loc name mode
+          ~kind:(Val_reg (Representable sort)) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
@@ -4096,7 +4132,9 @@ and type_pat_aux
           ~make:(fun loc i -> Const.char ~loc (Char.chr i))
       | Const_untagged_char c1, Const_untagged_char c2 ->
         (* Intervals are specified by character code, as for [char]. *)
-        expand_interval (c1 land 0xff) (c2 land 0xff)
+        expand_interval
+          (Numbers.Int8.to_int c1 land 0xff)
+          (Numbers.Int8.to_int c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
         Error.log_and_raise loc !!penv Invalid_interval
@@ -4414,6 +4452,34 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+  | Ppat_addr (mut, sp1) ->
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      let mutability =
+        match mut with
+        | Mutable -> Mutable {
+          mode = With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+        | Immutable -> Immutable
+      in
+      let modalities = Typemode.address_modalities mutability in
+      check_project_mutability ~loc ~env:!!penv Address_contents mutability
+        pat_mode.mode;
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Address Modality; container = (loc, Pattern) }
+      in
+      let mode =
+        apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
+      in
+      let pat_mode = simple_pat_mode mode in
+      let p1 = type_pat ~pat_mode tps Value sp1 ty_arg arg_sort in
+      rvp {
+        pat_desc = Tpat_addr (mutability, arg_sort, p1);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -4558,7 +4624,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.With_regionality.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg pv_sort
+            ; val_kind = Val_reg (Representable pv_sort)
             ; val_lpoly = Lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
@@ -4630,7 +4696,8 @@ let rec pat_tuple_arity spat =
   | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
-  | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _ | Ppat_effect _ ->
+  | Ppat_addr _ | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _
+  | Ppat_effect _ ->
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
@@ -4994,6 +5061,18 @@ let rec check_counter_example_pat
       (* do not explode under lazy: PR#7421 *)
       check_rec ~info:(no_explosion info) tp1 nv
         (fun p1 -> mkp k (Tpat_lazy p1))
+  | Tpat_addr (mutability, original_arg_sort, tp1) ->
+      let mut : mutable_flag =
+        match mutability with
+        | Mutable _ -> Mutable
+        | Immutable -> Immutable
+      in
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      assert (
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
+      check_rec tp1 ty_arg
+        (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -6081,6 +6160,14 @@ let rec approx_type env sty =
       newty (Ttuple (List.map (fun (l, t) -> l, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
       let path, decl = Env.lookup_type ~use:false ~loc:lid.loc lid.txt env in
+      let ctl =
+        (* Mirror [Typetexp.transl_type]: a single [_] argument stands for
+           all of the type's parameters. *)
+        match ctl with
+        | [ {ptyp_desc=Ptyp_any None} as t ] when decl.type_arity > 1 ->
+            List.map (fun _ -> t) decl.type_params
+        | _ -> ctl
+      in
       if List.length ctl <> decl.type_arity
       then newvar (Jkind.Builtin.any ~why:Dummy_jkind)
       else begin
@@ -6506,7 +6593,8 @@ let shallow_iter_ppat f p =
   | Ppat_construct (_, Some (_, p))
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
-  | Ppat_constraint (p,_,_) | Ppat_lazy p -> f p
+  | Ppat_constraint (p,_,_)
+  | Ppat_addr (_, p) | Ppat_lazy p -> f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 
@@ -6731,6 +6819,12 @@ let generalize_structure_type_block_access_result
 let generalize_structure_type_unboxed_access_result
       (el_ty, Uaccess_unboxed_field _) =
   generalize_structure el_ty
+
+let lower_nongen loc env level mty =
+  match Mtype.lower_nongen level mty with
+  | Ok () -> ()
+  | Error { var; kind } ->
+    Error.log_and_raise loc env (Non_generalizable_escape { mty; var; kind })
 
 let unique_use ~loc ~env mode_l mode_r  =
   if not (Language_extension.is_at_least Unique
@@ -7181,8 +7275,10 @@ let create_typing_recovery_error_node loc env ty_expected ~attributes =
             desc =
               { Types.val_type = ty_expected;
                 val_kind =
-                  Val_reg (Var (Jkind.Sort.new_var
-                                  ~level:(Ctype.get_current_level ())));
+                  Val_reg
+                    (Representable
+                       (Var (Jkind.Sort.new_var
+                               ~level:(Ctype.get_current_level ()))));
                 val_lpoly = Lpoly.determined [];
                 val_loc = loc;
                 val_attributes = [];
@@ -7319,7 +7415,7 @@ and type_expect_
           match extract_concrete_record record_form env ty with
           | Record_type (p0, p, _, _) ->
               Some (p0, p, is_principal ty)
-          | Record_type_of_other_form ->
+          | Record_type_of_other_form _ ->
               Error.log_and_raise loc env other_form_error
           | Maybe_a_record_type -> None
           | Not_a_record_type ->
@@ -8420,7 +8516,7 @@ and type_expect_
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
       let (record, _, rmode, label, expected_type, ambiguity) =
-        type_label_access Legacy env srecord Env.Mutation lid in
+        type_label_access Legacy loc env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
         then
@@ -8952,7 +9048,7 @@ and type_expect_
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let modl, md_shape = !type_module env smodl in
-              Mtype.lower_nongen lv modl.mod_type;
+              lower_nongen loc env lv modl.mod_type;
               let pres =
                 match modl.mod_type with
                 | Mty_alias _ -> Mp_absent
@@ -10610,9 +10706,9 @@ and type_function
      }
 
 and type_label_access
-  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
+  : 'rep . 'rep record_form -> _ -> _ -> _ -> _ -> _ ->
     _ * _ * _ * 'rep gen_label_description * _ * _
-  = fun record_form env srecord usage lid ->
+  = fun record_form loc env srecord usage lid ->
   let mode = With_regionality.newvar (get_current_level ()) in
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
@@ -10631,9 +10727,22 @@ and type_label_access
     | Record_type(p0, p, _, _) ->
         Some(p0, p, is_principal ty_exp)
     | Maybe_a_record_type -> None
-    | Record_type_of_other_form ->
-        let error = Expr_record_type_has_wrong_boxing (P record_form, ty_exp) in
-        Error.log_and_raise record.exp_loc env error
+    | Record_type_of_other_form fields ->
+        let name = Longident.last lid.txt in
+        let field =
+          List.find_opt (fun ld -> Ident.name ld.Types.ld_id = name) fields
+        in
+        let error_loc, error =
+          match P record_form, usage, field with
+          | P Legacy, Env.Mutation, Some { ld_mutable; _ } ->
+              loc,
+              Unboxed_label_assignment
+                { lid = lid.txt; mutability = ld_mutable }
+          | _ ->
+              record.exp_loc,
+              Expr_record_type_has_wrong_boxing (P record_form, ty_exp)
+        in
+        Error.log_and_raise error_loc env error
     | Not_a_record_type ->
         let error = Expr_not_a_record_type (P record_form, ty_exp) in
         Error.log_and_raise record.exp_loc env error
@@ -10655,14 +10764,18 @@ and type_label_access
     in
     let make_fake_label (type rep) (record_form : rep record_form)
       : rep gen_label_description =
+      let lbl_mut =
+        Mutable {
+          mode = Mode.With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+      in
       {
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
-        lbl_mut =
-          Mutable { mode = Mode.With_regionality.Comonadic.legacy;
-                    atomic = Nonatomic };
-        lbl_modalities = Mode.Modality.Const.id;
+        lbl_mut;
+        lbl_modalities = Typemode.mutable_modalities lbl_mut;
         lbl_pos = 0;
         lbl_all = [||];
         lbl_repres =
@@ -10684,7 +10797,7 @@ and solve_Pexp_field
     _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
   fun ~label_usage loc env sexp srecord record_form lid ->
   let (record, record_sort, rmode, label, _expected_type, ambiguity) =
-    type_label_access record_form env srecord label_usage lid
+    type_label_access record_form loc env srecord label_usage lid
   in
   let ty_arg, record_repres =
     with_local_level_generalize_structure_if_principal
@@ -11173,7 +11286,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
       let var_pair ~(mode : With_regionality.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg sort;
+          { val_type = ty; val_kind = Val_reg (Representable sort);
             val_lpoly = Lpoly.determined [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
@@ -14508,6 +14621,18 @@ let report_error ~loc env =
          which is %s record rather than %s one."
         (Style.as_inline_code Printtyp.type_expr) ty
         actual expected
+  | Unboxed_label_assignment { lid; mutability = Mutable _ } ->
+      Location.errorf ~loc
+        "The unboxed record field %a is declared mutable,@ \
+         but fields of unboxed records can't be mutated."
+        quoted_longident lid
+  | Unboxed_label_assignment { lid; mutability = Immutable } ->
+      Location.errorf ~loc
+        ~sub:[ Location.msg
+                 "@{<hint>Hint@}: Only mutable fields of boxed records can be \
+                  mutated." ]
+        "The unboxed record field %a is not mutable"
+        quoted_longident lid
   | Invalid_unboxed_access { prev_el_type; ua } ->
       begin match ua with
       | Uaccess_unboxed_field { txt = lid; _ } ->
@@ -14814,6 +14939,17 @@ let report_error ~loc env =
          Consider using a regular %a instead."
         Style.inline_code "poly_"
         Style.inline_code "let"
+  (* Same as [Typemod.Non_generalizable_escape] *)
+  | Non_generalizable_escape { mty; var; kind } ->
+      Out_type.add_type_to_preparation var;
+      Location.errorf ~loc
+        "The type of this module,@ %a,@ \
+         contains a non-generalized variable %a of kind@;<1 2>%a.@ \
+         The kind constructor@;<1 2>%a@ would escape its scope."
+        Printtyp.modtype mty
+        (Style.as_inline_code Out_type.prepared_type_scheme) var
+        (Style.as_inline_code Printtyp.path) kind
+        (Style.as_inline_code Printtyp.path) kind
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

@@ -156,18 +156,18 @@ let module_substitution sub x =
 
 let include_kind sub = function
   | Tincl_structure -> Tincl_structure
-  | Tincl_functor { input_coercion; input_repr; yielding } ->
+  | Tincl_functor { input_coercion; input_repr; yielding; staticity } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_functor { input_coercion; input_repr; yielding }
-  | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
+      Tincl_functor { input_coercion; input_repr; yielding; staticity }
+  | Tincl_gen_functor { input_coercion; input_repr; yielding; staticity } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_gen_functor { input_coercion; input_repr; yielding }
+      Tincl_gen_functor { input_coercion; input_repr; yielding; staticity }
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
@@ -390,6 +390,7 @@ let pat
                      sort; mode; type_expr }
     | Tpat_fun_layout { id; name; uid; sort; mode; lpoly } ->
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode; lpoly }
+    | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc

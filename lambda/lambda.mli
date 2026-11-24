@@ -126,9 +126,10 @@ type region_close =
 (** Whether an application might perform a free effect (i.e. an effect
     handled in the parent stack). [Unyielding] means the applied
     function and all of its arguments were at mode [unyielding], so the
-    call can never perform a free effect. Only meaningful for bytecode
-    (it is recorded in debug events for consumers such as js_of_ocaml);
-    native backends ignore it. *)
+    call can never perform a free effect. Only meaningful for js_of_ocaml:
+    bytecode records it in debug events, and Flambda 2 carries it through
+    to JSIR (see [Apply_expr.Yielding]), whereas the native backend ignores
+    it. *)
 type yielding_kind =
   | May_yield
   | Unyielding
@@ -482,6 +483,7 @@ type primitive =
   | Pdls_get
   | Ptls_get
   | Pdomain_index
+  | Pthread_self_id
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -1384,6 +1386,10 @@ val is_evaluated : lambda -> bool
 
 val free_variables: lambda -> Ident.Set.t
 
+val free_sort_vars: lambda -> Layout_ident.Set.t
+(** The sort variables in the layouts of a term, other than those bound by a
+    kind template within it. *)
+
 val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda
@@ -1465,11 +1471,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
 
-val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
-(** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
-
-val duplicate_function : lfunction -> lfunction
-(** Duplicate a term, freshening all locally-bound identifiers. *)
+val duplicate_function : ?rename:Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Duplicate a term, freshening all locally-bound identifiers and renaming
+    free identifiers according to [rename]. *)
 
 val map : (lambda -> lambda) -> lambda -> lambda
   (** Bottom-up rewriting, applying the function on

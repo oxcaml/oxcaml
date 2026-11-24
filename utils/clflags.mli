@@ -59,7 +59,7 @@ type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium | Fidelity_high
   | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -81,13 +81,13 @@ val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
-val include_dirs : visible_include list ref
-val hidden_include_dirs : string list ref
+val include_dirs : include_dir list ref
+val hidden_include_dirs : include_dir list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
 
 type hidden_include_file =
-  { visible_path : string;
+  { basename : string;
     actual_path : string;
     cmx_guaranteed : bool;
   }
@@ -135,7 +135,7 @@ val match_context_rows : int ref
 val safer_matching : bool ref
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 val open_args : open_arg list ref
 val preprocessor : string option ref
@@ -216,19 +216,38 @@ module Target : sig
     | Bytecode
     | Native
     | Js_of_ocaml
+    | Wasm_of_ocaml
+end
+
+module Jsir_target : sig
+  type t =
+    | Js
+    | Wasm
+
+  val program_name : t -> string
 end
 
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
-val target_is_jsir : unit -> bool
+val target_is_bytecode : unit -> bool
 
-(** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
-    can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
-    of them):
-    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
-    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a]);
-    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
-    - [Link]: [js_of_ocaml link], when linking an executable. *)
+(** Whether the target is one of the JSIR targets. *)
+val target_is_jsir : unit -> bool
+val jsir_target : unit -> Jsir_target.t option
+val jsir_target_exn : unit -> Jsir_target.t
+
+(** The invocations of [js_of_ocaml] (or [wasm_of_ocaml] with
+    [-target wasm_of_ocaml]) that options can be passed through to, with
+    [-jsoo-opt-<phase>] (and [-jsoo-opt] for all of them):
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmo-js]
+      ([.cmo-wasm]), or compiling the whole program when linking an executable
+      with [-link-jsir];
+    - [Archive]: [js_of_ocaml link -a], producing a [.cma-js] ([.cma-wasm])
+      ([-a]); not run with [-link-jsir];
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable (not
+      run with [-link-jsir]);
+    - [Link]: [js_of_ocaml link], when linking an executable (not run with
+      [-link-jsir]). *)
 module Jsoo_phase : sig
   type t = All | Compile | Archive | Runtime | Link
 
@@ -240,6 +259,34 @@ end
 
 (** The options given for a phase, most recent first. *)
 val jsoo_opts : Jsoo_phase.t -> string list ref
+
+module Jsoo_effects : sig
+  type t = Disabled | Cps | Double_translation | Jspi | Native
+
+  val all : t list
+
+  val to_string : t -> string
+
+  val of_string : string -> t option
+
+  (** The values supported by a target, in the order of [all]. *)
+  val supported_by : Jsir_target.t -> t list
+
+  (** The value used when [-jsoo-effects] is not given: [Double_translation]
+      for [Js] and [Jspi] for [Wasm]. *)
+  val default : Jsir_target.t -> t
+end
+
+(** Whether the units of an executable are linked as JSIR into one program
+    that [js_of_ocaml] (or [wasm_of_ocaml]) compiles as a whole, instead of
+    being compiled one by one and linked by [js_of_ocaml link]. Object files
+    then hold JSIR (see [Jscomp]). *)
+val link_jsir : bool ref
+
+val jsir_inlined_frames : bool ref
+val set_jsoo_effects : Jsoo_effects.t -> unit
+val jsoo_effects : unit -> Jsoo_effects.t option
+
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
@@ -301,6 +348,8 @@ val dump_jsir : bool ref
 val classic_inlining : bool ref
 val afl_instrument : bool ref
 val afl_inst_ratio : int ref
+val gated_trace_pc_guard : bool ref
+val gated_trace_pc_guard_define_gate : bool ref
 val function_sections : bool ref
 val probes : bool ref
 val kind_verbosity : int ref
@@ -320,6 +369,8 @@ val set_dumped_pass : string -> bool -> unit
 val dump_into_file : bool ref
 val dump_into_csv : bool ref
 val dump_dir : string option ref
+val enable_action_trace : bool ref
+val debug_action_trace : bool ref
 
 val keyword_edition: string option ref
 val parse_keyword_edition: string -> (int*int) option * string list

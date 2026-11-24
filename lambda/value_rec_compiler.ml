@@ -43,13 +43,6 @@
 
 open Lambda
 
-type error = | Recursive_template
-
-exception Error of (Location.t * error)
-
-let raise_error ~loc error =
-  raise (Error (Debuginfo.Scoped_location.to_location loc, error))
-
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
@@ -191,10 +184,18 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
-let bytecode_block_size shape =
-  match singleton_product_shape_for_bytecode shape with
-  | Some elements -> Array.length elements
-  | None -> Array.length shape
+let non_native_block_size shape =
+  if Clflags.target_is_jsir () then
+    (* JSIR has one field per flattened, non-void component. *)
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.pp_print_string ppf "()")
+    in
+    Mixed_block_shape.new_block_length shape
+  else
+    match singleton_product_shape_for_bytecode shape with
+    | Some elements -> Array.length elements
+    | None -> Array.length shape
 
 let compute_mixed_block_size shape =
   if Clflags.target_is_native () then
@@ -203,7 +204,7 @@ let compute_mixed_block_size shape =
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = bytecode_block_size shape in
+    let size = non_native_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -279,9 +280,7 @@ let compute_static_size lam =
       assert false
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
-    | Ltemplate tmpl ->
-      raise_error ~loc:tmpl.loc Recursive_template
-    | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
+    | Ltemplate _ | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -294,14 +293,14 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
-  (* In native code, void fields are erased, so the runtime block size is the
-     number of value fields only. In bytecode, void fields are kept, so the
-     block size includes all fields. *)
+  (* In native code and JSIR, void fields are erased, so the runtime block
+     size is the number of value fields only. In bytecode, void fields are
+     kept, so the block size includes all fields. *)
   and all_value_mixed_block_size shape =
     if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else bytecode_block_size shape
+    else non_native_block_size shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env loc p args =
@@ -417,7 +416,9 @@ let compute_static_size lam =
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
-        | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray ->
+        | Pgenarray ->
+            dynamic_size lam
+        | Paddrarray | Pgcignorableaddrarray | Pintarray ->
             Block (Regular_block size)
         | Pfloatarray ->
             Block (Float_record size)
@@ -514,6 +515,7 @@ let compute_static_size lam =
     | Pdls_get
     | Ptls_get
     | Pdomain_index
+    | Pthread_self_id
     | Ppeek _
     | Ppoke _
     | Pscalar _
@@ -1187,18 +1189,3 @@ let compile_letrec input_bindings body =
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations
-
-open Format_doc
-
-let report_error ppf = function
-  | Recursive_template ->
-    fprintf ppf "Recursive static functors are not supported"
-
-let () =
-  Location.register_error_of_exn
-    (function
-      | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
-      | _ ->
-          None
-    )

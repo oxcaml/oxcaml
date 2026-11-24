@@ -84,8 +84,9 @@ let continue continuation args =
   Terminator.Continue
     { continuation; args = Array.map (fun arg -> Terminator.Arg arg) args }
 
-let new_block env ~params =
+let new_block env ~params ~entry_dbg =
   Block.create env.graph ~params ~cold:env.cold ~handler_dbg:Debuginfo.none
+    ~entry_dbg
 
 (* Matches [Cfg_selectgen.mark_sub_cfg_as_cold], including its gating on
    [-cfg-block-layout]: a block is cold iff it is emitted lexically inside the
@@ -118,10 +119,9 @@ let bind_let env c v args =
   emit_name_for_debugger env c v args;
   env
 
-let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
-  let make_cond op args =
-    (emit_op env c op Debuginfo.none Cmm.typ_int args).(0)
-  in
+let emit_branch env c (test : Operation.test) rarg ~dbg ~true_block ~false_block
+    =
+  let make_cond op args = (emit_op env c op dbg Cmm.typ_int args).(0) in
   (* A boolean branch is a two-target switch: [targets.(0)] is the false edge,
      [targets.(1)] the true edge. The condition is always a 0/1 comparison. *)
   let branch index ~true_block ~false_block : under_construction Terminator.t =
@@ -154,7 +154,7 @@ let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
         (make_cond (Intop_imm (Iand, 1)) [| rarg.(0) |])
         ~true_block:false_block ~false_block:true_block
   in
-  finish_block env c ~dbg:Debuginfo.none term
+  finish_block env c ~dbg term
 
 let rec emit_parts_list env c exp_list :
     (Cmm.expression list * env) Or_never_returns.t =
@@ -263,51 +263,36 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
-    | Cifthenelse
-        (econd, _ifso_dbg, ifso_p, eif, _ifnot_dbg, ifnot_p, eelse, _dbg) ->
-      emit_ifthenelse env c ~tail econd ifso_p eif ifnot_p eelse
-    | Cswitch (esel, index, ecases, _dbg) ->
-      emit_switch env c ~tail esel index ecases
+    | Cifthenelse (econd, ifso_dbg, ifso_p, eif, ifnot_dbg, ifnot_p, eelse, dbg)
+      ->
+      emit_ifthenelse env c ~tail econd ~ifso_dbg ifso_p eif ~ifnot_dbg ifnot_p
+        eelse ~dbg
+    | Cswitch (esel, index, ecases, dbg) ->
+      emit_switch env c ~tail esel index ecases ~dbg
     | Ccatch (_, [], e1) -> emit env c e1 ~tail
     | Ccatch (_flag, handlers, body) -> emit_catch env c ~tail handlers body
     (* Leaf expressions *)
-    | Cconst_int (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_int (Nativeint.of_int n))
-           Debuginfo.none Cmm.typ_int [||])
-    | Cconst_natint (n, _dbg) ->
-      Ok (emit_op env c (SU.make_const_int n) Debuginfo.none Cmm.typ_int [||])
-    | Cconst_float32 (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_float32 (Int32.bits_of_float n))
-           Debuginfo.none Cmm.typ_float32 [||])
-    | Cconst_float (n, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_float (Int64.bits_of_float n))
-           Debuginfo.none Cmm.typ_float [||])
-    | Cconst_vec128 (bits, _dbg) ->
-      Ok
-        (emit_op env c
-           (SU.make_const_vec128 bits)
-           Debuginfo.none Cmm.typ_vec128 [||])
-    | Cconst_vec256 (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_vec256 bits) Debuginfo.none
-           Cmm.typ_vec256 [||])
-    | Cconst_vec512 (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_vec512 bits) Debuginfo.none
-           Cmm.typ_vec512 [||])
-    | Cconst_mask (bits, _dbg) ->
-      Ok
-        (emit_op env c (Operation.Const_mask bits) Debuginfo.none Cmm.typ_mask
-           [||])
-    | Cconst_symbol (n, _dbg) ->
-      Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_int [||])
+    | Cconst_int (n, dbg) ->
+      let op = SU.make_const_int (Nativeint.of_int n) in
+      Ok (emit_op env c op dbg Cmm.typ_int [||])
+    | Cconst_natint (n, dbg) ->
+      Ok (emit_op env c (SU.make_const_int n) dbg Cmm.typ_int [||])
+    | Cconst_float32 (n, dbg) ->
+      let op = SU.make_const_float32 (Int32.bits_of_float n) in
+      Ok (emit_op env c op dbg Cmm.typ_float32 [||])
+    | Cconst_float (n, dbg) ->
+      let op = SU.make_const_float (Int64.bits_of_float n) in
+      Ok (emit_op env c op dbg Cmm.typ_float [||])
+    | Cconst_vec128 (bits, dbg) ->
+      Ok (emit_op env c (SU.make_const_vec128 bits) dbg Cmm.typ_vec128 [||])
+    | Cconst_vec256 (bits, dbg) ->
+      Ok (emit_op env c (Operation.Const_vec256 bits) dbg Cmm.typ_vec256 [||])
+    | Cconst_vec512 (bits, dbg) ->
+      Ok (emit_op env c (Operation.Const_vec512 bits) dbg Cmm.typ_vec512 [||])
+    | Cconst_mask (bits, dbg) ->
+      Ok (emit_op env c (Operation.Const_mask bits) dbg Cmm.typ_mask [||])
+    | Cconst_symbol (n, dbg) ->
+      Ok (emit_op env c (SU.make_const_symbol n) dbg n.sym_type [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -330,8 +315,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
         ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
            | Caddi128 | Csubi128 | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
            | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
-           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-           | Capply _ | Cextcall _ | Cload _
+           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
+           | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
            | Cstore (_, _)
            | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
@@ -341,7 +326,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            | Cprobe _ | Cprobe_is_enabled _ | Copaque _ ) as op),
           args,
           dbg ) ->
-      emit_expr_op env c op args dbg
+      emit_expr_op env c ~tail op args dbg
     | Cexit (lbl, args, traps) -> emit_expr_exit env c lbl args traps
     | Cinvalid { message; symbol } -> emit_invalid env c message symbol
   in
@@ -361,7 +346,9 @@ and emit_invalid env c message symbol =
   in
   if current_function_is_check_enabled
   then (
-    let cont_block = new_block env ~params:Cmm.typ_int in
+    let cont_block =
+      new_block env ~params:Cmm.typ_int ~entry_dbg:Debuginfo.none
+    in
     finish_block env c ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
     Cursor.move c ~new_pos:cont_block;
@@ -375,7 +362,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     result =
   let may_raise = Cfg.can_raise_terminator new_op in
   let call_returning_to op (ty : Cmm.machtype) : result =
-    let cont_block = new_block env ~params:ty in
+    let cont_block = new_block env ~params:ty ~entry_dbg:Debuginfo.none in
     finish_block env c ~dbg
       (Call
          { op;
@@ -387,6 +374,17 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Cursor.move c ~new_pos:cont_block;
     Ok (Block.params cont_block)
   in
+  let call_no_return op : result =
+    finish_block env c ~dbg
+      (Call
+         { op;
+           args = arg_instrs;
+           continuation = Unreachable;
+           may_raise;
+           nontail
+         });
+    Never_returns
+  in
   match new_op with
   | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
   | Call { op = Indirect candidates; _ } ->
@@ -395,16 +393,9 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     call_returning_to (External ext_call) ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return ext_call ->
-    finish_block env c ~dbg
-      (Call
-         { op = External ext_call;
-           args = arg_instrs;
-           continuation = Unreachable;
-           may_raise;
-           nontail
-         });
-    Never_returns
+  | Call_no_return (Direct sym) -> call_no_return (Direct sym)
+  | Call_no_return (Indirect candidates) -> call_no_return (Indirect candidates)
+  | External_call_no_return ext_call -> call_no_return (External ext_call)
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
   | Invalid _ ->
@@ -412,7 +403,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
       (Printcfg.terminator_desc ~sep:"")
       new_op
 
-and emit_expr_op env c op args dbg : result =
+and emit_expr_op env c ~tail op args dbg : result =
   let* simple_args, env = emit_parts_list env c args in
   let ty = SU.oper_result_type op in
   let new_op, new_args =
@@ -440,7 +431,8 @@ and emit_expr_op env c op args dbg : result =
   | Basic
       ( Op
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-          | Tls_get | Domain_index | Poll | Pause | Const_int _
+          | Tls_get | Domain_index | Thread_self_id | Poll | Pause
+          | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
           | Load _
@@ -458,9 +450,13 @@ and emit_expr_op env c op args dbg : result =
     | Terminator term ->
       let nontail =
         match[@warning "-fragile-match"] op with
-        | Cmm.Capply { region; _ } -> (
+        | Cmm.Capply { region; returns; _ } -> (
           match (region : Lambda.region_close) with
-          | Rc_normal -> false
+          | Rc_normal ->
+            (* A call that never returns gets an [Unreachable] continuation,
+               which [Ssa_tail_call] can turn into a tail call. Only allow this
+               in tail position, matching [Cfg_selectgen.emit_tail]. *)
+            not (returns || tail)
           | Rc_nontail -> true
           | Rc_close_at_apply ->
             Misc.fatal_error
@@ -475,31 +471,34 @@ and emit_expr_op env c op args dbg : result =
       Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
         basic)
 
-and emit_ifthenelse env c ~tail econd ifa eif elsea eelse : result =
+and emit_ifthenelse env c ~tail econd ~ifso_dbg ifa eif ~ifnot_dbg elsea eelse
+    ~dbg : result =
+  let dbg = SU.dbg_of_test econd dbg in
   let cond, earg = Sel.select_condition econd in
   let* rarg = emit env c earg ~tail:false in
   let then_env = if branch_is_cold ifa then { env with cold = true } else env in
   let else_env =
     if branch_is_cold elsea then { env with cold = true } else env
   in
-  let then_block = new_block then_env ~params:[||] in
-  let else_block = new_block else_env ~params:[||] in
-  emit_branch env c cond rarg ~true_block:then_block ~false_block:else_block;
+  let then_block = new_block then_env ~params:[||] ~entry_dbg:ifso_dbg in
+  let else_block = new_block else_env ~params:[||] ~entry_dbg:ifnot_dbg in
+  emit_branch env c cond rarg ~dbg ~true_block:then_block
+    ~false_block:else_block;
   let then_c = Cursor.start then_block in
   let r_then = emit then_env then_c eif ~tail in
   let else_c = Cursor.start else_block in
   let r_else = emit else_env else_c eelse ~tail in
   join env c [| r_then, then_c; r_else, else_c |]
 
-and emit_switch env c ~tail esel index ecases : result =
+and emit_switch env c ~tail esel index ecases ~dbg : result =
   let* rsel = emit env c esel ~tail:false in
   let case_blocks =
     Array.map
-      (fun (_case_expr, _dbg, annots) ->
+      (fun (_case_expr, case_dbg, annots) ->
         let env =
           if branch_is_cold annots then { env with cold = true } else env
         in
-        new_block env ~params:[||])
+        new_block env ~params:[||] ~entry_dbg:case_dbg)
       ecases
   in
   let targets = Array.map (fun idx -> case_blocks.(idx)) index in
@@ -507,7 +506,7 @@ and emit_switch env c ~tail esel index ecases : result =
     assert (Array.length rsel = 1);
     rsel.(0)
   in
-  finish_block env c ~dbg:Debuginfo.none (Switch { index; targets });
+  finish_block env c ~dbg (Switch { index; targets });
   let case_results =
     Array.mapi
       (fun i (case_expr, _dbg, _) ->
@@ -529,7 +528,7 @@ and emit_catch env c ~tail handlers body : result =
         let handler_block =
           Block.create env.graph ~params:types
             ~cold:(env.cold || handler_is_cold handler)
-            ~handler_dbg:dbg
+            ~handler_dbg:dbg ~entry_dbg:Debuginfo.none
         in
         ( Static_label.Map.add nfail handler_block static_exceptions,
           handler_block ))
@@ -611,7 +610,9 @@ and join env c (results : (result * Cursor.t) array) : result =
   match !join_info with
   | None -> Never_returns
   | Some join_types ->
-    let join_block = new_block env ~params:join_types in
+    let join_block =
+      new_block env ~params:join_types ~entry_dbg:Debuginfo.none
+    in
     results
     |> Array.iter (fun ((r, c_branch) : result * Cursor.t) ->
         match r with

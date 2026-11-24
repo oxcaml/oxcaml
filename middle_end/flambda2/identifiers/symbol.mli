@@ -26,3 +26,14 @@ val is_predefined_exception : t -> bool
 (** Same as [create] but follows [Flambda_features.Expert.shorten_symbol_names]
     and uses a specific global counter. *)
 val manufacture : Compilation_unit.t -> string -> t
+
+type stamp_state
+
+val export_stamp_state : unit -> stamp_state
+
+(** Set the counter used by [manufacture]. This can only be called before any
+    symbol has been manufactured in the current process, and will error
+    otherwise. *)
+val restore_stamp_state : stamp_state -> unit
+
+val merge_stamp_state : stamp_state -> stamp_state -> stamp_state

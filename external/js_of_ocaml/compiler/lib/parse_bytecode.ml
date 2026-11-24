@@ -3651,33 +3651,133 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   Code.invariant p.code;
   p
 
+let register_predefined_exceptions () =
+  let open Code in
+  List.map predefined_exceptions ~f:(fun (index, name) ->
+      assert (String.is_valid_utf_8 name);
+      let exn = Var.fresh () in
+      let v_name = Var.fresh () in
+      let v_index = Var.fresh () in
+      let by_index =
+        match Config.target () with
+        | `Wasm -> Some index
+        | `JavaScript -> None
+      in
+      [ Let (v_name, Constant (String name))
+      ; Let
+          ( v_index
+          , Constant
+              (Int
+                 ((* Predefined exceptions are registered in
+                     Symtable.init with [-index - 1] *)
+                  Targetint.of_int_exn
+                    (-index - 1))) )
+      ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
+      ]
+      @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
+  |> List.concat
+
 type jsir_unit =
   { name : string
+  ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
+  ; whole_program : bool
   }
 
-let from_cmj ic =
-  let { Code.program
+(* The OxCaml JSIR backend records source files as the compiler does in debug
+   information, rewritten with [BUILD_PATH_PREFIX_MAP]. *)
+let restore_source_paths (program : Code.program) =
+  match Build_path_prefix_map.get_build_path_prefix_map () with
+  | None -> program
+  | Some map ->
+      let map = Build_path_prefix_map.flip map in
+      let restore (pi : Parse_info.t) =
+        match pi.src with
+        | Some src when not (Filename.is_relative src) ->
+            { pi with src = Some (Build_path_prefix_map.rewrite map src) }
+        | Some _ | None -> pi
+      in
+      let blocks =
+        Addr.Map.map
+          (fun block ->
+            let body =
+              List.map block.body ~f:(function
+                | Event pi -> Event (restore pi)
+                | Let (x, Closure (params, cont, (hint, Some pi))) ->
+                    Let (x, Closure (params, cont, (hint, Some (restore pi))))
+                | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) as instr
+                  -> instr)
+            in
+            { block with body })
+          program.blocks
+      in
+      { program with blocks }
+
+let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
+  let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
+  (match Magic_number.kind magic with
+  | `Jsir -> ()
+  | `Cmo | `Cma | `Exe | `Other _ ->
+      raise Magic_number.(Bad_magic_number (to_string magic)));
+  if
+    Config.Flag.check_magic () && not (Magic_number.equal magic Magic_number.current_jsir)
+  then raise Magic_number.(Bad_magic_version magic);
+  let { Code.target
+      ; program
       ; last_var
+      ; var_names
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
+      ; whole_program
+      ; symbol_imports = _
+      ; symbol_exports = _
       } =
-    (Marshal.from_channel ic : Code.cmj_body)
+    (Marshal.from_channel ic : Code.jsir_file)
   in
   (* Each unit is compiled one at a time, so the variables might not be disjoint.
      This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
-  { name = exported_compilation_unit
-  ; program = Code.Marshalable_program.to_program program
-  ; info =
-      Unit_info.of_compilation_units
-        ~exported:exported_compilation_unit
-        ~imported:imported_compilation_units
-        ~force_link
-  }
+  List.iter var_names ~f:(fun (var, name) -> Code.Variable_name.set var name);
+  let program = restore_source_paths (Code.Marshalable_program.to_program program) in
+  let program =
+    if whole_program
+    then Code.prepend program (register_predefined_exceptions ())
+    else program
+  in
+  let unit =
+    { name = exported_compilation_unit
+    ; target
+    ; program
+    ; info =
+        Unit_info.of_compilation_units
+          ~exported:exported_compilation_unit
+          ~imported:imported_compilation_units
+          ~force_link
+    ; whole_program
+    }
+  in
+  let program_name : Code.jsir_target -> string = function
+    | Js -> "js_of_ocaml"
+    | Wasm -> "wasm_of_ocaml"
+  in
+  let output_language : Code.jsir_target -> string = function
+    | Js -> "JavaScript"
+    | Wasm -> "WebAssembly"
+  in
+  (match target, expected_target with
+  | Js, Js | Wasm, Wasm -> ()
+  | Js, Wasm | Wasm, Js ->
+      failwith
+        (Printf.sprintf
+           "%s was compiled for %s (ocamlopt -target %s) and cannot be compiled to %s"
+           filename
+           (program_name target)
+           (program_name target)
+           (output_language expected_target)));
+  unit
 
 let from_channel ic =
   let format =
@@ -3725,32 +3825,7 @@ let from_channel ic =
 
 let predefined_exceptions () =
   (* Register predefined exceptions in case of separate compilation *)
-  let body =
-    let open Code in
-    List.map predefined_exceptions ~f:(fun (index, name) ->
-        assert (String.is_valid_utf_8 name);
-        let exn = Var.fresh () in
-        let v_name = Var.fresh () in
-        let v_index = Var.fresh () in
-        let by_index =
-          match Config.target () with
-          | `Wasm -> Some index
-          | `JavaScript -> None
-        in
-        [ Let (v_name, Constant (String name))
-        ; Let
-            ( v_index
-            , Constant
-                (Int
-                   ((* Predefined exceptions are registered in
-                       Symtable.init with [-index - 1] *)
-                    Targetint.of_int_exn
-                      (-index - 1))) )
-        ; Let (exn, Block (248, [| v_name; v_index |], NotArray, Immutable))
-        ]
-        @ register_global_instrs exn ~name:(Glob_predef (Predef name)) ?by_index [])
-    |> List.concat
-  in
+  let body = register_predefined_exceptions () in
   let block = { params = []; body; branch = Stop } in
   let unit_info =
     { Unit_info.provides = Global_name.Compunit_set.empty

@@ -81,6 +81,8 @@ let to_string { position; inlining_stack } =
   |> List.map Position.to_string
   |> String.concat " <- "
 
+let print ppf t = Format.fprintf ppf "%s" (to_string t)
+
 let hash { position; inlining_stack } =
   List.map Position.hash (position :: inlining_stack)
 

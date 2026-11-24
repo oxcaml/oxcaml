@@ -416,6 +416,27 @@ val has_f16c : bool
 val has_fma : bool
 (* Whether the compiler was configured on a machine with FMA *)
 
+val has_avx512f : bool
+(* Whether the compiler was configured on a machine with AVX512F *)
+
+val has_avx512dq : bool
+(* Whether the compiler was configured on a machine with AVX512DQ *)
+
+val has_avx512cd : bool
+(* Whether the compiler was configured on a machine with AVX512CD *)
+
+val has_avx512bw : bool
+(* Whether the compiler was configured on a machine with AVX512BW *)
+
+val has_avx512vl : bool
+(* Whether the compiler was configured on a machine with AVX512VL *)
+
+val has_avx512bf16 : bool
+(* Whether the compiler was configured on a machine with AVX512_BF16 *)
+
+val has_vpclmulqdq : bool
+(* Whether the compiler was configured on a machine with VPCLMULQDQ *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
 

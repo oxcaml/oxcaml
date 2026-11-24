@@ -482,15 +482,16 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
   | Switch { scrutinee; cases } ->
     let (acc, build_let_ks), arms =
       List.fold_left_map
-        (fun (acc, build_let_ks) (case, apply) ->
-          match (apply : Fexpr.apply_or_inlined_cont) with
+        (fun (acc, build_let_ks)
+             ({ tag; action; annotations } : Fexpr.switch_case) ->
+          let arm apply = Switch_arm.create ~annotations apply in
+          match action with
           | Named_cont apply ->
             (* CR mshinwell: Should get machine_width from fexpr context when
                available *)
             let acc, apply = apply_cont env acc apply in
-            let arm = Switch_arm.from_apply_cont apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, arm) )
+              (Target_ocaml_int.of_int machine_width tag, arm apply) )
           | Inlined_goto body ->
             let (acc : Acc.t), build_let, (apply : Apply_cont_expr.t) =
               inlined_goto env acc body
@@ -499,9 +500,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let acc, let_k = build_let acc body in
               build_let_ks acc let_k
             in
-            let arm = Switch_arm.from_apply_cont apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, arm) ))
+              (Target_ocaml_int.of_int machine_width tag, arm apply) ))
         (acc, fun acc e -> acc, e)
         cases
     in
@@ -697,7 +697,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             is_tupled;
             stub;
             loopify;
-            result_mode
+            result_mode;
+            fdo_entry_annotation
           } ->
         let code_id = find_code_id env id in
         let newer_version_of = Option.map (find_code_id env) newer_version_of in
@@ -837,7 +838,11 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
-            ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
+            ~dbg:Debuginfo.none
+            ~fdo_entry_annotation:
+              (Option.value fdo_entry_annotation
+                 ~default:Fdo_annotation.With_body_hash.empty)
+            ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
               (Inlining_history.Absolute.empty (Current_unit.get_cu_exn ()))
@@ -867,7 +872,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         continuation;
         exn_continuation;
         args;
-        arities
+        arities;
+        callsite_counter
       } ->
     let continuation = find_result_cont env continuation in
     let return_mode = alloc_mode_for_applications env alloc_mode in
@@ -970,8 +976,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
         ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
-        ~inlined ~inlining_state ~probe:None ~position:Normal
-        ~relative_history:Inlining_history.Relative.empty
+        ~callsite_counter ~inlined ~inlining_state ~probe:None ~position:Normal
+        ~yielding:May_yield ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
   | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")

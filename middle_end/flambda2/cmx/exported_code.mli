@@ -19,7 +19,7 @@ type raw
 
 include Contains_ids.S with type t := t
 
-val apply_renaming : Code_id.importer -> Renaming.t -> t -> t
+val apply_renaming : Renaming.t -> t -> t
 
 val print : Format.formatter -> t -> unit
 

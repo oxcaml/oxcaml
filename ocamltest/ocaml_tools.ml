@@ -27,6 +27,7 @@ module type Tool = sig
   val output_variable : Variables.t
   val reference_filename_suffix : Environments.t -> string
   val reference_file : Environments.t -> string -> string
+  val extra_dependencies : string list
 end
 
 type tool = (module Tool)
@@ -42,6 +43,7 @@ let tool
   ~(exit_status_variable : Variables.t)
   ~(reference_variable : Variables.t)
   ~(output_variable : Variables.t)
+  ~(extra_dependencies : string list)
 = (module struct
   let name = name
   let family = family
@@ -50,6 +52,7 @@ let tool
   let exit_status_variable = exit_status_variable
   let reference_variable = reference_variable
   let output_variable = output_variable
+  let extra_dependencies = extra_dependencies
 
   let reference_filename_suffix env =
     let tool_reference_suffix =
@@ -78,6 +81,7 @@ let ocamldoc =
     ~exit_status_variable:Ocaml_variables.ocamldoc_exit_status
     ~reference_variable:Ocaml_variables.ocamldoc_reference
     ~output_variable:Ocaml_variables.ocamldoc_output
+    ~extra_dependencies:[]
   )
 
     let reference_filename_suffix env =

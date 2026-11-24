@@ -117,6 +117,7 @@ module Language_feature_name = struct
     | Ppat_or _ -> "or '|' pattern"
     | Ppat_constraint _ -> "type constraint ':' pattern"
     | Ppat_type _ -> "type '#' pattern"
+    | Ppat_addr _ -> "address pattern"
     | Ppat_lazy _ -> "lazy pattern"
     | Ppat_unpack _ -> "first-class module pattern"
     | Ppat_exception _ -> "exception pattern"
@@ -142,6 +143,7 @@ module Language_feature_name = struct
     | Psig_attribute _ -> "module-level attribute (in a sig)"
     | Psig_extension _ -> "extension point as a signature item"
     | Psig_jkind _ -> "kind declaration"
+    | Psig_law _ -> "law declaration"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -159,6 +161,7 @@ module Language_feature_name = struct
     | Pstr_attribute _ -> "module-level attribute (in a struct)"
     | Pstr_extension _ -> "extension point as a structure item"
     | Pstr_jkind _ -> "kind definition"
+    | Pstr_law _ -> "law definition"
     | Pstr_eval _ -> "top-level expression"
     | Pstr_primitive _ -> "primitive 'external' binding"
   ;;
@@ -280,6 +283,7 @@ module Constructor_name = struct
     | Ppat_or _ -> "Ppat_or"
     | Ppat_constraint _ -> "Ppat_constraint"
     | Ppat_type _ -> "Ppat_type"
+    | Ppat_addr _ -> "Ppat_addr"
     | Ppat_lazy _ -> "Ppat_lazy"
     | Ppat_unpack _ -> "Ppat_unpack"
     | Ppat_exception _ -> "Ppat_exception"
@@ -305,6 +309,7 @@ module Constructor_name = struct
     | Psig_attribute _ -> "Psig_attribute"
     | Psig_extension _ -> "Psig_extension"
     | Psig_jkind _ -> "Psig_jkind"
+    | Psig_law _ -> "Psig_law"
   ;;
 
   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
@@ -322,6 +327,7 @@ module Constructor_name = struct
     | Pstr_attribute _ -> "Pstr_attribute"
     | Pstr_extension _ -> "Pstr_extension"
     | Pstr_jkind _ -> "Pstr_jkind"
+    | Pstr_law _ -> "Pstr_law"
     | Pstr_eval _ -> "Pstr_eval"
     | Pstr_primitive _ -> "Pstr_primitive"
   ;;

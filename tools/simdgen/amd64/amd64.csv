@@ -1524,6 +1524,10 @@ PAUSE,F3 90,,NA,NA,NA,NA
 "VPBLENDW ymm1, ymm2, ymm3/m256, imm8",VEX.NDS.256.66.0F3A.WIG 0E /r ib,AVX2,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
 "PCLMULQDQ xmm1, xmm2/m128, imm8",66 0F 3A 44 /r ib,PCLMULQDQ,"ModRM:reg (r, w)",ModRM:r/m (r),imm8,NA
 "VPCLMULQDQ xmm1, xmm2, xmm3/m128, imm8",VEX.NDS.128.66.0F3A.WIG 44 /r ib,PCLMULQDQ AVX,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ ymm1, ymm2, ymm3/m256, imm8",VEX.NDS.256.66.0F3A.WIG 44 /r ib,VPCLMULQDQ AVX,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ xmm1, xmm2, xmm3/m128, imm8",EVEX.NDS.128.66.0F3A.WIG 44 /r ib,AVX512VL VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ ymm1, ymm2, ymm3/m256, imm8",EVEX.NDS.256.66.0F3A.WIG 44 /r ib,AVX512VL VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
+"VPCLMULQDQ zmm1, zmm2, zmm3/m512, imm8",EVEX.NDS.512.66.0F3A.WIG 44 /r ib,AVX512F VPCLMULQDQ,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),imm8
 "PCMPEQB mm,mm/m64",NP 0F 74 /r,MMX,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
 "PCMPEQB xmm1,xmm2/m128",66 0F 74 /r,SSE2,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
 "PCMPEQW mm,mm/m64",NP 0F 75 /r,MMX,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
@@ -2641,6 +2645,12 @@ UD2,0F 0B,,NA,NA,NA,NA
 "VCOMPRESSPS xmm1/m128 {k1}{z}, xmm2",EVEX.128.66.0F38.W0 8A /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VCOMPRESSPS ymm1/m256 {k1}{z}, ymm2",EVEX.256.66.0F38.W0 8A /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VCOMPRESSPS zmm1/m512 {k1}{z}, zmm2",EVEX.512.66.0F38.W0 8A /r,AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VCVTNE2PS2BF16 xmm1 {k1}{z}, xmm2, xmm3/m128/m32bcst",EVEX.NDS.128.F2.0F38.W0 72 /r,AVX512VL AVX512_BF16,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
+"VCVTNE2PS2BF16 ymm1 {k1}{z}, ymm2, ymm3/m256/m32bcst",EVEX.NDS.256.F2.0F38.W0 72 /r,AVX512VL AVX512_BF16,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
+"VCVTNE2PS2BF16 zmm1 {k1}{z}, zmm2, zmm3/m512/m32bcst",EVEX.NDS.512.F2.0F38.W0 72 /r,AVX512_BF16,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
+"VCVTNEPS2BF16 xmm1 {k1}{z}, xmm2/m128/m32bcst",EVEX.128.F3.0F38.W0 72 /r,AVX512VL AVX512_BF16,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"VCVTNEPS2BF16 xmm1 {k1}{z}, ymm2/m256/m32bcst",EVEX.256.F3.0F38.W0 72 /r,AVX512VL AVX512_BF16,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"VCVTNEPS2BF16 ymm1 {k1}{z}, zmm2/m512/m32bcst",EVEX.512.F3.0F38.W0 72 /r,AVX512_BF16,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTPD2QQ xmm1 {k1}{z}, xmm2/m128/m64bcst",EVEX.128.66.0F.W1 7B /r,AVX512VL AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTPD2QQ ymm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.66.0F.W1 7B /r,AVX512VL AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTPD2QQ zmm1 {k1}{z}, zmm2/m512/m64bcst{er}",EVEX.512.66.0F.W1 7B /r,AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
@@ -2720,6 +2730,9 @@ UD2,0F 0B,,NA,NA,NA,NA
 "VDBPSADBW xmm1 {k1}{z}, xmm2, xmm3/m128, imm8",EVEX.NDS.128.66.0F3A.W0 42 /r ib,AVX512VL AVX512BW,ModRM:reg (w),EVEX.vvvv,ModRM:r/m (r),Imm8
 "VDBPSADBW ymm1 {k1}{z}, ymm2, ymm3/m256, imm8",EVEX.NDS.256.66.0F3A.W0 42 /r ib,AVX512VL AVX512BW,ModRM:reg (w),EVEX.vvvv,ModRM:r/m (r),Imm8
 "VDBPSADBW zmm1 {k1}{z}, zmm2, zmm3/m512, imm8",EVEX.NDS.512.66.0F3A.W0 42 /r ib,AVX512BW,ModRM:reg (w),EVEX.vvvv,ModRM:r/m (r),Imm8
+"VDPBF16PS xmm1 {k1}{z}, xmm2, xmm3/m128/m32bcst",EVEX.NDS.128.F3.0F38.W0 52 /r,AVX512VL AVX512_BF16,"ModRM:reg (r, w)",EVEX.vvvv (r),ModRM:r/m (r),NA
+"VDPBF16PS ymm1 {k1}{z}, ymm2, ymm3/m256/m32bcst",EVEX.NDS.256.F3.0F38.W0 52 /r,AVX512VL AVX512_BF16,"ModRM:reg (r, w)",EVEX.vvvv (r),ModRM:r/m (r),NA
+"VDPBF16PS zmm1 {k1}{z}, zmm2, zmm3/m512/m32bcst",EVEX.NDS.512.F3.0F38.W0 52 /r,AVX512_BF16,"ModRM:reg (r, w)",EVEX.vvvv (r),ModRM:r/m (r),NA
 VERR r/m16,0F 00 /4,,,,,
 VERW r/m16,0F 00 /5,,,,,
 "VEXP2PD zmm1 {k1}{z}, zmm2/m512/m64bcst {sae}",EVEX.512.66.0F38.W1 C8 /r,AVX512ER,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA

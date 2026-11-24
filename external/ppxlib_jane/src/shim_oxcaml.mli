@@ -178,6 +178,15 @@ type nonrec jkind_declaration = jkind_declaration =
   ; pjkind_loc : Location.t
   }
 
+type nonrec law_declaration = law_declaration =
+  { plaw_name : string loc
+  ; plaw_params : (string loc * core_type option) list
+  ; plaw_assumptions : expression list
+  ; plaw_conclusion : expression
+  ; plaw_attributes : attributes
+  ; plaw_loc : Location.t
+  }
+
 module Type_declaration : sig
   type t = type_declaration =
     { ptype_name : string loc
@@ -320,6 +329,7 @@ module Pattern_desc : sig
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -447,6 +457,7 @@ module Signature_item_desc : sig
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
     | Psig_jkind of jkind_declaration
+    | Psig_law of law_declaration
 
   val of_parsetree : signature_item_desc -> t
   val to_parsetree : t -> signature_item_desc
@@ -481,6 +492,7 @@ module Structure_item_desc : sig
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
     | Pstr_jkind of jkind_declaration
+    | Pstr_law of law_declaration
 
   val of_parsetree : structure_item_desc -> t
   val to_parsetree : t -> structure_item_desc

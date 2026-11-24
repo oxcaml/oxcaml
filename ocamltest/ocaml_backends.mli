@@ -15,15 +15,18 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+(** [Jsir_js] and [Jsir_wasm] are [ocamlopt -target js_of_ocaml] and
+    [ocamlopt -target wasm_of_ocaml] *)
+type t = Native | Bytecode | Jsir_js | Jsir_wasm
 
 val is_bytecode : t -> bool
 
 val is_native : t -> bool
 
-val string_of_backend : t -> string
+(** Whether the backend is [Jsir_js] or [Jsir_wasm] *)
+val is_jsir : t -> bool
 
-val make_backend_function : 'a -> 'a -> t -> 'a
+val string_of_backend : t -> string
 
 val module_extension : t -> string
 

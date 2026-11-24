@@ -86,7 +86,7 @@ module Liveness = struct
             "Cfg_validation_facts.Liveness.create: unexpected Never terminator"
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Return | Raise _ | Tailcall_func _ | Call_no_return _
-        | Call _ | Prim _ | Invalid _ ->
+        | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
           ());
     { next = !next;
       exn_next = !exn_next;

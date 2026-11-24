@@ -412,6 +412,11 @@ module Parsetree = struct
             - [(P @ modes)] when [tyopt] is [None]
            *)
     | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
+    | Ppat_addr of mutable_flag * pattern
+        (** [Ppat_addr(flag, P)] represents:
+            - [addr_ P]     when [flag] is [Mutable]
+            - [addr_imm_ P] when [flag] is [Immutable]
+         *)
     | Ppat_lazy of pattern  (** Pattern [lazy P] *)
     | Ppat_unpack of string option loc
         (** [Ppat_unpack(s)] represents:
@@ -943,6 +948,17 @@ module Parsetree = struct
       pjkind_loc : Location.t
     }
 
+  and law_declaration (*IF_CURRENT = Parsetree.law_declaration *) =
+    {
+      plaw_name : string loc;
+      plaw_params : (string loc * core_type option) list;
+      plaw_assumptions : expression list;
+      plaw_conclusion : expression;
+      plaw_attributes : attributes;
+      plaw_loc : Location.t
+    }
+    (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] *)
+
 
   (** {1 Class language} *)
   (** {2 Type expressions for the class language} *)
@@ -1205,6 +1221,8 @@ module Parsetree = struct
     | Psig_extension of extension * attributes  (** [[%%id]] *)
     | Psig_jkind of jkind_declaration
         (** [kind_abbrev_ name = k] *)
+    | Psig_law of law_declaration
+        (** [law_? name x (y : T) : A implies_ C] *)
 
   and module_declaration (*IF_CURRENT = Parsetree.module_declaration *) =
     {
@@ -1368,6 +1386,8 @@ module Parsetree = struct
     | Pstr_extension of extension * attributes  (** [[%%id]] *)
     | Pstr_jkind of jkind_declaration
         (** [kind_abbrev_ name = k] *)
+    | Pstr_law of law_declaration
+        (** [law_? name x (y : T) : A implies_ C] *)
 
   and value_constraint (*IF_CURRENT = Parsetree.value_constraint *) =
     | Pvc_constraint of {

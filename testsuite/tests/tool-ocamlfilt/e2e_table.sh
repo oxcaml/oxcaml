@@ -19,9 +19,10 @@
 # The table has four columns: the raw linker symbol followed by
 # its demangling under [--format flat1], [--format structured], and
 # [--format auto]. Cells where ocamlfilt refuses the symbol show
-# [(error)]. Compiler-generated stamps ([_NN_MM_code], [_NN_code],
-# trailing [_NN], [PmakeblockNN], [const_blockNN], [iarrNN]) are
-# masked so the reference stays stable across builds.
+# [(error)]. Compiler-generated stamps ([DNN_] items in structured
+# symbols, [_NN_MM_code], [_NN_code], trailing [_NN], [PmakeblockNN],
+# [const_blockNN], [iarrNN]) are masked so the reference stays stable
+# across builds.
 # No [pipefail]: this script runs under POSIX [sh] (dash on Linux),
 # which does not support it. An empty extraction pipeline is caught by
 # the [! -s "$SYMS"] check below instead.
@@ -38,7 +39,7 @@ OBJ=${1:?"missing object file argument"}
 # relocation table regardless of the scheme used to compile this test.
 EXCLUDE=${2:?"missing exclude-pattern argument"}
 
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 TAB="$(printf '\t')"
 
 # ocamlfilt mirrors c++filt and passes unrecognised input through unchanged
@@ -87,6 +88,7 @@ done
     "${test_build_directory}/e2e_table.structured.col" \
     "${test_build_directory}/e2e_table.auto.col"
 } | sed -E \
+    -e 's/D[0-9]+_/DN_/g' \
     -e 's/_[0-9]+_[0-9]+_code/_N_M_code/g' \
     -e 's/_[0-9]+_code/_N_code/g' \
     -e "s/_[0-9]+_[0-9]+(${TAB}|$)/_N_N\\1/g" \

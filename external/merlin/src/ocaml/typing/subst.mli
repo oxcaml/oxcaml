@@ -52,6 +52,13 @@ val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_jkind: Ident.t -> Path.t -> t -> t
+val add_value: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_values: (Ident.t * Path.t) list -> 'k subst -> 'k subst
+
+(** [add_lazy_values bindings vals] is similar to
+    [add_values (Lazy.force bindings) vals], but delays forcing the lazy to
+    lookup time. *)
+val add_lazy_values: (Ident.t * Path.t) list Lazy.t -> 'k subst -> 'k subst
 
 type additional_action_config =
    | Duplicate_variables
@@ -82,7 +89,9 @@ val make_loc_ghost: t -> t
 val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t
+exception Not_path
 val type_path: t -> Path.t -> Path.t
+(* [type_path t p] may raise Not_path if t(p) is a type_function *)
 val modtype_path: t -> Path.t -> Path.t
 
 val type_expr: t -> type_expr -> type_expr

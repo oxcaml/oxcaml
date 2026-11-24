@@ -39,7 +39,8 @@ let rec loadfiles ppf name =
     let d = Filename.dirname name in
     if d <> Filename.current_dir_name then begin
       if not (List.mem d (Load_path.get_path_list ())) then
-        Load_path.add_dir (Visible { cmx_guaranteed = false }) d;
+        Load_path.add_dir
+          { visibility = Visible; cmx_guaranteed = false } d;
     end;
     fprintf ppf "File %s loaded@."
       (if d <> Filename.current_dir_name then
@@ -83,7 +84,7 @@ let rec eval_address = function
     (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
 
 let eval_value_path env path =
-  match Env.find_value_address path env with
+  match Env.find_value_address ~loc:Location.none path env with
   | addr -> eval_address addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))

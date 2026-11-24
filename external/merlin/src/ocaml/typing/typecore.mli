@@ -184,6 +184,7 @@ val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
 val generalize_structure_exp: Typedtree.expression -> unit
+val lower_nongen: Location.t -> Env.t -> int -> module_type -> unit
 type delayed_check
 val delayed_checks: delayed_check list ref
 val reset_delayed_checks: unit -> unit
@@ -398,6 +399,8 @@ type error =
       wrong_kind_context * Data_types.record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of
       Data_types.record_form_packed * type_expr
+  | Unboxed_label_assignment of
+      { lid : Longident.t; mutability : mutability }
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
@@ -445,6 +448,8 @@ type error =
   | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
   | Useless_lpoly
+  | Non_generalizable_escape of
+      { var : type_expr; mty: Types.module_type; kind : Path.t }
 
 module Error : sig
   type exn += private In_context of Location.t * Env.t * error

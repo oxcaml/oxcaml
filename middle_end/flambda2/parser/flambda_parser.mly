@@ -321,7 +321,9 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; stub; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode;
+        (* CR yusumez: parse FDO annotations *)
+        fdo_entry_annotation = None; } }
 ;
 
 code_header:
@@ -428,8 +430,14 @@ named:
 
 
 switch_case:
-  | i = tag; MINUSGREATER; ac = apply_cont_expr { i, Named_cont ac }
-  | i = tag; MINUSGREATER; b = atomic_body { i, Inlined_goto b }
+  | i = tag; MINUSGREATER; ac = apply_cont_expr
+    (* CR yusumez: parse branch annotations *)
+    { { tag = i; action = Named_cont ac;
+        annotations = Branch_annotations.default } }
+  | i = tag; MINUSGREATER; b = atomic_body
+    (* CR yusumez: parse branch annotations *)
+    { { tag = i; action = Inlined_goto b;
+        annotations = Branch_annotations.default } }
 ;
 
 switch:
@@ -651,6 +659,8 @@ apply_expr:
           inlined;
           inlining_state;
           arities;
+          (* CR yusumez: parse FDO counters *)
+          callsite_counter = None;
      } }
 ;
 

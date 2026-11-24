@@ -993,6 +993,8 @@ let maybe_pmod_constraint mode expr =
    string that will not trigger a syntax error; see how [not_expecting]
    is used in the definition of [type_variance]. */
 
+%token ADDR                   "addr_"
+%token ADDR_IMM               "addr_imm_"
 %token AMPERAMPER             "&&"
 %token AMPERSAND              "&"
 %token AND                    "and"
@@ -1046,6 +1048,7 @@ let maybe_pmod_constraint mode expr =
 %token HASHFALSE              "#false"
 %token HASHTRUE               "#true"
 %token IF                     "if"
+%token IMPLIES                "implies_"
 %token IN                     "in"
 %token INCLUDE                "include"
 %token <string> INFIXOP0      "!="   (* just an example *)
@@ -1065,6 +1068,7 @@ let maybe_pmod_constraint mode expr =
 %token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
+%token LAW                    "law_"
 %token LAZY                   "lazy"
 %token LBRACE                 "{"
 %token LBRACELESS             "{<"
@@ -1868,7 +1872,9 @@ structure_item:
     | floating_attribute
         { Pstr_attribute $1 }
     | jkind_decl
-        { Pstr_jkind $1 })
+        { Pstr_jkind $1 }
+    | law_declaration
+        { Pstr_law $1 })
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
@@ -2155,6 +2161,8 @@ signature_item:
         { Psig_attribute $1 }
      | jkind_decl
         { Psig_jkind $1 }
+     | law_declaration
+        { Psig_law $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -3766,6 +3774,8 @@ pattern_gen:
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
+  | addr_pattern_keyword ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_addr ($1, $3)) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -4230,6 +4240,43 @@ jkind_decl:
       let pjkind_loc = make_loc $sloc in
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     }
+;
+
+(* Laws: [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C],
+   where each parameter is [x] or [(x : T)] *)
+
+law_declaration:
+  LAW QUESTION
+  attrs1 = attributes
+  plaw_name = mkrhs(LIDENT)
+  plaw_params = law_param*
+  COLON
+  body = law_body
+  attrs2 = post_item_attributes
+    {
+      let docs = symbol_docs $sloc in
+      let plaw_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
+      let plaw_loc = make_loc $sloc in
+      let plaw_assumptions, plaw_conclusion = body in
+      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc }
+    }
+;
+
+law_param:
+  | name = mkrhs(LIDENT)
+      { (name, None) }
+  | LPAREN name = mkrhs(LIDENT) COLON ty = core_type RPAREN
+      { (name, Some ty) }
+;
+
+(* [implies_] only separates the clauses of a law. *)
+law_body:
+  | e = expr
+      { ([], e) }
+  | e = expr IMPLIES rest = law_body
+      { let (assumptions, conclusion) = rest in
+        (e :: assumptions, conclusion) }
 ;
 
 %inline type_param_with_jkind:
@@ -5443,6 +5490,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+%inline addr_pattern_keyword:
+    ADDR                                        { Mutable }
+  | ADDR_IMM                                    { Immutable }
+;
 poly_flag:
     /* empty */                                 { false }
   | POLY                                        { true }
@@ -5520,6 +5571,8 @@ optlabel:
 single_attr_id:
     LIDENT { $1 }
   | UIDENT { $1 }
+  | ADDR { "addr_" }
+  | ADDR_IMM { "addr_imm_" }
   | AND { "and" }
   | AS { "as" }
   | ASSERT { "assert" }

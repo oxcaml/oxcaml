@@ -585,23 +585,12 @@ module F : sig end -> sig end
 |}];;
 
 (****************************************)
-(* Test 8: [val]s must be representable *)
+(* Test 8: [val]s may be unrepresentable *)
 
 module type S = sig val x : t_any end
 
-module M = struct
-  let x : t_void = assert false
-end
-
 [%%expect{|
-Line 1, characters 28-33:
-1 | module type S = sig val x : t_any end
-                                ^^^^^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t_any is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be representable
-         because it's the type of something in a signature.
+module type S = sig val x : t_any end
 |}]
 
 (****************************************************************)

@@ -167,14 +167,14 @@ let rbp = phys_reg Int (P RBP)
 
 (* CSE needs to know that all versions of xmm15 are destroyed. *)
 let destroy_xmm =
-  let types =
+  let types = lazy ((* To be forced after flags are parsed. *)
     ([ Float; Float32; Vec128 ] : machtype_component list)
     |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256)
     |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
-    |> Array.of_list
+    |> Array.of_list)
   in
   fun (mm_reg : [`SIMD] Regs.phys_reg_classed) ->
-    Array.map (fun t -> phys_reg t (P mm_reg)) types
+    Array.map (fun t -> phys_reg t (P mm_reg)) (Lazy.force types)
 
 let destroyed_by_plt_stub =
   if not X86_proc.use_plt then [| |] else [| r10; r11 |]
@@ -186,6 +186,29 @@ let stack_slot slot ty = Reg.create_at_location ty (Stack slot)
 (* Calling conventions *)
 
 let size_domainstate_args = 64 * size_int
+
+(* The register allocators only know about the physical registers of enabled
+   extensions, so wide registers must be rejected before they get that far. *)
+let require_extension (ty : machtype_component) =
+  let require enabled ~kind ~ext =
+    if not enabled
+    then
+      raise
+        (Arch.Extension.Disabled
+           (Printf.sprintf
+              "found %s in a function argument or result, but %s is not \
+               enabled."
+              kind ext))
+  in
+  match ty with
+  | Vec256 ->
+    require (Arch.Extension.enabled_vec256 ()) ~kind:"256-bit vector" ~ext:"AVX"
+  | Vec512 ->
+    require (Arch.Extension.enabled_vec512 ()) ~kind:"512-bit vector"
+      ~ext:"AVX512F"
+  | Mask ->
+    require (Arch.Extension.enabled_vec512 ()) ~kind:"mask" ~ext:"AVX512F"
+  | Val | Int | Addr | Float | Float32 | Vec128 | Valx2 -> ()
 
 let calling_conventions
       ~int_registers
@@ -209,6 +232,7 @@ let calling_conventions
   in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
+    require_extension ty;
     let registers, size, ty =
       match ty with
       | Val | Int | Addr -> int_registers, size_int, ty
@@ -550,28 +574,29 @@ let destroyed_at_small_memory_op =
 ;;
 
 let destroyed_at_single_float64_store =
-  if Config.with_address_sanitizer then
-    Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
-  else
-    (destroy_xmm MM15)
-;;
+  lazy ((* To be forced after flags are parsed. *)
+    if Config.with_address_sanitizer then
+      Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
+    else
+      (destroy_xmm MM15))
 
-let all_256bit_regs = []
+let all_256bit_regs = lazy ((* To be forced after flags are parsed. *)
+  []
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
-let all_simd_regs =
+let all_simd_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_float32_reg; hard_float_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let destroyed_by_simd_instr (instr : Simd.instr) =
   (* CR mslater: (SIMD) these don't effect regs 16-31 *)
   match[@warning "-4"] instr.id with
-  | Vzeroupper -> all_256bit_regs
-  | Vzeroall -> all_simd_regs
+  | Vzeroupper -> Lazy.force all_256bit_regs
+  | Vzeroall -> Lazy.force all_simd_regs
   | _ ->
     match instr.res with
     | Res_none | Arg _ -> [||]
@@ -615,6 +640,22 @@ let destroyed_rax_rdx = [| rax; rdx |]
 let destroyed_rbp = [| rbp |]
 let destroyed_r10 = [| r10 |]
 
+let destroyed_at_atomic_compare_set =
+  (* CMPXCHG overwrites rax on failure, independently of the boolean result. *)
+  Array.append destroyed_at_small_memory_op destroyed_rax
+
+let may_be_destroyed_by_c_function (r : Reg.t) =
+  match r.loc with
+  | Reg (P (RAX | RDI | RSI | RDX | RCX | R8 | R9 | R10 | R11)) -> true
+  | Reg (P (RBX | RBP | R12 | R13)) -> false
+  | Reg
+      (P
+        ( MM0 | MM1 | MM2 | MM3 | MM4 | MM5 | MM6 | MM7 | MM8 | MM9 | MM10
+        | MM11 | MM12 | MM13 | MM14 | MM15 )) ->
+    true
+  | Reg (P (K1 | K2 | K3 | K4 | K5 | K6 | K7)) -> true
+  | Stack _ | Unknown -> false
+
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
@@ -624,7 +665,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
-    destroyed_at_single_float64_store
+    Lazy.force destroyed_at_single_float64_store
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single { reg = Float32 } ), _, _))
@@ -633,8 +674,12 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single _); _ })
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
-  | Op(Intop_atomic _) ->
+  | Op(Intop_atomic
+         { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
+              | Compare_exchange; _ }) ->
     destroyed_at_small_memory_op
+  | Op(Intop_atomic { op = Compare_set; _ }) ->
+    destroyed_at_atomic_compare_set
   | Op(Store( (Word_int | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
                Twofiftysix_aligned | Twofiftysix_unaligned |
@@ -656,6 +701,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
   | Op (Specific Ipackf32) -> [||]
+  | Op (Trace_pc_guard_gate | Trace_pc_guard _) ->
+    (* The call to the coverage callback preserves all registers. *)
+    [||]
   | Op (Specific (Isimd op)) ->
     destroyed_by_simd_op op
   | Op (Specific (Isimd_mem (op,_))) ->
@@ -685,7 +733,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+       | Thread_self_id | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then destroyed_rbp else [||]
   | Stack_check _ ->
@@ -707,8 +756,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if fp then [| rbp |] else [||]
   | Switch _ ->
     destroyed_rax_rdx
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; stack_align = _; effects = _; }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
@@ -720,6 +769,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if stack_ofs > 0
     then Lazy.force all_phys_regs
     else Lazy.force destroyed_at_c_call
+  | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
@@ -739,8 +789,8 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; stack_align = _; effects = _; }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     if more_destruction_points then
@@ -748,6 +798,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     else
       if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
+  | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} ->
     true
 
@@ -853,6 +904,7 @@ let operation_supported = function
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |

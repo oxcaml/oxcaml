@@ -536,7 +536,7 @@ let type_iterators_without_type_expr =
     | Mty_alias p -> it.it_path p
     | Mty_for_hole -> ()
     | Mty_signature sg -> it.it_signature it sg
-    | Mty_functor (p, mt, mm) ->
+    | Mty_functor (p, mt, mm, _) ->
         it.it_functor_param it p;
         it.it_module_type it mt;
         it.it_mode_expr mm
@@ -1762,6 +1762,35 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      let addr_layout =
+        Layout.Const.product
+          [ base Scannable
+              { nullability = Maybe_null; separability = Maybe_separable };
+            base Bits64 Scannable_axes.max ]
+
+      (* Addresses have the same modal base kind as a record with a field of the
+         same mutability. *)
+      let kind_of_addr =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless"
+        }
+
+      let kind_of_addr_imm =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless \
+             immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
@@ -1940,17 +1969,6 @@ module Jkind0 = struct
       let immediate_or_null =
         of_const Const.Builtin.immediate_or_null.jkind
     end
-
-    let product tys_modalities layouts =
-      let base = Layout (Jkind_types.Layout.product layouts) in
-      let mod_bounds = Mod_bounds.min in
-      let with_bounds =
-        List.fold_right
-          (fun (type_expr, modality) bounds ->
-            With_bounds.add_modality ~type_expr ~modality bounds)
-          tys_modalities No_with_bounds
-      in
-      { base; mod_bounds; with_bounds }
 
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
@@ -2156,14 +2174,6 @@ module Jkind0 = struct
         fresh_jkind Jkind_desc.Builtin.immediate_or_null
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
-
-      let product ~why tys_modalities layouts =
-        let desc = Jkind_desc.product tys_modalities layouts in
-        fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
-        (* [mark_best] is correct here because the with-bounds of a product
-           jkind include all the components of the product. Accordingly, looking
-           through the product, by one step, never loses any information. *)
-        |> mark_best
 
       let product_of_any ~why arity =
         let layout =
@@ -2436,6 +2446,57 @@ module Jkind0 = struct
         (orphaned_type_var_list @ domain)
         (type_of_kind_list @ range)
 
+  let add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
+    jkind_so_far cstr =
+    let cstr_arg_tys, cstr_arg_modalities =
+      match cstr.cd_args with
+      | Cstr_tuple args ->
+        List.fold_left
+          (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
+          ([], []) args
+      | Cstr_record lbls ->
+        List.fold_left
+          (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
+          ([], []) lbls
+    in
+    let extra_substs =
+      gadt_payload_subst
+        ~projected_params:decl_params ~cstr_res:cstr.cd_res
+        ~payload_tys:cstr_arg_tys ~get_free_vars
+    in
+    let cstr_arg_tys =
+      match extra_substs with
+      | [] -> cstr_arg_tys
+      | _ ->
+        let domain, range = List.split extra_substs in
+        List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
+    in
+    List.fold_left2
+      (fun jkind type_expr modality ->
+        add_with_bounds ~modality ~type_expr jkind)
+      jkind_so_far cstr_arg_tys cstr_arg_modalities
+
+  let for_unboxed_variant ~decl_params ~type_apply ~get_free_vars ~get_ty_base
+    cstr =
+    let inner_ty =
+      match cstr.cd_args with
+      | Cstr_tuple  [ { ca_type; _ } ] -> ca_type
+      | Cstr_record [ { ld_type; _ } ] -> ld_type
+      | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
+        assert false
+    in
+    let inner_jkind_base = get_ty_base inner_ty in
+    let jkind_of_base =
+      fresh_jkind
+        { base = inner_jkind_base;
+          mod_bounds = Mod_bounds.min;
+          with_bounds = No_with_bounds
+        }
+        ~annotation:None ~why:(Value_creation Unboxed_variant)
+    in
+    add_with_bounds_for_cstr ~decl_params ~type_apply ~get_free_vars
+      jkind_of_base cstr
+
   let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars
       ~cstr_layouts cstrs =
     let base =
@@ -2469,34 +2530,8 @@ module Jkind0 = struct
         |> jkind_of_mutability ~why:Boxed_variant
     in
     let base = mark_best base in
-    let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
-        | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
-      in
-      let extra_substs =
-        gadt_payload_subst
-          ~projected_params:decl_params ~cstr_res:cstr.cd_res
-          ~payload_tys:cstr_arg_tys ~get_free_vars
-      in
-      let cstr_arg_tys =
-        match extra_substs with
-        | [] -> cstr_arg_tys
-        | _ ->
-          let domain, range = List.split extra_substs in
-          List.map (fun ty -> type_apply domain ty range) cstr_arg_tys
-      in
-      List.fold_left2
-        (fun jkind type_expr modality ->
-          add_with_bounds ~modality ~type_expr jkind)
-        jkind_so_far cstr_arg_tys cstr_arg_modalities
+    let add_with_bounds_for_cstr =
+      add_with_bounds_for_cstr ~type_apply ~decl_params ~get_free_vars
     in
     List.fold_left add_with_bounds_for_cstr base cstrs
 

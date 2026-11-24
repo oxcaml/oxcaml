@@ -151,7 +151,9 @@ module Layout = struct
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
 
-  type level_error = Sort.level_error = Rigid
+  type level_error = Sort.level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error = Sort.error =
     | Incompatible
@@ -718,27 +720,70 @@ end
 (******************************)
 (*** user errors ***)
 
-module Error = struct
-  type t =
-    | Insufficient_level :
-        { jkind : Parsetree.jkind_annotation;
-          required_layouts_level : Language_extension.maturity
-        }
-        -> t
-    | Multiple_jkinds of
-        { from_annotation : Parsetree.jkind_annotation;
-          from_attribute : Builtin_attributes.jkind_attribute Location.loc
-        }
-    | Unknown_kind_modifier of string
-    | Unimplemented_syntax
-    | With_on_right : (_ * allowed) History.annotation_context -> t
-    | Abstract_kind_in_product
-    | Box_on_abstract_kind of Path.t
+type error =
+  | Insufficient_level :
+      { jkind : Parsetree.jkind_annotation;
+        required_layouts_level : Language_extension.maturity
+      }
+      -> error
+  | Multiple_jkinds of
+      { from_annotation : Parsetree.jkind_annotation;
+        from_attribute : Builtin_attributes.jkind_attribute Location.loc
+      }
+  | Unknown_kind_modifier of string
+  | Unimplemented_syntax
+  | With_on_right : (_ * allowed) History.annotation_context -> error
+  | Abstract_kind_in_product
+  | Box_on_abstract_kind of Path.t
 
-  exception User_error of Location.t * t
+module Error : sig
+  type exn += private In_context of Location.t * error
+
+  module Result : sig
+    type e
+
+    type 'a t = ('a, e) result
+
+    val error : loc:Location.t -> error -> _ t
+
+    (** Convert the result to an option. In the error case, always record an
+        exception. If type recovery is off, the error is raised. If on, it is
+        logged, and [None] is returned. *)
+    val to_opt_exn : 'a t -> 'a option
+  end
+
+  val log_or_raise : loc:Location.t -> error -> unit
+
+  val log_and_raise : loc:Location.t -> error -> 'a
+end = struct
+  type exn += In_context of Location.t * error
+
+  let log_and_raise ~loc err =
+    Typing_recovery.log_and_raise (In_context (loc, err))
+
+  let log_or_raise ~loc err =
+    Typing_recovery.log_or_raise (In_context (loc, err))
+
+  module Result = struct
+    type e = Location.t * error
+
+    type 'a t = ('a, e) result
+
+    let to_opt_exn (t : _ t) =
+      match t with
+      | Ok x -> Some x
+      | Error (loc, err) ->
+        log_or_raise ~loc err;
+        None
+
+    let error ~loc err : _ t = Error (loc, err)
+  end
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
 end
-
-let raise ~loc err = raise (Error.User_error (loc, err))
 
 (******************************)
 module Mod_bounds = struct
@@ -1038,6 +1083,8 @@ module Base = struct
     | Layout l -> Layout (f l)
     | Kconstr (p, sa, op) -> Kconstr (p, sa, op)
 
+  let of_const = map_layout ~f:Layout.of_const
+
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
@@ -1056,7 +1103,6 @@ module Base = struct
         Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
-    let of_const = map_layout ~f:Layout.of_const in
     match expand_once env t1, expand_once env t2 with
     | None, None -> None
     | Some t1, None -> Some (of_const t1, t2)
@@ -1105,8 +1151,7 @@ end
 module Base_and_axes = struct
   include Jkind0.Base_and_axes
 
-  let jkind_desc_of_const const =
-    { const with base = Base.map_layout ~f:Layout.of_const const.base }
+  let jkind_desc_of_const const = { const with base = Base.of_const const.base }
 
   let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
@@ -2126,11 +2171,12 @@ module Const = struct
   let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
-      { base = Layout (Layout.Const.box layout Scannable_axes.max);
-        mod_bounds = box_mod_bounds t.mod_bounds;
-        with_bounds = t.with_bounds
-      }
-    | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
+      Ok
+        { base = Layout (Layout.Const.box layout Scannable_axes.max);
+          mod_bounds = box_mod_bounds t.mod_bounds;
+          with_bounds = t.with_bounds
+        }
+    | Kconstr (p, _, _) -> Error.Result.error ~loc (Box_on_abstract_kind p)
 
   let apply_addressable (t : _ jkind_const_desc) =
     match t.base with
@@ -2562,7 +2608,9 @@ module Const = struct
         (* CR layouts: The [Kconstr] case here is pretty sad - see internal
            ticket 5769 *)
         match base with
-        | Kconstr _ -> raise ~loc Abstract_kind_in_product
+        | Kconstr (_, sa, _) ->
+          Error.log_or_raise ~loc Abstract_kind_in_product;
+          Layout.Const.any sa
         | Layout l -> l
       in
       ( layout :: layouts_acc,
@@ -2578,25 +2626,26 @@ module Const = struct
     }
 
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
-      Kind_operator.t Location.loc =
+      (Kind_operator.t Location.loc, _) result =
     let scannable_axis axis = Kind_operator.Scannable_axis axis in
     match txt with
     | "non_pointer" ->
-      Location.mkloc (scannable_axis (Separability Non_pointer)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_pointer)) loc)
     | "non_pointer64" ->
-      Location.mkloc (scannable_axis (Separability Non_pointer64)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_pointer64)) loc)
     | "non_float" ->
-      Location.mkloc (scannable_axis (Separability Non_float)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_float)) loc)
     | "separable" ->
-      Location.mkloc (scannable_axis (Separability Separable)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Separable)) loc)
     | "maybe_separable" ->
-      Location.mkloc (scannable_axis (Separability Maybe_separable)) loc
-    | "non_null" -> Location.mkloc (scannable_axis (Nullability Non_null)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Maybe_separable)) loc)
+    | "non_null" ->
+      Ok (Location.mkloc (scannable_axis (Nullability Non_null)) loc)
     | "maybe_null" ->
-      Location.mkloc (scannable_axis (Nullability Maybe_null)) loc
-    | "addressable" -> Location.mkloc Kind_operator.Addressable loc
-    | "box" -> Location.mkloc Kind_operator.Box loc
-    | _ -> raise ~loc (Unknown_kind_modifier txt)
+      Ok (Location.mkloc (scannable_axis (Nullability Maybe_null)) loc)
+    | "addressable" -> Ok (Location.mkloc Kind_operator.Addressable loc)
+    | "box" -> Ok (Location.mkloc Kind_operator.Box loc)
+    | _ -> Error.Result.error ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2640,7 +2689,11 @@ module Const = struct
           env context base
       in
       let ops =
-        List.map (fun name -> name, transl_kind_operator name) op_annot
+        List.filter_map
+          (fun name ->
+            transl_kind_operator name |> Error.Result.to_opt_exn
+            |> Option.map (fun operator -> name, operator))
+          op_annot
       in
       let jkind, _ =
         List.fold_left
@@ -2650,20 +2703,24 @@ module Const = struct
             let jkind = Base_and_axes.fully_expand_aliases_const env jkind in
             let jkind' =
               match op.txt with
-              | Scannable_axis axis -> apply_scannable_axis axis jkind
-              | Addressable -> apply_addressable jkind
+              | Scannable_axis axis -> Ok (apply_scannable_axis axis jkind)
+              | Addressable -> Ok (apply_addressable jkind)
               | Box -> apply_box ~loc:op.loc jkind
             in
-            (* Operators never change the with-bounds *)
-            (if warn && equal_ignoring_with_bounds jkind jkind'
-             then
-               match op.txt, jkind.base with
-               | Scannable_axis _, Layout l
-                 when Option.is_none (Layout.Const.get_root_scannable_axes l) ->
-                 warn_ignored_kind_modifier ~loc:op.loc name.txt base
-               | (Scannable_axis _ | Addressable | Box), _ ->
-                 warn_redundant_kind_modifier ~loc:op.loc (base, rev_ops));
-            jkind', name :: rev_ops)
+            match Error.Result.to_opt_exn jkind' with
+            | None -> jkind, name :: rev_ops
+            | Some jkind' ->
+              (* Operators never change the with-bounds *)
+              (if warn && equal_ignoring_with_bounds jkind jkind'
+               then
+                 match op.txt, jkind.base with
+                 | Scannable_axis _, Layout l
+                   when Option.is_none (Layout.Const.get_root_scannable_axes l)
+                   ->
+                   warn_ignored_kind_modifier ~loc:op.loc name.txt base
+                 | (Scannable_axis _ | Addressable | Box), _ ->
+                   warn_redundant_kind_modifier ~loc:op.loc (base, rev_ops));
+              jkind', name :: rev_ops)
           (base_jkind, []) ops
       in
       jkind
@@ -2680,45 +2737,47 @@ module Const = struct
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
           env context base
       in
+      let overapproximate_to_top () =
+        (* A with-bound weakens the mod-bounds, so a safe approximation is to
+           drop the with-bounds and raise the mod-bounds to [max]. *)
+        let expanded = Base_and_axes.fully_expand_aliases_const env base in
+        let base =
+          match expanded.base with
+          | Layout _ as b -> b
+          | Kconstr (_, sa, op) ->
+            (* However, we can't raise the mod-bounds of a truly-abstract
+               [Kconstr] because its mod-bounds can be further narrowed by
+               substitution. Instead, we approximate the layout as [any] (with
+               the same scannable axes/addressability). *)
+            Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
+        in
+        { base;
+          mod_bounds = Mod_bounds.max;
+          with_bounds = expanded.with_bounds
+        }
+      in
       match context with
-      | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
-      | Left_jkind (transl_type, _) -> (
-        match transl_type with
-        | Transl_type transl_type ->
-          let type_ = transl_type type_ in
-          let modality, externality =
-            Typemode.transl_with_bound_modifiers modalities
-          in
-          let bounds_mask =
-            let bounds = Mod_bounds.mask_of_modality ~modality in
-            match externality with
-            | None -> bounds
-            | Some ext -> Bounds_mask.meet_externality ext bounds
-          in
-          { base = base.base;
-            mod_bounds = base.mod_bounds;
-            with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
-          }
-        | Overapproximate_to_top ->
-          (* A with-bound weakens the mod-bounds, so a safe approximation is to
-             drop the with-bounds and raise the mod-bounds to [max]. *)
-          let expanded = Base_and_axes.fully_expand_aliases_const env base in
-          let base =
-            match expanded.base with
-            | Layout _ as b -> b
-            | Kconstr (_, sa, op) ->
-              (* However, we can't raise the mod-bounds of a truly-abstract
-                 [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as [any] (with
-                 the same scannable axes/addressability). *)
-              Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
-          in
-          { base;
-            mod_bounds = Mod_bounds.max;
-            with_bounds = expanded.with_bounds
-          }))
+      | Right_jkind c ->
+        Error.log_or_raise ~loc:type_.ptyp_loc (With_on_right c);
+        overapproximate_to_top ()
+      | Left_jkind (Overapproximate_to_top, _) -> overapproximate_to_top ()
+      | Left_jkind (Transl_type transl_type, _) ->
+        let type_ = transl_type type_ in
+        let modality, externality =
+          Typemode.transl_with_bound_modifiers modalities
+        in
+        let bounds_mask =
+          let bounds = Mod_bounds.mask_of_modality ~modality in
+          match externality with
+          | None -> bounds
+          | Some ext -> Bounds_mask.meet_externality ext bounds
+        in
+        { base = base.base;
+          mod_bounds = base.mod_bounds;
+          with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
+        })
     | Pjk_default | Pjk_kind_of _ ->
-      raise ~loc:jkind.pjka_loc Unimplemented_syntax
+      Error.log_and_raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2762,7 +2821,7 @@ module Const = struct
     let required_layouts_level = get_required_layouts_level context const in
     if not (Language_extension.is_at_least Layouts required_layouts_level)
     then
-      raise ~loc:annot.pjka_loc
+      Error.log_or_raise ~loc:annot.pjka_loc
         (Insufficient_level { jkind = annot; required_layouts_level });
     const
 
@@ -2924,9 +2983,10 @@ let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
   | None, None -> None
   | Some (jkind, annot), None -> Some (jkind, Some annot)
   | None, Some (jkind_with_annot, _) -> Some jkind_with_annot
-  | Some (_, from_annotation), Some (_, from_attribute) ->
-    raise ~loc:decl.ptype_loc
-      (Multiple_jkinds { from_annotation; from_attribute })
+  | Some (jkind_from_annot, from_annotation), Some (_, from_attribute) ->
+    Error.log_or_raise ~loc:decl.ptype_loc
+      (Multiple_jkinds { from_annotation; from_attribute });
+    Some (jkind_from_annot, Some from_annotation)
 
 let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
   of_type_decl_gen ?use_abstract_jkinds ?warn ~context
@@ -2941,29 +3001,34 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record lbls =
-  let open Types in
-  let tys_modalities =
-    List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
-      lbls
+let for_at_at_unboxed_record ~get_ty_base ~lbl ~ld_type =
+  let inner_jkind_base = get_ty_base ld_type in
+  let jkind_of_base =
+    fresh_jkind
+      { base = inner_jkind_base;
+        mod_bounds = Mod_bounds.min;
+        with_bounds = No_with_bounds
+      }
+      ~annotation:None ~why:(Value_creation At_at_unboxed_record)
   in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  jkind_of_base
+  |> add_with_bounds ~modality:lbl.Types.ld_modalities ~type_expr:ld_type
 
-let for_abbreviation ~type_jkind_purely ~modality ty =
-  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
-  let jkind = type_jkind_purely ty in
-  let with_bounds_types =
-    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-    With_bounds_types.singleton ty { bounds_mask }
+let apply_modality_l modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
+  let with_bounds =
+    With_bounds.map
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
+      jk.jkind.with_bounds
   in
-  fresh_jkind_poly
-    { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
-    }
-    ~annotation:None ~why:Abbreviation
+  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  |> disallow_right
+
+let apply_modality_r modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
+  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2994,7 +3059,9 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most
+         cases. But if we ever allow open types to mode-cross, we have to get
+         rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       (* Here we count how many rows are in the polymorphic variant and default
@@ -3129,21 +3196,32 @@ let get_layout env jk : Layout.Const.t option =
   Option.bind (extract_layout_opt env jk) Layout.get_const
 
 let default_to_scannable t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
+  (* [Kconstr] cannot contain non-generic variables which could be defaulted. *)
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_scannable_and_get l)
 
 let generalize ~current_level t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
   match t.jkind.base with
+  (* [Kconstr] cannot contain non-generic variables to generalize. *)
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
-let update_level level t : (unit, Sort.level_error) result =
-  match t.jkind.base with
-  | Kconstr _ -> Ok ()
-  | Layout l -> Layout.update_level level l
+let rec update_level_base_and_axes env level jkind =
+  match jkind.base with
+  | Kconstr (path, _, _) when level < Path.scope path -> (
+    match Base_and_axes.expand_base_once_const env jkind with
+    | Expanded jkind' ->
+      Base_and_axes.jkind_desc_of_const jkind'
+      |> update_level_base_and_axes env level
+    | Not_expanded | Missing_cmi _ -> Error (Layout.Escape path))
+  | Kconstr _ -> Ok jkind
+  | Layout l -> Layout.update_level level l |> Result.map (fun () -> jkind)
+
+let update_level env level t =
+  update_level_base_and_axes env level t.jkind
+  |> Result.map (fun jkind ->
+      if jkind != t.jkind then Some { t with jkind } else None)
 
 let get t = Jkind_desc.get t.jkind
 
@@ -3247,22 +3325,6 @@ let of_mod_bounds ~history mod_bounds =
     ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
-
-let apply_modality_l modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
-  let with_bounds =
-    With_bounds.map
-      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
-      jk.jkind.with_bounds
-  in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
-  |> disallow_right
-
-let apply_modality_r modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
   let or_null_axes ({ nullability; separability } : Scannable_axes.t) :
@@ -3553,6 +3615,9 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx_imm or idx_mut)"
+    | Address_contents ->
+      fprintf ppf
+        "it's the type of the value at an address@ in an address pattern"
     | Field_in_indexed_record ->
       fprintf ppf
         "it's the type of a field in a record type into which a@ block index \
@@ -3563,6 +3628,17 @@ module Format_history = struct
     | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
     | Typing_recovery ->
       fprintf ppf "it's a fake kind created during error recovery"
+    | Module_projection ->
+      fprintf ppf "it's the type of an item in a module being projected from"
+    | Module_coercion ->
+      fprintf ppf "it's the type of an item in a module being coerced"
+    | Module_inclusion ->
+      fprintf ppf "it's the type of an item in a module being included"
+    | Module_open ->
+      fprintf ppf "it's the type of an item in a module being opened"
+    | Module_argument ->
+      fprintf ppf
+        "it's the type of an item in an argument for a parameterized library"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3708,6 +3784,8 @@ module Format_history = struct
     | Class_field -> fprintf ppf "it's the type of a class field"
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
+    | Unboxed_variant -> fprintf ppf "it's an @@@@unboxed variant type"
+    | At_at_unboxed_record -> fprintf ppf "it's an @@@@unboxed record type"
     | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"
     | Primitive id ->
@@ -3910,6 +3988,20 @@ module Violation = struct
     *)
     match violation with
     | Not_a_subjkind (sub, super, reasons) -> (
+      begin match
+        List.find_map
+          (function
+            | Sub_failure_reason.Layout_disagreement (Level (Escape path)) ->
+              Some path
+            | _ -> None)
+          reasons
+      with
+      | Some path ->
+        fprintf ppf
+          "@;@[The kind constructor@;<1 2>%a@ would escape its scope.@]"
+          !printtyp_path path
+      | None -> ()
+      end;
       let disagreeing_axes =
         (* Collect all the axes that disagree into a set. If none disagree,
            then it is [None] *)
@@ -4375,6 +4467,167 @@ module Violation = struct
   let report_with_name ~name env = report_general env "" pp_print_string name
 end
 
+(*********************************)
+(* unboxed field transformations *)
+
+module Unboxed_field_transformation = struct
+  (* Transformations strengthen a [jkind_l]'s crossing based on the modality and
+     then weaken it based on the presence of a [mutable] label.
+
+     For [jkind_r]s, the bound restricted by the presence of a [mutable] label
+     and loosened by the modality. *)
+  type t =
+    { modality : Mode.Modality.Const.t;
+      mutability_transformation : Axis_lattice.t
+          (** Tracks how to weaken based on mutability, since outer modalities
+              allow some mutability contributions to be ignored (see [nest]).
+              Bottom on axes other than contention and visibility. *)
+    }
+
+  let id =
+    { modality = Mode.Modality.Const.id;
+      mutability_transformation = Axis_lattice.bot
+    }
+
+  (* A [mutable] label (without modalities) contributes only to the axes on
+     which [mutable_data] and [immutable_data] differ, currently contention and
+     visibility.
+
+     This is the best crossing we can give to unboxed versions so that boxing
+     them (joining with [immutable_data]) gives the boxed version's crossing. *)
+  let mutable_label_axes =
+    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
+
+  let of_field ~(mutability : Types.mutability) ~modality =
+    let mutability_transformation =
+      match mutability with
+      | Immutable -> Axis_lattice.bot
+      | Mutable { atomic = Nonatomic; _ } -> mutable_label_axes
+      | Mutable { atomic = Atomic; _ } ->
+        Misc.fatal_error
+          "Jkind.Unboxed_field_transformation.of_field: atomic field"
+    in
+    { modality; mutability_transformation }
+
+  let of_modality modality = of_field ~mutability:Immutable ~modality
+
+  let of_label ({ ld_modalities; ld_mutable; _ } : Types.label_declaration) =
+    of_field ~mutability:ld_mutable ~modality:ld_modalities
+
+  (* The modality of [outer] masks the [mutability_transformation] of the
+     [inner].
+
+       type inner = #{ mutable y : int }
+       type outer = #{ x : inner @@ contended }
+
+     Here, the outer [@@contended] modality hides [inner]'s mutability
+     contribution on the contention axis, but not for visibility. *)
+  let nest ~outer ~inner =
+    let masked_inner_weakening =
+      Axis_lattice.meet
+        (Axis_lattice.mask_of_modality outer.modality)
+        inner.mutability_transformation
+    in
+    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality;
+      mutability_transformation =
+        Axis_lattice.join outer.mutability_transformation masked_inner_weakening
+    }
+
+  let weaken weakening (jk : _ jkind) =
+    (* Avoid allocation if possible *)
+    if Axis_lattice.equal weakening Axis_lattice.bot
+    then jk
+    else
+      { jk with
+        jkind =
+          { jk.jkind with
+            mod_bounds =
+              Mod_bounds.join_axis_lattice jk.jkind.mod_bounds weakening
+          }
+      }
+
+  (* We weaken by the mutability transformation after strengthening according to
+     the modality, since the following unboxed record (like the boxed version)
+     does not cross contention:
+
+       type 'a t = #{ mutable a : 'a @@ contended }
+   *)
+  let apply_l t jk =
+    apply_modality_l t.modality jk |> weaken t.mutability_transformation
+
+  (* The modality loosens the container's upper bound [jk], turning it into a
+     (potentially weaker) requirement on the contents.
+
+     The [mutability_transformation] restricts crossing regardless of the
+     record's contents; we fail if the [jk] bound requires more crossing than
+     the transformation allows. For instance, if [jk] requires crossing
+     contention and the transformation says it doesn't, we fail. *)
+  let apply_r t jk =
+    let satisfiable =
+      Axis_lattice.leq t.mutability_transformation
+        (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
+    in
+    if satisfiable then Ok (apply_modality_r t.modality jk) else Error ()
+
+  (* The failure reasons carry over: [apply_r] only relaxes the requirement on
+     axes that [apply_l] strengthens, and [apply_r] succeeding means that the
+     weakening by [mutability_transformation] can't introduce new failures. *)
+  let unapply_violation ~context env t ~history jk
+      ({ violation; missing_cmi } : Violation.t) =
+    match violation with
+    | Not_a_subjkind (sub, _, reasons) ->
+      let sub = { (apply_l t sub) with history } in
+      Some
+        (Violation.of_ ~context ?missing_cmi env
+           (Not_a_subjkind (sub, jk, reasons)))
+    | No_intersection _ -> None
+end
+
+let product_of_fields ~why fields layouts =
+  let mod_bounds, with_bounds =
+    List.fold_right
+      (fun ( type_expr,
+             ({ modality; mutability_transformation } :
+               Unboxed_field_transformation.t) ) (mod_bounds, with_bounds) ->
+        ( Mod_bounds.join_axis_lattice mod_bounds mutability_transformation,
+          With_bounds.add_modality ~type_expr ~modality with_bounds ))
+      fields
+      (Mod_bounds.min, No_with_bounds)
+  in
+  fresh_jkind_poly
+    { base = Layout (Layout.product layouts); mod_bounds; with_bounds }
+    ~annotation:None ~why:(Product_creation why)
+  (* [mark_best] is correct here because the with-bounds of a product jkind
+     include all the components of the product. Accordingly, looking through
+     the product, by one step, never loses any information. *)
+  |> mark_best
+
+let for_unboxed_record lbls =
+  let fields =
+    List.map
+      (fun ((lbl : Types.label_declaration), _layout) ->
+        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
+      lbls
+  in
+  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
+  product_of_fields ~why:Unboxed_record fields layouts
+
+let for_abbreviation ~type_jkind_purely wrapping ty =
+  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
+  let jkind = type_jkind_purely ty in
+  let with_ty_bound =
+    With_bounds_types.singleton ty { bounds_mask = Axis_lattice.top }
+  in
+  let jkind_before_wrapping =
+    fresh_jkind_poly
+      { base = jkind.jkind.base;
+        mod_bounds = Mod_bounds.min;
+        with_bounds = With_bounds with_ty_bound
+      }
+      ~annotation:None ~why:Abbreviation
+  in
+  Unboxed_field_transformation.apply_l wrapping jkind_before_wrapping
+
 (******************************)
 (* relations *)
 
@@ -4718,6 +4971,36 @@ let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
     false
 
+let is_obviously_sub (type r l) (sub : (allowed * r) jkind)
+    (super : (l * allowed) jkind) =
+  let base_le =
+    match sub.jkind.base, super.jkind.base with
+    | Layout l1, Layout l2 -> (
+      (* Only compare constant layouts, as [Layout.sub] may mutate *)
+      match Layout.get_const l1, Layout.get_const l2 with
+      | Some c1, Some c2 ->
+        Misc.Le_result.is_le (Layout.Const.less_or_equal c1 c2)
+      | (Some _ | None), _ -> false)
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2) ->
+      Path.same p1 p2
+      && Kind_operator.equal op1 op2
+      && Scannable_axes.le sa1 sa2
+    | Kconstr (_, sa1, _), Layout (Any sa2) -> Scannable_axes.le sa1 sa2
+    | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
+  in
+  base_le
+  &&
+  let { base = _; mod_bounds = super_bounds; with_bounds = No_with_bounds } =
+    super.jkind
+  in
+  match sub.jkind.with_bounds with
+  | No_with_bounds ->
+    Sub_result.is_le
+      (Mod_bounds.less_or_equal sub.jkind.mod_bounds super_bounds)
+  | With_bounds _ ->
+    (* With-bounds can only matter if [super]'s mod bounds aren't max *)
+    Mod_bounds.is_max super_bounds
+
 let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
 
@@ -4776,11 +5059,17 @@ module Debug_printers = struct
     | Tuple_element -> fprintf ppf "Tuple_element"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Address_contents -> fprintf ppf "Address_contents"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
     | Typing_recovery -> fprintf ppf "Typing_recovery"
+    | Module_projection -> fprintf ppf "Module_projection"
+    | Module_coercion -> fprintf ppf "Module_coercion"
+    | Module_inclusion -> fprintf ppf "Module_inclusion"
+    | Module_open -> fprintf ppf "Module_open"
+    | Module_argument -> fprintf ppf "Module_argument"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4881,6 +5170,8 @@ module Debug_printers = struct
     | Class_field -> fprintf ppf "Class_field"
     | Boxed_record -> fprintf ppf "Boxed_record"
     | Boxed_variant -> fprintf ppf "Boxed_variant"
+    | Unboxed_variant -> fprintf ppf "Unboxed_variant"
+    | At_at_unboxed_record -> fprintf ppf "At_at_unboxed_record"
     | Boxed -> fprintf ppf "Boxed"
     | Extensible_variant -> fprintf ppf "Extensible_variant"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
@@ -5015,7 +5306,7 @@ module Debug_printers = struct
 end
 
 (*** formatting user errors ***)
-let report_error ~loc : Error.t -> _ = function
+let report_error ~loc : error -> _ = function
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\
@@ -5064,5 +5355,5 @@ let report_error ~loc : Error.t -> _ = function
 
 let () =
   Location.register_error_of_exn (function
-    | Error.User_error (loc, err) -> Some (report_error ~loc err)
+    | Error.In_context (loc, err) -> Some (report_error ~loc err)
     | _ -> None)
