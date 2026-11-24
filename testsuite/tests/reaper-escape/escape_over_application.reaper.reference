@@ -1,0 +1,333 @@
+let code sum7_0 deleted in
+let code clobber_1 deleted in
+let code over2_2 deleted in
+let code `fn[escape_over_application.ml:32,4--30]_4` deleted in
+let code make_3 deleted in
+let code over3_5 deleted in
+let code `fn[escape_over_application.ml:43,6--40]_8` deleted in
+let code `fn[escape_over_application.ml:40,4--106]_7` deleted in
+let code make2_6 deleted in
+let code run_9 deleted in
+let $camlEscape_over_application__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_over_application__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_over_application__const_block_0)
+in
+let $camlEscape_over_application__immstring_2 = "%d\n" in
+let $camlEscape_over_application__const_block_3 =
+  Block 0 ($camlEscape_over_application__const_block_1,
+           $camlEscape_over_application__immstring_2)
+in
+let code inline(never) loopify(never) size(20) newer_version_of(sum7_0)
+      sum7_0_1
+        (t :
+           [ 0 of imm tagged * imm tagged * imm tagged * imm tagged *
+               imm tagged * imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pmixedfield = %block_load.[`6`] (t) in
+  let Pmixedfield_1 = %block_load.[`5`] (t) in
+  let Pmixedfield_2 = %block_load.[`4`] (t) in
+  let Pmixedfield_3 = %block_load.[`3`] (t) in
+  let Pmixedfield_4 = %block_load.[`2`] (t) in
+  let Pmixedfield_5 = %block_load.[`1`] (t) in
+  let Pmixedfield_6 = %block_load.[`0`] (t) in
+  let int_add = %int_barith.add (Pmixedfield_6, Pmixedfield_5) in
+  let int_add_1 = %int_barith.add (int_add, Pmixedfield_4) in
+  let int_add_2 = %int_barith.add (int_add_1, Pmixedfield_3) in
+  let int_add_3 = %int_barith.add (int_add_2, Pmixedfield_2) in
+  let int_add_4 = %int_barith.add (int_add_3, Pmixedfield_1) in
+  let int_add_5 = %int_barith.add (int_add_4, Pmixedfield) in
+  cont k (int_add_5)
+in
+let $camlEscape_over_application__sum7_4 = closure sum7_0_1 @sum7 &toplevel
+in
+let code inline(never) loopify(never) size(33) newer_version_of(clobber_1)
+      clobber_1_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let int_add = %int_barith.add (n, 7) in
+   let int_add_1 = %int_barith.add (n, 6) in
+   let int_add_2 = %int_barith.add (n, 5) in
+   let int_add_3 = %int_barith.add (n, 4) in
+   let int_add_4 = %int_barith.add (n, 3) in
+   let int_add_5 = %int_barith.add (n, 2) in
+   let int_add_6 = %int_barith.add (n, 1) in
+   let big =
+     %block.[`0`].my_alloc_region.local[`region`]
+       (int_add_6,
+        int_add_5,
+        int_add_4,
+        int_add_3,
+        int_add_2,
+        int_add_1,
+        int_add)
+   in
+   apply direct(sum7_0_1 &my_alloc_region)
+     ($camlEscape_over_application__sum7_4 : _ -> imm tagged)
+       (big)
+       -> k2 * k1)
+    where k2 (function_return_0_clobber_1 : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_clobber_1)
+in
+let $camlEscape_over_application__clobber_5 =
+  closure clobber_1_1 @clobber &toplevel
+in
+let code inline(never) loopify(never) size(13) newer_version_of(over2_2)
+      over2_2_1 (f : val, x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region f (x, 2) -> k2 * k1
+    where k2 (r : imm tagged) =
+      (apply direct(clobber_1_1 &my_alloc_region)
+         ($camlEscape_over_application__clobber_5 : _ -> imm tagged)
+           (x)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_add = %int_barith.add (r, apply_result) in
+           cont k (int_add))
+in
+let $camlEscape_over_application__over2_6 =
+  closure over2_2_1 @over2 &toplevel
+in
+let code loopify(never) size(7) newer_version_of(`fn[escape_over_application.ml:32,4--30]_4`)
+      `fn[escape_over_application.ml:32,4--30]_4_1` (b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let t_into_t_field_1 =
+    %project_value_slot.[`fn[escape_over_application.ml:32,4--30]`].[unboxed_field_t_field_1]
+      (my_closure)
+  in
+  let t_into_t_field_0 =
+    %project_value_slot.[`fn[escape_over_application.ml:32,4--30]`].[unboxed_field_t_field_0]
+      (my_closure)
+  in
+  let Pfield = t_into_t_field_1 in
+  let Pfield_1 = t_into_t_field_0 in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  let int_add_1 = %int_barith.add (int_add, b) in
+  cont k (int_add_1)
+in
+let code inline(never) loopify(never) size(25) newer_version_of(make_3)
+      make_3_1 (a : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let int_add = %int_barith.add (a, 1) in
+  let t_into_t_field_1 = int_add in
+  let t_into_t_field_0 = a in
+  apply direct(clobber_1_1 &my_alloc_region)
+    ($camlEscape_over_application__clobber_5 : _ -> imm tagged)
+      (a)
+      -> k4 * k1
+    where k4 (function_return : imm tagged) =
+      cont k3
+    where k3 =
+      cont k2
+    where k2 =
+      let `fn[escape_over_application.ml:32,4--30]` =
+        closure `fn[escape_over_application.ml:32,4--30]_4_1`
+          @`fn[escape_over_application.ml:32,4--30]` &my_alloc_region
+      with {
+        unboxed_field_t_field_1 = t_into_t_field_1;
+        unboxed_field_t_field_0 = t_into_t_field_0
+      }
+      in
+      cont k (`fn[escape_over_application.ml:32,4--30]`)
+in
+let $camlEscape_over_application__make_7 = closure make_3_1 @make &toplevel
+in
+let code inline(never) loopify(never) size(13) newer_version_of(over3_5)
+      over3_5_1 (f : val, x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region f (x, 2, 3) -> k2 * k1
+    where k2 (r : imm tagged) =
+      (apply direct(clobber_1_1 &my_alloc_region)
+         ($camlEscape_over_application__clobber_5 : _ -> imm tagged)
+           (x)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_add = %int_barith.add (r, apply_result) in
+           cont k (int_add))
+in
+let $camlEscape_over_application__over3_8 =
+  closure over3_5_1 @over3 &toplevel
+in
+let code loopify(never) size(10) newer_version_of(`fn[escape_over_application.ml:43,6--40]_8`)
+      `fn[escape_over_application.ml:43,6--40]_8_1` (c : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let t_into_t_field_1 =
+    %project_value_slot.[`fn[escape_over_application.ml:43,6--40]`].[unboxed_field_t_field_1_1]
+      (my_closure)
+  in
+  let u_into_u_field_1 =
+    %project_value_slot.[`fn[escape_over_application.ml:43,6--40]`].[unboxed_field_u_field_1]
+      (my_closure)
+  in
+  let u_into_u_field_0 =
+    %project_value_slot.[`fn[escape_over_application.ml:43,6--40]`].[unboxed_field_u_field_0]
+      (my_closure)
+  in
+  let Pfield = t_into_t_field_1 in
+  let Pfield_1 = u_into_u_field_1 in
+  let Pfield_2 = u_into_u_field_0 in
+  let int_add = %int_barith.add (Pfield_2, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  let int_add_2 = %int_barith.add (int_add_1, c) in
+  cont k (int_add_2)
+in
+let code loopify(never) size(29) newer_version_of(`fn[escape_over_application.ml:40,4--106]_7`)
+      `fn[escape_over_application.ml:40,4--106]_7_1` (b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let t_into_t_field_1 =
+    %project_value_slot.[`fn[escape_over_application.ml:40,4--106]`].[unboxed_field_t_field_1_2]
+      (my_closure)
+  in
+  let t_into_t_field_0 =
+    %project_value_slot.[`fn[escape_over_application.ml:40,4--106]`].[unboxed_field_t_field_0_1]
+      (my_closure)
+  in
+  let Pfield = t_into_t_field_0 in
+  let u_into_u_field_1 = Pfield in
+  let u_into_u_field_0 = b in
+  apply direct(clobber_1_1 &my_alloc_region)
+    ($camlEscape_over_application__clobber_5 : _ -> imm tagged)
+      (b)
+      -> k4 * k1
+    where k4 (function_return : imm tagged) =
+      cont k3
+    where k3 =
+      cont k2
+    where k2 =
+      let `fn[escape_over_application.ml:43,6--40]` =
+        closure `fn[escape_over_application.ml:43,6--40]_8_1`
+          @`fn[escape_over_application.ml:43,6--40]` &my_alloc_region
+      with {
+        unboxed_field_t_field_1_1 = t_into_t_field_1;
+        unboxed_field_u_field_1 = u_into_u_field_1;
+        unboxed_field_u_field_0 = u_into_u_field_0
+      }
+      in
+      cont k (`fn[escape_over_application.ml:43,6--40]`)
+in
+let code inline(never) loopify(never) size(41) newer_version_of(make2_6)
+      make2_6_1 (a : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let int_add = %int_barith.add (a, 1) in
+  let t_into_t_field_1 = int_add in
+  let t_into_t_field_0 = a in
+  let `fn[escape_over_application.ml:40,4--106]` =
+    closure `fn[escape_over_application.ml:40,4--106]_7_1`
+      @`fn[escape_over_application.ml:40,4--106]` &my_alloc_region
+  with {
+    unboxed_field_t_field_1_2 = t_into_t_field_1;
+    unboxed_field_t_field_0_1 = t_into_t_field_0
+  }
+  in
+  cont k (`fn[escape_over_application.ml:40,4--106]`)
+in
+let $camlEscape_over_application__make2_9 =
+  closure make2_6_1 @make2 &toplevel
+in
+let code inline(never) loopify(never) size(53) newer_version_of(run_9)
+      run_9_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(over2_2_1 &my_alloc_region)
+    ($camlEscape_over_application__over2_6 : _ -> imm tagged)
+      ($camlEscape_over_application__make_7, n)
+      -> k2 * k1
+    where k2 (x : imm tagged) =
+      (apply direct(over3_5_1 &my_alloc_region)
+         ($camlEscape_over_application__over3_8 : _ -> imm tagged)
+           ($camlEscape_over_application__make2_9, n)
+           -> k2 * k1
+         where k2 (y : imm tagged) =
+           (apply direct(make_3_1 &my_alloc_region)
+              ($camlEscape_over_application__make_7 : _ -> val)
+                (n)
+                -> k2 * k1
+              where k2 (g : val) =
+                (apply direct(clobber_1_1 &my_alloc_region)
+                   ($camlEscape_over_application__clobber_5 : _ -> imm tagged
+                    )
+                     (n)
+                     -> k4 * k1
+                   where k4 (function_return : imm tagged) =
+                     cont k3
+                   where k3 =
+                     cont k2
+                   where k2 =
+                     (apply &my_alloc_region g (5) -> k2 * k1
+                        where k2 (z : imm tagged) =
+                          (apply direct(make2_6_1 &my_alloc_region)
+                             $camlEscape_over_application__make2_9
+                               (n)
+                               -> k3 * k1
+                             where k3 (func) =
+                               apply &my_alloc_region func (7) -> k2 * k1
+                             where k2 (h : val) =
+                               (apply direct(clobber_1_1 &my_alloc_region)
+                                  ($camlEscape_over_application__clobber_5
+                                   : _ -> imm tagged)
+                                    (n)
+                                    -> k4 * k1
+                                  where k4 (function_return : imm tagged) =
+                                    cont k3
+                                  where k3 =
+                                    cont k2
+                                  where k2 =
+                                    (apply &my_alloc_region h (9) -> k2 * k1
+                                       where k2 (apply_result : imm tagged) =
+                                         let int_add = %int_barith.add (x, y)
+                                         in
+                                         let int_add_1 =
+                                           %int_barith.add (int_add, z)
+                                         in
+                                         let int_add_2 =
+                                           %int_barith.add
+                                             (int_add_1, apply_result)
+                                         in
+                                         cont k (int_add_2))))))))
+in
+let $camlEscape_over_application__run_10 = closure run_9_1 @run &toplevel in
+let $camlEscape_over_application__Pmakeblock_11 =
+  Block 0 ($camlEscape_over_application__run_10)
+in
+apply direct(run_9_1 &toplevel)
+  ($camlEscape_over_application__run_10 : _ -> imm tagged) (10) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_over_application__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_over_application =
+      Block 0 ($camlEscape_over_application__sum7_4,
+               $camlEscape_over_application__clobber_5,
+               $camlEscape_over_application__Pmakeblock_11)
+    in
+    cont done ($camlEscape_over_application)

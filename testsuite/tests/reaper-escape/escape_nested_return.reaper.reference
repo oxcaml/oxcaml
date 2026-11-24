@@ -1,0 +1,130 @@
+let code get_0 deleted in
+let code sum_pair_1 deleted in
+let code mk_2 deleted in
+let code f_3 deleted in
+let code g_4 deleted in
+let $camlEscape_nested_return__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_nested_return__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_nested_return__const_block_0)
+in
+let $camlEscape_nested_return__immstring_2 = "%d\n" in
+let $camlEscape_nested_return__const_block_3 =
+  Block 0 ($camlEscape_nested_return__const_block_1,
+           $camlEscape_nested_return__immstring_2)
+in
+let code inline(never) loopify(never) size(13) newer_version_of(get_0)
+      get_0_1 (o : [ 0 | 0 of imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (o) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let Pfield = %block_load.[`0`] (o) in
+      cont k (Pfield)
+in
+let $camlEscape_nested_return__get_4 = closure get_0_1 @get &toplevel in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_1)
+      sum_pair_1_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_nested_return__sum_pair_5 =
+  closure sum_pair_1_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(8) newer_version_of(mk_2)
+      mk_2_1 (x)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : val * imm stack =
+  let Pmakeblock = %block.[`0`].my_alloc_region.local[my_region] (x) in
+  let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+  let Pmakeblock_into_Pmakeblock_field_0 = Pmakeblock in
+  cont k
+         (Pmakeblock_into_Pmakeblock_field_0,
+          Pmakeblock_into_Pmakeblock_field_is_int)
+in
+let $camlEscape_nested_return__mk_6 = closure mk_2_1 @mk &toplevel in
+let code inline(never) loopify(never) size(15) newer_version_of(f_3)
+      f_3_1 (x)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] stack =
+  apply direct(mk_2_1 &my_alloc_region &my_region &my_ghost_region)
+    ($camlEscape_nested_return__mk_6 : _ -> val * imm) (x) -> k2 * k1
+    where k2
+            (`Pmakeblock_into_*match*_field_0`,
+             `Pmakeblock_into_*match*_field_is_int` : imm) =
+      let prim = `Pmakeblock_into_*match*_field_is_int` in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = `Pmakeblock_into_*match*_field_0` in
+           cont k (Pfield))
+in
+let $camlEscape_nested_return__f_7 = closure f_3_1 @f &toplevel in
+let code inline(never) loopify(never) size(28) newer_version_of(g_4)
+      g_4_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  apply direct(f_3_1 &my_alloc_region &`region` &ghost_region)
+    ($camlEscape_nested_return__f_7 : _ -> [ 0 | 0 of val ]) (x) -> k2 * k1
+    where k2 (y : [ 0 | 0 of imm tagged ]) =
+      let int_add = %int_barith.add (x, 200) in
+      let int_add_1 = %int_barith.add (x, 100) in
+      let p =
+        %block.[`0`].my_alloc_region.local[`region`] (int_add_1, int_add)
+      in
+      (apply direct(sum_pair_1_1 &my_alloc_region)
+         ($camlEscape_nested_return__sum_pair_5 : _ -> imm tagged)
+           (p)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           (apply direct(get_0_1 &my_alloc_region)
+              ($camlEscape_nested_return__get_4 : _ -> imm tagged)
+                (y)
+                -> k2 * k1
+              where k2 (apply_result_1 : imm tagged) =
+                let int_add_2 =
+                  %int_barith.add (apply_result_1, apply_result)
+                in
+                let region_end = %end_region (`region`) in
+                let region_end_1 = %end_ghost_region (ghost_region) in
+                cont k (int_add_2)))
+in
+let $camlEscape_nested_return__g_8 = closure g_4_1 @g &toplevel in
+let $camlEscape_nested_return__Pmakeblock_9 =
+  Block 0 ($camlEscape_nested_return__g_8)
+in
+apply direct(g_4_1 &toplevel)
+  ($camlEscape_nested_return__g_8 : _ -> imm tagged) (7) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_nested_return__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_nested_return =
+      Block 0 ($camlEscape_nested_return__get_4,
+               $camlEscape_nested_return__sum_pair_5,
+               $camlEscape_nested_return__Pmakeblock_9)
+    in
+    cont done ($camlEscape_nested_return)

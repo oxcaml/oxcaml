@@ -1,0 +1,1011 @@
+let code sum3_0 deleted in
+let code sum_pair_1 deleted in
+let code sum3_exn_2 deleted in
+let code used_3 deleted in
+let $camlEscape_exclave_control_flow__const_block_1 = Block 0 (0, 0) in
+let code join_4 deleted in
+let code join_from_switch_5 deleted in
+let code with_loop_6 deleted in
+let code with_allocating_loop_7 deleted in
+let code with_try_8 deleted in
+let code make_9 deleted in
+let code temporary_to_callee_10 deleted in
+let code value_11 deleted in
+let code value2_12 deleted in
+let code value3_13 deleted in
+let $camlEscape_exclave_control_flow__immstring_2 = "; count " in
+let $camlEscape_exclave_control_flow__immstring_3 = "; used " in
+let $camlEscape_exclave_control_flow__const_block_4 = Block 12 (10, 0) in
+let $camlEscape_exclave_control_flow__const_block_5 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_4)
+in
+let $camlEscape_exclave_control_flow__const_block_6 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_5)
+in
+let $camlEscape_exclave_control_flow__const_block_7 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_6)
+in
+let $camlEscape_exclave_control_flow__const_block_8 =
+  Block 11 ($camlEscape_exclave_control_flow__immstring_3,
+            $camlEscape_exclave_control_flow__const_block_7)
+in
+let $camlEscape_exclave_control_flow__const_block_9 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_8)
+in
+let $camlEscape_exclave_control_flow__const_block_10 =
+  Block 11 ($camlEscape_exclave_control_flow__immstring_2,
+            $camlEscape_exclave_control_flow__const_block_9)
+in
+let $camlEscape_exclave_control_flow__const_block_11 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_10)
+in
+let $camlEscape_exclave_control_flow__const_block_12 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_11)
+in
+let $camlEscape_exclave_control_flow__const_block_13 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_12)
+in
+let $camlEscape_exclave_control_flow__const_block_14 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_13)
+in
+let $camlEscape_exclave_control_flow__const_block_15 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_14)
+in
+let $camlEscape_exclave_control_flow__const_block_16 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_15)
+in
+let $camlEscape_exclave_control_flow__const_block_17 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_16)
+in
+let $camlEscape_exclave_control_flow__const_block_18 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_17)
+in
+let $camlEscape_exclave_control_flow__const_block_19 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_18)
+in
+let $camlEscape_exclave_control_flow__const_block_20 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_19)
+in
+let $camlEscape_exclave_control_flow__const_block_21 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_20)
+in
+let $camlEscape_exclave_control_flow__const_block_22 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_21)
+in
+let $camlEscape_exclave_control_flow__const_block_23 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_22)
+in
+let $camlEscape_exclave_control_flow__const_block_24 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_23)
+in
+let $camlEscape_exclave_control_flow__const_block_25 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_24)
+in
+let $camlEscape_exclave_control_flow__const_block_26 =
+  Block 12 (32, $camlEscape_exclave_control_flow__const_block_25)
+in
+let $camlEscape_exclave_control_flow__const_block_27 =
+  Block 4 (0, 0, 0, $camlEscape_exclave_control_flow__const_block_26)
+in
+let $camlEscape_exclave_control_flow__immstring_28 =
+  "%d %d %d %d %d %d %d %d %d; count %d; used %d %d\n"
+in
+let $camlEscape_exclave_control_flow__const_block_29 =
+  Block 0 ($camlEscape_exclave_control_flow__const_block_27,
+           $camlEscape_exclave_control_flow__immstring_28)
+in
+let code run_14 deleted in
+let $camlEscape_exclave_control_flow__immstring_0 =
+  "Escape_exclave_control_flow.Negative"
+in
+let code inline(never) loopify(never) size(8) newer_version_of(sum3_0)
+      sum3_0_1 (t : [ 0 of imm tagged * imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`2`] (t) in
+  let Pfield_1 = %block_load.[`1`] (t) in
+  let Pfield_2 = %block_load.[`0`] (t) in
+  let int_add = %int_barith.add (Pfield_2, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  cont k (int_add_1)
+in
+let $camlEscape_exclave_control_flow__sum3_30 =
+  closure sum3_0_1 @sum3 &toplevel
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_1)
+      sum_pair_1_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_exclave_control_flow__sum_pair_31 =
+  closure sum_pair_1_1 @sum_pair &toplevel
+in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlEscape_exclave_control_flow__Negative_32 =
+      Block immutable_unique
+      248 ($camlEscape_exclave_control_flow__immstring_0, Pccall)
+    in
+    let code inline(never) loopify(never) size(17) newer_version_of(sum3_exn_2)
+          sum3_exn_2_1 (t : [ 0 of imm tagged * imm tagged * imm tagged ])
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let Pfield = %block_load.[`0`] (t) in
+      let prim = %int_comp.lt (Pfield, 0) in
+      switch prim
+        | 0 -> k2
+        | 1 ->
+          k1 pop(reraise k1) ($camlEscape_exclave_control_flow__Negative_32)
+        where k2 =
+          apply direct(sum3_0_1 &my_alloc_region)
+            ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
+              (t)
+              -> k * k1
+    in
+    let $camlEscape_exclave_control_flow__sum3_exn_33 =
+      closure sum3_exn_2_1 @sum3_exn &toplevel
+    in
+    let count = %block.mut.[`0`].`toplevel` (0) in
+    let base = %block.mut.[`0`].`toplevel` (0) in
+    let $camlEscape_exclave_control_flow__used_34 =
+      closure used_3_1 @used &toplevel
+    and code inline(never) loopify(never) size(15) newer_version_of(used_3)
+          used_3_1 (param : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let base_1 =
+        %project_value_slot.[used].[base]
+          ($camlEscape_exclave_control_flow__used_34)
+      in
+      let Pfield = %block_load.mut.[`0`] (base_1) in
+      apply ccall
+        ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
+        where k2 (Pccall_1) =
+          let int_sub = %int_barith.sub (Pccall_1, Pfield) in
+          cont k (int_sub)
+      with { base = base }
+    in
+    let $camlEscape_exclave_control_flow__join_35 =
+      closure join_4_1 @join &toplevel
+    and code inline(never) loopify(never) size(59) newer_version_of(join_4)
+          join_4_1 (x : imm tagged, y : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of [ 0 of val * imm tagged ] ] stack =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      let count_1 =
+        %project_value_slot.[join].[unboxed_field_count]
+          ($camlEscape_exclave_control_flow__join_35)
+      in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (x, y, x) in
+      apply direct(sum3_0_1 &my_alloc_region)
+        ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          ((let prim = %int_comp.gt (s, 10) in
+            switch prim
+              | 0 -> k3
+              | 1 -> k4
+              where k4 =
+                let region_end = %end_region (`region`) in
+                let region_end_1 = %end_ghost_region (ghost_region) in
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region.local[my_region] (s, 1)
+                in
+                cont k2 (Pmakeblock)
+              where k3 =
+                let prim_1 =
+                  %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (count_1)
+                in
+                let prim_2 = %int_barith.add (1, prim_1) in
+                let Poffsetref =
+                  %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
+                    (count_1, prim_2)
+                in
+                let region_end = %end_region (`region`) in
+                let region_end_1 = %end_ghost_region (ghost_region) in
+                cont k2 ($camlEscape_exclave_control_flow__const_block_1))
+             where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+               (apply direct(sum_pair_1_1 &my_alloc_region)
+                  ($camlEscape_exclave_control_flow__sum_pair_31
+                   : _ -> imm tagged)
+                    (p)
+                    -> k2 * k1
+                  where k2 (u : imm tagged) =
+                    let Pmakeblock =
+                      %block.[`0`].my_alloc_region.local[my_region] (p, u)
+                    in
+                    let Pmakeblock_1 =
+                      %block.[`0`].my_alloc_region.local[my_region]
+                        (Pmakeblock)
+                    in
+                    cont k (Pmakeblock_1)))
+      with { unboxed_field_count = count }
+    in
+    let code inline(never) loopify(never) size(50) newer_version_of(join_from_switch_5)
+          join_from_switch_5_1 (x : imm tagged, y : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of [ 0 of val * imm tagged ] ] stack =
+      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      apply direct(sum3_0_1 &my_alloc_region)
+        ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          ((let prim = %int_comp.gt (s, 10) in
+            switch prim
+              | 0 -> k2 ($camlEscape_exclave_control_flow__const_block_1)
+              | 1 -> k3
+              where k3 =
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region.local[my_region] (s, 1)
+                in
+                cont k2 (Pmakeblock))
+             where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+               (apply direct(sum_pair_1_1 &my_alloc_region)
+                  ($camlEscape_exclave_control_flow__sum_pair_31
+                   : _ -> imm tagged)
+                    (p)
+                    -> k2 * k1
+                  where k2 (u : imm tagged) =
+                    let Pmakeblock =
+                      %block.[`0`].my_alloc_region.local[my_region] (p, u)
+                    in
+                    let Pmakeblock_1 =
+                      %block.[`0`].my_alloc_region.local[my_region]
+                        (Pmakeblock)
+                    in
+                    cont k (Pmakeblock_1)))
+    in
+    let $camlEscape_exclave_control_flow__join_from_switch_36 =
+      closure join_from_switch_5_1 @join_from_switch &toplevel
+    in
+    let code inline(never) loopify(never) size(54) newer_version_of(with_loop_6)
+          with_loop_6_1 (x : imm tagged, n : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of imm tagged ] stack =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (x, n, 1) in
+      (let prim = %int_comp.le (1, n) in
+       switch prim
+         | 0 -> k2 (0)
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %untag_imm (n) in
+           let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
+           (cont k3 (1L, 0)
+              where rec k3
+                          (for_counter_naked : int64,
+                           acc_unboxed0 : imm tagged) =
+                let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked)
+                in
+                let i = %tag_imm (prim_2) in
+                (apply direct(sum3_0_1 &my_alloc_region)
+                   ($camlEscape_exclave_control_flow__sum3_30
+                    : _ -> imm tagged)
+                     (t)
+                     -> k4 * k1
+                   where k4 (return_val0 : imm tagged) =
+                     let int_add =
+                       %int_barith.add (acc_unboxed0, return_val0)
+                     in
+                     let int_add_1 = %int_barith.add (int_add, i) in
+                     let for_next_naked =
+                       %int_barith.`int64`.add (for_counter_naked, 1L)
+                     in
+                     let prim_3 =
+                       %int_comp.`int64`.le (for_next_naked, for_stop_naked)
+                     in
+                     switch prim_3
+                       | 0 -> k2 (int_add_1)
+                       | 1 -> k3 (for_next_naked, int_add_1))))
+        where k2 (acc_unboxed0 : imm tagged) =
+          let region_end = %end_region (`region`) in
+          let region_end_1 = %end_ghost_region (ghost_region) in
+          let Pmakeblock =
+            %block.[`0`].my_alloc_region.local[my_region] (acc_unboxed0)
+          in
+          cont k (Pmakeblock)
+    in
+    let $camlEscape_exclave_control_flow__with_loop_37 =
+      closure with_loop_6_1 @with_loop &toplevel
+    in
+    let code inline(never) loopify(never) size(68) newer_version_of(with_allocating_loop_7)
+          with_allocating_loop_7_1 (x : imm tagged, n : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of imm tagged ] stack =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (x, n, 1) in
+      (let prim = %int_comp.le (1, n) in
+       switch prim
+         | 0 -> k2 (0)
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %untag_imm (n) in
+           let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
+           (cont k3 (1L, 0)
+              where rec k3
+                          (for_counter_naked : int64,
+                           acc_unboxed0 : imm tagged) =
+                let region_1 = %begin_region () in
+                let ghost_region_1 = %begin_ghost_region () in
+                ((let prim_2 =
+                    %num_conv.[`int64`].[`imm`] (for_counter_naked)
+                  in
+                  let i = %tag_imm (prim_2) in
+                  apply direct(sum3_0_1 &my_alloc_region)
+                    ($camlEscape_exclave_control_flow__sum3_30
+                     : _ -> imm tagged)
+                      (t)
+                      -> k6 * k1
+                    where k6 (return_val0 : imm tagged) =
+                      let u =
+                        %block.[`0`].my_alloc_region.local[region_1]
+                          (i, acc_unboxed0, return_val0)
+                      in
+                      (apply direct(sum3_0_1 &my_alloc_region)
+                         ($camlEscape_exclave_control_flow__sum3_30
+                          : _ -> imm tagged)
+                           (u)
+                           -> k6 * k1
+                         where k6 (return_val0_1 : imm tagged) =
+                           let int_and =
+                             %int_barith.`and` (return_val0_1, 65535)
+                           in
+                           let for_next_naked =
+                             %int_barith.`int64`.add (for_counter_naked, 1L)
+                           in
+                           let prim_3 =
+                             %int_comp.`int64`.le
+                               (for_next_naked, for_stop_naked)
+                           in
+                           switch prim_3
+                             | 0 -> k5 (int_and)
+                             | 1 -> k4 (for_next_naked, int_and)))
+                   where k5 (acc_unboxed0_1 : imm tagged) =
+                     let region_end = %end_region (region_1) in
+                     let region_end_1 = %end_ghost_region (ghost_region_1) in
+                     cont k2 (acc_unboxed0_1)
+                   where k4
+                           (for_counter_naked_1 : int64,
+                            acc_unboxed0_1 : imm tagged) =
+                     let region_end = %end_region (region_1) in
+                     let region_end_1 = %end_ghost_region (ghost_region_1) in
+                     cont k3 (for_counter_naked_1, acc_unboxed0_1))))
+        where k2 (acc_unboxed0 : imm tagged) =
+          let region_end = %end_region (`region`) in
+          let region_end_1 = %end_ghost_region (ghost_region) in
+          let Pmakeblock =
+            %block.[`0`].my_alloc_region.local[my_region] (acc_unboxed0)
+          in
+          cont k (Pmakeblock)
+    in
+    let $camlEscape_exclave_control_flow__with_allocating_loop_38 =
+      closure with_allocating_loop_7_1 @with_allocating_loop &toplevel
+    in
+    let code inline(never) loopify(never) size(43) newer_version_of(with_try_8)
+          with_try_8_1 (x : imm tagged, y : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : val * imm stack =
+      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      (let try_region = %begin_try_region () in
+       let try_ghost_region = %begin_try_ghost_region () in
+       cont k5 push(k3)
+         where k5 =
+           apply direct(sum3_exn_2_1 &my_alloc_region)
+             ($camlEscape_exclave_control_flow__sum3_exn_33 : _ -> imm tagged
+              )
+               (t)
+               -> k4 * k3
+         where k4 (body_result : imm tagged) =
+           cont k2 pop(k3) (body_result)
+         where k3 exn (`exn` : val) =
+           let `unit` = %end_try_region (try_region) in
+           let unit_1 = %end_try_ghost_region (try_ghost_region) in
+           let prim =
+             %phys_eq (`exn`, $camlEscape_exclave_control_flow__Negative_32)
+           in
+           switch prim
+             | 0 -> k1 pop(reraise k1) (`exn`)
+             | 1 -> k2 (0))
+        where k2 (s : imm tagged) =
+          let Pmakeblock =
+            %block.[`0`].my_alloc_region.local[my_region] (s, y)
+          in
+          let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+          let Pmakeblock_into_Pmakeblock_field_0 = Pmakeblock in
+          cont k
+                 (Pmakeblock_into_Pmakeblock_field_0,
+                  Pmakeblock_into_Pmakeblock_field_is_int)
+    in
+    let $camlEscape_exclave_control_flow__with_try_39 =
+      closure with_try_8_1 @with_try &toplevel
+    in
+    let code inline(never) loopify(never) size(14) newer_version_of(make_9)
+          make_9_1 (t : [ 0 of imm tagged * imm tagged * imm tagged ])
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : val * imm stack =
+      let Pfield = %block_load.[`2`] (t) in
+      let Pfield_1 = %block_load.[`1`] (t) in
+      let Pfield_2 = %block_load.[`0`] (t) in
+      let int_add = %int_barith.add (Pfield_2, Pfield_1) in
+      let Pmakeblock =
+        %block.[`0`].my_alloc_region.local[my_region] (int_add, Pfield)
+      in
+      let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+      let Pmakeblock_into_Pmakeblock_field_0 = Pmakeblock in
+      cont k
+             (Pmakeblock_into_Pmakeblock_field_0,
+              Pmakeblock_into_Pmakeblock_field_is_int)
+    in
+    let $camlEscape_exclave_control_flow__make_40 =
+      closure make_9_1 @make &toplevel
+    in
+    let code inline(never) loopify(never) size(18) newer_version_of(temporary_to_callee_10)
+          temporary_to_callee_10_1 (x : imm tagged, y : imm tagged)
+            my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+            -> k * k1
+            : val * imm * val * imm stack =
+      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      apply direct(sum3_0_1 &my_alloc_region)
+        ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          (apply
+                  direct(make_9_1
+                  &my_alloc_region &my_region &my_ghost_region)
+             ($camlEscape_exclave_control_flow__make_40 : _ -> val * imm)
+               (t)
+               -> k2 * k1
+             where k2
+                     (Pmakeblock_into_p_field_0,
+                      Pmakeblock_into_p_field_is_int : imm) =
+               let Pmakeblock_into_Pmakeblock_field_1 = s in
+               let Pmakeblock_into_Pmakeblock_field_0_field_is_int =
+                 Pmakeblock_into_p_field_is_int
+               in
+               let Pmakeblock_into_Pmakeblock_field_0_field_0 =
+                 Pmakeblock_into_p_field_0
+               in
+               let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+               let Pmakeblock_into_Pmakeblock_field_0_field_1 =
+                 Pmakeblock_into_Pmakeblock_field_1
+               in
+               let Pmakeblock_into_Pmakeblock_field_0_field_0_field_is_int =
+                 Pmakeblock_into_Pmakeblock_field_0_field_is_int
+               in
+               let Pmakeblock_into_Pmakeblock_field_0_field_0_field_0 =
+                 Pmakeblock_into_Pmakeblock_field_0_field_0
+               in
+               cont k
+                      (Pmakeblock_into_Pmakeblock_field_0_field_0_field_0,
+                       Pmakeblock_into_Pmakeblock_field_0_field_0_field_is_int,
+                       Pmakeblock_into_Pmakeblock_field_0_field_1,
+                       Pmakeblock_into_Pmakeblock_field_is_int))
+    in
+    let $camlEscape_exclave_control_flow__temporary_to_callee_41 =
+      closure temporary_to_callee_10_1 @temporary_to_callee &toplevel
+    in
+    let code inline(never) loopify(never) size(13) newer_version_of(value_11)
+          value_11_1 (o : [ 0 | 0 of imm tagged ])
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %is_int (o) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (-1)
+        where k2 =
+          let Pfield = %block_load.[`0`] (o) in
+          cont k (Pfield)
+    in
+    let $camlEscape_exclave_control_flow__value_42 =
+      closure value_11_1 @value &toplevel
+    in
+    let code inline(never) loopify(never) size(21) newer_version_of(value2_12)
+          value2_12_1 (o : [ 0 | 0 of [ 0 of val * imm tagged ] ])
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %is_int (o) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (-1)
+        where k2 =
+          let `*match*` = %block_load.[`0`] (o) in
+          let Pmixedfield = %block_load.[`1`] (`*match*`) in
+          ((let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+            apply direct(sum_pair_1_1 &my_alloc_region)
+              ($camlEscape_exclave_control_flow__sum_pair_31
+               : _ -> imm tagged)
+                (Pmixedfield_1)
+                -> k2 * k1)
+             where k2 (apply_result : imm tagged) =
+               let int_add = %int_barith.add (apply_result, Pmixedfield) in
+               cont k (int_add))
+    in
+    let $camlEscape_exclave_control_flow__value2_43 =
+      closure value2_12_1 @value2 &toplevel
+    in
+    let code inline(never) loopify(never) size(27) newer_version_of(value3_13)
+          value3_13_1
+            (Pmakeblock_into_o_field_0_field_0_field_0,
+             Pmakeblock_into_o_field_0_field_0_field_is_int : imm,
+             Pmakeblock_into_o_field_0_field_1,
+             Pmakeblock_into_o_field_is_int : imm)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = Pmakeblock_into_o_field_is_int in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (-1)
+        where k2 =
+          let `Pmakeblock_into_*match*_field_1` =
+            Pmakeblock_into_o_field_0_field_1
+          in
+          let `Pmakeblock_into_*match*_field_0_field_is_int` =
+            Pmakeblock_into_o_field_0_field_0_field_is_int
+          in
+          let `Pmakeblock_into_*match*_field_0_field_0` =
+            Pmakeblock_into_o_field_0_field_0_field_0
+          in
+          let `Pmakeblock_into_*match*_field_is_int` =
+            `Pmakeblock_into_*match*_field_0_field_is_int`
+          in
+          let `Pmakeblock_into_*match*_field_0` =
+            `Pmakeblock_into_*match*_field_0_field_0`
+          in
+          let prim_1 = `Pmakeblock_into_*match*_field_is_int` in
+          (switch prim_1
+             | 0 -> k2
+             | 1 -> k (-1)
+             where k2 =
+               let Pmixedfield = `Pmakeblock_into_*match*_field_1` in
+               ((let Pfield = `Pmakeblock_into_*match*_field_0` in
+                 apply direct(sum_pair_1_1 &my_alloc_region)
+                   ($camlEscape_exclave_control_flow__sum_pair_31
+                    : _ -> imm tagged)
+                     (Pfield)
+                     -> k2 * k1)
+                  where k2 (apply_result : imm tagged) =
+                    let int_add = %int_barith.add (apply_result, Pmixedfield)
+                    in
+                    cont k (int_add)))
+    in
+    let $camlEscape_exclave_control_flow__value3_44 =
+      closure value3_13_1 @value3 &toplevel
+    in
+    let $camlEscape_exclave_control_flow__run_45 =
+      closure run_14_1 @run &toplevel
+    and code inline(never) loopify(never) size(153) newer_version_of(run_14)
+          run_14_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      let count_1 =
+        %project_value_slot.[run].[count]
+          ($camlEscape_exclave_control_flow__run_45)
+      in
+      let base_1 =
+        %project_value_slot.[run].[base_1]
+          ($camlEscape_exclave_control_flow__run_45)
+      in
+      apply ccall
+        ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
+        where k2 (Pccall_1) =
+          let Psetfield = %block_set.`imm`.[`0`] (base_1, Pccall_1) in
+          (apply direct(join_4_1 &my_alloc_region &`region` &ghost_region)
+             ($camlEscape_exclave_control_flow__join_35
+              : _ -> [ 0 | 0 of [ 0 of val * imm tagged ] ])
+               (n, 1)
+               -> k2 * k1
+             where k2 (j1 : [ 0 | 0 of [ 0 of val * imm tagged ] ]) =
+               (apply
+                       direct(join_4_1
+                       &my_alloc_region &`region` &ghost_region)
+                  ($camlEscape_exclave_control_flow__join_35
+                   : _ -> [ 0 | 0 of [ 0 of val * imm tagged ] ])
+                    (1, 1)
+                    -> k2 * k1
+                  where k2 (j2 : [ 0 | 0 of [ 0 of val * imm tagged ] ]) =
+                    (apply direct(used_3_1 &my_alloc_region)
+                       ($camlEscape_exclave_control_flow__used_34
+                        : _ -> imm tagged)
+                         (0)
+                         -> k2 * k1
+                       where k2 (u1 : imm tagged) =
+                         (apply
+                                 direct(join_from_switch_5_1
+                                 &my_alloc_region &`region` &ghost_region)
+                            ($camlEscape_exclave_control_flow__join_from_switch_36
+                             : _ -> [ 0 | 0 of [ 0 of val * imm tagged ] ])
+                              (n, 1)
+                              -> k2 * k1
+                            where k2
+                                    (j3 :
+                                       [ 0 | 0 of [ 0 of val * imm tagged ] ]) =
+                              (apply
+                                      direct(join_from_switch_5_1
+                                      &my_alloc_region &`region` &ghost_region)
+                                 ($camlEscape_exclave_control_flow__join_from_switch_36
+                                  : _ ->
+                                    [ 0 | 0 of [ 0 of val * imm tagged ] ]
+                                  )
+                                   (1, 1)
+                                   -> k2 * k1
+                                 where k2
+                                         (j4 :
+                                            [ 0
+                                            | 0 of [ 0 of val * imm tagged ]
+                                            ]) =
+                                   (apply
+                                           direct(with_loop_6_1
+                                           &my_alloc_region &`region` &ghost_region)
+                                      ($camlEscape_exclave_control_flow__with_loop_37
+                                       : _ -> [ 0 | 0 of imm tagged ])
+                                        (n, 5)
+                                        -> k2 * k1
+                                      where k2 (l : [ 0 | 0 of imm tagged ]) =
+                                        (apply
+                                                direct(with_allocating_loop_7_1
+                                                &my_alloc_region &`region` &ghost_region)
+                                           ($camlEscape_exclave_control_flow__with_allocating_loop_38
+                                            : _ -> [ 0 | 0 of imm tagged ])
+                                             (n, 5)
+                                             -> k2 * k1
+                                           where k2
+                                                   (l2 :
+                                                      [ 0 | 0 of imm tagged ]) =
+                                             (apply
+                                                     direct(used_3_1
+                                                     &my_alloc_region)
+                                                ($camlEscape_exclave_control_flow__used_34
+                                                 : _ -> imm tagged)
+                                                  (0)
+                                                  -> k2 * k1
+                                                where k2 (u2 : imm tagged) =
+                                                  (apply
+                                                          direct(with_try_8_1
+                                                          &my_alloc_region &`region` &ghost_region)
+                                                     ($camlEscape_exclave_control_flow__with_try_39
+                                                      : _ -> val * imm)
+                                                       (n, 2)
+                                                       -> k2 * k1
+                                                     where k2
+                                                             (Pmakeblock_into_t1_field_0,
+                                                              Pmakeblock_into_t1_field_is_int :
+                                                                imm) =
+                                                       (apply
+                                                               direct(with_try_8_1
+                                                               &my_alloc_region &`region` &ghost_region)
+                                                          ($camlEscape_exclave_control_flow__with_try_39
+                                                           : _ -> val * imm)
+                                                            (-1, 2)
+                                                            -> k2 * k1
+                                                          where k2
+                                                                  (Pmakeblock_into_t2_field_0,
+                                                                   Pmakeblock_into_t2_field_is_int :
+                                                                    imm) =
+                                                            (apply
+                                                                    direct(temporary_to_callee_10_1
+                                                                    &my_alloc_region &`region` &ghost_region)
+                                                               ($camlEscape_exclave_control_flow__temporary_to_callee_41
+                                                                : _ ->
+                                                                  val *
+                                                                  imm *
+                                                                  val *
+                                                                  imm
+                                                                )
+                                                                 (n, 3)
+                                                                 -> k2 * k1
+                                                               where 
+                                                                 k2
+                                                                   (Pmakeblock_into_c_field_0_field_0_field_0,
+                                                                    Pmakeblock_into_c_field_0_field_0_field_is_int :
+                                                                    imm,
+                                                                    Pmakeblock_into_c_field_0_field_1,
+                                                                    Pmakeblock_into_c_field_is_int :
+                                                                    imm) =
+                                                                 let int_sub =
+                                                                   %int_barith.sub
+                                                                    (u2, u1)
+                                                                 in
+                                                                 let Pfield =
+                                                                   %block_load.mut.[`0`]
+                                                                    (count_1)
+                                                                 in
+                                                                 (apply
+                                                                     direct(value3_13_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value3_44
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (Pmakeblock_into_c_field_0_field_0_field_0,
+                                                                    Pmakeblock_into_c_field_0_field_0_field_is_int,
+                                                                    Pmakeblock_into_c_field_0_field_1,
+                                                                    Pmakeblock_into_c_field_is_int)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result :
+                                                                    imm tagged) =
+                                                                    ((let prim =
+                                                                    Pmakeblock_into_t2_field_is_int
+                                                                    in
+                                                                    switch prim
+                                                                    | 0 -> k4
+                                                                    | 1 ->
+                                                                    k3 (0)
+                                                                    where 
+                                                                    k4 =
+                                                                    ((let Pfield_1 =
+                                                                    Pmakeblock_into_t2_field_0
+                                                                    in
+                                                                    apply
+                                                                     direct(sum_pair_1_1
+                                                                    &my_alloc_region)
+                                                                    inlining_state(depth(10))
+                                                                    $camlEscape_exclave_control_flow__sum_pair_31
+                                                                    (Pfield_1)
+                                                                    -> k4
+                                                                    * k1)
+                                                                    where 
+                                                                    k4
+                                                                    (apply_result_1) =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region.local[`region`]
+                                                                    (apply_result_1)
+                                                                    in
+                                                                    cont 
+                                                                    k3
+                                                                    (Pmakeblock)))
+                                                                    where 
+                                                                    k3
+                                                                    (apply_result_1 :
+                                                                    [ 0
+                                                                    | 
+                                                                    0 of imm tagged
+                                                                    ]) =
+                                                                    apply
+                                                                     direct(value_11_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (apply_result_1)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_1 :
+                                                                    imm tagged) =
+                                                                    ((let prim =
+                                                                    Pmakeblock_into_t1_field_is_int
+                                                                    in
+                                                                    switch prim
+                                                                    | 0 -> k4
+                                                                    | 1 ->
+                                                                    k3 (0)
+                                                                    where 
+                                                                    k4 =
+                                                                    ((let Pfield_1 =
+                                                                    Pmakeblock_into_t1_field_0
+                                                                    in
+                                                                    apply
+                                                                     direct(sum_pair_1_1
+                                                                    &my_alloc_region)
+                                                                    inlining_state(depth(10))
+                                                                    $camlEscape_exclave_control_flow__sum_pair_31
+                                                                    (Pfield_1)
+                                                                    -> k4
+                                                                    * k1)
+                                                                    where 
+                                                                    k4
+                                                                    (apply_result_2) =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`].my_alloc_region.local[`region`]
+                                                                    (apply_result_2)
+                                                                    in
+                                                                    cont 
+                                                                    k3
+                                                                    (Pmakeblock)))
+                                                                    where 
+                                                                    k3
+                                                                    (apply_result_2 :
+                                                                    [ 0
+                                                                    | 
+                                                                    0 of imm tagged
+                                                                    ]) =
+                                                                    apply
+                                                                     direct(value_11_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (apply_result_2)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_2 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value_11_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (l2)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_3 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value_11_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value_42
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (l)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_4 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value2_12_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (j4)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_5 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value2_12_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (j3)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_6 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value2_12_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (j2)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_7 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(value2_12_1
+                                                                    &my_alloc_region)
+                                                                    ($camlEscape_exclave_control_flow__value2_43
+                                                                    : 
+                                                                    _ ->
+                                                                    imm tagged
+                                                                    )
+                                                                    (j1)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (apply_result_8 :
+                                                                    imm tagged) =
+                                                                    (apply
+                                                                     direct(printf_13
+                                                                    &my_alloc_region)
+                                                                    inlined(never)
+                                                                    $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+                                                                    ($camlEscape_exclave_control_flow__const_block_29)
+                                                                    -> k2
+                                                                    * k1
+                                                                    where 
+                                                                    k2
+                                                                    (full_apply) =
+                                                                    let region_end =
+                                                                    %end_region
+                                                                    (`region`)
+                                                                    in
+                                                                    let region_end_1 =
+                                                                    %end_ghost_region
+                                                                    (ghost_region)
+                                                                    in
+                                                                    apply
+                                                                     &my_alloc_region
+                                                                    inlined(never)
+                                                                    full_apply
+                                                                    (apply_result_8,
+                                                                    apply_result_7,
+                                                                    apply_result_6,
+                                                                    apply_result_5,
+                                                                    apply_result_4,
+                                                                    apply_result_3,
+                                                                    apply_result_2,
+                                                                    apply_result_1,
+                                                                    apply_result,
+                                                                    Pfield,
+                                                                    u1,
+                                                                    int_sub)
+                                                                    -> k * k1)))))))))))))))))))))
+      with { count = count; base_1 = base }
+    in
+    let $camlEscape_exclave_control_flow__Pmakeblock_46 =
+      Block 0 ($camlEscape_exclave_control_flow__run_45)
+    in
+    (apply direct(run_14_1 &toplevel)
+       ($camlEscape_exclave_control_flow__run_45 : _ -> imm tagged)
+         (10)
+         -> k2 * error
+       where k2 (function_return : imm tagged) =
+         cont k1
+       where k1 =
+         cont k
+       where k =
+         let $camlEscape_exclave_control_flow =
+           Block 0 ($camlEscape_exclave_control_flow__sum3_30,
+                    $camlEscape_exclave_control_flow__sum_pair_31,
+                    $camlEscape_exclave_control_flow__Negative_32,
+                    $camlEscape_exclave_control_flow__sum3_exn_33,
+                    count,
+                    base,
+                    $camlEscape_exclave_control_flow__used_34,
+                    $camlEscape_exclave_control_flow__Pmakeblock_46)
+         in
+         cont done ($camlEscape_exclave_control_flow))

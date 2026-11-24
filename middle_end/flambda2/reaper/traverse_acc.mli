@@ -91,8 +91,11 @@ end
 (** The type of traversal accumulators. *)
 type t
 
-(** Create a fresh, empty accumulator. *)
-val create : unit -> t
+(** Create a fresh, empty accumulator. The facts for the escape analysis are
+    recorded in [escape] (by default, they are not recorded). *)
+val create : ?escape:Escape_graph.t -> unit -> t
+
+val escape : t -> Escape_graph.t
 
 (** Record an application, so that the queries that will be needed for
     rebuilding can be precomputed. *)

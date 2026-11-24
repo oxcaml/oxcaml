@@ -1,0 +1,105 @@
+let code sum_pair_0 deleted in
+let $camlEscape_local_return_recursive__const_block_0 = Block 0 (0, 0) in
+let code build_1 deleted in
+let code f_2 deleted in
+let $camlEscape_local_return_recursive__const_block_1 = Block 12 (10, 0) in
+let $camlEscape_local_return_recursive__const_block_2 =
+  Block 4 (0, 0, 0, $camlEscape_local_return_recursive__const_block_1)
+in
+let $camlEscape_local_return_recursive__immstring_3 = "%d\n" in
+let $camlEscape_local_return_recursive__const_block_4 =
+  Block 0 ($camlEscape_local_return_recursive__const_block_2,
+           $camlEscape_local_return_recursive__immstring_3)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+      sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_local_return_recursive__sum_pair_5 =
+  closure sum_pair_0_1 @sum_pair &toplevel
+in
+let $camlEscape_local_return_recursive__build_6 =
+  closure build_1_1 @build &toplevel
+and code rec inline(never) loopify(never) size(30) newer_version_of(build_1)
+      build_1_1 (n : imm tagged)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] stack =
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k ($camlEscape_local_return_recursive__const_block_0)
+    where k2 =
+      ((let int_sub = %int_barith.sub (n, 1) in
+        apply direct(build_1_1 &my_alloc_region &my_region &my_ghost_region)
+          ($camlEscape_local_return_recursive__build_6 ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 of imm tagged * imm tagged ])
+            (int_sub)
+            -> k2 * k1)
+         where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+           (apply direct(sum_pair_0_1 &my_alloc_region)
+              ($camlEscape_local_return_recursive__sum_pair_5
+               : _ -> imm tagged)
+                (p)
+                -> k2 * k1
+              where k2 (apply_result : imm tagged) =
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region.local[my_region]
+                    (apply_result, n)
+                in
+                cont k (Pmakeblock)))
+in
+let code inline(never) loopify(never) size(11) newer_version_of(f_2)
+      f_2_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  apply direct(build_1_1 &my_alloc_region &`region` &ghost_region)
+    ($camlEscape_local_return_recursive__build_6
+     : _ -> [ 0 of imm tagged * imm tagged ])
+      (n)
+      -> k3 * k1
+    where k3 (p : [ 0 of imm tagged * imm tagged ]) =
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_local_return_recursive__sum_pair_5 : _ -> imm tagged)
+          (p)
+          -> k2 * k1
+    where k2 (function_return_0_f_2 : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_f_2)
+in
+let $camlEscape_local_return_recursive__f_7 = closure f_2_1 @f &toplevel in
+let $camlEscape_local_return_recursive__Pmakeblock_8 =
+  Block 0 ($camlEscape_local_return_recursive__f_7)
+in
+apply direct(f_2_1 &toplevel)
+  ($camlEscape_local_return_recursive__f_7 : _ -> imm tagged)
+    (10)
+    -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_local_return_recursive__const_block_4)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_local_return_recursive =
+      Block 0 ($camlEscape_local_return_recursive__sum_pair_5,
+               $camlEscape_local_return_recursive__Pmakeblock_8)
+    in
+    cont done ($camlEscape_local_return_recursive)

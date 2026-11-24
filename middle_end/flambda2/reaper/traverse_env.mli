@@ -52,7 +52,16 @@ val create :
   all_constants:Name.t ->
   function_slots_to_keep:Function_slot.Set.t ->
   value_slots_to_keep:Value_slot.Set.t ->
+  escape:Escape_env.t ->
   t
+
+(** The part of the environment used by the escape analysis. *)
+val escape : t -> Escape_env.t
+
+val with_escape : t -> Escape_env.t -> t
+
+(** The continuations currently in scope. *)
+val conts : t -> cont_kind Continuation.Map.t
 
 (** The reversed expression context above the current point in the traversal. *)
 val parent : t -> Rev_expr.rev_expr_holed
