@@ -1257,26 +1257,28 @@ module Recursive_let_cont_handlers = struct
   type t = recursive_let_cont_handlers
 
   let create ~body ~invariant_params handlers ~free_names_of_handlers =
-    (match (free_names_of_handlers : _ Or_unknown.t) with
-    | Unknown -> ()
-    | Known free_names_of_handlers ->
-      (* Unused invariant parameters are removed by the passes that create
-         recursive groups, so every invariant parameter must occur in the
-         handlers' free names. This catches callers that have already removed
-         the invariant parameters from those names, which would silently zero
-         their occurrence counts. *)
-      ListLabels.iter (Bound_parameters.to_list invariant_params)
-        ~f:(fun param ->
-          if
-            not
-              (Name_occurrences.mem_var free_names_of_handlers
-                 (Bound_parameter.var param))
-          then
-            Misc.fatal_errorf
-              "Invariant parameter %a does not occur in the free names of the \
-               handlers:@ %a"
-              Bound_parameter.print param Name_occurrences.print
-              free_names_of_handlers));
+    (if Flambda_features.check_light_invariants ()
+     then
+       match (free_names_of_handlers : _ Or_unknown.t) with
+       | Unknown -> ()
+       | Known free_names_of_handlers ->
+         (* Every recursive use of the handlers passes the invariant parameters,
+            so they are expected to occur in the handlers' free names. This
+            catches callers that have already removed the invariant parameters
+            from those names, which would silently zero their occurrence
+            counts. *)
+         ListLabels.iter (Bound_parameters.to_list invariant_params)
+           ~f:(fun param ->
+             if
+               not
+                 (Name_occurrences.mem_var free_names_of_handlers
+                    (Bound_parameter.var param))
+             then
+               Misc.fatal_errorf
+                 "Invariant parameter %a does not occur in the free names of \
+                  the handlers:@ %a"
+                 Bound_parameter.print param Name_occurrences.print
+                 free_names_of_handlers));
     let bound = Continuation_handlers.domain handlers in
     let num_occurrences_of_invariant_params =
       num_occurrences_of_params invariant_params
