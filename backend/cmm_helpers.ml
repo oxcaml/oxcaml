@@ -5463,45 +5463,64 @@ let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
 let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
-  let addr =
+  let addr ~ba_data_p ~index =
     array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
-    box_complex dbg
-      (load ~dbg elt_chunk Mutable ~addr)
-      (load ~dbg elt_chunk Mutable ~addr:addr')
+    (* The address is used twice, so its components are bound. The data pointer
+       is read last: nothing that could release the bigarray is evaluated
+       between that read and the loads. *)
+    bind "index" index (fun index ->
+        bind "ba_data" ba_data_p (fun ba_data_p ->
+            let addr = addr ~ba_data_p ~index in
+            let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+            box_complex dbg
+              (load ~dbg elt_chunk Mutable ~addr)
+              (load ~dbg elt_chunk Mutable ~addr:addr')))
   | Pbigarray_float16 ->
     assert (match elt_chunk with Sixteen_unsigned -> true | _ -> false);
+    let addr = addr ~ba_data_p ~index in
     float_of_float16 dbg (load ~dbg elt_chunk Mutable ~addr)
   | _ ->
     (* Note that no sign extension operation is necessary here: if the element
        type of the bigarray is signed, then the backend will emit a
        sign-extending load instruction. *)
+    let addr = addr ~ba_data_p ~index in
     load ~dbg elt_chunk Mutable ~addr
 
 let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
     ~bigarray ~index ~new_value =
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
-  let addr =
+  let addr ~ba_data_p ~index =
     array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
-    return_unit dbg
-      (sequence
-         (store ~dbg elt_chunk Assignment ~addr
-            ~new_value:(complex_re new_value dbg))
-         (store ~dbg elt_chunk Assignment ~addr:addr'
-            ~new_value:(complex_im new_value dbg)))
+    (* There are two stores, so everything used by both is bound: an argument
+       evaluated once per store could give a different result the second time.
+       The data pointer is read last: nothing that could release the bigarray is
+       evaluated between that read and the stores. *)
+    bind "new_value" new_value (fun new_value ->
+        bind "index" index (fun index ->
+            bind "ba_data" ba_data_p (fun ba_data_p ->
+                let addr = addr ~ba_data_p ~index in
+                let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+                return_unit dbg
+                  (sequence
+                     (store ~dbg elt_chunk Assignment ~addr
+                        ~new_value:(complex_re new_value dbg))
+                     (store ~dbg elt_chunk Assignment ~addr:addr'
+                        ~new_value:(complex_im new_value dbg))))))
   | Pbigarray_float16 ->
     assert (match elt_chunk with Sixteen_unsigned -> true | _ -> false);
+    let addr = addr ~ba_data_p ~index in
     let new_value = float16_of_float dbg new_value in
     return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
-  | _ -> return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
+  | _ ->
+    let addr = addr ~ba_data_p ~index in
+    return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
 
 (* Infix field address. Contrary to regular field addresses, these addresses are
    valid ocaml values, and can be live at gc points. *)
