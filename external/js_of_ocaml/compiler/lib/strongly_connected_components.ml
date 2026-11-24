@@ -76,7 +76,7 @@ end = struct
           else (
             marked.(node) <- true;
             id.(node) <- !count;
-            aux (List.rev_append graph.(node) rem))
+            aux (graph.(node) @ rem))
     in
     for i = size - 1 downto 0 do
       let node = order.(i) in
