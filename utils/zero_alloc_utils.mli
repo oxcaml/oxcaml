@@ -140,7 +140,7 @@ module Allocation_sources : sig
     'args t ->
     'args t
 
-  val other_than_calling_arguments : 'args t -> bool
+  val allocates_other_than_calling_arguments : 'args t -> bool
 
   val top : 'args t
 

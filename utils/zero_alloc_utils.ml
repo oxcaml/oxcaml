@@ -239,7 +239,7 @@ module Allocation_sources = struct
         No_allocation_other_than_calling_arguments a2 ) ->
       No_allocation_other_than_calling_arguments (meet_args a1 a2)
 
-  let other_than_calling_arguments = function
+  let allocates_other_than_calling_arguments = function
     | Allocation_other_than_calling_arguments -> true
     | No_allocation_other_than_calling_arguments _ -> false
 

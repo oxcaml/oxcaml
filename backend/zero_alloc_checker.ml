@@ -885,9 +885,10 @@ end = struct
        cutoff. *)
     let args_with_top (top : Top.t) args =
       if
-        (not (Args.has_witnesses args))
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-             top.allocation_sources
+        (not (Args.has_witnesses args)) &&
+        Zero_alloc_utils.Allocation_sources.
+          allocates_other_than_calling_arguments
+            top.allocation_sources
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
@@ -896,8 +897,9 @@ end = struct
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
         if
-          Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-            top.allocation_sources
+          Zero_alloc_utils.Allocation_sources.
+            allocates_other_than_calling_arguments
+              top.allocation_sources
         then
           Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
             top.witnesses
@@ -1203,9 +1205,10 @@ end = struct
     | (Resolved (Top w) as top), Var { var; witnesses }
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
-        Witnesses.is_empty witnesses
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-             w.allocation_sources
+        Witnesses.is_empty witnesses &&
+        Zero_alloc_utils.Allocation_sources.
+          allocates_other_than_calling_arguments
+            w.allocation_sources
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1236,16 +1239,18 @@ end = struct
       if
         Transform.has_witnesses tr
         || not
-             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-                w.allocation_sources)
+             (Zero_alloc_utils.Allocation_sources.
+                allocates_other_than_calling_arguments
+                  w.allocation_sources)
       then Join (Join.tr_with_top tr w)
       else top
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
         Join.has_witnesses j
         || not
-             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-                w.allocation_sources)
+             (Zero_alloc_utils.Allocation_sources.
+                allocates_other_than_calling_arguments
+                  w.allocation_sources)
       then Join (Join.add_top j w)
       else top
     | Resolved Safe, Join j | Join j, Resolved Safe -> Join (Join.add_safe j)
@@ -1302,9 +1307,10 @@ end = struct
       bounded_join (Join.distribute_transform_over_join j tr)
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
-        (Join.has_safe j || Option.is_some (Join.get_top j))
-        && (not (Join.has_witnesses j))
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+        (Join.has_safe j || Option.is_some (Join.get_top j)) &&
+        (not (Join.has_witnesses j)) &&
+        Zero_alloc_utils.Allocation_sources.
+          allocates_other_than_calling_arguments
              w.allocation_sources
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
