@@ -96,6 +96,9 @@ module Continuation_info : sig
       direct_aliases : Simple.t Variable.Map.t;
       mutable_let_prims_rev : Mutable_let_prim.List.t;
       defined : Variable.Set.t;
+      ended_regions : Variable.Set.t;
+          (** The variables given to an [End_region] in the handler. These are
+              not uses (see [Flow_acc.record_let_binding]). *)
       code_ids : Name_occurrences.t Code_id.Map.t;
       value_slots : Name_occurrences.t Name.Map.t Value_slot.Map.t;
       apply_cont_args :

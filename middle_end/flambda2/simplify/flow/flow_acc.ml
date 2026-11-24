@@ -77,6 +77,7 @@ let enter_continuation continuation ~recursive ~is_exn_handler params (t : t) =
       direct_aliases = Variable.Map.empty;
       mutable_let_prims_rev = [];
       defined = Variable.Set.empty;
+      ended_regions = Variable.Set.empty;
       code_ids = Code_id.Map.empty;
       value_slots = Value_slot.Map.empty;
       used_in_handler;
@@ -357,9 +358,17 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
       let bound_var = Bound_pattern.must_be_singleton let_bound in
       let var = Bound_var.var bound_var in
       match[@ocaml.warning "-4"] original_prim with
-      | Unary (End_region { ghost = _ }, _region) ->
-        (* Uses of region variables in [End_region] don't count as uses. *)
-        t
+      | Unary (End_region { ghost = _ }, region) -> (
+        (* Uses of region variables in [End_region] don't count as uses, so that
+           a region in which nothing is allocated can be deleted together with
+           its [End_region]. They are recorded apart: [Data_flow_graph] needs
+           them when the region is a parameter of a continuation. *)
+        match Simple.must_be_var region with
+        | None -> t
+        | Some (region, _coercion) ->
+          update_top_of_stack ~t ~f:(fun elt ->
+              let ended_regions = Variable.Set.add region elt.ended_regions in
+              { elt with ended_regions }))
       | Unary (Is_int _, simple) -> (
         match Simple.must_be_var simple with
         | Some (v, _) ->

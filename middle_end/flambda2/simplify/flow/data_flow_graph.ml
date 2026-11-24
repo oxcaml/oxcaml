@@ -259,6 +259,7 @@ let add_continuation_info map ~return_continuation ~exn_continuation
         direct_aliases;
         mutable_let_prims_rev;
         defined = _;
+        ended_regions = _;
         code_ids;
         value_slots;
         continuation = _;
@@ -411,6 +412,47 @@ let add_continuation_info map ~return_continuation ~exn_continuation
           rewrite_ids t)
     apply_cont_args t
 
+(* An [End_region] is not recorded as a use of its region, and is deleted when
+   the name it is given is not required (see [Simplify_let_expr]). That is right
+   as long as this name is the one bound by the [Begin_region]: the region is
+   then begun and ended, or neither. It is not when the name is a parameter of a
+   continuation that stands for several regions (the lifting of continuations
+   followed by specialisation makes such parameters): these regions can be
+   required, by the allocations made in them, while the parameter is not, and
+   they would then never be ended.
+
+   A variable of kind [Region] is bound by a [Begin_region], which depends on
+   nothing, or is a parameter or an alias, so the names reachable in the graph
+   from the name given to an [End_region] are exactly the regions that it may
+   end, together with the parameters and aliases in between. We reverse every
+   edge on these paths. All these names are then required or all not required:
+   the [Begin_region]s and the [End_region] are all kept, or all deleted. *)
+let add_region_dependencies (map : T.Continuation_info.t Continuation.Map.t) t =
+  let forward_edges = t.name_to_name in
+  let rec loop t seen = function
+    | [] -> t
+    | region :: todo -> (
+      match Name.Map.find_opt region forward_edges with
+      | None -> loop t seen todo
+      | Some flowing_in ->
+        let t =
+          Name.Set.fold
+            (fun src t -> add_dependency ~src ~dst:region t)
+            flowing_in t
+        in
+        let unseen = Name.Set.diff flowing_in seen in
+        loop t (Name.Set.union unseen seen) (Name.Set.elements unseen @ todo))
+  in
+  let ended_regions =
+    Continuation.Map.fold
+      (fun _ (elt : T.Continuation_info.t) acc ->
+        Variable.Set.fold
+          (fun region acc -> Name.Set.add (Name.var region) acc)
+          elt.ended_regions acc)
+      map Name.Set.empty
+  in
+  loop t ended_regions (Name.Set.elements ended_regions)
+
 let create ~return_continuation ~exn_continuation ~code_age_relation
     ~used_value_slots ~code_ids_to_never_delete map =
   (* Build the dependencies using the regular params and args of continuations,
@@ -427,7 +469,7 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
       map
       (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
   in
-  t
+  add_region_dependencies map t
 
 let required_names
     ({ code_age_relation = _;

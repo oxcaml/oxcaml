@@ -128,6 +128,7 @@ module Continuation_info = struct
       direct_aliases : Simple.t Variable.Map.t;
       mutable_let_prims_rev : Mutable_let_prim.List.t;
       defined : Variable.Set.t;
+      ended_regions : Variable.Set.t;
       code_ids : Name_occurrences.t Code_id.Map.t;
       value_slots : Name_occurrences.t Name.Map.t Value_slot.Map.t;
       apply_cont_args :
@@ -145,6 +146,7 @@ module Continuation_info = struct
         direct_aliases;
         mutable_let_prims_rev;
         defined;
+        ended_regions;
         code_ids;
         value_slots;
         apply_cont_args
@@ -160,6 +162,7 @@ module Continuation_info = struct
         @[<hov 1>(direct_aliases %a)@]@ \
         @[<hov 1>(ref_prims %a)@]@ \
         @[<hov 1>(defined %a)@]@ \
+        @[<hov 1>(ended_regions %a)@]@ \
         @[<hov 1>(code_ids %a)@]@ \
         @[<hov 1>(value_slots %a)@]@ \
         @[<hov 1>(apply_cont_args %a)@]\
@@ -176,6 +179,8 @@ module Continuation_info = struct
       Mutable_let_prim.List.print_rev mutable_let_prims_rev
       Variable.Set.print
       defined
+      Variable.Set.print
+      ended_regions
       (Code_id.Map.print Name_occurrences.print)
       code_ids
       (Value_slot.Map.print (Name.Map.print Name_occurrences.print))
