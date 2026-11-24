@@ -564,11 +564,11 @@ let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ compile_cfg ppf_dump ~funcnames fd_cmm
   ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
-  ++ Profile.record ~accumulate:true "save_linear" save_linear
   ++ (fun (fd : Linear.fundecl) ->
   match !Oxcaml_flags.cfg_stack_checks with
   | false -> Stack_check.linear fd
   | true -> fd)
+  ++ Profile.record ~accumulate:true "save_linear" save_linear
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
 
 module Cfg_selection = Cfg_selectgen.Make (Cfg_selection)
