@@ -82,6 +82,24 @@ let%expect_test "merge_blocks on a deep chain of blocks does not overflow the st
   Printf.printf "blocks after merge: %d\n" (Addr.Map.cardinal p.blocks);
   [%expect {| blocks after merge: 1 |}]
 
+let%expect_test "merge_blocks on a deep chain of unmergeable blocks does not overflow the stack"
+    =
+  (* Both arms of each [Cond] go to the same block, so every block has two
+     predecessors and nothing is merged: the traversal itself must be
+     stack-safe. *)
+  let x = Var.fresh () in
+  let p =
+    program
+      0
+      ((deep, block [] [] (Return x))
+      :: List.init deep (fun pc ->
+             let next = pc + 1, [] in
+             pc, block [] [] (Cond (x, next, next))))
+  in
+  let p = Jsoo.Deadcode.merge_blocks p in
+  Printf.printf "blocks after merge: %d\n" (Addr.Map.cardinal p.blocks);
+  [%expect {| blocks after merge: 1000001 |}]
+
 let%expect_test "pure function analysis on a deep chain of blocks" =
   let f = Var.fresh () in
   let x = Var.fresh () in
