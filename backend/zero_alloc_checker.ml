@@ -1437,7 +1437,7 @@ module Allocation_source :
   let argument ~argument_index ~tag :
       Relevant_components_by_argument_index.t Allocation_source.t =
     (Allocation_source.No_allocation_other_than_calling_arguments
-      (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
+      (Numbers.Int.Map.singleton argument_index (Tag.Nonempty_set.singleton tag)))
 end
 
 module T = Make_value (Allocation_source) (Witnesses) (V)

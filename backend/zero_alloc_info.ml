@@ -20,13 +20,15 @@ module Encoded = struct
   module Component = struct
     type t = int list Allocation_source.t Component.t
 
-    let pack_relevant_components (relevant : bool Components.t) =
-      pack ~bits_per_component:1
-        (Components.map relevant ~f:(fun _tag -> Bool.to_int))
+    let pack_relevant_components (relevant : Tag.Nonempty_set.t) =
+      Components.of_nonempty_set relevant
+      |> Components.map ~f:(fun _tag -> Bool.to_int)
+      |> pack ~bits_per_component:1
 
-    let unpack_relevant_components packed : bool Components.t =
-      Components.map (unpack ~bits_per_component:1 packed) ~f:(fun _tag bit ->
-          bit <> 0)
+    let unpack_relevant_components packed : Tag.Nonempty_set.t option =
+      unpack ~bits_per_component:1 packed
+      |> Components.map ~f:(fun _tag bit -> bit <> 0)
+      |> Components.to_nonempty_set
 
     let encode_arguments
         (relevant_components_by_argument_index :
@@ -47,9 +49,8 @@ module Encoded = struct
 
     let decode_arguments arguments : Relevant_components_by_argument_index.t =
       arguments
-      |> List.mapi (fun i bits -> i, bits)
-      |> List.filter (fun (_, bits) -> bits <> 0)
-      |> List.map (fun (i, bits) -> i, unpack_relevant_components bits)
+      |> List.mapi (fun i bits -> i, unpack_relevant_components bits)
+      |> List.filter_map (fun (i, opt) -> Option.map (fun set -> (i, set)) opt)
       |> Numbers.Int.Map.of_list
 
     let encode = Component.map ~f:(Allocation_source.map ~f:encode_arguments)

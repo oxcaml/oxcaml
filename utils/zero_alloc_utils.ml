@@ -80,19 +80,10 @@ module Component = struct
     | Safe, Bot -> false
 end
 
-module Tag = struct
-  type t =
-    | NormalReturn
-    | Exception
-    | Diverge
-
-  let compare : t -> t -> int = Stdlib.compare
-
-  let print ppf = function
-    | NormalReturn -> Format.fprintf ppf "nor"
-    | Exception -> Format.fprintf ppf "exn"
-    | Diverge -> Format.fprintf ppf "div"
-end
+type tag =
+  | NormalReturn
+  | Exception
+  | Diverge
 
 module Components = struct
   type 'component t =
@@ -101,20 +92,25 @@ module Components = struct
       div : 'component
     }
 
-  let create f = { nor = f Tag.NormalReturn; exn = f Tag.Exception; div = f Tag.Diverge }
+  let get = function
+    | NormalReturn -> fun { nor; _ } -> nor
+    | Exception -> fun { exn; _ } -> exn
+    | Diverge -> fun { div; _ } -> div
+
+  let create f = { nor = f NormalReturn; exn = f Exception; div = f Diverge }
 
   let iter ~f { nor; exn; div } =
-    f Tag.NormalReturn nor;
-    f Tag.Exception exn;
-    f Tag.Diverge div
+    f NormalReturn nor;
+    f Exception exn;
+    f Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.NormalReturn nor; exn = f Tag.Exception exn; div = f Tag.Diverge div }
+    { nor = f NormalReturn nor; exn = f Exception exn; div = f Diverge div }
 
   let map2 ~f lhs rhs =
-    { nor = f Tag.NormalReturn lhs.nor rhs.nor;
-      exn = f Tag.Exception lhs.exn rhs.exn;
-      div = f Tag.Diverge lhs.div rhs.div
+    { nor = f NormalReturn lhs.nor rhs.nor;
+      exn = f Exception lhs.exn rhs.exn;
+      div = f Diverge lhs.div rhs.div
     }
 
   let lessequal f lhs rhs =
@@ -129,29 +125,73 @@ module Components = struct
       let c = f e1 e2 in
       if c <> 0 then c else f d1 d2
 
-  let one_hot = Fun.compose create ( = )
+  let of_nonempty_set t = t
+
+  let to_nonempty_set t =
+    if t.nor || t.exn || t.div
+    then Some t
+    else None
 
   let print print_component ppf { nor; exn; div } =
     Format.fprintf ppf "@[<hv 2>{ nor = %a;@ exn = %a;@ div = %a }@]"
       print_component nor print_component exn print_component div
 end
 
-module Relevant_components_by_argument_index = struct
-  type t = bool Components.t Numbers.Int.Map.t
+module Tag = struct
+  type t = tag = NormalReturn | Exception | Diverge
 
-  let compare = Numbers.Int.Map.compare (Components.compare Bool.compare)
+  let all = [NormalReturn; Exception; Diverge]
+
+  let compare : t -> t -> int = Stdlib.compare
+
+  let print ppf = function
+    | NormalReturn -> Format.fprintf ppf "nor"
+    | Exception -> Format.fprintf ppf "exn"
+    | Diverge -> Format.fprintf ppf "div"
+
+  module Nonempty_set = struct
+    type t = bool Components.t
+
+    let compare = Components.compare Bool.compare
+
+    let contains = Components.get
+
+    let lessequal = Components.lessequal (fun r1 r2 -> (not r1) || r2)
+
+    let union (lhs : t) (rhs : t) : t =
+      { nor = lhs.nor || rhs.nor
+      ; exn = lhs.exn || rhs.exn
+      ; div = lhs.div || rhs.div
+      }
+
+    let intersection (lhs : t) (rhs : t) : t option =
+      let unchecked : t =
+        { nor = lhs.nor && rhs.nor
+        ; exn = lhs.exn && rhs.exn
+        ; div = lhs.div && rhs.div
+        }
+      in
+      if unchecked.nor || unchecked.exn || unchecked.div
+      then Some unchecked
+      else None
+
+    let singleton = Fun.compose Components.create ( = )
+  end
+end
+
+module Relevant_components_by_argument_index = struct
+  type t = Tag.Nonempty_set.t Numbers.Int.Map.t
+
+  let compare = Numbers.Int.Map.compare Tag.Nonempty_set.compare
 
   let join =
-    Numbers.Int.Map.union (fun _ c1 c2 ->
-        Some (Components.map2 ~f:(fun _ r1 r2 -> r1 || r2) c1 c2))
+    Numbers.Int.Map.union (fun _ c1 c2 -> Some (Tag.Nonempty_set.union c1 c2))
 
   let meet t1 t2 =
     Numbers.Int.Map.merge
       (fun _argument_index c1 c2 ->
         match c1, c2 with
-        | Some c1, Some c2 ->
-          let c = Components.map2 ~f:(fun _tag r1 r2 -> r1 && r2) c1 c2 in
-          if c.nor || c.exn || c.div then Some c else None
+        | Some c1, Some c2 -> Tag.Nonempty_set.intersection c1 c2
         | None, _ | _, None -> None)
       t1 t2
 
@@ -160,10 +200,10 @@ module Relevant_components_by_argument_index = struct
       (fun argument_index c1 ->
         match Numbers.Int.Map.find_opt argument_index t2 with
         | None -> false
-        | Some c2 -> Components.lessequal (fun r1 r2 -> (not r1) || r2) c1 c2)
+        | Some c2 -> Tag.Nonempty_set.lessequal c1 c2)
       t1
 
-  let print_argument ppf (argument_index, (relevant : bool Components.t)) =
+  let print_argument ppf (argument_index, (relevant : Tag.Nonempty_set.t)) =
     let paths =
       List.filter_map
         (fun (is_relevant, path) -> if is_relevant then Some path else None)

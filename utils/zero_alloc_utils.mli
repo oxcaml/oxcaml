@@ -28,10 +28,29 @@ module Tag : sig
     | NormalReturn
     | Exception
     | Diverge
+  type tag := t (* for scoping inside [Nonempty_set] *)
+
+  val all : t list
 
   val compare : t -> t -> int
 
   val print : Format.formatter -> t -> unit
+
+  module Nonempty_set : sig
+    type t
+
+    val compare : t -> t -> int
+
+    val contains : tag -> t -> bool
+
+    val intersection : t -> t -> t option
+
+    val lessequal : t -> t -> bool
+
+    val union : t -> t -> t
+
+    val singleton : tag -> t
+  end
 end
 
 (** One value per component, all of the same type. *)
@@ -48,6 +67,8 @@ module Components : sig
           *)
     }
 
+  val get : Tag.t -> 'a t -> 'a
+
   val create : (Tag.t -> 'a) -> 'a t
 
   val iter : f:(Tag.t -> 'a -> unit) -> 'a t -> unit
@@ -60,8 +81,9 @@ module Components : sig
 
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 
-  (** Mark all components [false] except a single component marked [true]. *)
-  val one_hot : Tag.t -> bool t
+  val of_nonempty_set : Tag.Nonempty_set.t -> bool t
+
+  val to_nonempty_set : bool t -> Tag.Nonempty_set.t option
 
   val print :
     (Format.formatter -> 'component -> unit) ->
@@ -93,7 +115,7 @@ module Relevant_components_by_argument_index : sig
 
       On the other hand, if we had [let f g = try g () with _ -> ()], then [g]'s
       exceptional behavior would matter for [f]'s *normal* path. *)
-  type t = bool Components.t Numbers.Int.Map.t
+  type t = Tag.Nonempty_set.t Numbers.Int.Map.t
 
   val compare : t -> t -> int
 
