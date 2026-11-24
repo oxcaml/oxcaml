@@ -54,6 +54,12 @@
 #define DW_REG_x29                29
 #define DW_REG_sp                 31
 
+/* The operand of DW_OP_breg is a signed LEB128, so a single byte can only
+   encode -64..63: larger non-negative offsets silently decode as negative.
+   SLEB128_2 always uses two bytes, which is valid for 0..8191; each use must
+   be guarded by an assembly-time range check. */
+#define SLEB128_2(x) (((x) & 0x7f) | 0x80), (((x) >> 7) & 0x7f)
+
 
         .set    domain_curr_field, 0
 #if defined(SYS_macosx)
@@ -1625,14 +1631,21 @@ FUNCTION(caml_runstack)
 6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
-        .cfi_escape DW_CFA_def_cfa_expression, 3+3+2,       \
+    /* Offset from sp to the parent field of this fiber's handler */
+#define RUNSTACK_PARENT_OFFSET                  \
+  (16 /* exn */ +                               \
+   8 /* gc_regs slot (unused) */ +              \
+   8 /* C_STACK_SP for DWARF (unused) */ +      \
+   Handler_parent_offset)
+        .ifge RUNSTACK_PARENT_OFFSET - 8192
+        .error "RUNSTACK_PARENT_OFFSET out of range for 2-byte SLEB128"
+        .endif
+        .cfi_escape DW_CFA_def_cfa_expression, 4+3+2,       \
           DW_OP_breg + DW_REG_sp,                           \
-            16 /* exn */ +                                  \
-            8 /* gc_regs slot (unused) */ +                 \
-            8 /* C_STACK_SP for DWARF (unused) */           \
-            + Handler_parent_offset, DW_OP_deref,           \
+            SLEB128_2(RUNSTACK_PARENT_OFFSET), DW_OP_deref, \
           DW_OP_plus_uconst, Stack_sp_offset, DW_OP_deref,  \
           DW_OP_plus_uconst, 16 /* fp + ret addr */
+#undef RUNSTACK_PARENT_OFFSET
 #endif
     /* Call the function on the new stack */
         mov     x0, x2
