@@ -110,44 +110,44 @@ module Relevant_components_by_argument_index : sig
 end
 
 module Allocation_sources : sig
-  type 'args_only t =
+  type 'args t =
     | Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments of 'args_only
+    | No_allocation_other_than_calling_arguments of 'args
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
   val compare :
-    compare_args_only:('args_only -> 'args_only -> int) ->
-    'args_only t ->
-    'args_only t ->
+    compare_args:('args -> 'args -> int) ->
+    'args t ->
+    'args t ->
     int
 
   val lessequal :
-    lessequal_args_only:('args_only -> 'args_only -> bool) ->
-    'args_only t ->
-    'args_only t ->
+    lessequal_args:('args -> 'args -> bool) ->
+    'args t ->
+    'args t ->
     bool
 
   val join :
-    join_args_only:('args_only -> 'args_only -> 'args_only) ->
-    'args_only t ->
-    'args_only t ->
-    'args_only t
+    join_args:('args -> 'args -> 'args) ->
+    'args t ->
+    'args t ->
+    'args t
 
   val meet :
-    meet_args_only:('args_only -> 'args_only -> 'args_only) ->
-    'args_only t ->
-    'args_only t ->
-    'args_only t
+    meet_args:('args -> 'args -> 'args) ->
+    'args t ->
+    'args t ->
+    'args t
 
-  val other_than_calling_arguments : 'args_only t -> bool
+  val other_than_calling_arguments : 'args t -> bool
 
-  val top : 'args_only t
+  val top : 'args t
 
   val print :
-    (Format.formatter -> 'args_only -> unit) ->
+    (Format.formatter -> 'args -> unit) ->
     Format.formatter ->
-    'args_only t ->
+    'args t ->
     unit
 end
 

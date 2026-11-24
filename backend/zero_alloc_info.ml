@@ -60,7 +60,7 @@ module Encoded = struct
       Component.compare
         ~compare_top:
           (Allocation_sources.compare
-             ~compare_args_only:(List.compare Int.compare))
+             ~compare_args:(List.compare Int.compare))
   end
 
   module Components = struct

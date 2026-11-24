@@ -186,17 +186,17 @@ module Relevant_components_by_argument_index = struct
 end
 
 module Allocation_sources = struct
-  type 'args_only t =
+  type 'args t =
     | Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments of 'args_only
+    | No_allocation_other_than_calling_arguments of 'args
 
   let map ~f = function
     | Allocation_other_than_calling_arguments ->
       Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments args_only ->
-      No_allocation_other_than_calling_arguments (f args_only)
+    | No_allocation_other_than_calling_arguments args ->
+      No_allocation_other_than_calling_arguments (f args)
 
-  let compare ~compare_args_only t1 t2 =
+  let compare ~compare_args t1 t2 =
     match t1, t2 with
     | ( Allocation_other_than_calling_arguments,
         Allocation_other_than_calling_arguments ) ->
@@ -209,35 +209,35 @@ module Allocation_sources = struct
       1
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
-      compare_args_only a1 a2
+      compare_args a1 a2
 
-  let lessequal ~lessequal_args_only t1 t2 =
+  let lessequal ~lessequal_args t1 t2 =
     match t1, t2 with
     | _, Allocation_other_than_calling_arguments -> true
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
-      lessequal_args_only a1 a2
+      lessequal_args a1 a2
     | ( Allocation_other_than_calling_arguments,
         No_allocation_other_than_calling_arguments _ ) ->
       false
 
-  let join ~join_args_only t1 t2 =
+  let join ~join_args t1 t2 =
     match t1, t2 with
     | Allocation_other_than_calling_arguments, _
     | _, Allocation_other_than_calling_arguments ->
       Allocation_other_than_calling_arguments
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
-      No_allocation_other_than_calling_arguments (join_args_only a1 a2)
+      No_allocation_other_than_calling_arguments (join_args a1 a2)
 
-  let meet ~meet_args_only t1 t2 =
+  let meet ~meet_args t1 t2 =
     match t1, t2 with
     | Allocation_other_than_calling_arguments, t
     | t, Allocation_other_than_calling_arguments ->
       t
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
-      No_allocation_other_than_calling_arguments (meet_args_only a1 a2)
+      No_allocation_other_than_calling_arguments (meet_args a1 a2)
 
   let other_than_calling_arguments = function
     | Allocation_other_than_calling_arguments -> true
@@ -245,13 +245,13 @@ module Allocation_sources = struct
 
   let top = Allocation_other_than_calling_arguments
 
-  let print print_args_only ppf = function
+  let print print_args ppf = function
     | Allocation_other_than_calling_arguments ->
       Format.fprintf ppf "Allocation_other_than_calling_arguments"
-    | No_allocation_other_than_calling_arguments args_only ->
+    | No_allocation_other_than_calling_arguments args ->
       Format.fprintf ppf
         "@[<hv 1>No_allocation_other_than_calling_arguments@ %a@]"
-        print_args_only args_only
+        print_args args
 end
 
 module type WS = sig

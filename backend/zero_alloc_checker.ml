@@ -255,7 +255,7 @@ module Top = struct
       { allocation_sources = a2; witnesses = w2 } =
     let c =
       Zero_alloc_utils.Allocation_sources.compare
-        ~compare_args_only:
+        ~compare_args:
           Zero_alloc_utils.Relevant_components_by_argument_index.compare a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
@@ -263,7 +263,7 @@ module Top = struct
   let lessequal { allocation_sources = a1; witnesses = w1 }
       { allocation_sources = a2; witnesses = w2 } =
     Zero_alloc_utils.Allocation_sources.lessequal
-      ~lessequal_args_only:
+      ~lessequal_args:
         Zero_alloc_utils.Relevant_components_by_argument_index.lessequal a1 a2
     && Witnesses.lessequal w1 w2
 
@@ -271,7 +271,7 @@ module Top = struct
       { allocation_sources = a2; witnesses = w2 } =
     { allocation_sources =
         Zero_alloc_utils.Allocation_sources.join
-          ~join_args_only:
+          ~join_args:
             Zero_alloc_utils.Relevant_components_by_argument_index.join a1 a2;
       witnesses = Witnesses.join w1 w2
     }
@@ -280,7 +280,7 @@ module Top = struct
       { allocation_sources = a2; witnesses = w2 } =
     { allocation_sources =
         Zero_alloc_utils.Allocation_sources.meet
-          ~meet_args_only:
+          ~meet_args:
             Zero_alloc_utils.Relevant_components_by_argument_index.meet a1 a2;
       witnesses = Witnesses.meet w1 w2
     }
