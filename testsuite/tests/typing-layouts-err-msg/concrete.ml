@@ -206,16 +206,16 @@ type t_any : any
 type t_any : any
 |}]
 
-module F(M : sig val x : t_any end) = struct
-  let x = M.x
+module F(M : sig val x : t_any val y : int end) = struct
+  let y = M.y
 end
 [%%expect{|
 Line 2, characters 10-13:
-2 |   let x = M.x
+2 |   let y = M.y
               ^^^
 Error: This path projects from a module that contains unrepresentable items.
 Line 1, characters 17-30:
-1 | module F(M : sig val x : t_any end) = struct
+1 | module F(M : sig val x : t_any val y : int end) = struct
                      ^^^^^^^^^^^^^
   "x" is not representable.
   The layout of t_any is any

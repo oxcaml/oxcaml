@@ -1028,7 +1028,15 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Extension p -> p
             | _ -> raise Not_found
         in
-        let addr = Env.find_constructor_address path env in
+        let addr =
+          try Env.find_constructor_address ~loc:Location.none path env with
+          | Env.Error.In_context
+              (Env.Lookup_error
+                 (_, _, Env.Module_projection_unrepresentable _)) ->
+            (* fall back to untyped printer rather than complaining about
+               the projection *)
+            raise Not_found
+        in
         (* Make sure this is the right exception and not an homonym,
            by evaluating the exception found and comparing with the
            identifier contained in the exception bucket *)
