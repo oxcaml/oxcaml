@@ -149,3 +149,46 @@ read_cmx_lib "ylppa"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
+
+(* Note that the diverging component involves [f]'s *normal* component, since
+   [f] could be a stateful function that allocates on its first call and then
+   diverges on its second call. On the other hand, this is not the case for
+   exceptions, since any exceptions from the second call are caught. *)
+read_cmx_lib "call_twice_with_catch"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+
+(* This is correct: [zero_alloc conditional] is not a mode, and it is not deep,
+   so the call to [f] inside the option is seen as a call to an un-tracked
+   arbitrary function and thus [Top] everywhere. Then, as a long-standing
+   optimization, all-[Top] summaries are dropped during serialization, so
+   nothing is found. *)
+read_cmx_lib "call_optional_callback"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* CR wsturgeon: fix (arity, work for later PRs) *)
+read_cmx_lib "apply2"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* CR wsturgeon: fix (arity, work for later PRs) *)
+read_cmx_lib "partially_apply_then_fully_apply"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
