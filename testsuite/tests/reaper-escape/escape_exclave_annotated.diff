@@ -15,10 +15,6 @@
 ---
 > where k2 (s : imm tagged) = let `unit` = %end_region (`region`) in 
 > (apply direct(after_call_3_1 &my_alloc_region &my_region &my_ghost_region) ($camlTest__after_call_66 : _ -> [ 0 of imm tagged * imm tagged ]) (s, y) -> k2 * k1
-159c158
-< where k2 (s : imm tagged) = let t = %block.[`0`].my_alloc_region (s, y, x) in 
----
-> where k2 (s : imm tagged) = let t = %block.[`0`].my_alloc_region.local[my_region] (s, y, x) in 
 177,178c176,177
 < | 0 of imm tagged * val ] ] stack = let `region` = %begin_region (my_region) in 
 < let peak_1 = %project_value_slot.[build].[unboxed_field_peak] ($camlTest__build_73) in 

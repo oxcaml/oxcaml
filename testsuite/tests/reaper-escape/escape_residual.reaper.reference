@@ -100,7 +100,7 @@ let code inline(never) loopify(never) size(43) newer_version_of(plain_4)
   apply direct(sum_pair_1_1 &my_alloc_region)
     ($camlEscape_residual__sum_pair_12 : _ -> imm tagged) (r) -> k2 * k1
     where k2 (s : imm tagged) =
-      let t = %block.[`0`].my_alloc_region (s, y, x) in
+      let t = %block.[`0`].my_alloc_region.local[my_region] (s, y, x) in
       (apply direct(sum3_0_1 &my_alloc_region)
          ($camlEscape_residual__sum3_11 : _ -> imm tagged) (t) -> k2 * k1
          where k2 (u : imm tagged) =

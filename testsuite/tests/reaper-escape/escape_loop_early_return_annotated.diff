@@ -1,0 +1,21 @@
+39,41c39,41
+< where rec `self` (i_1 : imm tagged, acc_1 : imm tagged) = let `region` = %begin_region () in 
+< ((let n = %project_value_slot.[loop_1].[unboxed_field_n_1] (my_closure) in 
+< let prim = %int_comp.gt (i_1, n) in 
+---
+> where rec `self` (i_1 : imm tagged, acc_1 : imm tagged) = let n = %project_value_slot.[loop_1].[unboxed_field_n_1] (my_closure) in 
+> let `region` = %begin_region () in 
+> ((let prim = %int_comp.gt (i_1, n) in 
+44c44
+< | 1 -> k2 (acc_1)
+---
+> | 1 -> k2
+50c50
+< | 1 -> k2 (acc_1)
+---
+> | 1 -> k2
+56c56,57
+< where k2 (region_return : imm tagged) = let `unit` = %end_region (`region`) in 
+---
+> where k2 = let region_return = acc_1 in 
+> let `unit` = %end_region (`region`) in 

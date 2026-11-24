@@ -252,6 +252,17 @@ let escapes_anywhere = rel1 "escapes_anywhere" Cols.[n]
    candidate block containing the value. *)
 let owner = rel2 "escape_owner" Cols.[n; n]
 
+(* [in_region a s]: the value allocated at [a] may be allocated in the region of
+   the region scope [s]: [s] is the scope of the allocation, or the scope of a
+   call site that receives the value, or a block containing it, as the result of
+   a function returning at mode local ([delivered a s]). Unlike [owner], this
+   does not hold for a value that is merely stored in a block allocated in [s]:
+   such a value was allocated before the block, possibly in the region of an
+   enclosing scope or of a caller, and may then leave [s]. *)
+let in_region = rel2 "escape_in_region" Cols.[n; n]
+
+let delivered = rel2 "escape_delivered" Cols.[n; n]
+
 (* [contained_in a b]: the value allocated at [a] may be stored in a field of
    the candidate block allocated at [b]. *)
 let contained_in = rel2 "escape_contained_in" Cols.[n; n]
@@ -518,7 +529,11 @@ let scope_rules =
         [ (let$ [a] = ["a"] in
            [escapes_anywhere a] ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
-           [allocation a s; ~~(escapes_anywhere a)] ==> owner a s);
+           [allocation a s; ~~(escapes_anywhere a)]
+           ==> and_ [owner a s; in_region a s]);
+          (let$ [a; b; s] = ["a"; "b"; "s"] in
+           [contained_in a b; delivered b s; ~~(escapes_anywhere a)]
+           ==> and_ [delivered a s; in_region a s]);
           (let$ [a; b; s] = ["a"; "b"; "s"] in
            [contained_in a b; owner b s; ~~(escapes_anywhere a)] ==> owner a s);
           (let$ [s; r; a] = ["s"; "r"; "a"] in
@@ -531,10 +546,11 @@ let scope_rules =
            ==> returned a s);
           (let$ [a; b] = ["a"; "b"] in
            [contained_in a b; escapes b] ==> escapes a);
-          (* Leaving an owning scope. Driven by [owner], which is small: the
-             scope exits are then looked up in [candidate_source]. *)
+          (* Leaving a scope in whose region the value may be allocated. Driven
+             by [in_region], which is small: the scope exits are then looked up
+             in [candidate_source]. *)
           (let$ [a; s; x] = ["a"; "s"; "x"] in
-           [owner a s; scope_exit ~scope:s ~param:x; candidate_source x a]
+           [in_region a s; scope_exit ~scope:s ~param:x; candidate_source x a]
            ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
            [owner a s; unsafe_scope s] ==> escapes a);
@@ -556,7 +572,7 @@ let scope_rules =
              candidate_source q a;
              result_of a s;
              owner a s ]
-           ==> owner a s') ] ]
+           ==> and_ [owner a s'; delivered a s'; in_region a s']) ] ]
 
 let decision_rules =
   saturate_in_order

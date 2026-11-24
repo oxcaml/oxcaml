@@ -89,7 +89,7 @@ let code inline(never) loopify(never) size(25) newer_version_of(papp_3)
         -> k * k1
         : val stack =
   let int_add = %int_barith.add (m, 1) in
-  let tmp = %block.[`0`].my_alloc_region (m, int_add) in
+  let tmp = %block.[`0`].my_alloc_region.local[my_region] (m, int_add) in
   apply direct(sum_pair_0_1 &my_alloc_region)
     ($camlEscape_partial_application_region__sum_pair_4 : _ -> imm tagged)
       (tmp)

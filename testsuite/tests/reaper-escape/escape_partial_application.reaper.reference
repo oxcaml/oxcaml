@@ -58,7 +58,7 @@ let code inline(never) loopify(never) size(36) newer_version_of(g_2)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let h = closure h_3_1 @h &my_alloc_region
+  (let h = closure h_3_1 @h &my_alloc_region &`region`
    with { unboxed_field_b = b; unboxed_field_a = a }
    in
    apply direct(papp_0_1 &my_alloc_region &`region` &ghost_region)

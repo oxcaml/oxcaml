@@ -2,14 +2,15 @@
    flambda2;
    stack-allocation;
    flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
-   flags += " -X reaper-escape-localize-residual=1";
+   flags += " -X reaper-escape-heap-residual=1";
    { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A function made to return at mode local that cannot have a region of its own
    (see [Escape_exclave]) allocates in the region of its caller. Its local
-   allocations that are not returned (the residual allocations) are left on the
-   heap, unless [-X reaper-escape-localize-residual=1] is given; except the
+   allocations that are not returned (the residual allocations) are made there
+   too, as the type checker does under [exclave_]; with
+   [-X reaper-escape-heap-residual=1] they are left on the heap, except the
    ones that may contain a local value, which have to stay local. [used]
    reports how much of the local stack is in use. *)
 external local_stack_offset : unit -> int = "caml_local_stack_offset"

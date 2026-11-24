@@ -337,15 +337,16 @@ let report_stats t { stats; closers = _ } =
 (* A function returning at mode local allocates in the region of its caller
    whenever it has no region of its own open (see [Escape_exclave]). The local
    allocations that it makes there without returning them (the residual
-   allocations) are only freed when its caller's region is closed. Unless the
-   option [-X reaper-escape-localize-residual=1] is given, they are left on the
-   heap instead, when that is possible: a heap block must not point at the local
+   allocations) are only freed when its caller's region is closed. This is also
+   what the type checker does for the allocations made under an [exclave_]. With
+   the option [-X reaper-escape-heap-residual=1], they are left on the heap
+   instead, when that is possible: a heap block must not point at the local
    stack, so the ones that may contain a local allocation stay local. *)
-let localize_residual =
-  Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape-localize-residual"
+let heap_residual =
+  Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape-heap-residual"
 
 let is_residual t ~returned vars =
-  (not (localize_residual ()))
+  heap_residual ()
   && List.for_all
        (fun var ->
          let alloc = Code_id_or_name.var var in

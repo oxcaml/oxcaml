@@ -18,10 +18,6 @@
 > where k4 = let Pmakeblock = %block.[`0`].my_alloc_region.local[my_region] (s, 1) in 
 92d91
 < let `unit` = %end_region (`region`) in 
-99c98
-< | 0 of [ 0 of val * imm tagged ] ] stack = let t = %block.[`0`].my_alloc_region (x, y, x) in 
----
-> | 0 of [ 0 of val * imm tagged ] ] stack = let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in 
 136c135
 < let code inline(never) loopify(never) size(68) newer_version_of(with_allocating_loop_7) with_allocating_loop_7_1 (x : imm tagged, n : imm tagged) my_closure &my_alloc_region &my_region &my_ghost_region my_depth -> k * k1 : [ 0
 ---
@@ -53,18 +49,12 @@
 ---
 > | 0 -> k2 (int_and)
 > | 1 -> k3 (for_next_naked, int_and)))))
-166,168c162,164
-< let code inline(never) loopify(never) size(43) newer_version_of(with_try_8) with_try_8_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region &my_region &my_ghost_region my_depth -> k * k1 : val * imm stack = let t = %block.[`0`].my_alloc_region (x, y, x) in 
+167,168c163,164
 < (let try_region = %begin_try_region () in 
 < let try_ghost_region = %begin_try_ghost_region () in 
 ---
-> let code inline(never) loopify(never) size(43) newer_version_of(with_try_8) with_try_8_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region &my_region &my_ghost_region my_depth -> k * k1 : val * imm stack = let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in 
 > (let try_region = %begin_try_region (my_region) in 
 > let try_ghost_region = %begin_try_ghost_region (my_ghost_region) in 
-192c188
-< let code inline(never) loopify(never) size(18) newer_version_of(temporary_to_callee_10) temporary_to_callee_10_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region &my_region &my_ghost_region my_depth -> k * k1 : val * imm * val * imm stack = let t = %block.[`0`].my_alloc_region (x, y, x) in 
----
-> let code inline(never) loopify(never) size(18) newer_version_of(temporary_to_callee_10) temporary_to_callee_10_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region &my_region &my_ghost_region my_depth -> k * k1 : val * imm * val * imm stack = let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in 
 251,253c247
 < and code inline(never) loopify(never) size(111) newer_version_of(run_15) run_15_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let `region` = %begin_region () in 
 < let ghost_region = %begin_ghost_region () in 

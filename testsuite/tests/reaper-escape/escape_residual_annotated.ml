@@ -2,7 +2,7 @@
    flambda2;
    stack-allocation;
    flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
-   script = "sh ${test_source_directory}/compare-with-annotated.sh escape_residual_localized";
+   script = "sh ${test_source_directory}/compare-with-annotated.sh escape_residual";
    setup-ocamlopt.byte-build-env;
    ocamlopt.byte with dump-reaper;
    script;
@@ -10,9 +10,8 @@
    check-program-output;
  *)
 
-(* [escape_residual_localized] with the annotations the escape analysis infers (see
-   [compare-with-annotated.sh]). The type checker stack-allocates the residual
-   allocations, as [-X reaper-escape-localize-residual=1] does. *)
+(* [escape_residual] with the annotations the escape analysis infers (see
+   [compare-with-annotated.sh]). *)
 external local_stack_offset : unit -> int = "caml_local_stack_offset"
 
 type triple =

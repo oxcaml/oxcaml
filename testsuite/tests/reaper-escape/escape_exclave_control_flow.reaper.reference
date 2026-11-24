@@ -236,7 +236,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : [ 0 | 0 of [ 0 of val * imm tagged ] ] stack =
-      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in
       apply direct(sum3_0_1 &my_alloc_region)
         ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
           (t)
@@ -395,7 +395,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : val * imm stack =
-      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in
       (let try_region = %begin_try_region () in
        let try_ghost_region = %begin_try_ghost_region () in
        cont k5 push(k3)
@@ -455,7 +455,7 @@ apply ccall noalloc
             my_closure &my_alloc_region &my_region &my_ghost_region my_depth
             -> k * k1
             : val * imm * val * imm stack =
-      let t = %block.[`0`].my_alloc_region (x, y, x) in
+      let t = %block.[`0`].my_alloc_region.local[my_region] (x, y, x) in
       apply direct(sum3_0_1 &my_alloc_region)
         ($camlEscape_exclave_control_flow__sum3_30 : _ -> imm tagged)
           (t)

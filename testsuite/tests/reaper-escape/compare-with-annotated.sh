@@ -22,9 +22,11 @@ capitalize () {
 }
 
 # The layout of a dump depends on the length of the names, so the dumps are
-# laid out again, with one binding or handler per line.
+# laid out again, with one binding or handler per line. The names of anonymous
+# functions contain their location in the source, which is removed.
 normalize () {
-  sed -e "s/$(capitalize "$2")/Test/g" -e "s/$2/test/g" "$1" |
+  sed -e "s/$(capitalize "$2")/Test/g" -e "s/$2/test/g" \
+      -e 's/\[test\.ml:[0-9,-]*\]/[test.ml]/g' "$1" |
     tr -s '[:space:]' ' ' |
     sed -e 's/ )/)/g' -e 's/( /(/g' |
     sed -e 's/ in /&\
