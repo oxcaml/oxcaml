@@ -94,9 +94,9 @@
    the template's environment has at its definition. In [Env_types_lib], the
    code of [top]'s instantiation calls [f] directly rather than reading it from
    the environment, and that of [h]'s calls [g]'s code directly, although each
-   application of [F] has its own [g] closure. This unit's instantiations can't
-   do the same yet, since [Env_types_lib] doesn't export the types of its
-   templates' environments.
+   application of [F] has its own [g] closure. [Env_types_lib] exports these
+   types, so this unit's instantiations do the same, and the code of [h]'s
+   instantiation is shared by [use_h1] and [use_h2].
 
    The other runs compile the two units at different optimisation levels, with
    and without the reaper. *)
