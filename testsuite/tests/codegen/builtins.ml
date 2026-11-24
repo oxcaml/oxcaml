@@ -538,10 +538,10 @@ let prefetch_static_across_allocation x =
 [%%expect_asm X86_64{|
 prefetch_static_across_allocation:
   subq  $8, %rsp
-  movl  $2147483648, %ebx
-  movq  <hidden PC-relative offset>(%rip), %rdi
-  addq  %rdi, %rbx
-  prefetcht0 (%rbx)
+  movl  $2147483648, %edi
+  movq  <hidden PC-relative offset>(%rip), %rbx
+  addq  %rbx, %rdi
+  prefetcht0 (%rdi)
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
@@ -549,7 +549,9 @@ prefetch_static_across_allocation:
   leaq  8(%r15), %rdi
   movq  $1024, -8(%rdi)
   movq  %rax, (%rdi)
-  prefetcht0 (%rbx)
+  movl  $2147483648, %eax
+  addq  %rbx, %rax
+  prefetcht0 (%rax)
   movq  %rdi, %rax
   addq  $8, %rsp
   ret
@@ -562,14 +564,16 @@ let prefetch_static_across_poll () =
 [%%expect_asm X86_64{|
 prefetch_static_across_poll:
   subq  $8, %rsp
-  movl  $2147483648, %eax
-  movq  <hidden PC-relative offset>(%rip), %rbx
-  addq  %rbx, %rax
-  prefetcht0 (%rax)
+  movl  $2147483648, %ebx
+  movq  <hidden PC-relative offset>(%rip), %rax
+  addq  %rax, %rbx
+  prefetcht0 (%rbx)
   pause
   cmpq  (%r14), %r15
   jbe   <hidden GC jump pad>
 .L0:
+  movl  $2147483648, %ebx
+  addq  %rbx, %rax
   prefetcht0 (%rax)
   movl  $1, %eax
   addq  $8, %rsp
@@ -581,7 +585,8 @@ let prefetch_fixed_base i =
 [%%expect_asm X86_64{|
 prefetch_fixed_base:
   sarq  $1, %rax
-  prefetcht0 8192(%rax)
+  movl  $8193, %ebx
+  prefetcht0 -1(%rbx,%rax)
   movl  $1, %eax
   ret
 |}]
@@ -590,8 +595,8 @@ let prefetch_immediate () =
   Builtins.prefetch_read_high_offset () 8
 [%%expect_asm X86_64{|
 prefetch_immediate:
-  movl  $9, %eax
-  prefetcht0 (%rax)
+  movl  $1, %eax
+  prefetcht0 8(%rax)
   movl  $1, %eax
   ret
 |}]
@@ -606,12 +611,14 @@ prefetch_external_across_poll:
   subq  $8, %rsp
   decq  %rax
   movabsq $4294967296, %rbx
-  addq  %rbx, %rax
-  prefetcht0 (%rax)
+  addq  %rax, %rbx
+  prefetcht0 (%rbx)
   pause
   cmpq  (%r14), %r15
   jbe   <hidden GC jump pad>
 .L0:
+  movabsq $4294967296, %rbx
+  addq  %rbx, %rax
   prefetcht0 (%rax)
   movl  $1, %eax
   addq  $8, %rsp
