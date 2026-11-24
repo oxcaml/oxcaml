@@ -4,7 +4,7 @@
  asmgen;
 *)
 
-(function "catch_float" (b:int)
+(function "catch_float" (b:int) : float
   (+f 10.0
   (catch
     (exit lbl 100.0)

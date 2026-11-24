@@ -99,18 +99,27 @@ val typ_int128 : machtype
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
 
+(** Version of [lub_component] that returns [None] for incomparable components.
+*)
+val lub_component_opt :
+  machtype_component -> machtype_component -> machtype_component option
+
 (** Returns [true] iff the first supplied [machtype_component] is greater than
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
 
-(** A variant of [machtype] used to describe arguments to external C functions
-*)
+(** Version of [ge_component] that doesn't raise for incomparable components. *)
+val ge_component_bool : machtype_component -> machtype_component -> bool
+
+(** A variant of [machtype] used to describe arguments to external C functions.
+    [XMask] and [XVec128/256/512] are not supported on Win64. *)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
   | XInt8  (**r 8-bit integer *)
   | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
   | XInt64  (**r 64-bit integer *)
+  | XMask  (**r mask passed as a 64-bit integer according to the C ABI *)
   | XFloat32  (**r single-precision FP number *)
   | XFloat  (**r double-precision FP number *)
   | XVec128  (**r 128-bit vector *)
@@ -360,6 +369,8 @@ type memory_chunk =
 
 (** Size in bytes of a memory access for the given chunk type. *)
 val size_of_memory_chunk : memory_chunk -> int
+
+val machtype_of_memory_chunk : memory_chunk -> machtype
 
 (* These casts compile to a single move instruction. If the operands are
    assigned the same physical register, the move will be omitted entirely. *)

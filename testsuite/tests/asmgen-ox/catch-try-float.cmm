@@ -4,7 +4,7 @@
  asmgen;
 *)
 
-(function "catch_try_float" (b:float)
+(function "catch_try_float" (b:float) : float
   (+f 10.0
   (catch
     (try float (exit lbl 100.0)
