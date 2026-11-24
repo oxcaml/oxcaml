@@ -453,6 +453,7 @@ struct gc_tweak {
 };
 
 extern uintnat caml_small_heap_limit; /* see major_gc.c */
+extern uintnat caml_init_local_arena_bsize; /* see memory.c */
 
 static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
@@ -462,6 +463,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "main_stack_size", &caml_init_main_stack_wsz, 0 },
   { "thread_stack_size", &caml_init_thread_stack_wsz, 0 },
   { "fiber_stack_size", &caml_init_fiber_stack_wsz, 0 },
+  { "init_local_arena_size", &caml_init_local_arena_bsize, 0 },
   { "percent_sweep_per_mark", &caml_percent_sweep_per_mark, 0 },
   { "gc_overhead_adjustment", &caml_gc_overhead_adjustment, 0 },
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },

@@ -641,6 +641,11 @@ void caml_free_local_arenas(caml_local_arenas* s) {
   caml_stat_free(s);
 }
 
+/* The size in bytes of a stack's first local arena; each later arena is
+   four times the size of the one before. Set by the init_local_arena_size
+   GC tweak, and read when a stack makes its first local allocation. */
+uintnat caml_init_local_arena_bsize = Init_local_arena_bsize;
+
 void caml_local_realloc(void)
 {
   caml_local_arenas* s = caml_refresh_locals(Caml_state->current_stack);
@@ -656,10 +661,22 @@ void caml_local_realloc(void)
 
   do {
     if (s->next_length == 0) {
-      s->next_length = Init_local_arena_bsize;
+      uintnat init_bsize = caml_init_local_arena_bsize;
+      if (init_bsize == 0 || init_bsize % sizeof(value) != 0 ||
+          init_bsize > CAML_INTNAT_MAX / 4) {
+        caml_fatal_error("Bad init_local_arena_size %"
+                         ARCH_INTNAT_PRINTF_FORMAT "u: must be a non-zero "
+                         "multiple of the word size", init_bsize);
+      }
+      s->next_length = init_bsize;
     } else {
-      /* overflow check */
-      static_assert(((intnat)Init_local_arena_bsize << (2*Max_local_arenas)) > 0, "");
+      /* overflow check: static for the default initial size, dynamic for
+         a larger one */
+      static_assert(
+        ((intnat)Init_local_arena_bsize << (2*Max_local_arenas)) > 0, "");
+      if (s->next_length > CAML_INTNAT_MAX / 4) {
+        caml_fatal_error("Local allocation stack overflow - arena too large");
+      }
       s->next_length *= 4;
     }
     /* may need to loop, if a very large allocation was requested */

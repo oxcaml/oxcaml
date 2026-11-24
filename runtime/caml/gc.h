@@ -36,6 +36,7 @@
 #ifdef CAML_INTERNALS
 
 
+/* The default for [caml_init_local_arena_bsize] (see memory.c). */
 #define Init_local_arena_bsize 4096
 
 /* We allow the local stack to quadruple 19 times, which is virtually infinite.
