@@ -31,3 +31,6 @@ dynamic/partial overapply: OK
          method overapply: OK
       mode-crossed region: OK
   allocation from exclave: OK
+       tailcall via redex: OK
+       overapplied prim 1: OK
+       overapplied prim 2: OK

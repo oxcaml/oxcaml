@@ -326,3 +326,29 @@ let () =
   check_empty "allocation from exclave"
 
 let () = Gc.compact ()
+
+(* https://github.com/oxcaml/oxcaml/issues/8067 *)
+
+let rec loop n () =
+  if n = 0 then
+    check_empty "tailcall via redex"
+  else
+    let k = stack_ (ref 42) in
+    ignore_local k;
+    n-1 |> fun n -> loop n ()
+
+let () = loop 10 ()
+
+(* https://github.com/oxcaml/oxcaml/issues/8234 *)
+
+let[@inline never] check_empty' (s : string ref @ local) =
+  ignore_local (ref "<clobbered>");
+  check_empty !s
+
+let fst_tail () =
+  fst (check_empty', ()) (ref "overapplied prim 1")
+
+let id_tail () =
+  Fun.id check_empty' (ref "overapplied prim 2")
+
+let () = fst_tail (); id_tail ()
