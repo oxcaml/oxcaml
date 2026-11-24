@@ -1361,7 +1361,7 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
-    let addr = C.add_int x y dbg in
+    let addr = C.add_int_ptr ~ptr_out_of_heap:false x y dbg in
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
@@ -1408,7 +1408,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
         let write_into_block =
           match mode with
           | Heap ->
-            let addr = C.add_int x y dbg in
+            let addr = C.add_int_ptr ~ptr_out_of_heap:false x y dbg in
             C.caml_modify ~dbg addr z
           | Local ->
             (* divide to convert offset from bytes to field number *)
@@ -1429,7 +1429,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
             ~then_annots:Branch_annotations.default
             ~else_annots:Branch_annotations.default
       else
-        let addr = C.add_int x y dbg in
+        let addr = C.add_int_ptr ~ptr_out_of_heap:false x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
