@@ -61,6 +61,11 @@ module Skeleton : sig
   val apply_renaming : t -> Renaming.t -> t
 end
 
+(** The names that the types of [template_keys] mention, including through the
+    types of existential variables. *)
+val names_in_template_env_types :
+  typing_env -> template_keys:Symbol.Set.t -> Name_occurrences.t
+
 (** [template_keys] name the unit's templates: they have no value, but
     [final_typing_env] defines them (see [Flambda_primitive.Template_env]). *)
 val run :

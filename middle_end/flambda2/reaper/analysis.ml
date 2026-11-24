@@ -248,9 +248,13 @@ let solve (type f) (problem : f Traverse.Problem.t)
     | ( With_types types_rewrite_context,
         With_types final_typing_env,
         With_types unit_symbol ) ->
+      let template_env_symbols =
+        Name_occurrences.symbols
+          (Traverse.names_in_template_env_types final_typing_env ~template_keys)
+      in
       With_types
         (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
-           ~template_keys final_typing_env)
+           ~template_keys ~template_env_symbols final_typing_env)
   in
   { analysis_scope;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
