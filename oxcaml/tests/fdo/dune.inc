@@ -219,10 +219,12 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -fexpr-print-fdo-counters
-     -fexpr-print-branch-annotations -dflambda-heavy-invariants
-     -dfexpr-annot-after simplify -dfdo-dropped-counters -dump-into-file
-     -stop-after middle_end -color never simplify.ml))
+    (with-stderr-to
+     simplify.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -fexpr-print-fdo-counters
+      -fexpr-print-branch-annotations -dflambda-heavy-invariants
+      -dfexpr-annot-after simplify -dfdo-dropped-counters -stop-after middle_end
+      -color never simplify.ml)))
    (with-stdout-to
     simplify.output.corrected
     (progn
@@ -245,16 +247,18 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -no-reaper-local-fields
-     -fdo-counters -fexpr-print-fdo-counters -fexpr-print-branch-annotations
-     -dflambda-heavy-invariants -dfexpr-annot-after reaper
-     -dfdo-dropped-counters -dump-into-file -stop-after middle_end -color never
-     -o o3_reaper/simplify.cmx simplify.ml))
+    (with-stderr-to
+     o3_reaper.simplify.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -no-reaper-local-fields
+      -fdo-counters -fexpr-print-fdo-counters -fexpr-print-branch-annotations
+      -dflambda-heavy-invariants -dfexpr-annot-after reaper
+      -dfdo-dropped-counters -stop-after middle_end -color never -o
+      o3_reaper/simplify.cmx simplify.ml)))
    (with-stdout-to
     simplify_o3_reaper.output.corrected
     (progn
      (run %{exe:tools/fdo_annotations.exe} list o3_reaper/simplify.reaper.fl)
-     (run cat o3_reaper/simplify.cmx.dump))))))
+     (run cat o3_reaper.simplify.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -272,24 +276,29 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -fexpr-print-fdo-counters
-     -fexpr-print-branch-annotations -dflambda-heavy-invariants
-     -dfexpr-annot-after simplify -dcmm -dump-into-file -color never -o
-     to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -fexpr-print-fdo-counters
+      -fexpr-print-branch-annotations -dflambda-heavy-invariants
+      -dfexpr-annot-after simplify -dcmm -color never -o to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -caml-apply-inline-fast-path -fdo-counters
-     -fexpr-print-fdo-counters -fexpr-print-branch-annotations
-     -dflambda-heavy-invariants -dfexpr-annot-after simplify -dcmm
-     -dump-into-file -color never -o to_cmm_fast_path/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     to_cmm_fast_path.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -caml-apply-inline-fast-path -fdo-counters
+      -fexpr-print-fdo-counters -fexpr-print-branch-annotations
+      -dflambda-heavy-invariants -dfexpr-annot-after simplify -dcmm -color never
+      -o to_cmm_fast_path/to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -fdo-counters
-     -fexpr-print-fdo-counters -fexpr-print-branch-annotations
-     -dflambda-heavy-invariants -dfexpr-annot-after reaper -dcmm -dump-into-file
-     -color never -o to_cmm_o3_reaper/simplify.cmx simplify.ml))
+    (with-stderr-to
+     to_cmm_o3_reaper.simplify.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -fdo-counters
+      -fexpr-print-fdo-counters -fexpr-print-branch-annotations
+      -dflambda-heavy-invariants -dfexpr-annot-after reaper -dcmm -color never
+      -o to_cmm_o3_reaper/simplify.cmx simplify.ml)))
    (with-stdout-to
     to_cmm.output.corrected
     (progn
@@ -297,11 +306,11 @@
       to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} list to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} compare-sets
-      to_cmm_fast_path/to_cmm.simplify.fl to_cmm_fast_path/to_cmm.cmx.dump)
+      to_cmm_fast_path/to_cmm.simplify.fl to_cmm_fast_path.to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} list
-      to_cmm_fast_path/to_cmm.cmx.dump)
+      to_cmm_fast_path.to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} compare-sets
-      to_cmm_o3_reaper/simplify.reaper.fl to_cmm_o3_reaper/simplify.cmx.dump))))))
+      to_cmm_o3_reaper/simplify.reaper.fl to_cmm_o3_reaper.simplify.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -318,10 +327,12 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -fdo-counters
-     -fexpr-print-fdo-counters -fexpr-print-branch-annotations
-     -dflambda-heavy-invariants -dfexpr-annot-after reaper -dcmm
-     -dfdo-dropped-counters -dump-into-file -color never to_cmm_reaper.ml))
+    (with-stderr-to
+     to_cmm_reaper.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -O3 -flambda2-reaper -fdo-counters
+      -fexpr-print-fdo-counters -fexpr-print-branch-annotations
+      -dflambda-heavy-invariants -dfexpr-annot-after reaper -dcmm
+      -dfdo-dropped-counters -color never to_cmm_reaper.ml)))
    (with-stdout-to
     to_cmm_reaper.output.corrected
     (progn
@@ -345,8 +356,10 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dfdo-dropped-counters
-     -dump-into-file -color never to_cmm_probe.ml))
+    (with-stderr-to
+     to_cmm_probe.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dfdo-dropped-counters
+      -color never to_cmm_probe.ml)))
    (with-stdout-to
     to_cmm_probe.output.corrected
     (progn
@@ -369,33 +382,41 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dump-into-file -color never
-     -o cfg_cmm/cfg.cmx cfg.ml))
+    (with-stderr-to
+     cfg_cmm.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -color never -o
+      cfg_cmm/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcfg -dfdo-dropped-counters
-     -dump-into-file -color never -o cfg_cfg/cfg.cmx cfg.ml))
+    (with-stderr-to
+     cfg_cfg.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcfg -dfdo-dropped-counters
+      -color never -o cfg_cfg/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dump-into-file -color never
-     -o cfg_cmm/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     cfg_cmm.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -color never -o
+      cfg_cmm/to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcfg -dfdo-dropped-counters
-     -dump-into-file -color never -o cfg_cfg/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     cfg_cfg.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcfg -dfdo-dropped-counters
+      -color never -o cfg_cfg/to_cmm.cmx to_cmm.ml)))
    (with-stdout-to
     cfg.output.corrected
     (progn
-     (run %{exe:tools/fdo_annotations.exe} compare-sets cfg_cmm/cfg.cmx.dump
-      cfg_cfg/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} list cfg_cmm/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} list cfg_cfg/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} dropped cfg_cfg/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} compare-sets cfg_cmm/to_cmm.cmx.dump
-      cfg_cfg/to_cmm.cmx.dump))))))
+     (run %{exe:tools/fdo_annotations.exe} compare-sets cfg_cmm.cfg.cmx.dump
+      cfg_cfg.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} list cfg_cmm.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} list cfg_cfg.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} dropped cfg_cfg.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} compare-sets cfg_cmm.to_cmm.cmx.dump
+      cfg_cfg.to_cmm.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -413,48 +434,58 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o ssa_cmm/cfg.cmx cfg.ml))
+    (with-stderr-to
+     ssa_cmm.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcmm -color never -o
+      ssa_cmm/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dssa
-     -dfdo-dropped-counters -dump-into-file -color never -o ssa_ssa/cfg.cmx
-     cfg.ml))
+    (with-stderr-to
+     ssa_ssa.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dssa
+      -dfdo-dropped-counters -color never -o ssa_ssa/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcfg -dump-into-file
-     -color never -o ssa_cfg/cfg.cmx cfg.ml))
+    (with-stderr-to
+     ssa_cfg.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcfg -color never -o
+      ssa_cfg/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o ssa_cmm/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     ssa_cmm.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcmm -color never -o
+      ssa_cmm/to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dssa
-     -dfdo-dropped-counters -dump-into-file -color never -o ssa_ssa/to_cmm.cmx
-     to_cmm.ml))
+    (with-stderr-to
+     ssa_ssa.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dssa
+      -dfdo-dropped-counters -color never -o ssa_ssa/to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcfg -dump-into-file
-     -color never -o ssa_cfg/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     ssa_cfg.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -dcfg -color never -o
+      ssa_cfg/to_cmm.cmx to_cmm.ml)))
    (with-stdout-to
     ssa.output.corrected
     (progn
-     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm/cfg.cmx.dump
-      ssa_ssa/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} list ssa_ssa/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} dropped ssa_ssa/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm/cfg.cmx.dump
-      ssa_cfg/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm/to_cmm.cmx.dump
-      ssa_ssa/to_cmm.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm/to_cmm.cmx.dump
-      ssa_cfg/to_cmm.cmx.dump))))))
+     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm.cfg.cmx.dump
+      ssa_ssa.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} list ssa_ssa.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} dropped ssa_ssa.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm.cfg.cmx.dump
+      ssa_cfg.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm.to_cmm.cmx.dump
+      ssa_ssa.to_cmm.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} compare-sets ssa_cmm.to_cmm.cmx.dump
+      ssa_cfg.to_cmm.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -472,44 +503,56 @@
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dump-into-file -color never
-     -o linear_cmm/linear.cmx linear.ml))
+    (with-stderr-to
+     linear_cmm.linear.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -color never -o
+      linear_cmm/linear.cmx linear.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -dump-into-file -color
-     never -o linear_linear/linear.cmx linear.ml))
+    (with-stderr-to
+     linear_linear.linear.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -color never -o
+      linear_linear/linear.cmx linear.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dump-into-file -color never
-     -o linear_cmm/cfg.cmx cfg.ml))
+    (with-stderr-to
+     linear_cmm.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -color never -o
+      linear_cmm/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -dump-into-file -color
-     never -o linear_linear/cfg.cmx cfg.ml))
+    (with-stderr-to
+     linear_linear.cfg.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -color never -o
+      linear_linear/cfg.cmx cfg.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -dump-into-file -color never
-     -o linear_cmm/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     linear_cmm.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dcmm -color never -o
+      linear_cmm/to_cmm.cmx to_cmm.ml)))
    (setenv
     OCAMLPARAM
     ""
-    (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -dump-into-file -color
-     never -o linear_linear/to_cmm.cmx to_cmm.ml))
+    (with-stderr-to
+     linear_linear.to_cmm.cmx.dump
+     (run %{bin:ocamlopt.opt} -c -fdo-counters -dlinear -color never -o
+      linear_linear/to_cmm.cmx to_cmm.ml)))
    (with-stdout-to
     linear.output.corrected
     (progn
      (run %{exe:tools/fdo_annotations.exe} compare-sets
-      linear_cmm/linear.cmx.dump linear_linear/linear.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} list linear_linear/linear.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} compare-sets linear_cmm/cfg.cmx.dump
-      linear_linear/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} list linear_linear/cfg.cmx.dump)
+      linear_cmm.linear.cmx.dump linear_linear.linear.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} list linear_linear.linear.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} compare-sets linear_cmm.cfg.cmx.dump
+      linear_linear.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} list linear_linear.cfg.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} compare-sets
-      linear_cmm/to_cmm.cmx.dump linear_linear/to_cmm.cmx.dump))))))
+      linear_cmm.to_cmm.cmx.dump linear_linear.to_cmm.cmx.dump))))))
 
 (rule
  (alias runtest)
@@ -526,216 +569,181 @@
    (run mkdir -p backend_o3_cmm backend_o3_linear backend_o3_ssa_cmm
     backend_o3_ssa_linear backend_o3_merge_blocks_cmm
     backend_o3_merge_blocks_linear)
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -dump-into-file -color
-     never -o backend_o3_cmm/linear.cmx linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
+   (with-stderr-to
+    backend_o3_cmm.linear.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
+     backend_o3_cmm/linear.cmx linear.ml))
+   (with-stderr-to
+    backend_o3_linear.linear.cmx.dump
     (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_linear/linear.cmx linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -dump-into-file -color
-     never -o backend_o3_cmm/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_linear/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -dump-into-file -color
-     never -o backend_o3_cmm/to_cmm.cmx to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_linear/to_cmm.cmx to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -dump-into-file -color
-     never -o backend_o3_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -dump-into-file -color
-     never -o backend_o3_cmm/simplify.cmx simplify.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_linear/simplify.cmx simplify.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o backend_o3_ssa_cmm/linear.cmx linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_ssa_linear/linear.cmx linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o backend_o3_ssa_cmm/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_ssa_linear/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o backend_o3_ssa_cmm/to_cmm.cmx to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_ssa_linear/to_cmm.cmx to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o backend_o3_ssa_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_ssa_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -dump-into-file
-     -color never -o backend_o3_ssa_cmm/simplify.cmx simplify.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_ssa_linear/simplify.cmx simplify.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm
-     -dump-into-file -color never -o backend_o3_merge_blocks_cmm/linear.cmx
+     -dfdo-dropped-counters -color never -o backend_o3_linear/linear.cmx
      linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_merge_blocks_linear/linear.cmx linear.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm
-     -dump-into-file -color never -o backend_o3_merge_blocks_cmm/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_merge_blocks_linear/cfg.cmx cfg.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm
-     -dump-into-file -color never -o backend_o3_merge_blocks_cmm/to_cmm.cmx
+   (with-stderr-to
+    backend_o3_cmm.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
+     backend_o3_cmm/cfg.cmx cfg.ml))
+   (with-stderr-to
+    backend_o3_linear.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_linear/cfg.cmx cfg.ml))
+   (with-stderr-to
+    backend_o3_cmm.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
+     backend_o3_cmm/to_cmm.cmx to_cmm.ml))
+   (with-stderr-to
+    backend_o3_linear.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_linear/to_cmm.cmx
      to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_merge_blocks_linear/to_cmm.cmx to_cmm.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm
-     -dump-into-file -color never -o
-     backend_o3_merge_blocks_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
-     backend_o3_merge_blocks_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
-   (setenv
-    OCAMLPARAM
-    ""
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm
-     -dump-into-file -color never -o backend_o3_merge_blocks_cmm/simplify.cmx
+   (with-stderr-to
+    backend_o3_cmm.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
+     backend_o3_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_linear.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_linear/to_cmm_reaper.cmx
+     to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_cmm.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
+     backend_o3_cmm/simplify.cmx simplify.ml))
+   (with-stderr-to
+    backend_o3_linear.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_linear/simplify.cmx
      simplify.ml))
-   (setenv
-    OCAMLPARAM
-    ""
+   (with-stderr-to
+    backend_o3_ssa_cmm.linear.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
+     backend_o3_ssa_cmm/linear.cmx linear.ml))
+   (with-stderr-to
+    backend_o3_ssa_linear.linear.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/linear.cmx
+     linear.ml))
+   (with-stderr-to
+    backend_o3_ssa_cmm.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
+     backend_o3_ssa_cmm/cfg.cmx cfg.ml))
+   (with-stderr-to
+    backend_o3_ssa_linear.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/cfg.cmx
+     cfg.ml))
+   (with-stderr-to
+    backend_o3_ssa_cmm.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
+     backend_o3_ssa_cmm/to_cmm.cmx to_cmm.ml))
+   (with-stderr-to
+    backend_o3_ssa_linear.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/to_cmm.cmx
+     to_cmm.ml))
+   (with-stderr-to
+    backend_o3_ssa_cmm.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
+     backend_o3_ssa_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_ssa_linear.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o
+     backend_o3_ssa_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_ssa_cmm.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
+     backend_o3_ssa_cmm/simplify.cmx simplify.ml))
+   (with-stderr-to
+    backend_o3_ssa_linear.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/simplify.cmx
+     simplify.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_cmm.linear.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
+     never -o backend_o3_merge_blocks_cmm/linear.cmx linear.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_linear.linear.cmx.dump
     (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -dump-into-file -color never -o
+     -dfdo-dropped-counters -color never -o
+     backend_o3_merge_blocks_linear/linear.cmx linear.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_cmm.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
+     never -o backend_o3_merge_blocks_cmm/cfg.cmx cfg.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_linear.cfg.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o
+     backend_o3_merge_blocks_linear/cfg.cmx cfg.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_cmm.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
+     never -o backend_o3_merge_blocks_cmm/to_cmm.cmx to_cmm.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_linear.to_cmm.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o
+     backend_o3_merge_blocks_linear/to_cmm.cmx to_cmm.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_cmm.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
+     never -o backend_o3_merge_blocks_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_linear.to_cmm_reaper.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o
+     backend_o3_merge_blocks_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_cmm.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
+     never -o backend_o3_merge_blocks_cmm/simplify.cmx simplify.ml))
+   (with-stderr-to
+    backend_o3_merge_blocks_linear.simplify.cmx.dump
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
+     -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/simplify.cmx simplify.ml))
    (with-stdout-to
     backend_o3.output.corrected
     (progn
-     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm/linear.cmx.dump
-      backend_o3_linear/linear.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm/cfg.cmx.dump
-      backend_o3_linear/cfg.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm/to_cmm.cmx.dump
-      backend_o3_linear/to_cmm.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm.linear.cmx.dump
+      backend_o3_linear.linear.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm.cfg.cmx.dump
+      backend_o3_linear.cfg.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} check backend_o3_cmm.to_cmm.cmx.dump
+      backend_o3_linear.to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_cmm/to_cmm_reaper.cmx.dump
-      backend_o3_linear/to_cmm_reaper.cmx.dump)
+      backend_o3_cmm.to_cmm_reaper.cmx.dump
+      backend_o3_linear.to_cmm_reaper.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_cmm/simplify.cmx.dump backend_o3_linear/simplify.cmx.dump)
+      backend_o3_cmm.simplify.cmx.dump backend_o3_linear.simplify.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_ssa_cmm/linear.cmx.dump backend_o3_ssa_linear/linear.cmx.dump)
-     (run %{exe:tools/fdo_annotations.exe} check backend_o3_ssa_cmm/cfg.cmx.dump
-      backend_o3_ssa_linear/cfg.cmx.dump)
+      backend_o3_ssa_cmm.linear.cmx.dump backend_o3_ssa_linear.linear.cmx.dump)
+     (run %{exe:tools/fdo_annotations.exe} check backend_o3_ssa_cmm.cfg.cmx.dump
+      backend_o3_ssa_linear.cfg.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_ssa_cmm/to_cmm.cmx.dump backend_o3_ssa_linear/to_cmm.cmx.dump)
+      backend_o3_ssa_cmm.to_cmm.cmx.dump backend_o3_ssa_linear.to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_ssa_cmm/to_cmm_reaper.cmx.dump
-      backend_o3_ssa_linear/to_cmm_reaper.cmx.dump)
+      backend_o3_ssa_cmm.to_cmm_reaper.cmx.dump
+      backend_o3_ssa_linear.to_cmm_reaper.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_ssa_cmm/simplify.cmx.dump
-      backend_o3_ssa_linear/simplify.cmx.dump)
+      backend_o3_ssa_cmm.simplify.cmx.dump
+      backend_o3_ssa_linear.simplify.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_merge_blocks_cmm/linear.cmx.dump
-      backend_o3_merge_blocks_linear/linear.cmx.dump)
+      backend_o3_merge_blocks_cmm.linear.cmx.dump
+      backend_o3_merge_blocks_linear.linear.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_merge_blocks_cmm/cfg.cmx.dump
-      backend_o3_merge_blocks_linear/cfg.cmx.dump)
+      backend_o3_merge_blocks_cmm.cfg.cmx.dump
+      backend_o3_merge_blocks_linear.cfg.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_merge_blocks_cmm/to_cmm.cmx.dump
-      backend_o3_merge_blocks_linear/to_cmm.cmx.dump)
+      backend_o3_merge_blocks_cmm.to_cmm.cmx.dump
+      backend_o3_merge_blocks_linear.to_cmm.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_merge_blocks_cmm/to_cmm_reaper.cmx.dump
-      backend_o3_merge_blocks_linear/to_cmm_reaper.cmx.dump)
+      backend_o3_merge_blocks_cmm.to_cmm_reaper.cmx.dump
+      backend_o3_merge_blocks_linear.to_cmm_reaper.cmx.dump)
      (run %{exe:tools/fdo_annotations.exe} check
-      backend_o3_merge_blocks_cmm/simplify.cmx.dump
-      backend_o3_merge_blocks_linear/simplify.cmx.dump))))))
+      backend_o3_merge_blocks_cmm.simplify.cmx.dump
+      backend_o3_merge_blocks_linear.simplify.cmx.dump))))))
 
 (rule
  (alias runtest)

@@ -32,10 +32,17 @@ let field name args = List (Atom name :: args)
 type compile =
   { flags : string list;
     output : string option;
-    source : string
+    source : string;
+    dump : bool
   }
 
-let compile ?output flags source = { flags; output; source }
+(* With [dump], the dumps that [flags] ask for, which the compiler prints on
+   stderr, are written to [dump_file <output>]. *)
+let compile ?output ?(dump = false) flags source =
+  { flags; output; source; dump }
+
+(* In the directory of the rule, as dune requires of its targets. *)
+let dump_file cmx = String.map (function '/' -> '.' | c -> c) cmx ^ ".dump"
 
 type step =
   | Annotations of string list  (** A command of [tools/fdo_annotations.exe]. *)
@@ -50,7 +57,8 @@ type test =
       { name : string;
         compiles : compile list;
         steps : step list;
-        linux_only : bool
+        linux_only : bool;
+        ci_flags : bool
       }
       (** Compiles sources with dumps, reads their FDO annotations with
           [tools/fdo_annotations.exe], and compares its output with
@@ -77,7 +85,10 @@ let diff ~linux_only name =
       field "deps" (atoms [output; corrected]);
       field "action" [field "diff" (atoms [output; corrected])] ]
 
-let compile_action { flags; output; source } =
+(* CI jobs set flags in OCAMLPARAM, which override those of the command line.
+   The tests whose expected output depends on the flags clear it; the others
+   ([ci_flags]) run with them, so that each CI configuration checks them. *)
+let compile_action ~ci_flags { flags; output; source; dump } =
   let run =
     field "run"
       (atoms
@@ -86,11 +97,18 @@ let compile_action { flags; output; source } =
          @ (match output with None -> [] | Some output -> ["-o"; output])
          @ [source]))
   in
-  (* The dumps are read from next to the .cmx files, so OCAMLPARAM is cleared:
-     CI's metrics job sets dump-dir in it, which moves them. *)
-  if List.mem "-dump-into-file" flags
-  then field "setenv" [Atom "OCAMLPARAM"; Atom "\"\""; run]
-  else run
+  let run =
+    if dump
+    then
+      let cmx =
+        match output with
+        | Some output -> output
+        | None -> Filename.chop_extension source ^ ".cmx"
+      in
+      field "with-stderr-to" [Atom (dump_file cmx); run]
+    else run
+  in
+  if ci_flags then run else field "setenv" [Atom "OCAMLPARAM"; Atom "\"\""; run]
 
 let mkdir = function
   | [] -> []
@@ -121,7 +139,7 @@ let stanzas = function
             in
             let build counters counter_flags =
               let output ext = dir counters ^ "/" ^ module_ ^ ext in
-              [ compile_action
+              [ compile_action ~ci_flags:true
                   (compile ~output:(output ".cmx") (flags @ counter_flags)
                      source);
                 field "with-stdout-to"
@@ -147,7 +165,7 @@ let stanzas = function
                     [field "diff" (atoms [code "without"; code "with"])] ] ])
           sources)
       configs
-  | Dumps { name; compiles; steps; linux_only } ->
+  | Dumps { name; compiles; steps; linux_only; ci_flags } ->
     let dedup l =
       List.rev
         (List.fold_left
@@ -181,15 +199,15 @@ let stanzas = function
           field "action"
             [ field "progn"
                 (mkdir dirs
-                @ List.map compile_action compiles
+                @ List.map (compile_action ~ci_flags) compiles
                 @ [ field "with-stdout-to"
                       [Atom (name ^ ".output.corrected"); steps] ]) ] ];
       diff ~linux_only name ]
 
 let unit name = Unit { name; libraries = "ocamloptcomp" }
 
-let dumps ?(linux_only = false) name compiles steps =
-  Dumps { name; compiles; steps; linux_only }
+let dumps ?(linux_only = false) ?(ci_flags = false) name compiles steps =
+  Dumps { name; compiles; steps; linux_only; ci_flags }
 
 let list file = Annotations ["list"; file]
 
@@ -203,6 +221,7 @@ let check a b = Annotations ["check"; a; b]
    [fdo_annotations.exe] reads. [flags] come first, [dumps] last. *)
 let fexpr ?output ?(flags = []) ?(dumps = []) ~pass source =
   compile ?output
+    ~dump:(not (List.is_empty dumps))
     (flags
     @ [ "-fdo-counters";
         "-fexpr-print-fdo-counters";
@@ -217,7 +236,7 @@ let fexpr ?output ?(flags = []) ?(dumps = []) ~pass source =
    for each of [stages], a name and dump flags, into [<name><suffix>_<stage>].
    Then, for each config and source, runs [checks ~dump source], where [dump
    stage] is the dump of the source at that stage. *)
-let pipeline ?(configs = ["", []]) name ~sources ~stages checks =
+let pipeline ?ci_flags ?(configs = ["", []]) name ~sources ~stages checks =
   let dir suffix stage = name ^ suffix ^ "_" ^ stage in
   let module_ source = Filename.chop_extension source in
   let for_each f =
@@ -225,19 +244,20 @@ let pipeline ?(configs = ["", []]) name ~sources ~stages checks =
       (fun (suffix, flags) -> List.concat_map (f suffix flags) sources)
       configs
   in
-  dumps name
+  dumps ?ci_flags name
     (for_each (fun suffix flags source ->
          List.map
            (fun (stage, dump_flags) ->
              compile
                ~output:(dir suffix stage ^ "/" ^ module_ source ^ ".cmx")
-               (flags @ ["-fdo-counters"] @ dump_flags @ ["-dump-into-file"])
+               ~dump:true
+               (flags @ ["-fdo-counters"] @ dump_flags)
                source)
            stages))
     (for_each (fun suffix _ source ->
          checks
            ~dump:(fun stage ->
-             dir suffix stage ^ "/" ^ module_ source ^ ".cmx.dump")
+             dump_file (dir suffix stage ^ "/" ^ module_ source ^ ".cmx"))
            source))
 
 let tests =
@@ -249,7 +269,7 @@ let tests =
     unit "cfg_to_linear_counters";
     unit "branch_relaxation_counters";
     unit "merge_blocks_counters";
-    dumps "function_ids"
+    dumps "function_ids" ~ci_flags:true
       [ fexpr ~pass:"raw" "function_ids.ml";
         fexpr ~output:"function_ids.edited.cmx" ~pass:"raw"
           "function_ids_edited.ml" ]
@@ -257,7 +277,7 @@ let tests =
           [ "compare-entries";
             "function_ids.raw.fl";
             "function_ids.edited.raw.fl" ] ];
-    dumps "body_hash"
+    dumps "body_hash" ~ci_flags:true
       [ fexpr ~pass:"raw" "body_hash.ml";
         fexpr ~output:"body_hash.edited.cmx" ~pass:"raw" "body_hash_edited.ml"
       ]
@@ -265,18 +285,14 @@ let tests =
           ["compare-entries"; "body_hash.raw.fl"; "body_hash.edited.raw.fl"];
         Annotations
           ["compare-counters"; "body_hash.raw.fl"; "body_hash.edited.raw.fl"] ];
-    dumps "instrumentation"
+    dumps "instrumentation" ~ci_flags:true
       [fexpr ~pass:"raw" "instrumentation.ml"]
       [list "instrumentation.raw.fl"];
     (* Compilation stops after the middle end, so that only its dropped counters
        are listed. *)
     dumps "simplify"
       [ fexpr ~pass:"simplify"
-          ~dumps:
-            [ "-dfdo-dropped-counters";
-              "-dump-into-file";
-              "-stop-after";
-              "middle_end" ]
+          ~dumps:["-dfdo-dropped-counters"; "-stop-after"; "middle_end"]
           "simplify.ml" ]
       [list "simplify.simplify.fl"; Cat "simplify.cmx.dump"];
     (* The same at -O3 with the reaper, in a directory of its own so that the
@@ -286,17 +302,13 @@ let tests =
       [ fexpr ~output:"o3_reaper/simplify.cmx"
           ~flags:["-O3"; "-flambda2-reaper"; "-no-reaper-local-fields"]
           ~pass:"reaper"
-          ~dumps:
-            [ "-dfdo-dropped-counters";
-              "-dump-into-file";
-              "-stop-after";
-              "middle_end" ]
+          ~dumps:["-dfdo-dropped-counters"; "-stop-after"; "middle_end"]
           "simplify.ml" ]
-      [list "o3_reaper/simplify.reaper.fl"; Cat "o3_reaper/simplify.cmx.dump"];
+      [list "o3_reaper/simplify.reaper.fl"; Cat "o3_reaper.simplify.cmx.dump"];
     (* [to_cmm.ml] is also compiled with the inline fast path of [caml_apply],
        whose two calls share the counter, and [simplify.ml] at -O3 with the
        reaper. *)
-    (let cmm = ["-dcmm"; "-dump-into-file"] in
+    (let cmm = ["-dcmm"] in
      dumps "to_cmm"
        [ fexpr ~output:"to_cmm.cmx" ~pass:"simplify" ~dumps:cmm "to_cmm.ml";
          fexpr ~output:"to_cmm_fast_path/to_cmm.cmx"
@@ -308,23 +320,23 @@ let tests =
        [ compare_sets "to_cmm.simplify.fl" "to_cmm.cmx.dump";
          list "to_cmm.cmx.dump";
          compare_sets "to_cmm_fast_path/to_cmm.simplify.fl"
-           "to_cmm_fast_path/to_cmm.cmx.dump";
-         list "to_cmm_fast_path/to_cmm.cmx.dump";
+           "to_cmm_fast_path.to_cmm.cmx.dump";
+         list "to_cmm_fast_path.to_cmm.cmx.dump";
          compare_sets "to_cmm_o3_reaper/simplify.reaper.fl"
-           "to_cmm_o3_reaper/simplify.cmx.dump" ]);
+           "to_cmm_o3_reaper.simplify.cmx.dump" ]);
     dumps "to_cmm_reaper"
       [ fexpr
           ~flags:["-O3"; "-flambda2-reaper"]
           ~pass:"reaper"
-          ~dumps:["-dcmm"; "-dfdo-dropped-counters"; "-dump-into-file"]
+          ~dumps:["-dcmm"; "-dfdo-dropped-counters"]
           "to_cmm_reaper.ml" ]
       [ compare_sets "to_cmm_reaper.reaper.fl" "to_cmm_reaper.cmx.dump";
         list "to_cmm_reaper.cmx.dump";
         dropped "to_cmm_reaper.cmx.dump" ];
     (* Probes are only supported on Linux. *)
     dumps "to_cmm_probe" ~linux_only:true
-      [ compile
-          ["-fdo-counters"; "-dcmm"; "-dfdo-dropped-counters"; "-dump-into-file"]
+      [ compile ~dump:true
+          ["-fdo-counters"; "-dcmm"; "-dfdo-dropped-counters"]
           "to_cmm_probe.ml" ]
       [list "to_cmm_probe.cmx.dump"; dropped "to_cmm_probe.cmx.dump"];
     (* The Cfg dumps hold every pass that prints one. *)
@@ -360,8 +372,8 @@ let tests =
         ::
         (if String.equal source "to_cmm.ml" then [] else [list (dump "linear")]));
     (* End to end through the backend, at -O3, with the SSA pipeline and with
-       the merging of identical blocks. *)
-    pipeline "backend_o3"
+       the merging of identical blocks, and with the flags of CI. *)
+    pipeline "backend_o3" ~ci_flags:true
       ~configs:
         [ "", ["-O3"];
           "_ssa", ["-O3"; "-use-ssa"];
