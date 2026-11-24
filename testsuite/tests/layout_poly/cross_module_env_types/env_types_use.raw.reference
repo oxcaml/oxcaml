@@ -1,5 +1,5 @@
 (let code inline(never) size(8)
-       `Env_types_lib/top/0_value_or_null_0` (`closure` : val, x)
+       `Env_types_lib/top/0_value_or_null` (`closure` : val, x)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val * val =
@@ -9,7 +9,7 @@
        cont k1 (apply_result, x)
  in
  let code inline(never) size(18)
-       `Env_types_lib/h/2_value_or_null_1` (`closure` : val, x)
+       `Env_types_lib/h/2_value_or_null` (`closure` : val, x)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val * val * val =
@@ -33,8 +33,8 @@
    let ghost_region = %begin_ghost_region () in
    let `unit` = %end_region (`region`) in
    let unit_1 = %end_ghost_region (ghost_region) in
-   apply direct(`Env_types_lib/top/0_value_or_null_0` &my_alloc_region)
-      ($Env_types_lib.camlEnv_types_lib__s4, x) -> k1 * k2
+   apply direct(`Env_types_lib/top/0_value_or_null` &my_alloc_region)
+      ($Env_types_lib.camlEnv_types_lib__s1, x) -> k1 * k2
  in
  let code inline(never) size(7)
        use_h1_3 (x)
@@ -43,10 +43,10 @@
          : val * val * val =
    let `region` = %begin_region () in
    let ghost_region = %begin_ghost_region () in
-   let Pfield = %block_load.[`1`] ($Env_types_lib.camlEnv_types_lib__s10) in
+   let Pfield = %block_load.[`1`] ($Env_types_lib.camlEnv_types_lib__s7) in
    let `unit` = %end_region (`region`) in
    let unit_1 = %end_ghost_region (ghost_region) in
-   apply direct(`Env_types_lib/h/2_value_or_null_1` &my_alloc_region)
+   apply direct(`Env_types_lib/h/2_value_or_null` &my_alloc_region)
       (Pfield, x) -> k1 * k2
  in
  let code inline(never) size(7)
@@ -56,13 +56,13 @@
          : val * val * val =
    let `region` = %begin_region () in
    let ghost_region = %begin_ghost_region () in
-   let Pfield = %block_load.[`1`] ($Env_types_lib.camlEnv_types_lib__s9) in
+   let Pfield = %block_load.[`1`] ($Env_types_lib.camlEnv_types_lib__s6) in
    let `unit` = %end_region (`region`) in
    let unit_1 = %end_ghost_region (ghost_region) in
-   apply direct(`Env_types_lib/h/2_value_or_null_1` &my_alloc_region)
+   apply direct(`Env_types_lib/h/2_value_or_null` &my_alloc_region)
       (Pfield, x) -> k1 * k2
  in
- let $camlEnv_types_use__s6 = " " in
+ let $camlEnv_types_use__s4 = " " in
  let code inline(never) size(12)
        print_ints_5
          (ints : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ])
@@ -73,88 +73,80 @@
       ($Stdlib__Int.camlStdlib__Int__to_string_6_7, ints) -> k4 * k2
      where k4 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
        apply direct(concat_8 &my_alloc_region)
-          ($camlEnv_types_use__s6, apply_result) -> k3 * k2
+          ($camlEnv_types_use__s4, apply_result) -> k3 * k2
      where k3 (apply_result : val) =
        apply direct(print_endline_47 &my_alloc_region)
           (apply_result) -> k1 * k2
  in
- let $camlEnv_types_use__s2 = closure use_top_2 @use_top &toplevel in
- let $camlEnv_types_use__s3 = closure use_h1_3 @use_h1 &toplevel in
- let $camlEnv_types_use__s4 = closure use_h2_4 @use_h2 &toplevel in
- let $camlEnv_types_use__s5 = closure print_ints_5 @print_ints &toplevel in
- let $camlEnv_types_use__s20 =
-   Block 0 ($camlEnv_types_use__s2,
-            $camlEnv_types_use__s3,
-            $camlEnv_types_use__s4,
-            $camlEnv_types_use__s5)
- in
- let $camlEnv_types_use__s1 =
-   closure `Env_types_lib/h/2_value_or_null_1`
-     @`Env_types_lib/h/2_value_or_null` &toplevel
- in
- let $camlEnv_types_use__s0 =
-   closure `Env_types_lib/top/0_value_or_null_0`
-     @`Env_types_lib/top/0_value_or_null` &toplevel
+ let $camlEnv_types_use__s0 = closure use_top_2 @use_top &toplevel in
+ let $camlEnv_types_use__s1 = closure use_h1_3 @use_h1 &toplevel in
+ let $camlEnv_types_use__s2 = closure use_h2_4 @use_h2 &toplevel in
+ let $camlEnv_types_use__s3 = closure print_ints_5 @print_ints &toplevel in
+ let $camlEnv_types_use__s18 =
+   Block 0 ($camlEnv_types_use__s0,
+            $camlEnv_types_use__s1,
+            $camlEnv_types_use__s2,
+            $camlEnv_types_use__s3)
  in
  apply direct(use_top_2 &toplevel)  (5) -> k2 * error
    where k2 (`*match*_unboxed0`, `*match*_unboxed1`) =
-     ((let $camlEnv_types_use__s7 = Block 0 (`*match*_unboxed1`, 0) in
-       let $camlEnv_types_use__s8 =
-         Block 0 (`*match*_unboxed0`, $camlEnv_types_use__s7)
+     ((let $camlEnv_types_use__s5 = Block 0 (`*match*_unboxed1`, 0) in
+       let $camlEnv_types_use__s6 =
+         Block 0 (`*match*_unboxed0`, $camlEnv_types_use__s5)
        in
        apply direct(print_ints_5 &toplevel)
-          ($camlEnv_types_use__s8) -> k2 * error)
+          ($camlEnv_types_use__s6) -> k2 * error)
         where k2 (apply_result : imm tagged) =
           (apply direct(use_h1_3 &toplevel)  (7) -> k2 * error
              where k2
                      (`*match*_unboxed0_1`,
                       `*match*_unboxed1_1`,
                       `*match*_unboxed2`) =
-               ((let $camlEnv_types_use__s9 = Block 0 (`*match*_unboxed2`, 0)
+               ((let $camlEnv_types_use__s7 = Block 0 (`*match*_unboxed2`, 0)
                  in
-                 let $camlEnv_types_use__s10 =
-                   Block 0 (`*match*_unboxed1_1`, $camlEnv_types_use__s9)
+                 let $camlEnv_types_use__s8 =
+                   Block 0 (`*match*_unboxed1_1`, $camlEnv_types_use__s7)
                  in
-                 let $camlEnv_types_use__s11 =
-                   Block 0 (`*match*_unboxed0_1`, $camlEnv_types_use__s10)
+                 let $camlEnv_types_use__s9 =
+                   Block 0 (`*match*_unboxed0_1`, $camlEnv_types_use__s8)
                  in
                  apply direct(print_ints_5 &toplevel)
-                    ($camlEnv_types_use__s11) -> k2 * error)
+                    ($camlEnv_types_use__s9) -> k2 * error)
                   where k2 (apply_result_1 : imm tagged) =
                     (apply direct(use_h2_4 &toplevel)  (8) -> k2 * error
                        where k2
                                (`*match*_unboxed0_2`,
                                 `*match*_unboxed1_2`,
                                 `*match*_unboxed2_1`) =
-                         ((let $camlEnv_types_use__s12 =
+                         ((let $camlEnv_types_use__s10 =
                              Block 0 (`*match*_unboxed2_1`, 0)
                            in
-                           let $camlEnv_types_use__s13 =
+                           let $camlEnv_types_use__s11 =
                              Block 0 (`*match*_unboxed1_2`,
-                                      $camlEnv_types_use__s12)
+                                      $camlEnv_types_use__s10)
                            in
-                           let $camlEnv_types_use__s14 =
+                           let $camlEnv_types_use__s12 =
                              Block 0 (`*match*_unboxed0_2`,
-                                      $camlEnv_types_use__s13)
+                                      $camlEnv_types_use__s11)
                            in
                            apply direct(print_ints_5 &toplevel)
-                              ($camlEnv_types_use__s14) -> k2 * error)
+                              ($camlEnv_types_use__s12) -> k2 * error)
                             where k2 (apply_result_2 : imm tagged) =
                               (apply direct(top_in_lib_5 &toplevel)
                                   (6) -> k2 * error
                                  where k2
                                          (`*match*_unboxed0_3`,
                                           `*match*_unboxed1_3`) =
-                                   ((let $camlEnv_types_use__s15 =
+                                   ((let $camlEnv_types_use__s13 =
                                        Block 0 (`*match*_unboxed1_3`, 0)
                                      in
-                                     let $camlEnv_types_use__s16 =
+                                     let $camlEnv_types_use__s14 =
                                        Block 0 (`*match*_unboxed0_3`,
-                                                $camlEnv_types_use__s15)
+                                                $camlEnv_types_use__s13)
                                      in
                                      apply direct(print_ints_5 &toplevel)
                                        
-                                         ($camlEnv_types_use__s16)
+                                         ($camlEnv_types_use__s14)
                                          -> k2 * error)
                                       where k2 (apply_result_3 : imm tagged) =
                                         ((let Pfield =
@@ -169,31 +161,31 @@
                                                    (`*match*_unboxed0_4`,
                                                     `*match*_unboxed1_4`,
                                                     `*match*_unboxed2_2`) =
-                                             let $camlEnv_types_use__s17 =
+                                             let $camlEnv_types_use__s15 =
                                                Block 0 (`*match*_unboxed2_2`,
                                                         0)
                                              in
-                                             let $camlEnv_types_use__s18 =
+                                             let $camlEnv_types_use__s16 =
                                                Block 0 (`*match*_unboxed1_4`,
-                                                        $camlEnv_types_use__s17)
+                                                        $camlEnv_types_use__s15)
                                              in
-                                             let $camlEnv_types_use__s19 =
+                                             let $camlEnv_types_use__s17 =
                                                Block 0 (`*match*_unboxed0_4`,
-                                                        $camlEnv_types_use__s18)
+                                                        $camlEnv_types_use__s16)
                                              in
                                              apply
                                                     direct(print_ints_5
                                                     &toplevel)
                                                
-                                                 ($camlEnv_types_use__s19)
+                                                 ($camlEnv_types_use__s17)
                                                  -> k1 * error))))))))
    where k1 (`*match*` : imm tagged) =
-     cont k ($camlEnv_types_use__s20))
+     cont k ($camlEnv_types_use__s18))
   where k define_root_symbol (module_block) =
     let $camlEnv_types_use =
-      Block 0 ($camlEnv_types_use__s2,
-               $camlEnv_types_use__s3,
-               $camlEnv_types_use__s4,
-               $camlEnv_types_use__s5)
+      Block 0 ($camlEnv_types_use__s0,
+               $camlEnv_types_use__s1,
+               $camlEnv_types_use__s2,
+               $camlEnv_types_use__s3)
     in
     cont done ($camlEnv_types_use)
