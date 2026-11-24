@@ -1,6 +1,3 @@
-; Tests for the FDO system with pseudo-instrumentation. The rules of the tests
-; are generated in dune.inc by gen/gen_dune.ml.
-
 (include dune.inc)
 
 (rule

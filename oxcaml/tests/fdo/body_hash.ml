@@ -1,6 +1,6 @@
 (* body_hash_edited.ml changes the [keep_*] functions in ways that must keep
    their body hashes, and the [change_*] functions in ways that must change
-   them. *)
+   them. Functions with the same hash must have the same counters. *)
 
 let[@inline never] apply f x = f x
 

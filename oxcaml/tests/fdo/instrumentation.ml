@@ -1,5 +1,5 @@
 (* The counters [Fdo_instrumentation] attaches during the translation from
-   Lambda. *)
+   Lambda: on switches and calls, in nested functions, functors and modules. *)
 
 external c_call : int -> int = "caml_fdo_test_c_call"
 
