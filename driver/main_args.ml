@@ -653,9 +653,11 @@ let mk_dprofile f =
 
 let mk_dprofile_level f =
   "-dprofile-level", Arg.Int f,
-  "<n>  Set the level of detail of -dprofile, -dtimings and -dcounters: \
-   0 disables them, 1 records the main passes (default), 2 also records the \
-   passes run for each function or continuation"
+  "<n>  Set the level of detail of profiling: 0 disables it, 1 records the \
+   main passes, 2 also records the passes run for each function or \
+   continuation. Defaults to 1 if -dprofile, -dtimings or -dcounters is \
+   given, and 0 otherwise. The data are only printed if one of those is \
+   given"
 
 let mk_dgranularity f =
   "-dgranularity",
@@ -2500,13 +2502,13 @@ module Default = struct
     let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
-    let _dprofile () = set_profile_columns Profile.all_columns
+    let _dprofile () = profile_columns := Profile.all_columns
     let _dprofile_level n =
       if n < 0 then raise (Arg.Bad "-dprofile-level: must not be negative");
-      set_profile_level n
-    let _dtimings () = set_profile_columns [`Time]
+      profile_level := Some n
+    let _dtimings () = profile_columns := [`Time]
     let _dtimings_precision n = timings_precision := n
-    let _dcounters () = set_profile_columns [`Counters]
+    let _dcounters () = profile_columns := [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
     let _dprofile_output s =
       Compenv.check_relative_path

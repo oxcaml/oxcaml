@@ -102,9 +102,10 @@ let reset () = hierarchy := create ()
 let skipping = ref false
 
 let record_call_internal ?(accumulate = false) ?(level = 1) ?counter_f name f =
-  if !Clflags.profile_level = 0 || !skipping then
+  let profile_level = Clflags.effective_profile_level () in
+  if profile_level = 0 || !skipping then
     f ()
-  else if !Clflags.profile_level < level then
+  else if profile_level < level then
     Misc.protect_refs [R (skipping, true)] f
   else
   let E prev_hierarchy = !hierarchy in
@@ -339,6 +340,7 @@ let output_rows
 let output_columns output_rows_f columns ~timings_precision =
   match columns with
   | [] -> ()
+  | _ :: _ when Clflags.effective_profile_level () = 0 -> ()
   | _ :: _ ->
      let total = Measure_diff.of_diff Measure.initial (Measure.create ()) in
      rows_of_hierarchy !hierarchy total columns timings_precision
@@ -381,7 +383,7 @@ let output_to_csv ppf columns =
   in
   output_columns output_row_f columns
 
-let all_columns = Clflags.all_profile_columns
+let all_columns = List.map fst column_mapping
 let column_names = List.map snd column_mapping
 
 let options_doc =

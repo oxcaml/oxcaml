@@ -609,11 +609,11 @@ let read_one_param ppf position name v =
       | "profile" -> Profile.all_columns
       | _ -> assert false
     in
-     set_profile_columns (if check_bool ppf name v then if_on else [])
+     profile_columns := if check_bool ppf name v then if_on else []
 
   | "profile-level" ->
     (match int_of_string_opt v with
-     | Some n when n >= 0 -> set_profile_level n
+     | Some n when n >= 0 -> profile_level := Some n
      | _ ->
        Printf.ksprintf (print_error ppf)
          "bad value %s for %S" v name)

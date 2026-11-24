@@ -41,8 +41,9 @@ val record_call :
   ?accumulate:bool -> ?level:int -> string -> (unit -> 'a) -> 'a
 (** [record_call pass f] calls [f] and records its profile information.
 
-    [level] (default 1) is the least value of [Clflags.profile_level] at which
-    [pass], and any nested calls to [record_] functions, are profiled. *)
+    [level] (default 1) is the least value of
+    [Clflags.effective_profile_level ()] at which [pass], and any nested calls
+    to [record_] functions, are profiled. *)
 
 val record_call_with_counters :
   ?accumulate:bool -> ?level:int -> counter_f:('a -> Counters.t) ->
@@ -51,14 +52,16 @@ val record_call_with_counters :
     profile information (including counter information given by calling
     [counter_f] on the result of calling [f]).
 
-    [level] (default 1) is the least value of [Clflags.profile_level] at which
-    [pass], and any nested calls to [record_] functions, are profiled. *)
+    [level] (default 1) is the least value of
+    [Clflags.effective_profile_level ()] at which [pass], and any nested calls
+    to [record_] functions, are profiled. *)
 
 val record : ?accumulate:bool -> ?level:int -> string -> ('a -> 'b) -> 'a -> 'b
 (** [record pass f arg] records the profile information of [f arg].
 
-    [level] (default 1) is the least value of [Clflags.profile_level] at which
-    [pass], and any nested calls to [record_] functions, are profiled. *)
+    [level] (default 1) is the least value of
+    [Clflags.effective_profile_level ()] at which [pass], and any nested calls
+    to [record_] functions, are profiled. *)
 
 val record_with_counters :
   ?accumulate:bool -> ?level:int -> counter_f:('b -> Counters.t) ->
@@ -67,8 +70,9 @@ val record_with_counters :
     of [f arg] and records counter information given by calling [counter_f] on
     the result of [f arg].
 
-    [level] (default 1) is the least value of [Clflags.profile_level] at which
-    [pass], and any nested calls to [record_] functions, are profiled. *)
+    [level] (default 1) is the least value of
+    [Clflags.effective_profile_level ()] at which [pass], and any nested calls
+    to [record_] functions, are profiled. *)
 
 val annotate_file_name : string -> string
 (** Annotates profiling pass for file names. *)
