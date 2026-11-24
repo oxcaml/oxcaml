@@ -1000,7 +1000,7 @@ let run0 unit acc ~free_names ~all_constants () =
    instantiations of the templates. Those instantiations can then use the values
    and call the code that the types mention, so they must be kept as they
    are. *)
-let mark_used_by_template_env_types acc typing_env ~template_keys =
+let names_in_template_env_types typing_env ~template_keys =
   (* The types can refer to (existential) variables, whose types can mention
      other names. *)
   let rec names_in_types ~visited_vars names =
@@ -1027,38 +1027,40 @@ let mark_used_by_template_env_types acc typing_env ~template_keys =
         ~visited_vars:(Variable.Set.union visited_vars vars_to_visit)
         names
   in
-  Symbol.Set.iter
-    (fun template_key ->
+  Symbol.Set.fold
+    (fun template_key names ->
       let free_names =
         Flambda2_types.free_names
           (Flambda2_types.Typing_env.find typing_env (Name.symbol template_key)
              (Some K.value))
       in
-      let free_names =
-        names_in_types ~visited_vars:Variable.Set.empty free_names
-      in
-      Symbol.Set.iter
-        (fun symbol -> Acc.add_any_usage acc (Code_id_or_name.symbol symbol))
-        (Name_occurrences.symbols free_names);
-      Code_id.Set.iter
-        (fun code_id ->
-          match Acc.find_code_dep acc code_id with
-          | None -> ()
-          | Some code_dep ->
-            (* Other units can call the code directly, with any closure (another
-               closure can have a newer version of the code) and arguments. *)
-            Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
-            List.iter (Acc.add_any_usage acc)
-              (code_dep.known_arity_call_witness
-             :: code_dep.unknown_arity_call_witnesses);
-            List.iter
-              (fun var -> Acc.add_any_source acc (Code_id_or_name.var var))
-              (code_dep.my_closure :: code_dep.params);
-            List.iter
-              (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
-              (code_dep.exn :: code_dep.return))
-        (Name_occurrences.code_ids free_names))
-    template_keys
+      Name_occurrences.union names
+        (names_in_types ~visited_vars:Variable.Set.empty free_names))
+    template_keys Name_occurrences.empty
+
+let mark_used_by_template_env_types acc typing_env ~template_keys =
+  let free_names = names_in_template_env_types typing_env ~template_keys in
+  Symbol.Set.iter
+    (fun symbol -> Acc.add_any_usage acc (Code_id_or_name.symbol symbol))
+    (Name_occurrences.symbols free_names);
+  Code_id.Set.iter
+    (fun code_id ->
+      match Acc.find_code_dep acc code_id with
+      | None -> ()
+      | Some code_dep ->
+        (* Other units can call the code directly, with any closure (another
+           closure can have a newer version of the code) and arguments. *)
+        Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
+        List.iter (Acc.add_any_usage acc)
+          (code_dep.known_arity_call_witness
+         :: code_dep.unknown_arity_call_witnesses);
+        List.iter
+          (fun var -> Acc.add_any_source acc (Code_id_or_name.var var))
+          (code_dep.my_closure :: code_dep.params);
+        List.iter
+          (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
+          (code_dep.exn :: code_dep.return))
+    (Name_occurrences.code_ids free_names)
 
 let run (type f) (unit : Flambda_unit.t)
     ~(final_typing_env : (f, _) With_types.t) ~free_names ~template_keys =

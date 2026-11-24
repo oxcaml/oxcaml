@@ -37,11 +37,15 @@ val prepare_rewrite_context :
   rewrite_context
 
 (** [template_keys] are symbols with no value, whose types are those of the
-    environments of the current unit's templates, which escape. *)
+    environments of the current unit's templates, which escape.
+    [template_env_symbols] are the symbols those types mention: they are
+    rewritten with the same metadata as the keys, so that the keys' types still
+    refer to them rather than to copies. *)
 val rewrite_typing_env :
   rewrite_context ->
   unit_symbol:Symbol.t ->
   template_keys:Symbol.Set.t ->
+  template_env_symbols:Symbol.Set.t ->
   typing_env ->
   typing_env
 
