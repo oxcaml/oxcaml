@@ -26,7 +26,7 @@
 (function "cmp" (i: int j: int)
   (- i j))
 
-(function "quick" (lo: int hi: int a: val cmp: val)
+(function "quick" (lo: int hi: int a: val cmp: code_pointer)
   (if (< lo hi)
       (letmut (i int lo
                j int hi
@@ -52,9 +52,9 @@
         (let temp (intaref a i)
              (intaset a i (intaref a hi))
              (intaset a hi temp))
-        (app "quick" lo (- i 1) a cmp unit)
-        (app "quick" (+ i 1) hi a cmp unit))
+        (app "quick":code_pointer lo (- i 1) a cmp unit)
+        (app "quick":code_pointer (+ i 1) hi a cmp unit))
     []))
 
 (function "quicksort" (lo: int hi: int a: val)
-  (app "quick" lo hi a "cmp" unit))
+  (app "quick":code_pointer lo hi a "cmp":code_pointer unit))

@@ -149,7 +149,10 @@ let bigstring_prefetch ~is_write locality args dbg =
       bind "index" arg2 (fun idx ->
           bind "ba" arg1 (fun ba ->
               bind "ba_data"
-                (Cop (mk_load_mut Word_int, [field_address ba 1 dbg], dbg))
+                (Cop
+                   ( mk_load_mut Word_out_of_heap_data_pointer,
+                     [field_address ba 1 dbg],
+                     dbg ))
                 (fun ba_data ->
                   (* pointer to element "idx" of "ba" of type (char,
                      int8_unsigned_elt, c_layout) Bigarray.Array1.t is simply
@@ -190,7 +193,9 @@ let bigstring_cas size (arg1, arg2, arg3, arg4) dbg =
                   bind "bs" arg1 (fun bs ->
                       bind "bs_data"
                         (Cop
-                           (mk_load_mut Word_int, [field_address bs 1 dbg], dbg))
+                           ( mk_load_mut Word_out_of_heap_data_pointer,
+                             [field_address bs 1 dbg],
+                             dbg ))
                         (fun bs_data ->
                           bind "dst" (add_int bs_data idx dbg) (fun dst ->
                               tag_int
@@ -219,7 +224,10 @@ let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
           bind "idx" arg2 (fun idx ->
               bind "bs" arg1 (fun bs ->
                   bind "bs_data"
-                    (Cop (mk_load_mut Word_int, [field_address bs 1 dbg], dbg))
+                    (Cop
+                       ( mk_load_mut Word_out_of_heap_data_pointer,
+                         [field_address bs 1 dbg],
+                         dbg ))
                     (fun bs_data ->
                       bind "dst" (add_int bs_data idx dbg) (fun dst ->
                           Cop (op, [src; dst], dbg)))))))

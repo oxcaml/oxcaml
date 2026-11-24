@@ -810,7 +810,8 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
             then None
             else
               Some
-                (Cmm.global_symbol ~ty:Cmm.typ_int (Primitive.native_name prim)))
+                (Cmm.global_symbol ~ty:Cmm.typ_code_pointer
+                   (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
   emit_end_assembly ~sourcefile ()
 
