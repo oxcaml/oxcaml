@@ -96,7 +96,8 @@
    the environment, and that of [h]'s calls [g]'s code directly, although each
    application of [F] has its own [g] closure. [Env_types_lib] exports these
    types, so this unit's instantiations do the same, and the code of [h]'s
-   instantiation is shared by [use_h1] and [use_h2].
+   instantiation is shared by [use_h1] and [use_h2]. In classic mode, closure
+   conversion does the same using the approximations of the environments.
 
    The other runs compile the two units at different optimisation levels, with
    and without the reaper. *)

@@ -1,14 +1,13 @@
-(let code inline(never) size(8)
+(let code inline(never) size(5)
        `Env_types_lib/top/0_value_or_null` (`closure` : val, x)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val * val =
-   (let Pmixedfield = %block_load.[`0`] (`closure`) in
-    apply &my_alloc_region Pmixedfield (1) -> k3 * k2)
+   apply direct(f_3 &my_alloc_region)  (1) -> k3 * k2
      where k3 (apply_result : imm tagged) =
        cont k1 (apply_result, x)
  in
- let code inline(never) size(18)
+ let code inline(never) size(13)
        `Env_types_lib/h/2_value_or_null` (`closure` : val, x)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
@@ -17,10 +16,10 @@
    let Pfield = %block_load.[`0`] (Pmixedfield) in
    (let Pmixedfield_1 = %block_load.`imm`.[`3`] (`closure`) in
     let Pmixedfield_2 = %block_load.[`2`] (`closure`) in
-    apply &my_alloc_region Pmixedfield_2 (Pmixedfield_1) -> k4 * k2)
+    apply direct(g_4 &my_alloc_region)
+      (Pmixedfield_2 : _ -> imm tagged) (Pmixedfield_1) -> k4 * k2)
      where k4 (apply_result : imm tagged) =
-       let Pmixedfield_1 = %block_load.[`0`] (`closure`) in
-       apply &my_alloc_region Pmixedfield_1 (apply_result) -> k3 * k2
+       apply direct(f_3 &my_alloc_region)  (apply_result) -> k3 * k2
      where k3 (apply_result : imm tagged) =
        cont k1 (apply_result, x, Pfield)
  in
