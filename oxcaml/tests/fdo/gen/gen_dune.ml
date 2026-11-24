@@ -1,8 +1,5 @@
-(* Generates dune.inc, the rules of the FDO tests. A unit test is an executable
-   whose output is compared with [<name>.output]. A dump test compiles sources
-   with dumps, reads their FDO annotations with [fdo_annotations.exe], and
-   compares its output with [<name>.output]. After changing this file, run the
-   tests and promote dune.inc. *)
+(* Generates dune.inc, the rules of the FDO tests. After changing this file, run
+   the tests and promote dune.inc. *)
 
 (* {2 S-expressions, printed in the style of dune files} *)
 
@@ -60,13 +57,16 @@ type test =
   | Unit of
       { name : string;
         libraries : string
-      }
+      }  (** An executable whose output is compared with [<name>.output]. *)
   | Dumps of
       { name : string;
         compiles : compile list;
         steps : step list;
         linux_only : bool
       }
+      (** Compiles sources with dumps, reads their FDO annotations with
+          [fdo_annotations.exe], and compares its output with [<name>.output].
+      *)
   | Codegen of
       { sources : string list;
         configs : string list
