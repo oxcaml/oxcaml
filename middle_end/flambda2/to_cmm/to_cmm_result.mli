@@ -30,7 +30,7 @@ type t
 val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
-val symbol : t -> ty:Cmm.machtype -> Symbol.t -> Cmm.symbol
+val symbol : t -> Symbol.t -> Cmm.symbol
 
 (** Produce the Cmm function symbol for a piece of code. *)
 val symbol_of_code_id :

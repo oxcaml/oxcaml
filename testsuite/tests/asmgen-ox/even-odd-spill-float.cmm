@@ -17,8 +17,8 @@
          (seq
            (extcall "printf_int" "format_odd" v unit)
            (let v2 (- v 1)
-             (app "force_spill" 0 int)
-             (app "force_spill_float" 0.0 float)
+             (app "force_spill":code_pointer 0 int)
+             (app "force_spill_float":code_pointer 0.0 float)
              (exit even v2 (+f 1.0 f)))))
    and (even v:val f:float)
      (if (== v 0) f

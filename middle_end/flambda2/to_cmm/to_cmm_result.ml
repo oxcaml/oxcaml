@@ -67,14 +67,14 @@ let raw_symbol res ~global:(sym_global : Cmm.is_global) ~ty sym_name :
         sym_name Printcmm.machtype sym.sym_type Printcmm.machtype ty;
     res, sym
 
-let symbol res ~ty sym =
+let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let s : Cmm.symbol =
     if
       Current_unit.is_current (Symbol.compilation_unit sym)
       && not (Name_occurrences.mem_symbol res.reachable_names sym)
-    then Cmm.local_symbol ~ty sym_name
-    else Cmm.global_symbol ~ty sym_name
+    then Cmm.local_symbol ~ty:Cmm.typ_static_block sym_name
+    else Cmm.global_symbol ~ty:Cmm.typ_static_block sym_name
   in
   s
 
@@ -93,8 +93,8 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   if
     Current_unit.is_current (Code_id.get_compilation_unit code_id)
     && not (Name_occurrences.mem_code_id res.reachable_names code_id)
-  then Cmm.local_symbol ~ty:Cmm.typ_int sym_name
-  else Cmm.global_symbol ~ty:Cmm.typ_int sym_name
+  then Cmm.local_symbol ~ty:Cmm.typ_code_pointer sym_name
+  else Cmm.global_symbol ~ty:Cmm.typ_code_pointer sym_name
 
 (* *)
 
@@ -164,7 +164,7 @@ let define_module_symbol_if_missing r =
     let linkage_name =
       Linkage_name.to_string (Symbol.linkage_name r.module_symbol)
     in
-    let sym = Cmm.global_symbol ~ty:Cmm.typ_int linkage_name in
+    let sym = Cmm.global_symbol ~ty:Cmm.typ_static_block linkage_name in
     let l = C.emit_block sym (C.black_block_header 0 0) [] in
     set_data r l
 
@@ -196,6 +196,6 @@ let to_cmm r =
   in
   let function_phrases = List.map (fun f -> C.cfunction f) sorted_functions in
   (* Translate roots to Cmm symbols *)
-  let roots = List.map (symbol r ~ty:Cmm.typ_int) r.gc_roots in
+  let roots = List.map (symbol r) r.gc_roots in
   (* Return the data list, gc roots and function declarations *)
   { data_items = r.data_list; gc_roots = roots; functions = function_phrases }
