@@ -1,37 +1,25 @@
 (* Generates dune.inc, the rules of the FDO tests. After changing this file, run
    the tests and promote dune.inc. *)
 
-(* {2 S-expressions, printed in the style of dune files} *)
+(* {2 S-expressions} *)
 
 type sexp =
   | Atom of string
   | List of sexp list
 
-let rec flat = function
-  | Atom s -> s
-  | List l -> "(" ^ String.concat " " (List.map flat l) ^ ")"
-
-let margin = 80
-
-(* A list is on one line if it fits, else its first element is on the line of
-   the parenthesis and each other element on a line of its own. *)
-let rec print buf ~indent sexp =
-  let line = flat sexp in
-  match sexp with
-  | Atom _ -> Buffer.add_string buf line
-  | List _ when indent + String.length line <= margin ->
-    Buffer.add_string buf line
-  | List [] -> Buffer.add_string buf "()"
-  | List (first :: rest) ->
-    Buffer.add_char buf '(';
-    print buf ~indent:(indent + 1) first;
-    List.iter
-      (fun sexp ->
-        Buffer.add_char buf '\n';
-        Buffer.add_string buf (String.make (indent + 1) ' ');
-        print buf ~indent:(indent + 1) sexp)
-      rest;
-    Buffer.add_char buf ')'
+(* A list is on one line if it fits. Else, a list of atoms fills its lines, and
+   any other list has its first element on the line of the parenthesis and each
+   other element on a line of its own. *)
+let rec print ppf = function
+  | Atom s -> Format.pp_print_string ppf s
+  | List l ->
+    let all_atoms =
+      List.for_all (function Atom _ -> true | List _ -> false) l
+    in
+    Format.fprintf ppf
+      (if all_atoms then "@[<hov 1>(%a)@]" else "@[<hv 1>(%a)@]")
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print)
+      l
 
 let atom s = Atom s
 
@@ -50,7 +38,7 @@ type compile =
 let compile ?output flags source = { flags; output; source }
 
 type step =
-  | Annotations of string list  (** A command of [fdo_annotations.exe]. *)
+  | Annotations of string list  (** A command of [tools/fdo_annotations.exe]. *)
   | Cat of string
 
 type test =
@@ -65,13 +53,14 @@ type test =
         linux_only : bool
       }
       (** Compiles sources with dumps, reads their FDO annotations with
-          [fdo_annotations.exe], and compares its output with [<name>.output].
-      *)
+          [tools/fdo_annotations.exe], and compares its output with
+          [<name>.output]. *)
   | Codegen of
       { sources : string list;
-        configs : string list
-      }  (** See codegen.sh. *)
-  | Annotations_exe
+        configs : (string * string list) list
+      }
+      (** Compiles each source with each named set of flags, with and without
+          counters, and checks that the code is the same. *)
 
 let enabled_if ~linux_only =
   let main = List (atoms ["="; "%{context_name}"; "\"main\""]) in
@@ -88,11 +77,26 @@ let diff ~linux_only name =
       field "deps" (atoms [output; corrected]);
       field "action" [field "diff" (atoms [output; corrected])] ]
 
+let compile_action { flags; output; source } =
+  let run =
+    field "run"
+      (atoms
+         (["%{bin:ocamlopt.opt}"; "-c"]
+         @ flags @ ["-color"; "never"]
+         @ (match output with None -> [] | Some output -> ["-o"; output])
+         @ [source]))
+  in
+  (* The dumps are read from next to the .cmx files, so OCAMLPARAM is cleared:
+     CI's metrics job sets dump-dir in it, which moves them. *)
+  if List.mem "-dump-into-file" flags
+  then field "setenv" [Atom "OCAMLPARAM"; Atom "\"\""; run]
+  else run
+
+let mkdir = function
+  | [] -> []
+  | dirs -> [field "run" (atoms ("mkdir" :: "-p" :: dirs))]
+
 let stanzas = function
-  | Annotations_exe ->
-    [ field "executable"
-        [ field "name" [Atom "fdo_annotations"];
-          field "modules" [Atom "fdo_annotations"] ] ]
   | Unit { name; libraries } ->
     [ field "executable"
         [ field "name" [Atom name];
@@ -106,22 +110,43 @@ let stanzas = function
                   field "run" [Atom ("./" ^ name ^ ".exe")] ] ] ];
       diff ~linux_only:false name ]
   | Codegen { sources; configs } ->
-    let quote s = Atom ("\"" ^ s ^ "\"") in
-    [ field "rule"
-        [ field "targets" [Atom "codegen.output.corrected"];
-          field "deps" (atoms ("codegen.sh" :: sources));
-          enabled_if ~linux_only:true;
-          field "action"
-            [ field "with-stdout-to"
-                [ Atom "codegen.output.corrected";
-                  field "setenv"
-                    [ Atom "OCAMLPARAM";
-                      Atom "\"\"";
-                      field "run"
-                        (atoms ["bash"; "codegen.sh"; "%{bin:ocamlopt.opt}"]
-                        @ List.map quote configs
-                        @ (Atom "--" :: atoms sources)) ] ] ] ];
-      diff ~linux_only:true "codegen" ]
+    List.concat_map
+      (fun (config, flags) ->
+        List.concat_map
+          (fun source ->
+            let module_ = Filename.chop_extension source in
+            let dir counters = "codegen_" ^ config ^ "_" ^ counters in
+            let code counters =
+              String.concat "." [module_; config; counters; "code"]
+            in
+            let build counters counter_flags =
+              let output ext = dir counters ^ "/" ^ module_ ^ ext in
+              [ compile_action
+                  (compile ~output:(output ".cmx") (flags @ counter_flags)
+                     source);
+                field "with-stdout-to"
+                  [ Atom (code counters);
+                    field "pipe-stdout"
+                      [ field "run" (atoms ["objdump"; "-dr"; output ".o"]);
+                        field "run" [Atom "%{dep:tools/filter_objdump.sh}"] ] ]
+              ]
+            in
+            [ field "rule"
+                [ field "targets" (atoms [code "without"; code "with"]);
+                  field "deps" [Atom source];
+                  enabled_if ~linux_only:true;
+                  field "action"
+                    [ field "progn"
+                        (mkdir [dir "without"; dir "with"]
+                        @ build "without" []
+                        @ build "with" ["-fdo-counters"]) ] ];
+              field "rule"
+                [ field "alias" [Atom "runtest"];
+                  enabled_if ~linux_only:true;
+                  field "action"
+                    [field "diff" (atoms [code "without"; code "with"])] ] ])
+          sources)
+      configs
   | Dumps { name; compiles; steps; linux_only } ->
     let dedup l =
       List.rev
@@ -139,24 +164,9 @@ let stanzas = function
              | Some dir -> Some dir)
            compiles)
     in
-    let compile { flags; output; source } =
-      let run =
-        field "run"
-          (atoms
-             (["%{bin:ocamlopt.opt}"; "-c"]
-             @ flags @ ["-color"; "never"]
-             @ (match output with None -> [] | Some output -> ["-o"; output])
-             @ [source]))
-      in
-      (* The dumps are read from next to the .cmx files, so OCAMLPARAM is
-         cleared: CI's metrics job sets dump-dir in it, which moves them. *)
-      if List.mem "-dump-into-file" flags
-      then field "setenv" [Atom "OCAMLPARAM"; Atom "\"\""; run]
-      else run
-    in
     let step = function
       | Annotations args ->
-        field "run" (atoms ("./fdo_annotations.exe" :: args))
+        field "run" (atoms ("%{exe:tools/fdo_annotations.exe}" :: args))
       | Cat file -> field "run" (atoms ["cat"; file])
     in
     let steps =
@@ -164,18 +174,14 @@ let stanzas = function
       | [step] -> step
       | steps -> field "progn" steps
     in
-    let mkdir =
-      match dirs with
-      | [] -> []
-      | dirs -> [field "run" (atoms ("mkdir" :: "-p" :: dirs))]
-    in
     [ field "rule"
         [ field "targets" [Atom (name ^ ".output.corrected")];
-          field "deps" (atoms (sources @ ["fdo_annotations.exe"]));
+          field "deps" (atoms sources);
           enabled_if ~linux_only;
           field "action"
             [ field "progn"
-                (mkdir @ List.map compile compiles
+                (mkdir dirs
+                @ List.map compile_action compiles
                 @ [ field "with-stdout-to"
                       [Atom (name ^ ".output.corrected"); steps] ]) ] ];
       diff ~linux_only name ]
@@ -243,7 +249,6 @@ let tests =
     unit "cfg_to_linear_counters";
     unit "branch_relaxation_counters";
     unit "merge_blocks_counters";
-    Annotations_exe;
     dumps "function_ids"
       [ fexpr ~pass:"raw" "function_ids.ml";
         fexpr ~output:"function_ids.edited.cmx" ~pass:"raw"
@@ -378,15 +383,18 @@ let tests =
             "to_cmm_probe.ml";
             "to_cmm_reaper.ml" ];
         configs =
-          [""; "-O3"; "-use-ssa"; "-O3 -use-ssa"; "-O3 -cfg-merge-blocks"]
+          [ "default", [];
+            "o3", ["-O3"];
+            "ssa", ["-use-ssa"];
+            "o3_ssa", ["-O3"; "-use-ssa"];
+            "o3_merge_blocks", ["-O3"; "-cfg-merge-blocks"] ]
       } ]
 
 let () =
-  let buf = Buffer.create 65536 in
-  List.iteri
-    (fun i stanza ->
-      if i > 0 then Buffer.add_char buf '\n';
-      print buf ~indent:0 stanza;
-      Buffer.add_char buf '\n')
-    (List.concat_map stanzas tests);
-  print_string (Buffer.contents buf)
+  (* Format breaks lines that reach the margin. *)
+  Format.set_margin 81;
+  Format.printf "@[<v>%a@]@."
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
+       print)
+    (List.concat_map stanzas tests)
