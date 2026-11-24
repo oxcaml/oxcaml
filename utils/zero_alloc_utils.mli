@@ -28,6 +28,7 @@ module Tag : sig
     | NormalReturn
     | Exception
     | Diverge
+
   type tag := t (* for scoping inside [Nonempty_set] *)
 
   val all : t list
@@ -136,38 +137,23 @@ module Allocation_source : sig
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
   val compare :
-    compare_args:('args -> 'args -> int) ->
-    'args t ->
-    'args t ->
-    int
+    compare_args:('args -> 'args -> int) -> 'args t -> 'args t -> int
 
   val lessequal :
-    lessequal_args:('args -> 'args -> bool) ->
-    'args t ->
-    'args t ->
-    bool
+    lessequal_args:('args -> 'args -> bool) -> 'args t -> 'args t -> bool
 
   val join :
-    join_args:('args -> 'args -> 'args) ->
-    'args t ->
-    'args t ->
-    'args t
+    join_args:('args -> 'args -> 'args) -> 'args t -> 'args t -> 'args t
 
   val meet :
-    meet_args:('args -> 'args -> 'args) ->
-    'args t ->
-    'args t ->
-    'args t
+    meet_args:('args -> 'args -> 'args) -> 'args t -> 'args t -> 'args t
 
   val allocates_other_than_calling_arguments : 'args t -> bool
 
   val top : 'args t
 
   val print :
-    (Format.formatter -> 'args -> unit) ->
-    Format.formatter ->
-    'args t ->
-    unit
+    (Format.formatter -> 'args -> unit) -> Format.formatter -> 'args t -> unit
 end
 
 (** Abstract domain used in static analysis for checking [@zero_alloc]
@@ -256,8 +242,7 @@ module Make_value
 
   val meet : t -> t -> t
 
-  val top :
-    allocation_source:Allocation_source.t -> witnesses:Witnesses.t -> t
+  val top : allocation_source:Allocation_source.t -> witnesses:Witnesses.t -> t
 
   val bot : t
 

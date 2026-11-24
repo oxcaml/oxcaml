@@ -239,15 +239,13 @@ end = struct
 
   let create name tag = { name; tag }
 
-  let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%a@ " name Tag.print tag
+  let print ppf { name; tag } = Format.fprintf ppf "%s.%a@ " name Tag.print tag
 end
 
 module Top = struct
   type t =
     { allocation_source :
-        Relevant_components_by_argument_index.t
-        Allocation_source.t;
+        Relevant_components_by_argument_index.t Allocation_source.t;
       witnesses : Witnesses.t
     }
 
@@ -255,24 +253,21 @@ module Top = struct
       { allocation_source = a2; witnesses = w2 } =
     let c =
       Allocation_source.compare
-        ~compare_args:Relevant_components_by_argument_index.compare
-        a1 a2
+        ~compare_args:Relevant_components_by_argument_index.compare a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
 
   let lessequal { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
     Allocation_source.lessequal
-      ~lessequal_args:Relevant_components_by_argument_index.lessequal
-      a1 a2
+      ~lessequal_args:Relevant_components_by_argument_index.lessequal a1 a2
     && Witnesses.lessequal w1 w2
 
   let join { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
     { allocation_source =
         Allocation_source.join
-          ~join_args:Relevant_components_by_argument_index.join
-          a1 a2;
+          ~join_args:Relevant_components_by_argument_index.join a1 a2;
       witnesses = Witnesses.join w1 w2
     }
 
@@ -280,8 +275,7 @@ module Top = struct
       { allocation_source = a2; witnesses = w2 } =
     { allocation_source =
         Allocation_source.meet
-          ~meet_args:Relevant_components_by_argument_index.meet
-          a1 a2;
+          ~meet_args:Relevant_components_by_argument_index.meet a1 a2;
       witnesses = Witnesses.meet w1 w2
     }
 
@@ -346,8 +340,7 @@ end = struct
   let pp_top ~witnesses ppf ({ allocation_source; witnesses = w } : Top.t) =
     Format.fprintf ppf "(top %a%a)"
       (Allocation_source.print Relevant_components_by_argument_index.print)
-        allocation_source
-      (pp_w ~witnesses) w
+      allocation_source (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
   module Vars : sig
@@ -559,8 +552,7 @@ end = struct
       | Args vars ->
         Format.fprintf ppf "(transform:@.%a)@." (Vars.print ~witnesses) vars
       | Args_with_top { top; vars } ->
-        Format.fprintf ppf "(transform:@.%a@.%a)@."
-          (pp_top ~witnesses) top
+        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses) top
           (Vars.print ~witnesses) vars
   end
 
@@ -888,7 +880,7 @@ end = struct
       if
         (not (Args.has_witnesses args))
         && Allocation_source.allocates_other_than_calling_arguments
-            top.allocation_source
+             top.allocation_source
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
@@ -1201,9 +1193,9 @@ end = struct
     | (Resolved (Top w) as top), Var { var; witnesses }
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
-        Witnesses.is_empty witnesses &&
-        Allocation_source.allocates_other_than_calling_arguments
-          w.allocation_source
+        Witnesses.is_empty witnesses
+        && Allocation_source.allocates_other_than_calling_arguments
+             w.allocation_source
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1300,10 +1292,10 @@ end = struct
       bounded_join (Join.distribute_transform_over_join j tr)
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
-        (Join.has_safe j || Option.is_some (Join.get_top j)) &&
-        (not (Join.has_witnesses j)) &&
-        Allocation_source.allocates_other_than_calling_arguments
-          w.allocation_source
+        (Join.has_safe j || Option.is_some (Join.get_top j))
+        && (not (Join.has_witnesses j))
+        && Allocation_source.allocates_other_than_calling_arguments
+             w.allocation_source
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
@@ -1429,17 +1421,17 @@ end
 
 module Allocation_source :
   Allocation_source
-    with type t =
-      (Relevant_components_by_argument_index.t Allocation_source.t) = struct
+    with type t = Relevant_components_by_argument_index.t Allocation_source.t =
+struct
   type t = Relevant_components_by_argument_index.t Allocation_source.t
 
-  let top =
-    Allocation_source.Allocation_other_than_calling_arguments
+  let top = Allocation_source.Allocation_other_than_calling_arguments
 
   let argument ~argument_index ~tag :
       Relevant_components_by_argument_index.t Allocation_source.t =
-    (Allocation_source.No_allocation_other_than_calling_arguments
-      (Numbers.Int.Map.singleton argument_index (Tag.Nonempty_set.singleton tag)))
+    Allocation_source.No_allocation_other_than_calling_arguments
+      (Numbers.Int.Map.singleton argument_index
+         (Tag.Nonempty_set.singleton tag))
 end
 
 module T = Make_value (Allocation_source) (Witnesses) (V)
@@ -1496,8 +1488,7 @@ end = struct
     Components.map ~f:(fun _ignore_tag -> V.replace_witnesses w)
 
   let attribute_to_call_site w =
-    Components.map ~f:(fun _ignore_tag ->
-        V.attribute_to_call_site w)
+    Components.map ~f:(fun _ignore_tag -> V.attribute_to_call_site w)
 
   let diff_witnesses ~expected ~actual =
     Components.map2
@@ -1704,8 +1695,7 @@ end = struct
       Some v
 
   let assume_value_unless_inferred dbg w =
-    if
-      Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+    if Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
     then None
     else assume_value dbg ~can_raise:false w
 end
@@ -2148,7 +2138,7 @@ end = struct
     V.match_with v
       ~resolved:
         (Component.map ~f:(fun ({ allocation_source; witnesses = _ } : Top.t) ->
-           allocation_source))
+             allocation_source))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2771,8 +2761,7 @@ end = struct
             match Metadata.assume_value_unless_inferred dbg witnesses with
             | Some effect_ -> effect_
             | None ->
-              { nor =
-                  V.top ~allocation_source:Allocation_source.top ~witnesses;
+              { nor = V.top ~allocation_source:Allocation_source.top ~witnesses;
                 exn = V.bot;
                 div = V.bot
               }

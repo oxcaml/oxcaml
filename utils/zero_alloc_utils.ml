@@ -127,10 +127,7 @@ module Components = struct
 
   let of_nonempty_set t = t
 
-  let to_nonempty_set t =
-    if t.nor || t.exn || t.div
-    then Some t
-    else None
+  let to_nonempty_set t = if t.nor || t.exn || t.div then Some t else None
 
   let print print_component ppf { nor; exn; div } =
     Format.fprintf ppf "@[<hv 2>{ nor = %a;@ exn = %a;@ div = %a }@]"
@@ -138,7 +135,10 @@ module Components = struct
 end
 
 module Tag = struct
-  type t = tag = NormalReturn | Exception | Diverge
+  type t = tag =
+    | NormalReturn
+    | Exception
+    | Diverge
 
   let all = [NormalReturn; Exception; Diverge]
 
@@ -159,16 +159,16 @@ module Tag = struct
     let lessequal = Components.lessequal (fun r1 r2 -> (not r1) || r2)
 
     let union (lhs : t) (rhs : t) : t =
-      { nor = lhs.nor || rhs.nor
-      ; exn = lhs.exn || rhs.exn
-      ; div = lhs.div || rhs.div
+      { nor = lhs.nor || rhs.nor;
+        exn = lhs.exn || rhs.exn;
+        div = lhs.div || rhs.div
       }
 
     let intersection (lhs : t) (rhs : t) : t option =
       let unchecked : t =
-        { nor = lhs.nor && rhs.nor
-        ; exn = lhs.exn && rhs.exn
-        ; div = lhs.div && rhs.div
+        { nor = lhs.nor && rhs.nor;
+          exn = lhs.exn && rhs.exn;
+          div = lhs.div && rhs.div
         }
       in
       if unchecked.nor || unchecked.exn || unchecked.div
@@ -290,8 +290,8 @@ module Allocation_source = struct
       Format.fprintf ppf "Allocation_other_than_calling_arguments"
     | No_allocation_other_than_calling_arguments args ->
       Format.fprintf ppf
-        "@[<hv 1>No_allocation_other_than_calling_arguments@ %a@]"
-        print_args args
+        "@[<hv 1>No_allocation_other_than_calling_arguments@ %a@]" print_args
+        args
 end
 
 module type WS = sig

@@ -50,7 +50,7 @@ module Encoded = struct
     let decode_arguments arguments : Relevant_components_by_argument_index.t =
       arguments
       |> List.mapi (fun i bits -> i, unpack_relevant_components bits)
-      |> List.filter_map (fun (i, opt) -> Option.map (fun set -> (i, set)) opt)
+      |> List.filter_map (fun (i, opt) -> Option.map (fun set -> i, set) opt)
       |> Numbers.Int.Map.of_list
 
     let encode = Component.map ~f:(Allocation_source.map ~f:encode_arguments)
@@ -60,8 +60,7 @@ module Encoded = struct
     let compare =
       Component.compare
         ~compare_top:
-          (Allocation_source.compare
-             ~compare_args:(List.compare Int.compare))
+          (Allocation_source.compare ~compare_args:(List.compare Int.compare))
   end
 
   module Components = struct
@@ -98,8 +97,8 @@ module Encoded = struct
         Unconditional (pack ~bits_per_component:2 { nor; exn; div })
       | _, _, _ -> Conditional encoded
 
-    let decode ~(decode_component : Component.t -> 'a) (t : t) :
-        'a Components.t =
+    let decode ~(decode_component : Component.t -> 'a) (t : t) : 'a Components.t
+        =
       let encoded : Component.t Components.t =
         match t with
         | Unconditional tags ->
@@ -111,9 +110,9 @@ module Encoded = struct
           decode_component component)
 
     let all_top : t =
-      (Components.create (fun _ignore_tag ->
-         Zero_alloc_utils.Component.Top
-           Allocation_source.Allocation_other_than_calling_arguments))
+      Components.create (fun _ignore_tag ->
+          Zero_alloc_utils.Component.Top
+            Allocation_source.Allocation_other_than_calling_arguments)
       |> encode ~encode_component:Component.encode
 
     let equal (t1 : t) (t2 : t) =
