@@ -131,8 +131,12 @@ let adjust_code_metadata t code_id code_metadata =
   let code_metadata =
     if returns_local t code_id
     then
+      (* The result types may say that the values returned are allocated on the
+         heap, which is no longer the case. *)
       with_nlocal_at_least 1
-        (Code_metadata.with_result_mode Lambda.maybe_alloc_stack code_metadata)
+        (Code_metadata.with_result_types Unknown
+           (Code_metadata.with_result_mode Lambda.maybe_alloc_stack
+              code_metadata))
     else code_metadata
   in
   if is_local_closure_code t code_id

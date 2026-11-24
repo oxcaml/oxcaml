@@ -2192,7 +2192,7 @@ and rebuild_function_params_and_body env res code_metadata
   let code_id = Code_metadata.code_id code_metadata in
   let my_alloc_mode, escape =
     Escape_rebuild.enter_function env.escape ~code_id ~return_continuation
-      ~my_alloc_mode body
+      ~exn_continuation ~my_alloc_mode body
   in
   let env = { env with escape } in
   let updating_calling_convention =

@@ -47,6 +47,15 @@ let function_env acc ~code_id ~is_opaque
     ~return_continuation ~exn_continuation =
   let graph = graph acc in
   let scope = Code_id_or_name.code_id code_id in
+  (match Acc.find_code_dep acc code_id with
+  | None -> ()
+  | Some { code_metadata; _ } ->
+    Escape_graph.add_code_arity graph code_id
+      ~num_params:
+        (if Code_metadata.is_tupled code_metadata
+         then 1
+         else
+           Flambda_arity.num_params (Code_metadata.params_arity code_metadata)));
   Escape_graph.add_scope_exit graph ~scope ~param:exn;
   List.iter
     (fun result -> Escape_graph.add_return_of graph ~scope ~result)
@@ -127,9 +136,20 @@ let record_call_results denv acc apply ~return_args =
 
 let record_tail_call denv acc apply =
   let escape = Env.escape denv in
-  match Apply.continuation apply, Apply.position apply with
-  | Return k, Normal
-    when Continuation.equal k (Escape_env.return_continuation escape) ->
+  let is_tail_call =
+    match Apply.continuation apply, Apply.position apply with
+    | Return k, Normal ->
+      Continuation.equal k (Escape_env.return_continuation escape)
+    | Never_returns, Normal ->
+      (* An application that does not return is a tail call too, unless an
+         exception it raises is handled in the function. *)
+      Continuation.equal
+        (Exn_continuation.exn_handler (Apply.exn_continuation apply))
+        (Escape_env.exn_continuation escape)
+    | (Return _ | Never_returns), Nontail -> false
+  in
+  if is_tail_call
+  then (
     (* Tail call: the regions of the enclosing scopes are closed before it, so
        that it remains a tail call (see [Escape_rebuild]); hence no local value
        may be passed to it. This is the same restriction as the one imposed by
@@ -154,8 +174,20 @@ let record_tail_call denv acc apply =
       (fun scope ->
         List.iter (add_sink scope) (Apply.args apply);
         Option.iter (add_sink scope) (Apply.callee apply))
-      (Escape_env.enclosing_region_scopes escape)
-  | Return _, (Normal | Nontail) | Never_returns, _ -> ()
+      (Escape_env.enclosing_region_scopes escape);
+    (* See [Escape_analysis.tail_over_applied_code]. *)
+    match Apply.call_kind apply, Apply.callee apply with
+    | Function { function_call = Indirect_unknown_arity; _ }, Some callee ->
+      Simple.pattern_match' callee
+        ~const:(fun _ -> ())
+        ~symbol:(fun _ ~coercion:_ -> ())
+        ~var:(fun callee ~coercion:_ ->
+          Escape_graph.add_tail_callee graph callee
+            ~num_args:(Flambda_arity.num_params (Apply.args_arity apply)))
+    | Function { function_call = Indirect_unknown_arity; _ }, None
+    | Function { function_call = Direct _ | Indirect_known_arity _; _ }, _
+    | (Method _ | C_call _ | Effect _), _ ->
+      ())
 
 let record_apply denv acc apply ~return_args =
   if enabled acc

@@ -156,6 +156,20 @@ val scope_contains_continuation :
     the recursive [Let_cont] binding the given continuation. *)
 val add_recursive_scope : t -> Continuation.t -> scope:Variable.t -> unit
 
+(** Record an unknown-arity application of [callee] to [num_args] arguments in
+    tail position. *)
+val add_tail_callee : t -> Variable.t -> num_args:int -> unit
+
+(** The callees recorded by [add_tail_callee], with the greatest number of
+    arguments they are applied to. *)
+val tail_callees : t -> int Code_id_or_name.Map.t
+
+(** Record the number of parameters of a function, as seen by the generic
+    application functions (1 for a tupled function). *)
+val add_code_arity : t -> Code_id.t -> num_params:int -> unit
+
+val code_arity : t -> Code_id.t -> int option
+
 (** The dummy variable recorded by [add_recursive_scope], if any. *)
 val recursive_scope : t -> Continuation.t -> Variable.t option
 

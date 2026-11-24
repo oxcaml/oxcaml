@@ -145,6 +145,8 @@ type enabled =
     (* The return continuation of the enclosing function, if any: applications
        returning to it are tail calls. *)
     return_continuation : Continuation.t option;
+    (* Its exception continuation. *)
+    exn_continuation : Continuation.t option;
     (* The regions of the enclosing region scopes being rebuilt, innermost
        first. *)
     regions : region list;
@@ -176,6 +178,7 @@ let create graph ~is_unboxed ~allocation_is_kept ~code_ids_directly_called
         continuation_info;
         machine_width;
         return_continuation = None;
+        exn_continuation = None;
         regions = [];
         exclave = None;
         block = None;
@@ -509,21 +512,26 @@ let end_regions t regions (body : RE.t) : RE.t =
    parent. *)
 let begin_regions t ({ region; ghost_region; has_ghost_region; _ } as opened)
     (body : RE.t) : RE.t =
-  let rec parent regions =
+  let rec enclosing regions =
     match regions with
-    | [] -> None
-    | region :: regions -> (
-      if region != opened
-      then parent regions
-      else match regions with [] -> None | parent :: _ -> Some parent)
+    | [] -> []
+    | region :: regions ->
+      if region != opened then enclosing regions else regions
   in
-  let parent = parent t.regions in
+  let enclosing = enclosing t.regions in
   let begin_region ~ghost region body =
+    (* Not all the enclosing regions have a ghost region. *)
     let parent =
-      Option.map
-        (fun { region; ghost_region; _ } ->
-          Simple.var (if ghost then ghost_region else region))
-        parent
+      if ghost
+      then
+        List.find_map
+          (fun { ghost_region; has_ghost_region; _ } ->
+            if has_ghost_region then Some (Simple.var ghost_region) else None)
+          enclosing
+      else
+        match enclosing with
+        | [] -> None
+        | { region; _ } :: _ -> Some (Simple.var region)
     in
     let begin_region : P.t =
       Variadic (Begin_region { ghost }, Option.to_list parent)
@@ -683,7 +691,28 @@ let rebuild_apply_in_regions t acc ~params_of_continuation apply ~rebuild :
   let apply = set_local_return_mode t apply in
   let expr : RE.t = rebuild apply in
   match Apply.continuation apply with
-  | Never_returns -> expr, acc
+  | Never_returns ->
+    (* An application that does not return is a tail call if an exception it
+       raises is not handled in the function: as for the other tail calls, the
+       regions are closed beforehand (see [Escape_traverse.record_apply]). *)
+    let is_tail_call =
+      Option.equal Continuation.equal
+        (Some (Exn_continuation.exn_handler (Apply.exn_continuation apply)))
+        t.exn_continuation
+      && match Apply.position apply with Normal -> true | Nontail -> false
+    in
+    if is_tail_call
+    then
+      ( end_regions t
+          (List.filter
+             (fun { scope; _ } ->
+               match scope with
+               | Callers_region _ -> false
+               | Scope _ | Before_exclave _ -> true)
+             t.regions)
+          expr,
+        acc )
+    else expr, acc
   | Return k -> (
     match regions_exited_by t k with
     | [] -> expr, acc
@@ -824,7 +853,7 @@ let leave_handler t acc cont body =
 (* A function returning at mode local allocates what it returns in its caller's
    region, which it must not close (see [Escape_analysis]); it may have a region
    of its own for the rest (see [Escape_exclave]). *)
-let enter_function t ~code_id ~return_continuation
+let enter_function t ~code_id ~return_continuation ~exn_continuation
     ~(my_alloc_mode : Alloc_mode.For_applications.t) body =
   match t with
   | Disabled -> my_alloc_mode, t
@@ -832,6 +861,7 @@ let enter_function t ~code_id ~return_continuation
     let t =
       { t with
         return_continuation = Some return_continuation;
+        exn_continuation = Some exn_continuation;
         regions = [];
         exclave = None;
         block = None

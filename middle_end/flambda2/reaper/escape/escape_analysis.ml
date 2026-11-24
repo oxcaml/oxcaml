@@ -185,6 +185,35 @@ let partial_argument_holder = rel2 "escape_partial_argument_holder" Cols.[n; n]
    unknown code. *)
 let code_with_unknown_closure = rel1 "escape_code_with_unknown_closure" Cols.[n]
 
+(* [code_has_heap_closure c]: some closure with code [c] is allocated on the
+   heap. The curry functions allocate the partial applications of a closure
+   according to the metadata of its code, which makes them local only if every
+   closure of the code is local: otherwise, all the closures of the code and all
+   their partial applications stay on the heap. A partial application treated as
+   local while it is allocated on the heap could point at the local stack
+   through the arguments it holds; one treated as heap-allocated while it is
+   allocated locally could outlive its region. *)
+let code_has_heap_closure = rel1 "escape_code_has_heap_closure" Cols.[n]
+
+(* [tail_over_applied_code c]: a candidate closure with code [c] may be the
+   callee of an unknown-arity application in tail position with more arguments
+   than the function has parameters, the function having several parameters.
+   Such an application goes through the generic application functions
+   ([caml_applyN]), which first apply the closure to its first argument, in a
+   region of their own: were the resulting partial application allocated
+   locally, they could no longer tail call the last function applied (see
+   [Cmm_helpers.apply_function_body]). The closures of such a code are thus kept
+   on the heap. Computed outside of Datalog, from the numbers of arguments and
+   parameters (see [add_tail_over_applications]). *)
+let tail_over_applied_code_tbl =
+  Schemas.N.create ~name:"escape_tail_over_applied_code"
+
+let tail_over_applied_code c = Datalog.atom tail_over_applied_code_tbl [c]
+
+let tail_callee_tbl = Schemas.N.create ~name:"escape_tail_callee"
+
+let tail_callee v = Datalog.atom tail_callee_tbl [v]
+
 (* [tail_edge f c]: the function [f] contains a known-arity application in tail
    position (an application whose result is the result of [f]; this includes the
    ones marked [@nontail]) whose callee may have code [c]. Only the functions
@@ -422,6 +451,14 @@ let candidate_rules =
          is_candidate r ]
        ==> contained_in x r) ]
 
+let closure_code_rules =
+  saturate_in_order
+    [ (let$ [x; wit; c] = ["x"; "wit"; "c"] in
+       [ constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+         ~~(is_candidate x) ]
+       ==> code_has_heap_closure c) ]
+
 (* When calling conventions may not be changed, no function may be made to
    return at mode local. *)
 let no_calling_convention_change_rules =
@@ -546,6 +583,22 @@ let scope_rules =
            ==> returned a s);
           (let$ [a; b] = ["a"; "b"] in
            [contained_in a b; escapes b] ==> escapes a);
+          (* See [code_has_heap_closure]. *)
+          (let$ [c] = ["c"] in
+           [tail_over_applied_code c] ==> code_has_heap_closure c);
+          (let$ [x; wit; c] = ["x"; "wit"; "c"] in
+           [ escapes x;
+             constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+             constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
+           ==> code_has_heap_closure c);
+          (let$ [x; wit; c] = ["x"; "wit"; "c"] in
+           [ is_candidate x;
+             constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+             constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+             code_has_heap_closure c ]
+           ==> escapes x);
+          (let$ [c; r] = ["c"; "r"] in
+           [code_has_heap_closure c; partial_result_of_code c r] ==> escapes r);
           (* Leaving a scope in whose region the value may be allocated. Driven
              by [in_region], which is small: the scope exits are then looked up
              in [candidate_source]. *)
@@ -607,6 +660,41 @@ let scopes_of_allocation =
     Cursor.fold_with_parameters scopes [a] db ~init:[] ~f:(fun [s] acc ->
         s :: acc)
 
+let add_tail_over_applications =
+  let callees =
+    query
+      (let$ [v; x; wit; c] = ["v"; "x"; "wit"; "c"] in
+       [ tail_callee v;
+         candidate_source v x;
+         constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
+       =>? [v; c])
+  in
+  fun graph db ->
+    let tail_callees = Escape_graph.tail_callees graph in
+    let db =
+      Datalog.set_table tail_callee_tbl
+        (Code_id_or_name.Map.fold
+           (fun callee _ table -> Schemas.N.add_or_replace [callee] () table)
+           tail_callees Schemas.N.empty)
+        db
+    in
+    let codes =
+      Cursor.fold callees db ~init:Schemas.N.empty ~f:(fun [v; c] codes ->
+          let num_args = Code_id_or_name.Map.find v tail_callees in
+          let over_applied =
+            Code_id_or_name.pattern_match c
+              ~code_id:(fun code_id ->
+                match Escape_graph.code_arity graph code_id with
+                | None -> true
+                | Some num_params -> num_params >= 2 && num_params < num_args)
+              ~symbol:(fun _ -> true)
+              ~var:(fun _ -> true)
+          in
+          if over_applied then Schemas.N.add_or_replace [c] () codes else codes)
+    in
+    Datalog.set_table tail_over_applied_code_tbl codes db
+
 let local_sources =
   let sources =
     query
@@ -656,7 +744,9 @@ let perform_analysis graph (unboxing : Unboxing_analysis.result) =
           then run (add_tail_cycles db) tail_cycle_rules
           else run db no_calling_convention_change_rules
         in
+        let db = run db closure_code_rules in
         let db = Schedule.run ?stats flow_rules db in
+        let db = add_tail_over_applications graph db in
         let db = Schedule.run ?stats scope_rules db in
         let db = run db decision_rules in
         Option.iter (Format.eprintf "%a@." Datalog.Schedule.print_stats) stats;

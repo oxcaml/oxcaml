@@ -126,6 +126,7 @@ val enter_function :
   t ->
   code_id:Code_id.t ->
   return_continuation:Continuation.t ->
+  exn_continuation:Continuation.t ->
   my_alloc_mode:Alloc_mode.For_applications.t ->
   Rev_expr.t ->
   Alloc_mode.For_applications.t * t

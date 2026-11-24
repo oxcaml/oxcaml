@@ -48,6 +48,12 @@ type t =
     (* The remaining fields are not Datalog relations. *)
     mutable outer_conts : Continuation.Set.t Code_id_or_name.Map.t;
     mutable recursive_scopes : Variable.t Continuation.Map.t;
+    (* The callees of the unknown-arity applications in tail position, with the
+       greatest number of arguments they are applied to. *)
+    mutable tail_callees : int Code_id_or_name.Map.t;
+    (* The number of parameters of each function, as seen by the generic
+       application functions. *)
+    mutable code_arities : int Code_id.Map.t;
     mutable solved : Datalog.database option
   }
 
@@ -85,6 +91,8 @@ let make ~enabled =
     unscoped_indirect_call_result = N.empty;
     outer_conts = Code_id_or_name.Map.empty;
     recursive_scopes = Continuation.Map.empty;
+    tail_callees = Code_id_or_name.Map.empty;
+    code_arities = Code_id.Map.empty;
     solved = None
   }
 
@@ -205,6 +213,23 @@ let add_recursive_scope t cont ~scope =
   then t.recursive_scopes <- Continuation.Map.add cont scope t.recursive_scopes
 
 let recursive_scope t cont = Continuation.Map.find_opt cont t.recursive_scopes
+
+let add_tail_callee t callee ~num_args =
+  if t.enabled
+  then
+    t.tail_callees
+      <- Code_id_or_name.Map.update
+           (Code_id_or_name.var callee)
+           (fun n -> Some (max num_args (Option.value n ~default:0)))
+           t.tail_callees
+
+let tail_callees t = t.tail_callees
+
+let add_code_arity t code_id ~num_params =
+  if t.enabled
+  then t.code_arities <- Code_id.Map.add code_id num_params t.code_arities
+
+let code_arity t code_id = Code_id.Map.find_opt code_id t.code_arities
 
 let set_solved t db = if t.enabled then t.solved <- Some db
 
