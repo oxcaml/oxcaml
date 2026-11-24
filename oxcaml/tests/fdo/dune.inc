@@ -1507,3 +1507,52 @@
  (enabled_if (= %{context_name} "main"))
  (deps backend_o3.output backend_o3.output.corrected)
  (action (diff backend_o3.output backend_o3.output.corrected)))
+
+; The counters do not change the generated code, which is compared with and
+; without them, with several sets of flags.
+
+(rule
+ (targets codegen.output.corrected)
+ (deps
+  codegen.sh
+  body_hash.ml
+  cfg.ml
+  function_ids.ml
+  instrumentation.ml
+  linear.ml
+  simplify.ml
+  to_cmm.ml
+  to_cmm_probe.ml
+  to_cmm_reaper.ml)
+ (enabled_if (and (= %{context_name} "main") (= %{system} "linux")))
+ (action
+  (with-stdout-to
+   codegen.output.corrected
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     bash
+     codegen.sh
+     %{bin:ocamlopt.opt}
+     ""
+     "-O3"
+     "-use-ssa"
+     "-O3 -use-ssa"
+     "-O3 -cfg-merge-blocks"
+     --
+     body_hash.ml
+     cfg.ml
+     function_ids.ml
+     instrumentation.ml
+     linear.ml
+     simplify.ml
+     to_cmm.ml
+     to_cmm_probe.ml
+     to_cmm_reaper.ml)))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{system} "linux")))
+ (deps codegen.output codegen.output.corrected)
+ (action (diff codegen.output codegen.output.corrected)))

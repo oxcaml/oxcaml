@@ -93,6 +93,10 @@ type test =
         steps : step list;
         linux_only : bool
       }
+  | Codegen of
+      { sources : string list;
+        configs : string list
+      }  (** See codegen.sh. *)
   | Annotations_exe
 
 let enabled_if ~linux_only =
@@ -127,6 +131,23 @@ let stanzas = function
                 [ Atom (name ^ ".output.corrected");
                   field "run" [Atom ("./" ^ name ^ ".exe")] ] ] ];
       diff ~linux_only:false name ]
+  | Codegen { sources; configs } ->
+    let quote s = Atom ("\"" ^ s ^ "\"") in
+    [ field "rule"
+        [ field "targets" [Atom "codegen.output.corrected"];
+          field "deps" (atoms ("codegen.sh" :: sources));
+          enabled_if ~linux_only:true;
+          field "action"
+            [ field "with-stdout-to"
+                [ Atom "codegen.output.corrected";
+                  field "setenv"
+                    [ Atom "OCAMLPARAM";
+                      Atom "\"\"";
+                      field "run"
+                        (atoms ["bash"; "codegen.sh"; "%{bin:ocamlopt.opt}"]
+                        @ List.map quote configs
+                        @ (Atom "--" :: atoms sources)) ] ] ] ];
+      diff ~linux_only:true "codegen" ]
   | Dumps { name; sources; dirs; compiles; steps; linux_only } ->
     let compile { flags; output; source; clear_ocamlparam } =
       let run =
@@ -456,7 +477,23 @@ let tests =
                    (dump (dir ^ "_cmm") source)
                    (dump (dir ^ "_linear") source))
                sources)
-           configs) ) ]
+           configs) );
+    ( "The counters do not change the generated code, which is compared with \
+       and without them, with several sets of flags.",
+      Codegen
+        { sources =
+            [ "body_hash.ml";
+              "cfg.ml";
+              "function_ids.ml";
+              "instrumentation.ml";
+              "linear.ml";
+              "simplify.ml";
+              "to_cmm.ml";
+              "to_cmm_probe.ml";
+              "to_cmm_reaper.ml" ];
+          configs =
+            [""; "-O3"; "-use-ssa"; "-O3 -use-ssa"; "-O3 -cfg-merge-blocks"]
+        } ) ]
 
 let () =
   let buf = Buffer.create 65536 in
