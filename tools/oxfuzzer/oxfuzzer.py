@@ -119,6 +119,8 @@ class Toolchain:
                     "n-way",
                     "-experimental-optimizations",
                     "-no-ssa-validate",
+                    "-float-op-fusion",
+                    "off",
                     "-caml-apply-inline-fast-path",
                 ),
                 ocamllib=self.ocamllib,
