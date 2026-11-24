@@ -142,7 +142,7 @@ Error: Mutable variable cannot be used inside a letop (at lines 4-5, characters 
 let foo4_1 y =
   let mutable x = [] in
   for i = 1 to y do
-    x <- local_ (i :: x)
+    x <- stack_ (i :: x)
   done;
   match x with
   | [] -> assert false
@@ -150,10 +150,10 @@ let foo4_1 y =
 
 [%%expect{|
 Line 4, characters 9-24:
-4 |     x <- local_ (i :: x)
+4 |     x <- stack_ (i :: x)
              ^^^^^^^^^^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global".
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 
@@ -161,7 +161,7 @@ let foo4_2 y = (* Can't sneak local out of non-local for loop body region *)
   let mutable x = [] in
   let build_loop () =
     for i = 1 to y do exclave_
-      x <- local_ (i :: x)
+      x <- stack_ (i :: x)
     done;
     match x with
     | [] -> assert false
@@ -171,7 +171,7 @@ let foo4_2 y = (* Can't sneak local out of non-local for loop body region *)
 
 [%%expect{|
 Line 5, characters 6-26:
-5 |       x <- local_ (i :: x)
+5 |       x <- stack_ (i :: x)
           ^^^^^^^^^^^^^^^^^^^^
 Error: Mutable variable cannot be used inside a function (at lines 3-9, characters 17-20).
 |}]
@@ -212,33 +212,34 @@ let foo4_5 y =
   let mutable x = [] in
   for i = 1 to y do
     for j = 1 to y do exclave_
-      x <- local_ ((i*j) :: x)
+      x <- stack_ ((i*j) :: x)
     done
   done;
   10
 ;;
 [%%expect{|
 Line 5, characters 11-30:
-5 |       x <- local_ ((i*j) :: x)
+5 |       x <- stack_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo4_6 y =
   let mutable x = [] in
   for i = 1 to y do exclave_
     for j = 1 to y do
-      x <- local_ ((i*j) :: x)
+      x <- stack_ ((i*j) :: x)
     done
   done;
   10
 ;;
 [%%expect{|
 Line 5, characters 11-30:
-5 |       x <- local_ ((i*j) :: x)
+5 |       x <- stack_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global".
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 (* This is valid since both regions are closed *)
@@ -246,7 +247,7 @@ let foo4_7 y =
   let mutable x = [] in
   for i = 1 to y do exclave_
     for j = 1 to y do exclave_
-      x <- local_ ((i*j) :: x)
+      x <- stack_ ((i*j) :: x)
     done
   done;
   10
@@ -290,8 +291,8 @@ Error: This value is "local"
 (* Test 5: Allowed interactions with locals. *)
 let foo5_1 y =  (* Assignment of local allowed in same scope *)
   let mutable x = [] in
-  x <- (local_ (y :: x));
-  x <- (local_ (y :: x));
+  x <- (stack_ (y :: x));
+  x <- (stack_ (y :: x));
   match x with
   | [] -> assert false
   | (x :: xs) -> 42
@@ -304,7 +305,7 @@ val foo5_1 : 'a -> int = <fun>
 let foo5_2 y =  (* Assignment of local works in _local_ for loop body region *)
   let mutable x = [] in
   for i = 1 to y do exclave_
-    x <- local_ (i :: x)
+    x <- stack_ (i :: x)
   done;
   match x with
   | [] -> assert false

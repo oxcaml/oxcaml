@@ -3,7 +3,7 @@
 *)
 
 let leak n =
-  let r = local_ ref n in
+  let r = stack_ (ref n) in
   r
 [%%expect{|
 Line 3, characters 2-3:
@@ -21,7 +21,7 @@ external idint : int @ local -> int = "%identity"
 |}]
 
 let noleak n =
-  let r = local_ ref n in
+  let r = stack_ (ref n) in
   idint (r.contents)
 [%%expect{|
 val noleak : int -> int = <fun>
@@ -321,13 +321,13 @@ val apply3_stack : int -> int = <fun>
  * Optional arguments
  *)
 let appopt1 (f : ?a:local_ int ref -> unit -> unit) =
-  let res = f ~a:(let x = local_ ref 42 in x) () in
+  let res = f ~a:(let x = stack_ (ref 42) in x) () in
   res
 [%%expect{|
 val appopt1 : (?a:int ref @ local -> unit -> unit) -> unit = <fun>
 |}]
 let appopt2 (f : ?a:local_ int ref -> unit -> unit) =
-  let res = f ~a:(let x = local_ ref 42 in x) in
+  let res = f ~a:(let x = stack_ (ref 42) in x) in
   res
 [%%expect{|
 Line 3, characters 2-5:
@@ -427,7 +427,7 @@ Error: This value is "local" but is expected to be "global".
  *)
 
 let heap_closure () =
-  let foo = local_ ref 1 in
+  let foo = stack_ (ref 1) in
   let fn () =
     let[@stack] fn2 () =
       let[@stack] _baz = foo in
@@ -450,7 +450,7 @@ Error: This value is "local"
 |}]
 
 let local_closure () =
-  let foo = local_ ref 1 in
+  let foo = stack_ (ref 1) in
   let local_ fn () =
     let local_ fn2 () =
       let _baz = local_ foo in
@@ -469,33 +469,35 @@ val local_closure : unit -> unit = <fun>
 (*
  * Always-nonlocal things
  *)
-let toplevel_stack = local_ {contents=42}
+let toplevel_stack = stack_ {contents=42}
 [%%expect{|
 Line 1, characters 21-41:
-1 | let toplevel_stack = local_ {contents=42}
+1 | let toplevel_stack = stack_ {contents=42}
                          ^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 module M = struct
-  let _ = local_ {contents=42}
+  let _ = stack_ {contents=42}
 end
 [%%expect{|
 module M : sig end
 |}]
 
-let _ = local_ {contents=42}
+let _ = stack_ {contents=42}
 [%%expect{|
 Line 1, characters 8-28:
-1 | let _ = local_ {contents=42}
+1 | let _ = stack_ {contents=42}
             ^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 
 module type T = sig val x : int option end
 let first_class_module () =
-  let thing = local_ Some 1 in
+  let thing = stack_ (Some 1) in
   let _m : (module T) = local_ (module struct let x = thing end) in
   ()
 [%%expect{|
@@ -503,14 +505,14 @@ module type T = sig val x : int option end
 Line 4, characters 50-51:
 4 |   let _m : (module T) = local_ (module struct let x = thing end) in
                                                       ^
-Error: The expression is "local"
-       but is expected to be "global"
+Error: The expression is "local" because it is "stack_"-allocated.
+       However, the expression highlighted is expected to be "global"
          because it is the value "x" in the structure at line 4, characters 46-59
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
 let local_module () =
-  let thing = local_ Some 1 in
+  let thing = stack_ (Some 1) in
   let _ =
     let module M = struct let x = thing end in
     local_ ()
@@ -519,22 +521,22 @@ let local_module () =
 Line 4, characters 30-31:
 4 |     let module M = struct let x = thing end in
                                   ^
-Error: The expression is "local"
-       but is expected to be "global"
+Error: The expression is "local" because it is "stack_"-allocated.
+       However, the expression highlighted is expected to be "global"
          because it is the value "x" in the structure at line 4, characters 26-39
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
 let obj () =
-  let thing = local_ Some 1 in
+  let thing = stack_ (Some 1) in
   let _obj = object method foo = thing end in
   ()
 [%%expect{|
 Line 3, characters 33-38:
 3 |   let _obj = object method foo = thing end in
                                      ^^^^^
-Error: The value "thing" is "local"
-       but is expected to be "global"
+Error: The value "thing" is "local" because it is "stack_"-allocated.
+       However, the value "thing" highlighted is expected to be "global"
          because it is used in an object (at line 3, characters 13-42).
 |}]
 
@@ -584,7 +586,7 @@ Error: This value is "local" to the parent region
 |}]
 
 let leak_ref_2 =
-  let r = local_ ref None in
+  let r = stack_ (ref None) in
   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
 [%%expect{|
 Line 3, characters 39-40:
@@ -597,7 +599,7 @@ Error: The value "r" is "local"
 |}]
 
 let leak_ref_3 =
-  let r = local_ ref None in
+  let r = stack_ (ref None) in
   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
 [%%expect{|
 Line 3, characters 64-65:
@@ -612,7 +614,7 @@ Error: This value is "local" to the parent region
 
 (* raised exceptions must be global *)
 let no_leak_exn =
-  use_locally (fun x -> let _exn = local_ Invalid_argument x in "bluh") "blah"
+  use_locally (fun x -> let _exn = stack_ (Invalid_argument x) in "bluh") "blah"
 [%%expect{|
 val no_leak_exn : string = "bluh"
 |}]
@@ -1024,15 +1026,15 @@ Error: This value is "local" to the parent region
 let print (local_ x) = print_string !x
 
 let foo x =
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   print r
 [%%expect{|
 val print : string ref @ local -> unit = <fun>
 Line 5, characters 8-9:
 5 |   print r
             ^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is an argument in a tail call.
 |}]
 
@@ -1052,7 +1054,7 @@ Error: The value "x" is "local" to the parent region
 |}]
 
 let foo x =
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   print r;
   ()
 [%%expect{|
@@ -1060,7 +1062,7 @@ val foo : string -> unit = <fun>
 |}]
 
 let foo x = exclave_
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   print r
 [%%expect{|
 val foo : string -> unit @ local = <fun>
@@ -1084,7 +1086,7 @@ val foo : 'a -> int = <fun>
 (* Cannot call local values in tail calls *)
 
 let foo x =
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   let local_ foo () = r.contents in
   foo ()
 [%%expect{|
@@ -1097,7 +1099,7 @@ Error: This value is "local"
 |}]
 
 let foo x =
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   let local_ foo () = r.contents in
   let res = foo () in
   res
@@ -1106,7 +1108,7 @@ val foo : 'a -> 'a = <fun>
 |}]
 
 let foo x = exclave_
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   let local_ foo () = r.contents in
   foo ()
 [%%expect{|
@@ -1116,27 +1118,27 @@ val foo : 'a -> 'a @ local = <fun>
 (* Cannot return local values without annotations on all exits *)
 
 let foo x =
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   r
 [%%expect{|
 Line 3, characters 2-3:
 3 |   r
       ^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
 
 let foo x = exclave_
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   r
 [%%expect{|
 val foo : 'a -> 'a ref @ local = <fun>
 |}]
 
 let foo p x = exclave_
-  let r = local_ { contents = x } in
+  let r = stack_ { contents = x } in
   if p then r
   else r
 [%%expect{|
@@ -1153,7 +1155,7 @@ val length : int -> 'a list @ local -> int = <fun>
 |}]
 
 let foo () =
-  let r = local_ ref 5 in
+  let r = stack_ (ref 5) in
   let bar x = !x in
   let baz () =
     bar r
@@ -1169,7 +1171,7 @@ val foo : unit -> int = <fun>
    the callee does not return an allocation. We allocate to demonstrate
    the potential leaking.  *)
 let foo () = exclave_
-  let _ = local_ (52, 24) in
+  let _ = stack_ (52, 24) in
   42
 [%%expect{|
 val foo : unit -> int @ local = <fun>
@@ -1297,7 +1299,7 @@ let foo (local_ x) = x.imm
 val foo : 'a imm @ local -> 'a @ local = <fun>
 |}]
 let foo y =
-  let x = local_ { imm = y } in
+  let x = stack_ { imm = y } in
   x.imm
 [%%expect{|
 Line 3, characters 2-7:
@@ -1305,7 +1307,7 @@ Line 3, characters 2-7:
       ^^^^^
 Error: This value is "local"
          because it is the field "imm" of the record at line 3, characters 2-3
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -1315,7 +1317,7 @@ let foo (local_ x) = x.mut
 val foo : 'a mut @ local -> 'a = <fun>
 |}]
 let foo y =
-  let x = local_ { mut = y } in
+  let x = stack_ { mut = y } in
   x.mut
 [%%expect{|
 val foo : 'a -> 'a = <fun>
@@ -1325,7 +1327,7 @@ let foo (local_ x) = x.gbl
 val foo : 'a gbl @ local -> 'a = <fun>
 |}]
 let foo y =
-  let x = local_ { gbl = y } in
+  let x = stack_ { gbl = y } in
   x.gbl
 [%%expect{|
 val foo : 'a -> 'a = <fun>
@@ -1336,7 +1338,7 @@ let foo (local_ { imm }) = imm
 val foo : 'a imm @ local -> 'a @ local = <fun>
 |}]
 let foo y =
-  let { imm } = local_ { imm = y } in
+  let { imm } = stack_ { imm = y } in
   imm
 [%%expect{|
 Line 3, characters 2-5:
@@ -1344,7 +1346,7 @@ Line 3, characters 2-5:
       ^^^
 Error: This value is "local"
          because it is the field "imm" of the record at line 2, characters 6-13
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -1354,7 +1356,7 @@ let foo (local_ { mut }) = mut
 val foo : 'a mut @ local -> 'a = <fun>
 |}]
 let foo y =
-  let { mut } = local_ { mut = y } in
+  let { mut } = stack_ { mut = y } in
   mut
 [%%expect{|
 val foo : 'a -> 'a = <fun>
@@ -1364,7 +1366,7 @@ let foo (local_ { gbl }) = gbl
 val foo : 'a gbl @ local -> 'a = <fun>
 |}]
 let foo y =
-  let { gbl } = local_ { gbl = y } in
+  let { gbl } = stack_ { gbl = y } in
   gbl
 [%%expect{|
 val foo : 'a -> 'a = <fun>
@@ -1377,7 +1379,7 @@ let foo (local_ imm) =
 val foo : 'a @ local -> unit = <fun>
 |}]
 let foo () =
-  let imm = local_ ref 5 in
+  let imm = stack_ (ref 5) in
   let _ = { imm } in
   ()
 [%%expect{|
@@ -1395,7 +1397,7 @@ Error: This value is "local" to the parent region
          because it is the field "mut" (with some modality) of the record at line 2, characters 10-17.
 |}]
 let foo () =
-  let mut = local_ ref 5 in
+  let mut = stack_ (ref 5) in
   let _ = { mut } in
   ()
 [%%expect{|
@@ -1418,7 +1420,7 @@ Error: This value is "local" to the parent region
          because it is the field "gbl" (with some modality) of the record at line 2, characters 10-17.
 |}]
 let foo () =
-  let gbl = local_ ref 5 in
+  let gbl = stack_ (ref 5) in
   let _ = { gbl } in
   ()
 [%%expect{|
@@ -1517,7 +1519,7 @@ let foo (local_ imm) =
 val foo : 'a @ local -> unit = <fun>
 |}]
 let foo () =
-  let imm = local_ ref 5 in
+  let imm = stack_ (ref 5) in
   let _ = #{ imm } in
   ()
 [%%expect{|
@@ -1535,7 +1537,7 @@ Error: This value is "local" to the parent region
          because it is the field "mut" (with some modality) of the record at line 2, characters 10-18.
 |}]
 let foo () =
-  let mut = local_ ref 5 in
+  let mut = stack_ (ref 5) in
   let _ = #{ mut } in
   ()
 [%%expect{|
@@ -1558,7 +1560,7 @@ Error: This value is "local" to the parent region
          because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
 |}]
 let foo () =
-  let gbl = local_ ref 5 in
+  let gbl = stack_ (ref 5) in
   let _ = #{ gbl } in
   ()
 [%%expect{|
@@ -1609,7 +1611,7 @@ Error: This value is "local" to the parent region
          because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
 |}]
 let foo () =
-  let gbl = local_ ref 5 in
+  let gbl = stack_ (ref 5) in
   let _ = #{ gbl } in
   ()
 [%%expect{|
@@ -2207,7 +2209,7 @@ val foo : 'a option @ local -> 'a option -> 'a @ local = <fun>
 
 module M = struct
   let (Some z, _, _) | (None, Some z, _)
-      | (None, None, z) = (Some (ref 0), (local_ (Some (ref 0))), (ref 0))
+      | (None, None, z) = (Some (ref 0), (stack_ (Some (ref 0))), (ref 0))
 end
 [%%expect{|
 Line 2, characters 12-13:
@@ -2215,7 +2217,7 @@ Line 2, characters 12-13:
                 ^
 Error: The expression is "local"
          because it is contained (via constructor "Some") in the value at line 2, characters 30-36
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the expression highlighted is expected to be "global"
          because it is the value "z" in the structure at lines 2-3, characters 2-74
          which is expected to be "global"
@@ -2224,7 +2226,7 @@ Error: The expression is "local"
 
 module M = struct
   let (Some z, _, _) | (None, Some z, _)
-      | (None, None, z) = ((local_ Some (ref 0)), (Some (ref 0)), (ref 0))
+      | (None, None, z) = ((stack_ (Some (ref 0))), (Some (ref 0)), (ref 0))
 end
 [%%expect{|
 Line 2, characters 12-13:
@@ -2232,16 +2234,16 @@ Line 2, characters 12-13:
                 ^
 Error: The expression is "local"
          because it is contained (via constructor "Some") in the value at line 2, characters 7-13
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the expression highlighted is expected to be "global"
-         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         because it is the value "z" in the structure at lines 2-3, characters 2-76
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
 
 (* Example of backtracking after mode error *)
 let f g n =
-  let a = local_ [n+1] in
+  let a = stack_ [n+1] in
   let () = g a in
   ()
 let z : (int list -> unit) -> int -> unit = f
@@ -2259,7 +2261,7 @@ Error: The value "f" has type "(int list @ local -> unit) -> int -> unit"
 
 module M = struct
   let f g n =
-    let a = local_ [n+1] in
+    let a = stack_ [n+1] in
     let () = g a in
     ()
   let z : (int list -> unit) -> int -> unit = f
@@ -2778,7 +2780,7 @@ Error: This value is "local" to the parent region
 
 (* a test that was passing type check *)
 let unsafe_globalize (local_ s : string) : string =
-  match local_ [:s:] with
+  match stack_ [:s:] with
   | [:s':] -> s'
   | _ -> assert false
 [%%expect{|
@@ -2787,7 +2789,11 @@ Line 3, characters 14-16:
                   ^^
 Error: This value is "local"
          because it is an element of the array at line 3, characters 4-10
-         which is "local".
+         which is "local"
+         because it is allocated at line 2, characters 15-20 containing data
+         which is "local" to the parent region
+         because it is an array that contains the expression at line 2, characters 17-18
+         which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -2981,7 +2987,7 @@ val f : unit -> (int -> (int -> int)) @ local = <fun>
  * with the below type error where `local_` is omitted on the binding.
  *)
 let foo () =
-  let local_ _bar1 : int -> int -> int = local_ (fun x y -> x + y) in
+  let local_ _bar1 : int -> int -> int = stack_ (fun x y -> x + y) in
   let local_ _bar2 z : int -> int -> int = exclave_ (fun x y -> x + y + z) in
   ()
 [%%expect{|
@@ -2989,14 +2995,14 @@ val foo : unit -> unit = <fun>
 |}];;
 
 let foo () =
-  let _bar : int -> int -> int = local_ (fun x y -> x + y) in
+  let _bar : int -> int -> int = stack_ (fun x y -> x + y) in
   ()
 [%%expect{|
 Line 2, characters 40-58:
-2 |   let _bar : int -> int -> int = local_ (fun x y -> x + y) in
+2 |   let _bar : int -> int -> int = stack_ (fun x y -> x + y) in
                                             ^^^^^^^^^^^^^^^^^^
-Error: This function or one of its parameters escape their region
-       when it is partially applied.
+Error: The allocation is "local" because it is "stack_"-allocated.
+       However, the allocation highlighted is expected to be "global".
 |}];;
 
 
@@ -3052,7 +3058,7 @@ let () = foo (local_ M_constructor)
 [%%expect{|
 |}]
 
-let () = foo_f (local_ (fun M_constructor -> ()))
+let () = foo_f (stack_ (fun M_constructor -> ()))
 [%%expect{|
 |}]
 

@@ -9,6 +9,6 @@ let test (f : local_ 'a -> local_ 'b) (eq : (local_ 'a -> local_ 'b, 'a -> 'b) e
 
 type 'a box = Box of 'a
 
-let localf : (local_ 'a -> local_ 'a box) = fun x -> exclave_ (local_ (Box x))
+let localf : (local_ 'a -> local_ 'a box) = fun x -> exclave_ (stack_ (Box x))
 
 let g eq x = test localf eq x

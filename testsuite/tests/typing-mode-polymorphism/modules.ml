@@ -50,7 +50,7 @@ val make :
 let unpack_inferred_witness () =
   let e = make (fun (y : int ref) -> y) in
   let module M = (val e) in
-  let l = local_ (ref 0) in
+  let l = stack_ (ref 0) in
   let _ = M.v l in
   ()
 [%%expect{|
@@ -62,7 +62,7 @@ let unpack_annotated_witness () =
     make (fun y -> y)
   in
   let module M = (val e) in
-  let l = local_ (ref 0) in
+  let l = stack_ (ref 0) in
   let _ = M.v l in
   ()
 [%%expect{|

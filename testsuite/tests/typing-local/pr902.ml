@@ -18,7 +18,7 @@ let f1 () x : (unit -> local_ (int * int)) = exclave_
      return mode of the second application in the expansion of the
      overapplication below is wrongly Heap, then caml_apply will be used
      instead, which will open its own region for this allocation. *)
-  let p = local_ (x, x) in
+  let p = stack_ (x, x) in
   ((opaque_identity f2) p) [@nontail]
 
 let[@inline never] to_be_overapplied () () = Sys.opaque_identity f1

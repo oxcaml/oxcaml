@@ -32,9 +32,9 @@ let[@inline never] consume (local_ a) (local_ c) =
 let[@inline never] sink (x : int) = ignore (Sys.opaque_identity x)
 
 let[@inline never] f n =
-  let a = local_ [n] in
+  let a = stack_ [n] in
   let b = [n + 1] in
-  let c = local_ [n + 2] in
+  let c = stack_ [n + 2] in
   glob := b;
   let s = ref (consume a c) in
   for i = 0 to Sys.opaque_identity 3 do

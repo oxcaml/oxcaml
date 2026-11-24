@@ -126,7 +126,7 @@ let globalref = ref 42
 type 'a glob = { global_ g : 'a }
 let escape x = { g = x }.g
 let[@inline never] prim () =
-  let r = local_ ref 42 in
+  let r = stack_ (ref 42) in
   (* currying of primitives (opaque goes via caml_curry) *)
   let a,b,c,d =
     ((Sys.opaque_identity (:=)) r,
@@ -141,5 +141,5 @@ let () = prim ()
 
 let curried (local_ x) = { g = fun () -> 42 }
 let () =
-  let _ = (Sys.opaque_identity curried) (local_ ref 42) in
+  let _ = (Sys.opaque_identity curried) (stack_ (ref 42)) in
   Gc.minor ()

@@ -118,7 +118,7 @@ let bigconst =
   }
 
 let makebig n =
-  let r = local_
+  let r = stack_
     {
       v001 = n; v002 = n; v003 = n; v004 = n; v005 = n; v006 = n; v007 = n; v008 = n; v009 = n; v010 = n;
       v011 = n; v012 = n; v013 = n; v014 = n; v015 = n; v016 = n; v017 = n; v018 = n; v019 = n; v020 = n;
@@ -155,7 +155,7 @@ let makebig n =
   ()
 
 let dupbig r =
-  let v = local_ { r with v001 = 42 } in
+  let v = stack_ { r with v001 = 42 } in
   ignore_local v;
   ()
 
@@ -413,7 +413,7 @@ let readbigstringbint () =
 
 let rec makemanylong n =
   if n = 0 then () else
-  let stuff = local_
+  let stuff = stack_
    [| n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; n;
       n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; n;
       n; n; n; n; n; n; n; n; n; n; n; n; n; n; n; n;

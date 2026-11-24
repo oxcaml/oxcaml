@@ -396,7 +396,7 @@ let rec bar =
   fun (o @ unique) ->
   match o with
   | Some () -> ()
-  | None -> bar (local_ Some ()) [@nontail]
+  | None -> bar (stack_ (Some ())) [@nontail]
 [%%expect{|
 val bar : unit option @ local unique -> unit = <fun>
 |}]

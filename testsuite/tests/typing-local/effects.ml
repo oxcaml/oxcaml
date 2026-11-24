@@ -33,7 +33,7 @@ let[@inline never] expect_local_stack_offset expected =
 (* When a fiber stack is created, its accompanying local stack is empty,
    even if the parent fiber stack's local stack is not. *)
 let[@inline never] f1 () =
-  let (_ : int * int) = opaque (local_ (rand (), rand ())) in
+  let (_ : int * int) = opaque (stack_ (rand (), rand ())) in
   expect_local_stack_offset 3;
   let result =
     try_with (fun () ->
@@ -49,12 +49,12 @@ let[@inline never] f1 () =
 (* When a fiber stack is created, local allocation from the corresponding
    fiber does not touch the local stack of the parent. *)
 let[@inline never] f2 () =
-  let (_ : int * int) = opaque (local_ (rand (), rand ())) in
+  let (_ : int * int) = opaque (stack_ (rand (), rand ())) in
   expect_local_stack_offset 3;
   let result =
     try_with (fun () ->
         let (_ : int * int * int) =
-          opaque (local_ (rand (), rand (), rand ()))
+          opaque (stack_ (rand (), rand (), rand ()))
         in
         expect_local_stack_offset 4;
         42
@@ -72,12 +72,12 @@ let[@inline never] f2 () =
    the fiber's local stack offset is unaffected. *)
 type _ Effect.t += Eff_f3 : unit -> unit t
 let[@inline never] f3 () =
-  let (_ : int * int) = opaque (local_ (rand (), rand ())) in
+  let (_ : int * int) = opaque (stack_ (rand (), rand ())) in
   expect_local_stack_offset 3;
   let result =
     try_with (fun () ->
         let (_ : int * int * int) =
-          opaque (local_ (rand (), rand (), rand ()))
+          opaque (stack_ (rand (), rand (), rand ()))
         in
         expect_local_stack_offset 4;
         perform (Eff_f3 ());
@@ -107,12 +107,12 @@ let[@inline never] f3 () =
 type _ Effect.t += Eff_f4 : unit -> unit t
 exception Exn_f4
 let[@inline never] f4 () =
-  let (p : int * int) = opaque (local_ (rand (), rand ())) in
+  let (p : int * int) = opaque (stack_ (rand (), rand ())) in
   expect_local_stack_offset 3;
   match
     try_with (fun () ->
         let (_ : int * int * int) =
-          opaque (local_ (rand (), rand (), rand ()))
+          opaque (stack_ (rand (), rand (), rand ()))
         in
         expect_local_stack_offset 4;
         perform (Eff_f4 ());
@@ -142,12 +142,12 @@ let[@inline never] f4 () =
 type _ Effect.t += Eff_f5 : unit -> unit t
 exception Exn_f5
 let[@inline never] f5 () =
-  let (p : int * int) = opaque (local_ (rand (), rand ())) in
+  let (p : int * int) = opaque (stack_ (rand (), rand ())) in
   expect_local_stack_offset 3;
   match
     try_with (fun () ->
         let (_ : int * int * int) =
-          opaque (local_ (rand (), rand (), rand ()))
+          opaque (stack_ (rand (), rand (), rand ()))
         in
         expect_local_stack_offset 4;
         perform (Eff_f5 ());
@@ -184,7 +184,7 @@ let g1_comp () =
   let p = g1_local_alloc 1 2 in
   perform (Xchg (fst (fst (opaque p))))
     + (opaque (
-        let q = opaque (local_ (opaque 100, opaque 200)) in
+        let q = opaque (stack_ (opaque 100, opaque 200)) in
         fst q
       ))
     + perform (Xchg (snd (snd (opaque p))))
@@ -196,7 +196,7 @@ let[@inline never] g1' () =
         match eff with
         | Xchg n -> Some (fun (k: (a, _) continuation) ->
             Gc.compact ();
-            let q = opaque (local_ (opaque 10, opaque 20)) in
+            let q = opaque (stack_ (opaque 10, opaque 20)) in
             continue k (n + fst q))
         | _ -> None
     }
@@ -212,7 +212,7 @@ let[@inline never] effect_syntax_value_case () =
   let result =
     match perform Eff_syntax with
     | x ->
-      let r = opaque (local_ ref x) in
+      let r = opaque (stack_ (ref x)) in
       !r
     | effect Eff_syntax, k -> continue k 42
   in
@@ -222,7 +222,7 @@ let[@inline never] effect_syntax_exception_case () =
   let result =
     try raise Exn_syntax with
     | Exn_syntax ->
-      let r = opaque (local_ ref 42) in
+      let r = opaque (stack_ (ref 42)) in
       !r
     | effect Eff_syntax, _ -> 0
   in
@@ -233,7 +233,7 @@ let[@inline never] effect_syntax_effect_case () =
     match perform Eff_syntax with
     | x -> x
     | effect Eff_syntax, k ->
-      let r = opaque (local_ ref 41) in
+      let r = opaque (stack_ (ref 41)) in
       continue k (!r + 1)
   in
   assert (result = 42)
@@ -241,7 +241,7 @@ let[@inline never] effect_syntax_effect_case () =
 let[@inline never] effect_syntax_body () =
   let result =
     match
-      let r = opaque (local_ ref 1) in
+      let r = opaque (stack_ (ref 1)) in
       perform Eff_syntax + !r
     with
     | x -> x

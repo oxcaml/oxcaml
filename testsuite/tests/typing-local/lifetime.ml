@@ -24,7 +24,7 @@ let[@inline never] live_local () =
   if !rtrue then begin
     let g =
       if !rtrue then begin
-        let s = local_ (Some (Some (alloc ()))) in
+        let s = stack_ (Some (Some (alloc ()))) in
         Gc.full_major ();
         ev "live local";
         use s;

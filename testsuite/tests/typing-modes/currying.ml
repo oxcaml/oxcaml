@@ -79,7 +79,7 @@ Line 1, characters 29-30:
  * Defaulting of modes in printing, similar to mli-less files
  *)
 
-let f g = g (local_ (1, 2)) 1 2 3 [@nontail]
+let f g = g (stack_ (1, 2)) 1 2 3 [@nontail]
 [%%expect{|
 val f : (int * int @ local -> int -> int -> int -> 'a) -> 'a = <fun>
 |}]
@@ -88,11 +88,11 @@ val f : (int * int @ local -> int -> int -> int -> 'a) -> 'a = <fun>
  * Labels and reordering
  *)
 
-let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
+let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(stack_ (ref 42)) ()
 [%%expect{|
-Line 1, characters 64-79:
-1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
-                                                                    ^^^^^^^^^^^^^^^
+Line 1, characters 72-80:
+1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(stack_ (ref 42)) ()
+                                                                            ^^^^^^^^
 Error: This value is "local"
        but is expected to be "global"
          because it is captured by a partial application
@@ -100,11 +100,11 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
-let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
+let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(stack_ (ref 42))
 [%%expect{|
-Line 1, characters 64-79:
-1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
-                                                                    ^^^^^^^^^^^^^^^
+Line 1, characters 72-80:
+1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(stack_ (ref 42))
+                                                                            ^^^^^^^^
 Error: This value is "local"
        but is expected to be "global"
          because it is captured by a partial application
@@ -112,11 +112,11 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
-let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
+let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(stack_ (ref 42))
 [%%expect{|
-Line 1, characters 56-71:
-1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
-                                                            ^^^^^^^^^^^^^^^
+Line 1, characters 64-72:
+1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(stack_ (ref 42))
+                                                                    ^^^^^^^^
 Error: This value is "local"
        but is expected to be "global"
          because it is captured by a partial application
@@ -124,38 +124,38 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
-let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
+let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(stack_ (ref 42))
 [%%expect{|
-Line 1, characters 56-71:
-1 | let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
-                                                            ^^^^^^^^^^^^^^^
+Line 1, characters 56-73:
+1 | let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(stack_ (ref 42))
+                                                            ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is an argument in a tail call.
 |}]
 let app42 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
-  f ~a:(local_ ref 1) 2 ~c:4
+  f ~a:(stack_ (ref 1)) 2 ~c:4
 [%%expect{|
-Line 2, characters 2-21:
-2 |   f ~a:(local_ ref 1) 2 ~c:4
-      ^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-23:
+2 |   f ~a:(stack_ (ref 1)) 2 ~c:4
+      ^^^^^^^^^^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
 Hint: Try wrapping the marked application in parentheses.
 |}]
 let app42_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
-  (f ~a:(local_ ref 1)) 2 ~c:4
+  (f ~a:(stack_ (ref 1))) 2 ~c:4
 [%%expect{|
 val app42_wrapped :
   (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) ->
   b:int ref @ local -> unit = <fun>
 |}]
 let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
-  f ~a:(local_ ref 1) 2
+  f ~a:(stack_ (ref 1)) 2
 [%%expect{|
-Line 2, characters 7-21:
-2 |   f ~a:(local_ ref 1) 2
-           ^^^^^^^^^^^^^^
+Line 2, characters 7-23:
+2 |   f ~a:(stack_ (ref 1)) 2
+           ^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is an argument in a tail call.

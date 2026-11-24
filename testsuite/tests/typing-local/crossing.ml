@@ -488,7 +488,7 @@ module M :
 environment at mode local, but they cross to global when they are refered to
 again. Note that ref is polymorphic and thus doesn't trigger crossing. *)
 let foo () =
-  let x, y = local_ (42, 24) in
+  let x, y = stack_ (42, 24) in
   let _ = ref x, ref y in
   ()
 [%%expect{|

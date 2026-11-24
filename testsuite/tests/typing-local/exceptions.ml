@@ -5,7 +5,7 @@
 external local_stack_offset : unit -> int = "caml_local_stack_offset"
 
 let leak () =
-  let r = local_ ref 42 in
+  let r = stack_ (ref 42) in
   let[@inline never] f () = incr r in
   f ();
   f ();

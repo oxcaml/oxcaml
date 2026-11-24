@@ -90,7 +90,7 @@ let () =
 
 let[@inline never] uses_local_try x =
   try
-    let r = local_ ref x in
+    let r = stack_ (ref x) in
     if opaque_identity false then raise Exit;
     let _ = opaque_identity r in
     ()
@@ -205,16 +205,16 @@ let () = check_empty "first class mod"
 
 class d x =
   let z =
-    let r = local_ ref 1000 in
+    let r = stack_ (ref 1000) in
     let _ = opaque_identity r in
     !r + 1
   in
   object
     val p =
-      let r = opaque_identity (local_ ref 42) in
+      let r = opaque_identity (stack_ (ref 42)) in
       !r
     initializer
-      let r = local_ ref 42 in
+      let r = stack_ (ref 42) in
       let _ = opaque_identity r in
       ()
     method getd =
@@ -225,20 +225,20 @@ let () = check_empty "class d definition"
 
 class c =
   let z =
-    let r = local_ ref 1000 in
+    let r = stack_ (ref 1000) in
     let _ = opaque_identity r in
     !r + 1
   in
   object
     initializer
-      let r = local_ ref 42 in
+      let r = stack_ (ref 42) in
       let _ = opaque_identity r in
       ()
     val q =
-      let r = opaque_identity (local_ ref 42) in
+      let r = opaque_identity (stack_ (ref 42)) in
       !r
     inherit d (
-      let r = local_ ref 42 in
+      let r = stack_ (ref 42) in
       let _ = opaque_identity r in
       42)
     method getc =
@@ -246,7 +246,7 @@ class c =
   end
 
 class e = d (
-  let r = local_ ref 42 in
+  let r = stack_ (ref 42) in
   let _ = opaque_identity r in
   !r)
 

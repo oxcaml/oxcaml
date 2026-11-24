@@ -2,16 +2,16 @@
 let glob = ref []
 
 let[@inline never] f g n =
-  let a = local_ [n] in
+  let a = stack_ [n] in
   let b = [n+1] in
-  let c = local_ [n+2] in
+  let c = stack_ [n+2] in
   glob := b;
   g a c;
   ()
 
 type junk = { a : float; b : float; c : float; d : float; e : float; f : float }
 let[@inline never] clear g n =
-  let junk = local_ {a=n;b=n;c=n;d=n;e=n;f=n} in
+  let junk = stack_ {a=n;b=n;c=n;d=n;e=n;f=n} in
   g junk;
   ()
 

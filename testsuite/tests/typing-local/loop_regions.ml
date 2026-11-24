@@ -24,7 +24,7 @@ let loc_for () =
   let offset_loop = ref (-1) in
   let offset1 = local_stack_offset () in
   for i = 0 to 0 do [%exclave] (
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ()
   )
@@ -37,7 +37,7 @@ let nonloc_for () =
   let offset_loop = ref (-1) in
   let offset1 = local_stack_offset () in
   for i = 0 to 0 do
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ()
   done;
@@ -50,7 +50,7 @@ let loc_while_body () =
   let offset1 = local_stack_offset () in
   let cond = ref true in
   while !cond do [%exclave] (
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ();
     cond := false
@@ -65,7 +65,7 @@ let nonloc_while_body () =
   let offset1 = local_stack_offset () in
   let cond = ref true in
   while !cond do
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ();
     cond := false
@@ -78,7 +78,7 @@ let[@inline never] loc_while_cond () =
   let offset_loop = ref (-1) in
   let offset1 = local_stack_offset () in
   while [%exclave] (
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ();
     Sys.opaque_identity false
@@ -94,7 +94,7 @@ let[@inline never] nonloc_while_cond () =
   let offset_loop = ref (-1) in
   let offset1 = local_stack_offset () in
   while
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     offset_loop := local_stack_offset ();
     Sys.opaque_identity false
@@ -108,7 +108,7 @@ let[@inline never] loc_func () =
   let offset_func = ref (-1) in
   let fun_exclave r =
     [%exclave] (
-        let z = local_ (Some (Sys.opaque_identity 42)) in
+        let z = stack_ (Some (Sys.opaque_identity 42)) in
         let _ = (opaque_local z) in
         r := local_stack_offset ()
     ) in
@@ -121,7 +121,7 @@ let[@inline never] loc_func () =
 let[@inline never] nonloc_func () =
   let offset_func = ref (-1) in
   let fun_nonexclave r =
-    let z = local_ (Some (Sys.opaque_identity 42)) in
+    let z = stack_ (Some (Sys.opaque_identity 42)) in
     let _ = (opaque_local z) in
     r := local_stack_offset ()
   in

@@ -5,7 +5,7 @@
    This can introduce a region around the whole definition. *)
 
 let rec f =
-  let p = local_ (fun msg -> print_string msg) in
+  let p = stack_ (fun msg -> print_string msg) in
   p "hello, ";
   p "world!";
   print_newline ();

@@ -42,7 +42,7 @@ module _ : sig end = struct
 
   let () =
     check_if_zero_alloc ~name:"take unrestricted of local (not exposed)" 0 ~f:(fun x ->
-      take_unrestricted (local_ { a = x; b = x }) [@nontail])
+      take_unrestricted (stack_ { a = x; b = x }) [@nontail])
 end
 
 module _ : sig end = struct
@@ -50,7 +50,7 @@ module _ : sig end = struct
 
   let () =
     check_if_zero_alloc ~name:"take local of local (not exposed)" 0 ~f:(fun x ->
-      take_local (local_ { a = x; b = x }) [@nontail])
+      take_local (stack_ { a = x; b = x }) [@nontail])
 end
 
 module _ : sig end = struct
@@ -92,7 +92,7 @@ module M2 = struct
 
   let () =
     check_if_zero_alloc ~name:"take unrestricted of local (exposed)" 0 ~f:(fun x ->
-      take_unrestricted (local_ { a = x; b = x }) [@nontail])
+      take_unrestricted (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M3 = struct
@@ -100,7 +100,7 @@ module M3 = struct
 
   let () =
     check_if_zero_alloc ~name:"take local of local (exposed)" 0 ~f:(fun x ->
-      take_local (local_ { a = x; b = x }) [@nontail])
+      take_local (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M4 = struct
@@ -126,7 +126,7 @@ module M6 = struct
 
   let () =
     check_if_zero_alloc ~name:"take local of local (exposed)" 0 ~f:(fun x ->
-      take_local__global_in_mli (local_ { a = x; b = x }) [@nontail])
+      take_local__global_in_mli (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M7 = struct

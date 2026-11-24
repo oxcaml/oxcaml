@@ -18,7 +18,7 @@ let equal_backtraces b1 b2 =
        b1 b2
 
 let rec foo x stack =
-  let r = local_ ref x in
+  let r = stack_ (ref x) in
   r := !r - 1;
   let stack' = get_backtrace () in
   begin match stack with
