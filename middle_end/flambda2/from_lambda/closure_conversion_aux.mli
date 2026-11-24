@@ -131,6 +131,22 @@ module Env : sig
 
   val clear_local_bindings : t -> t
 
+  (** Declare an identifier bound to [Lambda.Lcode], with the code ID of its
+      code and an approximation giving only the code's metadata, so that calls
+      to it can be closed before the code itself. *)
+  val declare_lcode :
+    t ->
+    Ident.t ->
+    code_id:Code_id.t ->
+    metadata_approximation:value_approximation ->
+    t
+
+  val lcode_code_id : t -> Ident.t -> Code_id.t
+
+  val lcode_metadata_approximation : t -> Ident.t -> value_approximation
+
+  val is_lcode : t -> Ident.t -> bool
+
   val add_var : t -> Ident.t -> Variable.t -> Flambda_kind.With_subkind.t -> t
 
   val add_vars :
@@ -289,6 +305,13 @@ module Acc : sig
      must be careful to update acc afterward when necessary *)
   val eval_branch_free_names :
     t -> f:(t -> t * 'a) -> Name_occurrences.t * t * 'a
+
+  (** The approximation of a closure of the code bound to a [Lambda.Lcode]
+      (although no such closure exists), once the code has been closed. *)
+  val add_lcode_approximation : t -> Code_id.t -> Env.value_approximation -> t
+
+  val find_lcode_approximation :
+    t -> Code_id.t -> Env.value_approximation option
 
   val cost_metrics : t -> Cost_metrics.t
 

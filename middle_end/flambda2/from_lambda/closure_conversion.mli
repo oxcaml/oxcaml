@@ -40,6 +40,16 @@ val close_let_rec :
   current_region:Ident.t option ->
   Expr_with_acc.t
 
+(** The unit's [Lambda.Lcode] bindings, with the templates the code
+    instantiates, must all be declared before any of them is closed by
+    [close_lcodes]. *)
+val declare_lcodes :
+  Env.t -> (Ident.t * Template_id.t * Function_decl.t) list -> Env.t
+
+(** Close the code of instantiations of templates, which have no closure. *)
+val close_lcodes :
+  Acc.t -> Env.t -> (Ident.t * Template_id.t * Function_decl.t) list -> Acc.t
+
 val close_let_cont :
   Acc.t ->
   Env.t ->

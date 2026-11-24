@@ -510,6 +510,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
+      ~template_key:(Code.template_key code)
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
@@ -1195,9 +1196,10 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     all_sets_of_closures_and_symbols
     closure_bound_names_inside_functions_all_sets value_slots_and_types_all_sets
 
-let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
+let simplify_code_where_bound dacc code ~all_code ~simplify_function_body =
   let context =
-    C.create_for_static_stub dacc ~all_code ~simplify_function_body
+    C.create_for_code_where_bound dacc ~all_code ~simplify_function_body
+      ~is_stub:(Code.stub code)
   in
   let closure_bound_names_inside_function =
     (* Unused, the type of the value slot is going to be unknown *)

@@ -31,7 +31,8 @@ let function_decl_type ?new_code_id ~rec_info old_code_id =
   let code_id = Option.value new_code_id ~default:old_code_id in
   Or_unknown.Known (T.Function_type.create code_id ~rec_info)
 
-let create_for_static_stub dacc ~all_code ~simplify_function_body =
+let create_for_code_where_bound dacc ~all_code ~simplify_function_body ~is_stub
+    =
   let dacc_inside_functions =
     (* We ensure that inlining cannot happen inside the code of stubs. This is
        to avoid compile-time performance problems where large functions (or
@@ -46,7 +47,8 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
              code creates a context to simplify a function while looking at the
              let code rather than the set of closure. We should rename this
              `DE.enter_set_of_closures` function *)
-          (DE.enter_stub_function (DE.enter_set_of_closures denv)))
+          (let denv = DE.enter_set_of_closures denv in
+           if is_stub then DE.enter_stub_function denv else denv))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;

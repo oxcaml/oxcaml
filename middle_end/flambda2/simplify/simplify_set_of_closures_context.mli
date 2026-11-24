@@ -31,10 +31,15 @@ val create :
   value_slot_types_all_sets:T.t Value_slot.Map.t list ->
   t
 
-val create_for_static_stub :
+(** For simplifying code where it is bound rather than at the definition of a
+    set of closures: stubs (unless they are simplified like other functions,
+    with [-flambda2-simplify-stubs]) and code without a closure (see
+    [Code_metadata.template_key]). Inlining is not allowed inside stubs. *)
+val create_for_code_where_bound :
   DA.t ->
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
+  is_stub:bool ->
   t
 
 val dacc_inside_functions : t -> DA.t

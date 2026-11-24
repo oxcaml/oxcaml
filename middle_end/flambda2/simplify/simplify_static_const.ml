@@ -307,6 +307,18 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
       "[Set_of_closures] values cannot be bound by a [Block_like] binding:@ %a"
       SC.print static_const
 
+(* Whether [code] is simplified where it is bound, keeping its code ID, rather
+   than at the definition of a set of closures. *)
+let simplified_where_bound code =
+  match Code.template_key code with
+  | Some _ ->
+    (* The code of an instantiation of a template has no closure. *)
+    true
+  | None ->
+    (* With "-flambda2-simplify-stubs" stubs are simplified like other functions
+       at the definition of the set of closures. *)
+    Code.stub code && not (Flambda_features.simplify_stubs ())
+
 let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     ~simplify_function_body =
   let bound_static_list = Bound_static.to_list bound_static in
@@ -378,7 +390,7 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
     let old_code_ids =
       Code_id.Map.fold
         (fun code_id code old_code_ids ->
-          if Code.stub code && not (Flambda_features.simplify_stubs ())
+          if simplified_where_bound code
           then old_code_ids
           else
             match Code.newer_version_of code with
@@ -396,18 +408,13 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
       ~init:([], [], dacc)
       ~code:(fun (bound_static, static_consts, dacc) code_id code ->
         let code, static_const, dacc =
-          if
-            Code.stub code
-            &&
-            (* With "-flambda2-simplify-stubs" stubs are simplified like other
-               functions at the definition of the set of closures. *)
-            not (Flambda_features.simplify_stubs ())
+          if simplified_where_bound code
           then
             let dacc, prior_lifted_constants =
               DA.get_and_clear_lifted_constants dacc
             in
             let static_const, dacc_after_function =
-              Simplify_set_of_closures.simplify_static_stub_function dacc code
+              Simplify_set_of_closures.simplify_code_where_bound dacc code
                 ~all_code ~simplify_function_body
             in
             let dacc_after_function =
