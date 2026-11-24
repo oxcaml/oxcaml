@@ -32,7 +32,7 @@ module Hash = Fdo_counter.Position_hash
 
 module Event = struct
   type t =
-    | Branch of
+    | Conditional_branch of
         { taken : Fdo_annotation.t;
           fallthrough : Fdo_annotation.t
         }
@@ -40,44 +40,77 @@ module Event = struct
         { return_address : L.t;
           counter : Fdo_counter.t
         }
-    | Tailcall of Fdo_counter.t
-    | Jump of
+    | Tail_call of Fdo_counter.t
+    | Indirect_jump of
         { target : L.t;
           taken : Fdo_annotation.t
         }
-    | Reset
+    | Exception_handler
 end
 
-type kind =
-  | Taken  (** a branch from here was taken *)
-  | Fallthrough  (** instruction was executed without taking a branch *)
-  | Exec  (** instruction was executed *)
+(* What a decoder does when the instruction at an entry's address executes. *)
+module Action = struct
+  type t =
+    | Count_taken of Fdo_counter.Hashed.t
+    | Count_fallthrough of Fdo_counter.Hashed.t
+    | Count_executed of Fdo_counter.Hashed.t
+    | Count_call of
+        { return_address : L.t;
+          counter : Fdo_counter.Hashed.t
+        }
+    | Count_tail_call of Fdo_counter.Hashed.t
+    | Count_indirect_jump of
+        { target : L.t;
+          counter : Fdo_counter.Hashed.t
+        }
+    | Unwind_to_handler
 
-type action =
-  | Call of
-      { return_address : L.t;
-        stack : Fdo_counter.Hashed.t
-      }
-  | Tailcall of Fdo_counter.Hashed.t
-  | Normal of Fdo_counter.Hashed.t
-  | Jump of
-      { target : L.t;
-        stack : Fdo_counter.Hashed.t
-      }
-  | Reset
+  (* The flags byte of the format, without the sharing bit. *)
+  let flags t =
+    let on_taken = 2 and on_fallthrough = 1 in
+    let code, on =
+      match t with
+      | Count_call _ -> 0, on_taken
+      | Count_tail_call _ -> 1, on_taken
+      | Count_taken _ -> 2, on_taken
+      | Count_fallthrough _ -> 2, on_fallthrough
+      | Count_executed _ -> 2, on_taken lor on_fallthrough
+      | Unwind_to_handler -> 3, on_taken lor on_fallthrough
+      | Count_indirect_jump _ -> 4, on_taken
+    in
+    (code lsl 2) lor on
 
-type piece =
-  { start : L.t;
-    finish : L.t;
-    operations : (L.t * kind * action) list
-  }
+  let counter = function
+    | Count_taken counter
+    | Count_fallthrough counter
+    | Count_executed counter
+    | Count_tail_call counter
+    | Count_call { counter; _ }
+    | Count_indirect_jump { counter; _ } ->
+      Some counter
+    | Unwind_to_handler -> None
+end
+
+module Entry = struct
+  type t =
+    { address : L.t;
+      action : Action.t
+    }
+end
+
+module Function = struct
+  type t =
+    { start : L.t;
+      finish : L.t;
+      entries : Entry.t list
+    }
+end
 
 type t =
   { record_names : bool;
-    mutable pieces : piece list;  (** the functions so far, most recent first *)
+    mutable functions : Function.t list;  (** most recent first *)
     names : string Hash.Tbl.t;
     body_hashes : Fdo_counter.Body_hash.t Hash.Tbl.t;
-        (** of every compiled function, whether or not it executes *)
     mutable dropped :
       (Fdo_dropped_counters.Reason.t * Fdo_counter.Hashed.t) list
   }
@@ -85,31 +118,29 @@ type t =
 type function_metadata =
   { unit_metadata : t;
     start : L.t;
-    mutable operations : (L.t * kind * action) list  (** most recent first *)
+    mutable rev_entries : Entry.t list
   }
 
 let create ~record_names =
   { record_names;
-    pieces = [];
+    functions = [];
     names = Hash.Tbl.create 64;
     body_hashes = Hash.Tbl.create 64;
     dropped = []
   }
 
-let remember t hash name =
-  (match Hash.Tbl.find_opt t.names hash with
-  | Some old when not (String.equal old name) ->
-    Misc.fatal_errorf "FDO hash collision %08lx: %s and %s" (Hash.to_int32 hash)
-      old name
-  | Some _ | None -> ());
-  Hash.Tbl.replace t.names hash name
+(* CR-someday yusumez: hashes are 32 bits, so collisions are possible. They are
+   rare enough that both tables just keep the first binding. We should check
+   whether we care. *)
+let add_first table hash value =
+  if not (Hash.Tbl.mem table hash) then Hash.Tbl.add table hash value
 
 let hash_counter t counter =
   if t.record_names
   then
     List.iter
       (fun position ->
-        remember t
+        add_first t.names
           (Fdo_counter.Position.hash position)
           (Fdo_counter.Position.to_string position))
       (Fdo_counter.position counter :: Fdo_counter.inlining_stack counter);
@@ -118,91 +149,133 @@ let hash_counter t counter =
 let hash_annotation t annotation =
   List.map (hash_counter t) (Fdo_annotation.to_list annotation)
 
-let emit fn kind label action =
-  fn.operations <- (label, kind, action) :: fn.operations
+let add_entry fn address action =
+  fn.rev_entries <- { Entry.address; action } :: fn.rev_entries
 
-let record fn kind label ?(action = fun stack -> Normal stack) stacks =
-  (* Group common outer contexts for metadata-order compression. Every action
-     still specifies its complete within-function stack, innermost first. *)
-  List.map List.rev stacks
+let add_counters fn address (action : Fdo_counter.Hashed.t -> Action.t) counters
+    =
+  (* Sorting by outermost position first groups the counters sharing inlining
+     contexts, for the sharing in the encoding. *)
+  List.map List.rev counters
   |> List.sort_uniq (List.compare Hash.compare)
   |> List.iter (function
     | [] -> ()
-    | path -> emit fn kind label (action (List.rev path)))
+    | rev_counter -> add_entry fn address (action (List.rev rev_counter)))
 
 let record_body t ~function_ ~body_hash =
-  let hash = Fdo_counter.Function.entry_position_hash function_ in
-  (* There could be hash collisions here, but this is fine as it will be very
-     rare. *)
-  Hash.Tbl.replace t.body_hashes hash body_hash
+  add_first t.body_hashes
+    (Fdo_counter.Function.entry_position_hash function_)
+    body_hash
 
 let begin_function t ~start ~entry_annotation =
-  let fn = { unit_metadata = t; start; operations = [] } in
-  record fn Exec start (hash_annotation t entry_annotation);
+  let fn = { unit_metadata = t; start; rev_entries = [] } in
+  add_counters fn start
+    (fun counter -> Count_executed counter)
+    (hash_annotation t entry_annotation);
   fn
 
-let record_event fn label (event : Event.t) =
+let record_event fn address (event : Event.t) =
   let t = fn.unit_metadata in
   match event with
-  | Branch { taken; fallthrough } ->
-    record fn Taken label (hash_annotation t taken);
-    record fn Fallthrough label (hash_annotation t fallthrough)
+  | Conditional_branch { taken; fallthrough } ->
+    add_counters fn address
+      (fun counter -> Count_taken counter)
+      (hash_annotation t taken);
+    add_counters fn address
+      (fun counter -> Count_fallthrough counter)
+      (hash_annotation t fallthrough)
   | Call { return_address; counter } ->
-    let stack = hash_counter t counter in
-    emit fn Taken label (Call { return_address; stack })
-  | Tailcall counter -> emit fn Taken label (Tailcall (hash_counter t counter))
-  | Jump { target; taken } ->
-    record fn Taken label
-      ~action:(fun stack -> Jump { target; stack })
+    add_entry fn address
+      (Count_call { return_address; counter = hash_counter t counter })
+  | Tail_call counter ->
+    add_entry fn address (Count_tail_call (hash_counter t counter))
+  | Indirect_jump { target; taken } ->
+    add_counters fn address
+      (fun counter -> Count_indirect_jump { target; counter })
       (hash_annotation t taken)
-  | Reset -> emit fn Exec label Reset
+  | Exception_handler -> add_entry fn address Unwind_to_handler
 
 let end_function fn ~finish =
   let t = fn.unit_metadata in
-  if not (List.is_empty fn.operations)
+  if not (List.is_empty fn.rev_entries)
   then
-    t.pieces
-      <- { start = fn.start; finish; operations = List.rev fn.operations }
-         :: t.pieces
+    t.functions
+      <- { Function.start = fn.start;
+           finish;
+           entries = List.rev fn.rev_entries
+         }
+         :: t.functions
 
-let record_dropped t dropped =
+let set_dropped t dropped =
   t.dropped
     <- List.map
          (fun (counter, reason) -> reason, hash_counter t counter)
          (Fdo_dropped_counters.to_list dropped)
 
-(* A compilation-unit fragment: "FDOM", version (ULEB), number of functions
-   (ULEB); per function: absolute start (u64), byte length (ULEB), entry count
-   (ULEB); per entry: offset from function start (ULEB), opcode byte, operands;
-   body count (ULEB), then function hash (u32) and body hash (u32); name count
-   (ULEB), then hash (u32) and length-prefixed canonical name (ULEB + bytes);
-   dropped count (ULEB), then reason (byte, see
-   [Fdo_dropped_counters.Reason.to_int]), stack length (ULEB) and u32 hashes,
-   innermost first. Bodies cover every compiled instrumented function, so a
-   profile can tell an unexecuted function from one whose body changed. The
-   dropped counters are those the compiler has no instruction left for: they are
-   only recorded with -fdo-dropped-counters, to assess the loss.
+(* CR-someday yusumez: consider emitting this metadata as an FDO-only DWARF
+   compilation unit in .debug_info instead, with vendor tags and attributes, the
+   innermost position of each stack inline and the rest as references to a trie
+   of inlining contexts. Standard DWARF tools could then read it, and new
+   attributes would not break older decoders. *)
 
-   Bits 0/1 select on_fallthrough/on_taken (neither is invalid). Bits 2..4
-   encode Call=0, Tailcall=1, Normal=2, Reset=3, Jump=4. Bit 5 selects stack
-   sharing; bits 6..7 are reserved. Reset has no operands or sharing bit. Call
-   starts with its instruction length (ULEB), before the stack operands. The
-   loader matches observed return instructions against call address + length;
-   returns need no records. Jump (taken-only) counts only when the branch lands
-   at its target, whose offset from the function start (ULEB) comes before the
-   stack operands: the edges of an indirect jump through a jump table.
+(*= A fragment of the .debug_fdo_metadata section, for one compilation unit
+    (the linker concatenates them):
 
-   Call, Tailcall, Normal and Jump specify the full within-function stack,
-   innermost first. Uninstrumented calls have no annotation. Without sharing:
-   length (ULEB), then u32 hashes. With sharing: drop (ULEB), length (ULEB),
-   then u32 hashes prepended to the previous stack after dropping its innermost
-   [drop] entries. The previous stack starts empty per function and changes only
-   on counting actions, in METADATA order, not execution order. The loader
-   expands this encoding before interpreting any samples.
+    fragment:
+      "FDOM"            4 bytes
+      length            u64    bytes after this field, to skip the fragment
+      version           uleb
+      functions         uleb n, then n x function
+      bodies            uleb n, then n x (function hash u32, body hash u32)
+      names             uleb n, then n x (hash u32, .debug_str offset u32)
+      dropped           uleb n, then n x (reason u8, counter)
 
-   Labels in a piece are in the same text section, so all deltas are assembler
-   constants even though the metadata is emitted in another section. *)
-let version = 18
+    function:
+      start             u64    absolute address
+      length            uleb   bytes of code
+      entries           uleb n, then n x entry   (not sorted by offset)
+
+    entry:
+      offset            uleb   from the function's start
+      flags             u8
+      operands                 by action, see below
+
+    flags:
+       7  6  5  4  3  2  1  0
+      +-----+--+--------+-----+
+      |0  0 |s | action |t  f |   t, f: on taken, on fallthrough
+      +-----+--+--------+-----+   s: the counter is shared (see below)
+
+      action                code  t f   operands
+      Count_taken             2   1 0   counter
+      Count_fallthrough       2   0 1   counter
+      Count_executed          2   1 1   counter
+      Count_call              0   1 0   call length (uleb), counter
+      Count_tail_call         1   1 0   counter
+      Count_indirect_jump     4   1 0   target offset (uleb), counter
+      Unwind_to_handler       3   1 1   none (s = 0)
+
+    counter, innermost position first:
+      s = 0:            uleb n, then n x hash u32
+      s = 1:            uleb drop, uleb n, then n x hash u32, put in front of
+                        the previous counter without its [drop] innermost
+                        hashes
+*)
+
+(* The previous counter starts empty in each function, and is that of the
+   previous entry with one, in metadata order, not execution order. The return
+   address of a call is its address plus its length, so returns need no entries.
+   An indirect jump counts only when it lands at its target. An exception
+   handler unwinds the decoder's call stack to the nearest frame of its
+   function, or clears it if there is none: with recursion, that frame may not
+   be the one the exception was raised to. Bodies cover every compiled
+   instrumented function, so a profile can tell an unexecuted function from one
+   whose body changed. Dropped counters (see
+   [Fdo_dropped_counters.Reason.to_int] for the reasons) are only recorded with
+   -fdo-dropped-counters, to assess what dropping them loses. Names are only
+   recorded with -fdo-names. Labels of a function are in one text section, so
+   all offsets are assembler constants. *)
+let version = 19
 
 let section =
   Asm_targets.Asm_section.Custom
@@ -212,108 +285,151 @@ let section =
       is_delayed = false
     }
 
+(* Bytes are buffered, and flushed as a string directive before any other
+   directive. *)
+module Writer = struct
+  type t = Buffer.t
+
+  let create () = Buffer.create 4096
+
+  let flush t =
+    if Buffer.length t > 0
+    then (
+      D.string (Buffer.contents t);
+      Buffer.clear t)
+
+  let byte t n = Buffer.add_char t (Char.chr n)
+
+  (* Unsigned Little Endian Base 128. Split into 7-bit chunks and fill the 8th
+     bit with whether there are more bytes ahead. *)
+  let rec uleb t n =
+    if n < 0x80
+    then byte t n
+    else (
+      byte t (n land 0x7f lor 0x80);
+      uleb t (n lsr 7))
+
+  let int32 t n = Buffer.add_int32_le t n
+
+  let hash t hash = int32 t (Hash.to_int32 hash)
+
+  let hashes t hashes =
+    uleb t (List.length hashes);
+    List.iter (hash t) hashes
+
+  let raw_string t s = Buffer.add_string t s
+
+  let directive t emit =
+    flush t;
+    emit ()
+
+  let label t label = directive t (fun () -> D.label label)
+
+  let delta t ~upper ~lower =
+    directive t (fun () -> D.delta_uleb128 ~upper ~lower)
+end
+
+let rec uleb_size n = if n < 0x80 then 1 else 1 + uleb_size (n lsr 7)
+
+(* How many innermost hashes of [previous] to drop, and the innermost hashes of
+   [counter] to put in their place, innermost first. *)
+let unshared ~previous counter =
+  let rec drop_common previous counter =
+    match previous, counter with
+    | x :: previous, y :: counter when Hash.equal x y ->
+      drop_common previous counter
+    | _ -> List.length previous, List.rev counter
+  in
+  drop_common (List.rev previous) (List.rev counter)
+
+(* Returns the counter the next entry is encoded relative to. *)
+let encode_entry w ~start ~previous ({ address; action } : Entry.t) =
+  Writer.delta w ~upper:address ~lower:start;
+  let flags = Action.flags action in
+  match Action.counter action with
+  | None ->
+    Writer.byte w flags;
+    previous
+  | Some counter ->
+    let drop, push = unshared ~previous counter in
+    let n = List.length counter and m = List.length push in
+    let shared =
+      uleb_size drop + uleb_size m + (4 * m) < uleb_size n + (4 * n)
+    in
+    Writer.byte w (flags lor if shared then 32 else 0);
+    (match action with
+    | Count_call { return_address; _ } ->
+      Writer.delta w ~upper:return_address ~lower:address
+    | Count_indirect_jump { target; _ } ->
+      Writer.delta w ~upper:target ~lower:start
+    | Count_taken _ | Count_fallthrough _ | Count_executed _ | Count_tail_call _
+    | Unwind_to_handler ->
+      ());
+    if shared
+    then (
+      Writer.uleb w drop;
+      Writer.hashes w push)
+    else Writer.hashes w counter;
+    counter
+
+let encode_function w ({ start; finish; entries } : Function.t) =
+  Writer.label w start;
+  Writer.delta w ~upper:finish ~lower:start;
+  Writer.uleb w (List.length entries);
+  let (_ : Fdo_counter.Hashed.t) =
+    List.fold_left
+      (fun previous entry -> encode_entry w ~start ~previous entry)
+      [] entries
+  in
+  ()
+
+let sorted_bindings table =
+  Hash.Tbl.fold (fun key value acc -> (key, value) :: acc) table []
+  |> List.sort (fun (a, _) (b, _) -> Hash.compare a b)
+
+let encode_tables w t =
+  Writer.uleb w (Hash.Tbl.length t.body_hashes);
+  List.iter
+    (fun (hash, body_hash) ->
+      Writer.hash w hash;
+      Writer.int32 w (Fdo_counter.Body_hash.to_int32 body_hash))
+    (sorted_bindings t.body_hashes);
+  Writer.uleb w (Hash.Tbl.length t.names);
+  List.iter
+    (fun (hash, name) ->
+      Writer.hash w hash;
+      Writer.directive w (fun () ->
+          D.offset_into_dwarf_section_label ~width:Thirty_two Debug_str
+            (D.cache_string (DWARF Debug_str) name)))
+    (sorted_bindings t.names);
+  Writer.uleb w (List.length t.dropped);
+  List.iter
+    (fun (reason, counter) ->
+      Writer.byte w (Fdo_dropped_counters.Reason.to_int reason);
+      Writer.hashes w counter)
+    t.dropped
+
 let emit_section t =
-  match List.rev t.pieces with
-  | [] when Hash.Tbl.length t.body_hashes = 0 && List.is_empty t.dropped -> ()
-  | functions ->
-    let buf = Buffer.create 4096 in
-    let flush () =
-      D.string (Buffer.contents buf);
-      Buffer.clear buf
-    in
-    let rec uleb n =
-      if n < 0x80
-      then Buffer.add_char buf (Char.chr n)
-      else (
-        Buffer.add_char buf (Char.chr (n land 0x7f lor 0x80));
-        uleb (n lsr 7))
-    in
-    let rec uleb_size n = if n < 0x80 then 1 else 1 + uleb_size (n lsr 7) in
-    let hash n = Buffer.add_int32_le buf (Hash.to_int32 n) in
-    let rec unshared old stack =
-      match old, stack with
-      | x :: xs, y :: ys when Hash.equal x y -> unshared xs ys
-      | _ -> List.length old, List.rev stack
-    in
+  if
+    not
+      (List.is_empty t.functions
+      && Hash.Tbl.length t.body_hashes = 0
+      && List.is_empty t.dropped)
+  then (
+    let w = Writer.create () in
+    let functions = List.rev t.functions in
+    let after_length = L.create section in
+    let fragment_end = L.create section in
     D.switch_to_section section;
-    Buffer.add_string buf "FDOM";
-    uleb version;
-    uleb (List.length functions);
-    List.iter
-      (fun { start; finish; operations } ->
-        flush ();
-        D.label start;
-        D.delta_uleb128 ~upper:finish ~lower:start;
-        uleb (List.length operations);
-        let previous = ref [] in
-        List.iter
-          (fun (label, kind, action) ->
-            flush ();
-            D.delta_uleb128 ~upper:label ~lower:start;
-            let code, stack =
-              match action with
-              | Call { stack; _ } -> 0, Some stack
-              | Tailcall stack -> 1, Some stack
-              | Normal stack -> 2, Some stack
-              | Reset -> 3, None
-              | Jump { stack; _ } -> 4, Some stack
-            in
-            let flags =
-              (match kind with Fallthrough -> 1 | Taken -> 2 | Exec -> 3)
-              lor (code lsl 2)
-            in
-            match stack with
-            | None -> Buffer.add_char buf (Char.chr flags)
-            | Some stack ->
-              let drop, push = unshared (List.rev !previous) (List.rev stack) in
-              let n = List.length stack and m = List.length push in
-              let shared =
-                uleb_size drop + uleb_size m + (4 * m) < uleb_size n + (4 * n)
-              in
-              Buffer.add_char buf
-                (Char.chr (flags lor if shared then 32 else 0));
-              (match action with
-              | Call { return_address; _ } ->
-                flush ();
-                D.delta_uleb128 ~upper:return_address ~lower:label
-              | Jump { target; _ } ->
-                flush ();
-                D.delta_uleb128 ~upper:target ~lower:start
-              | Tailcall _ | Normal _ | Reset -> ());
-              if shared
-              then (
-                uleb drop;
-                uleb m;
-                List.iter hash push)
-              else (
-                uleb n;
-                List.iter hash stack);
-              previous := stack)
-          operations)
-      functions;
-    let sorted table =
-      Hash.Tbl.fold (fun key value acc -> (key, value) :: acc) table []
-      |> List.sort (fun (a, _) (b, _) -> Hash.compare a b)
-    in
-    uleb (Hash.Tbl.length t.body_hashes);
-    List.iter
-      (fun (key, body_hash) ->
-        hash key;
-        Buffer.add_int32_le buf (Fdo_counter.Body_hash.to_int32 body_hash))
-      (sorted t.body_hashes);
-    uleb (Hash.Tbl.length t.names);
-    List.iter
-      (fun (key, name) ->
-        hash key;
-        uleb (String.length name);
-        Buffer.add_string buf name)
-      (sorted t.names);
-    uleb (List.length t.dropped);
-    List.iter
-      (fun (reason, stack) ->
-        Buffer.add_char buf
-          (Char.chr (Fdo_dropped_counters.Reason.to_int reason));
-        uleb (List.length stack);
-        List.iter hash stack)
-      t.dropped;
-    flush ()
+    Writer.raw_string w "FDOM";
+    Writer.directive w (fun () ->
+        D.between_labels_64_bit ~upper:fragment_end ~lower:after_length ();
+        D.define_label after_length);
+    Writer.uleb w version;
+    Writer.uleb w (List.length functions);
+    List.iter (encode_function w) functions;
+    encode_tables w t;
+    Writer.directive w (fun () -> D.define_label fragment_end);
+    (* Emits the names, and forgets them: with -g, DWARF emission emits its own
+       strings later. *)
+    D.emit_cached_strings ())

@@ -604,14 +604,14 @@ let mk_fdo_counters f =
 let mk_fdo_names f =
   ( "-fdo-names",
     Arg.Unit f,
-    " Also record the names of the counters in the FDO metadata section, for \
-     readable decoder output" )
+    " With -fdo-counters, also record the names of the counters in the FDO \
+     metadata section, for readable decoder output" )
 
 let mk_fdo_dropped_counters f =
   ( "-fdo-dropped-counters",
     Arg.Unit f,
-    " Also record the FDO counters dropped by optimizations in the FDO \
-     metadata section, with the reason" )
+    " With -fdo-counters, also record the FDO counters dropped by \
+     optimizations in the FDO metadata section, with the reason" )
 
 let mk_dfdo_dropped_counters f =
   ( "-dfdo-dropped-counters",

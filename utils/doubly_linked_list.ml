@@ -43,10 +43,6 @@ let insert_before cell value =
   let _new_cell : _ cell = insert_and_return_before cell value in
   ()
 
-(* Cells are transient handles allocated by each accessor, so cells must be
-   compared through the node they point at, never physically. *)
-let same_cell (a : _ cell) (b : _ cell) = a.node == b.node
-
 let insert_and_return_after cell value =
   match unattached_node value with
   | Empty -> assert false
@@ -228,6 +224,16 @@ let remove t curr =
     | Node node -> node.prev <- curr.prev)
 
 let delete_curr cell = remove cell.t cell.node
+
+(* [remove] leaves the removed node's own links as they were, but not those of
+   its neighbours. *)
+let is_attached cell =
+  match cell.node with
+  | Empty ->
+    (* internal invariant: cell's nodes are not empty *)
+    assert false
+  | Node { prev = Empty; _ } -> cell.t.first == cell.node
+  | Node { prev = Node prev; _ } -> prev.next == cell.node
 
 let delete_before cell =
   match cell.node with

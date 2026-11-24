@@ -77,20 +77,14 @@ val current_output_pos : unit -> output_pos
 
 val output_range : from_pos:output_pos -> to_pos:output_pos -> asm_line list
 
-type 'a fdo_instruction =
-  { address : Asm_targets.Asm_label.t;
-    return_address : Asm_targets.Asm_label.t option;
-    annotation : 'a
-  }
+(** Whether peephole optimization has deleted the line at the position. *)
+val deleted : output_pos -> bool
 
-(** Label surviving annotations after peephole optimization. Annotated calls
-    also get a label immediately after CALL, for computing instruction length.
-    This inserts no instructions and leaves frame labels unchanged. *)
-val label_fdo_instructions :
-  from_pos:output_pos ->
-  to_pos:output_pos ->
-  recorded:(output_pos * 'a) list ->
-  'a fdo_instruction list
+(** A fresh label, defined just before the line at the position. *)
+val insert_label_before : output_pos -> Asm_targets.Asm_label.t
+
+(** A fresh label, defined just after the line at the position. *)
+val insert_label_after : output_pos -> Asm_targets.Asm_label.t
 
 val peephole_optimize_from : output_pos -> unit
 

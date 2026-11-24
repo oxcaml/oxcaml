@@ -42,6 +42,7 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump
     | Linear_branch_to_jump
     | Linear_branch_relaxed
+    | Peephole_deleted
 
   let to_string = function
     | Inlined_call -> "inlined_call"
@@ -58,6 +59,7 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump -> "ssa_self_tail_call_to_jump"
     | Linear_branch_to_jump -> "linear_branch_to_jump"
     | Linear_branch_relaxed -> "linear_branch_relaxed"
+    | Peephole_deleted -> "peephole_deleted"
 
   let to_int = function
     | Inlined_call -> 0
@@ -74,6 +76,7 @@ module Reason = struct
     | Inlined_call_without_counter -> 11
     | Ssa_self_tail_call_to_jump -> 12
     | Linear_branch_relaxed -> 13
+    | Peephole_deleted -> 14
 end
 
 module Counter_map = Map.Make (Fdo_counter)

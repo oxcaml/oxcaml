@@ -31,13 +31,15 @@
     them means, so that a profile decoder can attribute the branches it samples
     to counters.
 
-    Each counting annotation specifies a complete within-function stack.
-    Optional sharing against the previous stack in metadata order is purely an
+    Each entry has a complete counter, with its inlining context within the
+    function. Sharing inlining contexts with the previous entry is purely an
     encoding: decoding a sample does not depend on earlier branch outcomes. *)
 
+(** What Emit reports about the emitted code, at a label: an instrumented
+    instruction or an exception handler. *)
 module Event : sig
   type t =
-    | Branch of
+    | Conditional_branch of
         { taken : Fdo_annotation.t;
           fallthrough : Fdo_annotation.t
         }
@@ -45,12 +47,12 @@ module Event : sig
         { return_address : Asm_targets.Asm_label.t;
           counter : Fdo_counter.t
         }
-    | Tailcall of Fdo_counter.t
-    | Jump of
+    | Tail_call of Fdo_counter.t
+    | Indirect_jump of
         { target : Asm_targets.Asm_label.t;
           taken : Fdo_annotation.t
-        }  (** An indirect jump, whose edge to [target] carries [taken]. *)
-    | Reset  (** An exception handler, which discards the calling context. *)
+        }
+    | Exception_handler
 end
 
 (** The metadata of one compilation unit, accumulated function by function. *)
@@ -60,7 +62,6 @@ type t
     readable decoder output. *)
 val create : record_names:bool -> t
 
-(** Record a compiled function's body hash, executed or not. *)
 val record_body :
   t ->
   function_:Fdo_counter.Function.t ->
@@ -79,13 +80,11 @@ val begin_function :
 val record_event :
   function_metadata -> Asm_targets.Asm_label.t -> Event.t -> unit
 
-(** Adds the function to its compilation unit's metadata (unless nothing was
-    recorded for it). *)
 val end_function : function_metadata -> finish:Asm_targets.Asm_label.t -> unit
 
 (** Record the counters dropped in the unit, with the reason. They have no
     address: this is for assessing what dropping them loses. *)
-val record_dropped : t -> Fdo_dropped_counters.t -> unit
+val set_dropped : t -> Fdo_dropped_counters.t -> unit
 
 (** Emit the unit's ".debug_fdo_metadata" section. Nothing is emitted when
     nothing was recorded. *)

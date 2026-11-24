@@ -604,6 +604,7 @@
   emit_sancov_common
   emitaux
   fdo_info
+  fdo_metadata_encode
   generic_fns
   instructionId
   linear
@@ -620,7 +621,6 @@
   probe_emission
   simd
   simd_selection
-  fdo_metadata_encode
   amd64_simd_defs
   amd64_simd_instrs
   amd64_simd_intrins
