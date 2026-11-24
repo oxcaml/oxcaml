@@ -394,10 +394,16 @@ let mk_function_layout f =
 
 let mk_float_op_fusion f =
   ( "-float-op-fusion",
-    Arg.Symbol ([ "on"; "off" ], f),
-    " Allow (on) or forbid (off) fusing floating-point operations into single \
-     operations that round only once, where available, e.g. a multiplication \
-     and an addition into a fused multiply-add (default: on)" )
+    Arg.Unit f,
+    " Allow fusing floating-point operations into single operations that round \
+     only once, where available, e.g. a multiplication and an addition into a \
+     fused multiply-add (default)" )
+
+let mk_no_float_op_fusion f =
+  ( "-no-float-op-fusion",
+    Arg.Unit f,
+    " Do not fuse floating-point operations into single operations that round \
+     only once" )
 
 let mk_name_mangling_scheme f =
   ( "-name-mangling-scheme",
@@ -1539,7 +1545,8 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
-  val float_op_fusion : string -> unit
+  val float_op_fusion : unit -> unit
+  val no_float_op_fusion : unit -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
@@ -1764,6 +1771,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_zero_alloc_checker_join F.zero_alloc_checker_join;
       mk_function_layout F.function_layout;
       mk_float_op_fusion F.float_op_fusion;
+      mk_no_float_op_fusion F.no_float_op_fusion;
       mk_name_mangling_scheme F.name_mangling_scheme;
       mk_disable_builtin_check F.disable_builtin_check;
       mk_disable_poll_insertion F.disable_poll_insertion;
@@ -2200,11 +2208,8 @@ module Oxcaml_options_impl = struct
     | None -> () (* this should not occur as we use Arg.Symbol *)
     | Some layout -> Oxcaml_flags.function_layout := layout
 
-  let float_op_fusion s =
-    match s with
-    | "on" -> Oxcaml_flags.float_op_fusion := true
-    | "off" -> Oxcaml_flags.float_op_fusion := false
-    | _ -> () (* this should not occur as we use Arg.Symbol *)
+  let float_op_fusion = set' Oxcaml_flags.float_op_fusion
+  let no_float_op_fusion = clear' Oxcaml_flags.float_op_fusion
 
   let name_mangling_scheme s =
     let scheme : Config.name_mangling_scheme option =
@@ -2791,17 +2796,7 @@ module Extra_params = struct
         | None ->
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
-    | "float-op-fusion" -> (
-        match v with
-        | "on" ->
-            Oxcaml_flags.float_op_fusion := true;
-            true
-        | "off" ->
-            Oxcaml_flags.float_op_fusion := false;
-            true
-        | _ ->
-            raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
-        )
+    | "float-op-fusion" -> set' Oxcaml_flags.float_op_fusion
     | "name-mangling-scheme" -> (
         let scheme : Config.name_mangling_scheme option =
           match v with

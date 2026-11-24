@@ -722,6 +722,8 @@ let ocaml_ignored_flags =
     "-no-ssa-simplify";
     "-ssa-validate";
     "-no-ssa-validate";
+    "-float-op-fusion";
+    "-no-float-op-fusion";
     "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
@@ -911,7 +913,6 @@ let ocaml_ignored_parametrized_flags =
     "-cached-generic-functions-path";
     "-gdwarf-max-function-complexity";
     "-function-layout";
-    "-float-op-fusion";
     "-cfg-stack-checks-threshold";
     "-zero-alloc-checker-details-cutoff";
     "-zero-alloc-checker-join";

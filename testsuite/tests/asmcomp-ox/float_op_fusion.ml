@@ -1,11 +1,11 @@
 (* TEST
  {
-   flags = "-float-op-fusion off";
+   flags = "-no-float-op-fusion";
    native;
  }{
    arch_amd64;
    {
-     flags = "-float-op-fusion on";
+     flags = "-float-op-fusion";
      native;
    }{
      native;
@@ -14,7 +14,7 @@
    arch_arm64;
    reference = "${test_source_directory}/float_op_fusion.arm64.reference";
    {
-     flags = "-float-op-fusion on";
+     flags = "-float-op-fusion";
      native;
    }{
      native;
@@ -22,10 +22,10 @@
  }
 *)
 
-(* [-float-op-fusion] controls whether floating-point operations may be fused
-   into single operations that round only once. It is on by default, but only
-   arm64 performs such fusion (into fused multiply-add/sub, tested here), hence
-   its separate reference file.
+(* [-[no-]float-op-fusion] controls whether floating-point operations may be
+   fused into single operations that round only once. It is on by default, but
+   only arm64 performs such fusion (into fused multiply-add/sub, tested here),
+   hence its separate reference file.
 
    [a *. b] is exactly [1 - 2^-60], which rounds to [1.0]. Adding or
    subtracting [1.0] therefore gives zero if the product is rounded first, and
