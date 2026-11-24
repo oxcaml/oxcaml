@@ -1,10 +1,9 @@
-(** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
-    respectively. *)
+(** Components classifying the behavior of a region of code. *)
 module Component : sig
   type 'top t =
-    | Top of 'top
-    | Safe
-    | Bot
+    | Top of 'top  (** This region of code may be reached and may allocate. *)
+    | Safe  (** This region of code may be reached but will not allocate. *)
+    | Bot  (** This region of code will not be reached. *)
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
@@ -26,18 +25,16 @@ end
 
 module Tag : sig
   type t =
-    | N
-    | E
-    | D
+    | NormalReturn
+    | Exception
+    | Diverge
 
   val compare : t -> t -> int
 
   val print : Format.formatter -> t -> unit
 end
 
-(** Three fields, [nor], [exn], & [div], meaning "control flow that returns
-    normally," "control flow that raises," and "control flow that diverges,"
-    respectively. *)
+(** One value per component, all of the same type. *)
 module Components : sig
   type 'component t =
     { nor : 'component;
@@ -57,7 +54,7 @@ module Components : sig
 
   val map : f:(Tag.t -> 'a -> 'b) -> 'a t -> 'b t
 
-  val map2 : f:(Tag.t -> 'a -> 'a -> 'b) -> 'a t -> 'a t -> 'b t
+  val map2 : f:(Tag.t -> 'a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 
   val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 

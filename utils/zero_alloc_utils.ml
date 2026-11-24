@@ -43,11 +43,11 @@ module Component = struct
   let compare ~compare_top c1 c2 =
     match c1, c2 with
     | Bot, Bot -> 0
-    | Bot, _ -> -1
-    | _, Bot -> 1
+    | Bot, (Safe | Top _) -> -1
+    | (Safe | Top _), Bot -> 1
     | Safe, Safe -> 0
-    | Safe, _ -> -1
-    | _, Safe -> 1
+    | Safe, Top _ -> -1
+    | Top _, Safe -> 1
     | Top t1, Top t2 -> compare_top t1 t2
 
   let join ~join_top c1 c2 =
@@ -82,16 +82,16 @@ end
 
 module Tag = struct
   type t =
-    | N
-    | E
-    | D
+    | NormalReturn
+    | Exception
+    | Diverge
 
-  let compare = Stdlib.compare
+  let compare : t -> t -> int = Stdlib.compare
 
   let print ppf = function
-    | N -> Format.fprintf ppf "nor"
-    | E -> Format.fprintf ppf "exn"
-    | D -> Format.fprintf ppf "div"
+    | NormalReturn -> Format.fprintf ppf "nor"
+    | Exception -> Format.fprintf ppf "exn"
+    | Diverge -> Format.fprintf ppf "div"
 end
 
 module Components = struct
@@ -101,20 +101,20 @@ module Components = struct
       div : 'component
     }
 
-  let create f = { nor = f Tag.N; exn = f Tag.E; div = f Tag.D }
+  let create f = { nor = f Tag.NormalReturn; exn = f Tag.Exception; div = f Tag.Diverge }
 
   let iter ~f { nor; exn; div } =
-    f Tag.N nor;
-    f Tag.E exn;
-    f Tag.D div
+    f Tag.NormalReturn nor;
+    f Tag.Exception exn;
+    f Tag.Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.N nor; exn = f Tag.E exn; div = f Tag.D div }
+    { nor = f Tag.NormalReturn nor; exn = f Tag.Exception exn; div = f Tag.Diverge div }
 
   let map2 ~f lhs rhs =
-    { nor = f Tag.N lhs.nor rhs.nor;
-      exn = f Tag.E lhs.exn rhs.exn;
-      div = f Tag.D lhs.div rhs.div
+    { nor = f Tag.NormalReturn lhs.nor rhs.nor;
+      exn = f Tag.Exception lhs.exn rhs.exn;
+      div = f Tag.Diverge lhs.div rhs.div
     }
 
   let lessequal f lhs rhs =
