@@ -478,6 +478,13 @@ Event spanning a domain cleaning ephemerons at the end of a minor collection.
 @since 5.4
 *)
 | EV_MINOR_DEPENDENT
+| EV_STW_GLOBAL_BARRIER
+(**
+Event spanning the time a domain spends in a barrier inside a
+stop-the-world section, waiting for the other domains to arrive or for
+the last one to finish a step it runs alone.
+@since 5.5
+*)
 
 (** Lifecycle events for Runtime_events and domains. *)
 type lifecycle =

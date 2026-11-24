@@ -101,6 +101,7 @@ type runtime_phase =
 | EV_EMPTY_MINOR
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
+| EV_STW_GLOBAL_BARRIER
 
 type lifecycle =
   EV_RING_START
@@ -223,6 +224,7 @@ let runtime_phase_name phase =
   | EV_EMPTY_MINOR -> "empty_minor"
   | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
   | EV_MINOR_DEPENDENT -> "minor_dependent"
+  | EV_STW_GLOBAL_BARRIER -> "stw_global_barrier"
 
 let lifecycle_name lifecycle =
   match lifecycle with
