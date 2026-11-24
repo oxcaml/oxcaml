@@ -195,3 +195,73 @@ Error: This variant expression is expected to have type "unit"
        because it is in the result of a conditional with no else branch
        There is no constructor "true" within type "unit"
 |}]
+
+(* oxcaml#7787 *)
+let _ = if (3 : int) then ()
+
+[%%expect {|
+Line 1, characters 11-20:
+1 | let _ = if (3 : int) then ()
+               ^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "bool"
+       because it is in the condition of an if-statement
+|}]
+
+let _ =
+  while (42 : int) do
+    ()
+  done
+
+[%%expect {|
+Line 2, characters 8-18:
+2 |   while (42 : int) do
+            ^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "bool"
+       because it is in the condition of a while-loop
+|}]
+
+let _ = if true then (3 : int)
+
+[%%expect {|
+Line 1, characters 21-30:
+1 | let _ = if true then (3 : int)
+                         ^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "unit"
+       because it is in the result of a conditional with no else branch
+|}]
+
+let _ = if (3 :> int) then ()
+
+[%%expect {|
+Line 1, characters 11-21:
+1 | let _ = if (3 :> int) then ()
+               ^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "bool"
+       because it is in the condition of an if-statement
+|}]
+
+let _ = if (3 : int @ local) then ();;
+
+[%%expect{|
+Line 1, characters 11-28:
+1 | let _ = if (3 : int @ local) then ();;
+               ^^^^^^^^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "bool"
+       because it is in the condition of an if-statement
+|}]
+
+let _ = if (3 : @ local) then ();;
+
+[%%expect{|
+Line 1, characters 12-13:
+1 | let _ = if (3 : @ local) then ();;
+                ^
+Error: The constant "3" has type "int" but an expression was expected of type
+         "bool"
+       because it is in the condition of an if-statement
+|}]
