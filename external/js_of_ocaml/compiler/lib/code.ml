@@ -929,41 +929,33 @@ type 'c fold_blocs = block Addr.Map.t -> Addr.t -> (Addr.t -> 'c -> 'c) -> 'c ->
 
 type fold_blocs_poly = { fold : 'a. 'a fold_blocs } [@@unboxed]
 
-let rec traverse' { fold } f pc visited blocks acc =
-  if not (Addr.Set.mem pc visited)
-  then
-    let visited = Addr.Set.add pc visited in
-    let visited, acc =
-      fold
-        blocks
-        pc
-        (fun pc (visited, acc) ->
-          let visited, acc = traverse' { fold } f pc visited blocks acc in
-          visited, acc)
-        (visited, acc)
-    in
-    let acc = f pc acc in
-    visited, acc
-  else visited, acc
+let traverse { fold } f pc blocks acc =
+  let rec loop visited acc stack =
+    match stack with
+    | [] -> acc
+    | (pc, []) :: rem -> loop visited (f pc acc) rem
+    | (pc, pc' :: succs) :: rem ->
+        if Addr.Set.mem pc' visited
+        then loop visited acc ((pc, succs) :: rem)
+        else
+          let children = fold blocks pc' (fun pc l -> pc :: l) [] in
+          loop (Addr.Set.add pc' visited) acc ((pc', children) :: (pc, succs) :: rem)
+  in
+  loop (Addr.Set.singleton pc) acc [ pc, fold blocks pc (fun pc l -> pc :: l) [] ]
 
-let traverse fold f pc blocks acc = snd (traverse' fold f pc Addr.Set.empty blocks acc)
-
-let rec preorder_traverse' { fold } f pc visited blocks acc =
-  if not (Addr.Set.mem pc visited)
-  then
-    let visited = Addr.Set.add pc visited in
-    let acc = f pc acc in
-    fold
-      blocks
-      pc
-      (fun pc (visited, acc) ->
-        let visited, acc = preorder_traverse' { fold } f pc visited blocks acc in
-        visited, acc)
-      (visited, acc)
-  else visited, acc
-
-let preorder_traverse fold f pc blocks acc =
-  snd (preorder_traverse' fold f pc Addr.Set.empty blocks acc)
+let preorder_traverse { fold } f pc blocks acc =
+  let rec loop visited acc stack =
+    match stack with
+    | [] -> acc
+    | pc :: rem ->
+        if Addr.Set.mem pc visited
+        then loop visited acc rem
+        else
+          let visited = Addr.Set.add pc visited in
+          let acc = f pc acc in
+          loop visited acc (fold blocks pc (fun pc' s -> pc' :: s) rem)
+  in
+  loop Addr.Set.empty acc [ pc ]
 
 let fold_closures_innermost_first { start; blocks; _ } f accu =
   let rec visit blocks pc f accu =
