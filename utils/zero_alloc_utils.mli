@@ -63,6 +63,7 @@ module Components : sig
 
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 
+  (** Mark all components [false] except a single component marked [true]. *)
   val one_hot : Tag.t -> bool t
 
   val print :
