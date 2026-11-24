@@ -40,9 +40,8 @@ let tlambda_to_bytecode i tlambda =
     (fun { Lambda.code = tlambda; required_globals;
            main_module_block_format }  ->
        Builtin_attributes.warn_unused ();
-       let tlambda =
-         print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda tlambda
-       in
+       if !Clflags.dump_tlambda then
+         Format.fprintf i.ppf_dump "%a@." Printlambda.lambda tlambda;
        if Clflags.(should_stop_after Compiler_pass.Transl) then None
        else
        tlambda
