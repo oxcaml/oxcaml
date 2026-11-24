@@ -182,7 +182,7 @@ and type_desc =
   | Tivar of
       { name : string option;
         jkind : jkind_lr;
-        ivar : type_shape Ivar.t
+        ivar : type_shape Typing_ivar.t
       }
   (** A type variable whose [ivar] is filled with the shape of the type it is
       unified with. Handlers waiting on [ivar] are how suspended constraints

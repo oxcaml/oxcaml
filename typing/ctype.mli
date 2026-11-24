@@ -125,7 +125,7 @@ val newvar: ?name:string -> jkind_lr -> type_expr
 
 (** The scheduler on which filling a [Tivar] during unification
     enqueues the ivar's handlers. Unification never runs it. *)
-val scheduler: unit -> Scheduler.t
+val scheduler: unit -> Typing_scheduler.t
 
 (** Runs the scheduler and defaults the ivars in the initial pool, as no
     scope will. Does nothing inside a generalization scope, whose exit
@@ -378,16 +378,16 @@ val expand_head: Env.t -> type_expr -> type_expr
 (** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler} once
     [ty]'s head has a shape. If instead [ty] is defaulted, [default ()] is
     added. Both [run] and [default] run at the levels and the monitor (see
-    {!Scheduler.Monitor}) current when [upon_shape] was called. Depending on
-    the scheduling policy (see {!Scheduler}), [run] or [default] may run
-    before [upon_shape] returns.
+    {!Typing_scheduler.Monitor}) current when [upon_shape] was called. Depending
+    on the scheduling policy (see {!Typing_scheduler}), [run] or [default] may
+    run before [upon_shape] returns.
 
     If [-extension omnidirectionality] is enabled, a [Tvar] head becomes a
-    [Tivar], and [run] or [default] waits until its ivar is filled or
-    defaulted. Before [default] runs, [ty] is turned back into a [Tvar] if it
-    is still the [Tivar] for that ivar (it may since have been linked to
-    another type, or given a different ivar).
-    If the extension is disabled, a [Tvar] head is defaulted immediately.
+    [Tivar], and [run] or [default] waits until its ivar is filled or defaulted.
+    Before [default] runs, [ty] is turned back into a [Tvar] if it is still the
+    [Tivar] for that ivar (it may since have been linked to another type, or
+    given a different ivar). If the extension is disabled, a [Tvar] head is
+    defaulted immediately.
 
     [ty] must not be generic: [run] or [default] (and [upon_shape] itself) may
     mutate it.
@@ -581,7 +581,7 @@ val enlarge_type: Env.t -> type_expr -> type_expr * bool
         (* Make a type larger, flag is true if some pruning had to be done.
            A mode crossing delayed by omnidirectionality may raise [Subtype]
            later, in the monitor current when [enlarge_type] is called (see
-           [Scheduler.Monitor]). *)
+           [Typing_scheduler.Monitor]). *)
 val subtype: Env.t -> type_expr -> type_expr -> unit -> unit
         (* [subtype env t1 t2] checks that [t1] is a subtype of [t2].
            It accumulates the constraints the type variables must
@@ -980,15 +980,15 @@ exception Crossing_failed of Mode.With_regionality.error
 (** Cross a right mode according to a type wrapped in modalities. Non-principal
     types don't cross.
 
-    Under [-extension omnidirectionality] (unless [-no-ikinds]), principality
-    is not checked, and the crossing is delayed if it depends on unsolved type
-    variables.
-    [cross_right] returns a fresh mode [m] and checks [m <= cross mode]
-    once the crossing is known, raising [Crossing_failed] if that fails. The
-    check may run after [cross_right] returns, but runs in the monitor current
-    when [cross_right] is called (see {!Scheduler.Monitor}), so callers should
-    convert [Crossing_failed] into their own error with [Scheduler.Monitor.try_]
-    rather than [try ... with].
+    Under [-extension omnidirectionality] (unless [-no-ikinds]), principality is
+    not checked, and the crossing is delayed if it depends on unsolved type
+    variables. [cross_right] returns a fresh mode [m] and checks
+    [m <= cross mode] once the crossing is known, raising [Crossing_failed] if
+    that fails. The check may run after [cross_right] returns, but runs in the
+    monitor current when [cross_right] is called (see
+    {!Typing_scheduler.Monitor}), so callers should convert [Crossing_failed]
+    into their own error with [Typing_scheduler.Monitor.try_] rather than
+    [try ... with].
 
     [pp] is passed to the [submode] for that check. *)
 val cross_right :
