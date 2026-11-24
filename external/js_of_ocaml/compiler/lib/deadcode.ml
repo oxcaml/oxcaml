@@ -313,13 +313,20 @@ let merge_blocks p =
           in
           merge to_inline blocks rem
     in
-    let rec traverse pc blocks =
-      if BitSet.mem visited pc
-      then blocks
-      else
-        let () = BitSet.set visited pc in
-        let blocks = process_branch pc blocks in
-        Code.fold_children blocks pc traverse blocks
+    let traverse pc blocks =
+      let rec loop blocks stack =
+        match stack with
+        | [] -> blocks
+        | pc :: rem ->
+            if BitSet.mem visited pc
+            then loop blocks rem
+            else
+              let () = BitSet.set visited pc in
+              let blocks = process_branch pc blocks in
+              let children = Code.fold_children blocks pc (fun pc' l -> pc' :: l) [] in
+              loop blocks (List.rev_append children rem)
+      in
+      loop blocks [ pc ]
     in
     let blocks =
       Code.fold_closures p (fun _ _ (pc, _) _ blocks -> traverse pc blocks) p.blocks
