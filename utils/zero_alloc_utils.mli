@@ -73,6 +73,28 @@ module Components : sig
 end
 
 module Relevant_components_by_argument_index : sig
+  (** Answers "How does this callback's behavior affect the overall function?"
+      Notably, this can be done without knowing the behavior of the callback:
+      this just answers which components would be relevant if they were to
+      allocate, not whether they actually do.
+
+      Concretely, this is a map from function argument indices to a yes/no
+      answer for each component of that argument. Notably, these indices are the
+      arguments to the function whose body we're in, not arguments passed to the
+      callback. For example, with [let f g = g ()], argument 0 is [g], not [()].
+
+      Keep in mind that each function definition holds up to *three* analyses of
+      this type: one for each of its components (normal, exception, diverging).
+      So, for [let f g = g ()] above, we have three separate analyses for [g]:
+      - On [f]'s normal-return path, [g]'s behavior on *its* normal path
+        matters, and its behavior on exceptional or diverging paths does not,
+        since [g]'s exceptions are not caught in [f], so [g] cannot raise and
+        then have [f] return normally.
+      - On [f]'s exception path, [g]'s exception behavior is all that matters.
+      - On [f]'s diverging path, [g]'s diverging behavior is all that matters.
+
+      On the other hand, if we had [let f g = try g () with _ -> ()], then [g]'s
+      exceptional behavior would matter for [f]'s *normal* path. *)
   type t = bool Components.t Numbers.Int.Map.t
 
   val compare : t -> t -> int
