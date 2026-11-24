@@ -82,13 +82,16 @@ end
 
 module Tag = struct
   type t =
-    | N
-    | E
-    | D
+    | NormalReturn
+    | Exception
+    | Diverge
 
   let compare : t -> t -> int = Stdlib.compare
 
-  let print = function N -> "nor" | E -> "exn" | D -> "div"
+  let print = function
+    | NormalReturn -> "nor"
+    | Exception -> "exn"
+    | Diverge -> "div"
 end
 
 module Components = struct
@@ -98,20 +101,20 @@ module Components = struct
       div : 'component
     }
 
-  let create f = { nor = f Tag.N; exn = f Tag.E; div = f Tag.D }
+  let create f = { nor = f Tag.NormalReturn; exn = f Tag.Exception; div = f Tag.Diverge }
 
   let iter ~f { nor; exn; div } =
-    f Tag.N nor;
-    f Tag.E exn;
-    f Tag.D div
+    f Tag.NormalReturn nor;
+    f Tag.Exception exn;
+    f Tag.Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.N nor; exn = f Tag.E exn; div = f Tag.D div }
+    { nor = f Tag.NormalReturn nor; exn = f Tag.Exception exn; div = f Tag.Diverge div }
 
   let map2 ~f lhs rhs =
-    { nor = f Tag.N lhs.nor rhs.nor;
-      exn = f Tag.E lhs.exn rhs.exn;
-      div = f Tag.D lhs.div rhs.div
+    { nor = f Tag.NormalReturn lhs.nor rhs.nor;
+      exn = f Tag.Exception lhs.exn rhs.exn;
+      div = f Tag.Diverge lhs.div rhs.div
     }
 
   let lessequal f lhs rhs =

@@ -25,9 +25,9 @@ end
 
 module Tag : sig
   type t =
-    | N
-    | E
-    | D
+    | NormalReturn
+    | Exception
+    | Diverge
 
   val compare : t -> t -> int
 

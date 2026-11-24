@@ -1381,7 +1381,10 @@ end = struct
         (union (V.get_unresolved_names t.exn) (V.get_unresolved_names t.div)))
 
   let get_component (t : t) (tag : Zero_alloc_utils.Tag.t) =
-    match tag with N -> t.nor | E -> t.exn | D -> t.div
+    match tag with
+    | NormalReturn -> t.nor
+    | Exception -> t.exn
+    | Diverge -> t.div
 
   let apply t env = Components.map ~f:(fun _ignore_tag -> V.apply ~env) t
 
