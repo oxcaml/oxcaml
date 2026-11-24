@@ -26,13 +26,12 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
+open! Zero_alloc_utils
 
 let debug = false
 
 module String = Misc.Stdlib.String
 module Fmt = Format_doc
-module Component = Zero_alloc_utils.Component
-module Components = Zero_alloc_utils.Components
 
 module Witness = struct
   type kind =
@@ -201,11 +200,11 @@ end
 module Var : sig
   type t
 
-  val create : string -> Zero_alloc_utils.Tag.t -> t
+  val create : string -> Tag.t -> t
 
   val name : t -> string
 
-  val tag : t -> Zero_alloc_utils.Tag.t
+  val tag : t -> Tag.t
 
   val print : Format.formatter -> t -> unit
 
@@ -220,12 +219,12 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Zero_alloc_utils.Tag.t
+        tag : Tag.t
       }
 
     let compare { tag = tag1; name = name1 } { tag = tag2; name = name2 } =
       let c = String.compare name1 name2 in
-      if c = 0 then Zero_alloc_utils.Tag.compare tag1 tag2 else c
+      if c = 0 then Tag.compare tag1 tag2 else c
   end
 
   include T
@@ -241,48 +240,48 @@ end = struct
   let create name tag = { name; tag }
 
   let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%a@ " name Zero_alloc_utils.Tag.print tag
+    Format.fprintf ppf "%s.%a@ " name Tag.print tag
 end
 
 module Top = struct
   type t =
     { allocation_source :
-        Zero_alloc_utils.Relevant_components_by_argument_index.t
-        Zero_alloc_utils.Allocation_source.t;
+        Relevant_components_by_argument_index.t
+        Allocation_source.t;
       witnesses : Witnesses.t
     }
 
   let compare { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
     let c =
-      Zero_alloc_utils.Allocation_source.compare
-        ~compare_args:
-          Zero_alloc_utils.Relevant_components_by_argument_index.compare a1 a2
+      Allocation_source.compare
+        ~compare_args:Relevant_components_by_argument_index.compare
+        a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
 
   let lessequal { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
-    Zero_alloc_utils.Allocation_source.lessequal
-      ~lessequal_args:
-        Zero_alloc_utils.Relevant_components_by_argument_index.lessequal a1 a2
+    Allocation_source.lessequal
+      ~lessequal_args:Relevant_components_by_argument_index.lessequal
+      a1 a2
     && Witnesses.lessequal w1 w2
 
   let join { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
     { allocation_source =
-        Zero_alloc_utils.Allocation_source.join
-          ~join_args:
-            Zero_alloc_utils.Relevant_components_by_argument_index.join a1 a2;
+        Allocation_source.join
+          ~join_args:Relevant_components_by_argument_index.join
+          a1 a2;
       witnesses = Witnesses.join w1 w2
     }
 
   let meet { allocation_source = a1; witnesses = w1 }
       { allocation_source = a2; witnesses = w2 } =
     { allocation_source =
-        Zero_alloc_utils.Allocation_source.meet
-          ~meet_args:
-            Zero_alloc_utils.Relevant_components_by_argument_index.meet a1 a2;
+        Allocation_source.meet
+          ~meet_args:Relevant_components_by_argument_index.meet
+          a1 a2;
       witnesses = Witnesses.meet w1 w2
     }
 
@@ -326,8 +325,7 @@ module V : sig
 
   val top :
     allocation_source:
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_source.t) ->
+      Relevant_components_by_argument_index.t Allocation_source.t ->
     witnesses:Witnesses.t ->
     t
 
@@ -883,9 +881,8 @@ end = struct
        cutoff. *)
     let args_with_top (top : Top.t) args =
       if
-        (not (Args.has_witnesses args)) &&
-        Zero_alloc_utils.Allocation_source.
-          allocates_other_than_calling_arguments
+        (not (Args.has_witnesses args))
+        && Allocation_source.allocates_other_than_calling_arguments
             top.allocation_source
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
@@ -895,9 +892,8 @@ end = struct
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
         if
-          Zero_alloc_utils.Allocation_source.
-            allocates_other_than_calling_arguments
-              top.allocation_source
+          Allocation_source.allocates_other_than_calling_arguments
+            top.allocation_source
         then
           Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
             top.witnesses
@@ -1204,9 +1200,8 @@ end = struct
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
         Witnesses.is_empty witnesses &&
-        Zero_alloc_utils.Allocation_source.
-          allocates_other_than_calling_arguments
-            w.allocation_source
+        Allocation_source.allocates_other_than_calling_arguments
+          w.allocation_source
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1237,18 +1232,16 @@ end = struct
       if
         Transform.has_witnesses tr
         || not
-             (Zero_alloc_utils.Allocation_source.
-                allocates_other_than_calling_arguments
-                  w.allocation_source)
+             (Allocation_source.allocates_other_than_calling_arguments
+                w.allocation_source)
       then Join (Join.tr_with_top tr w)
       else top
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
         Join.has_witnesses j
         || not
-             (Zero_alloc_utils.Allocation_source.
-                allocates_other_than_calling_arguments
-                  w.allocation_source)
+             (Allocation_source.allocates_other_than_calling_arguments
+                w.allocation_source)
       then Join (Join.add_top j w)
       else top
     | Resolved Safe, Join j | Join j, Resolved Safe -> Join (Join.add_safe j)
@@ -1307,9 +1300,8 @@ end = struct
       if
         (Join.has_safe j || Option.is_some (Join.get_top j)) &&
         (not (Join.has_witnesses j)) &&
-        Zero_alloc_utils.Allocation_source.
-          allocates_other_than_calling_arguments
-             w.allocation_source
+        Allocation_source.allocates_other_than_calling_arguments
+          w.allocation_source
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
@@ -1434,27 +1426,21 @@ end = struct
 end
 
 module Allocation_source :
-  Zero_alloc_utils.Allocation_source
+  Allocation_source
     with type t =
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_source.t) = struct
-  type t =
-    Zero_alloc_utils.(
-      Relevant_components_by_argument_index.t Allocation_source.t)
+      (Relevant_components_by_argument_index.t Allocation_source.t) = struct
+  type t = Relevant_components_by_argument_index.t Allocation_source.t
 
   let top =
-    Zero_alloc_utils.Allocation_source.Allocation_other_than_calling_arguments
+    Allocation_source.Allocation_other_than_calling_arguments
 
   let argument ~argument_index ~tag :
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_source.t) =
-    Zero_alloc_utils.(
-      Allocation_source.No_allocation_other_than_calling_arguments
-        (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
-  [@@warning "-44"]
+      Relevant_components_by_argument_index.t Allocation_source.t =
+    (Allocation_source.No_allocation_other_than_calling_arguments
+      (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
 end
 
-module T = Zero_alloc_utils.Make_value (Allocation_source) (Witnesses) (V)
+module T = Make_value (Allocation_source) (Witnesses) (V)
 
 module Value : sig
   include module type of T
@@ -1475,7 +1461,7 @@ module Value : sig
 
   val is_resolved : t -> bool
 
-  val get_component : t -> Zero_alloc_utils.Tag.t -> V.t
+  val get_component : t -> Tag.t -> V.t
 
   val apply : t -> (Var.t -> V.t option) -> t
 end = struct
@@ -1493,7 +1479,7 @@ end = struct
         (V.get_unresolved_names t.nor)
         (union (V.get_unresolved_names t.exn) (V.get_unresolved_names t.div)))
 
-  let get_component (t : t) (tag : Zero_alloc_utils.Tag.t) =
+  let get_component (t : t) (tag : Tag.t) =
     match tag with
     | NormalReturn -> t.nor
     | Exception -> t.exn
@@ -1508,7 +1494,7 @@ end = struct
     Components.map ~f:(fun _ignore_tag -> V.replace_witnesses w)
 
   let attribute_to_call_site w =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
+    Components.map ~f:(fun _ignore_tag ->
         V.attribute_to_call_site w)
 
   let diff_witnesses ~expected ~actual =
@@ -1693,7 +1679,7 @@ end = struct
      be used in Assume_info due to cyclic dependencies. The witnesses in
      Assume_info are always empty and the translation is trivial. Is there a
      better way to avoid duplicating [Zero_alloc_utils]? *)
-  let transl witnesses (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
+  let transl witnesses (v : Assume_info.V.t) : V.t =
     match v with
     | Top () ->
       V.top ~allocation_source:Allocation_other_than_calling_arguments
@@ -1701,14 +1687,14 @@ end = struct
     | Safe -> V.safe
     | Bot -> V.bot
 
-  let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
+  let transl w (v : Assume_info.Value.t) : Value.t =
     { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
 
   let assume_value dbg ~can_raise w =
     (* [loc] can be obtained by [Debuginfo.to_location dbg], For now just return
        [Location.none] because it is not used. *)
     let a = Debuginfo.assume_zero_alloc dbg in
-    match Zero_alloc_utils.Assume_info.get_value a with
+    match Assume_info.get_value a with
     | None -> None
     | Some v ->
       let v = transl w v in
@@ -1717,7 +1703,7 @@ end = struct
 
   let assume_value_unless_inferred dbg w =
     if
-      Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+      Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
     then None
     else assume_value dbg ~can_raise:false w
 end
@@ -2166,7 +2152,6 @@ end = struct
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
           (V.print ~witnesses:false) v)
     |> Zero_alloc_info.Encoded.Component.encode
-  [@@warning "-44"]
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2715,7 +2700,7 @@ end = struct
                 match callee with
                 | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
                 | Argument { argument_index } ->
-                  Zero_alloc_utils.Components.create (fun tag ->
+                  Components.create (fun tag ->
                       V.top
                         ~allocation_source:
                           (Allocation_source.argument ~argument_index ~tag)

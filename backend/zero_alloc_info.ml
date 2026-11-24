@@ -98,7 +98,7 @@ module Encoded = struct
       | _, _, _ -> Conditional encoded
 
     let decode ~(decode_component : Component.t -> 'a) (t : t) :
-        'a Zero_alloc_utils.Components.t =
+        'a Components.t =
       let encoded : Component.t Components.t =
         match t with
         | Unconditional tags ->
@@ -110,12 +110,10 @@ module Encoded = struct
           decode_component component)
 
     let all_top : t =
-      Zero_alloc_utils.(
-        Components.create (fun _ignore_tag ->
-            Component.Top
-              Allocation_source.Allocation_other_than_calling_arguments))
+      (Components.create (fun _ignore_tag ->
+         Zero_alloc_utils.Component.Top
+           Allocation_source.Allocation_other_than_calling_arguments))
       |> encode ~encode_component:Component.encode
-    [@@ocaml.warning "-44"]
 
     let ( = ) (t1 : t) (t2 : t) =
       match t1, t2 with
