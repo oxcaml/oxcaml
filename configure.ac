@@ -4021,9 +4021,36 @@ quintet3="16 + $quintet3"
 quintet3_zinc=BASE32([$quintet3_zinc])
 quintet3=BASE32([$quintet3])
 
+# Bits 20-29 (magic)
+m4_define([QUINTET4],
+  [m4_substr(ALPHABET, m4_eval(MAGIC_NUMBER__VERSION & 31), [1])])
+m4_define([QUINTET5],
+  [m4_substr(ALPHABET, m4_eval(MAGIC_NUMBER__VERSION >> 5), [1])])
+
+# Bit 30 (stack-checks)
+AS_IF([test x"$enable_stack_checks" = 'xyes'],
+  [quintet6_native='1'],
+  [quintet6_native='0'])
+# Bit 31 (asan)
+AS_IF([$address_sanitizer],
+  [quintet6_byte='2'],
+  [quintet6_byte='0'])
+# Bit 32 (multidomain)
+AS_IF([test x"$enable_multidomain" = 'xyes'],
+  [quintet6_byte="4 + $quintet6_byte"])
+quintet6_native="$quintet6_native + $quintet6_byte"
+
+quintet6_byte=BASE32([$quintet6_byte])
+quintet6_native=BASE32([$quintet6_native])
+
 zinc_runtime_id="QUINTET0[]QUINTET1_ZINC${quintet2_zinc}${quintet3_zinc}"
 bytecode_runtime_id="QUINTET0${quintet1}${quintet2_byte}${quintet3}"
 native_runtime_id="QUINTET0${quintet1}${quintet2_native}${quintet3}"
+
+# Bits 20 onwards are only present because bit 19 is set
+zinc_runtime_id="${zinc_runtime_id}QUINTET4[]QUINTET5[]0"
+bytecode_runtime_id="${bytecode_runtime_id}QUINTET4[]QUINTET5${quintet6_byte}"
+native_runtime_id="${native_runtime_id}QUINTET4[]QUINTET5${quintet6_native}"
 
 # Update the values for is_official_release and release_number in
 # utils/config.common.ml.in (this is done when tools/autogen is run, not each

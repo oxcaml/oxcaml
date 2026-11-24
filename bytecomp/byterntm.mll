@@ -25,16 +25,16 @@ type state = Exec | R | C of string
 let cut_runtime_id search name =
   let len = String.length name in
   let id =
-    if len < 6 || name.[len - 5] <> '-' then
+    if len < 9 || name.[len - 8] <> '-' then
       None
     else
-      Misc.RuntimeID.of_string (String.sub name (len - 4) 4)
+      Misc.RuntimeID.of_string (String.sub name (len - 7) 7)
   in
   let name =
     if id = None then
       name
     else
-      String.sub name 0 (len - 5)
+      String.sub name 0 (len - 8)
   in
   Some (name, id, search)
 }

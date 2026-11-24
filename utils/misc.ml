@@ -2200,6 +2200,10 @@ module RuntimeID = struct
     no_compression: bool;
     ansi: bool;
     oxcaml: bool;
+    magic: int;
+    stack_checks: bool;
+    asan: bool;
+    multidomain: bool;
   }
 
   let make fn ?(dev = not Config.is_official_release)
@@ -2212,26 +2216,35 @@ module RuntimeID = struct
               ?(static = not Config.supports_shared_libraries)
               ?(no_compression = (Config.compression_c_libraries = ""))
               ?(ansi = Config.target_win32 && not Config.windows_unicode)
-              ?(oxcaml = true) () =
-    if release < 0 || release > 63 || reserved < 0 || reserved > 31 then
+              ?(oxcaml = true)
+              ?(magic =
+                  if oxcaml then Magic_number.(current_version Exec) else 0)
+              ?(stack_checks = oxcaml && not Config.no_stack_checks)
+              ?(asan = oxcaml && Config.with_address_sanitizer)
+              ?(multidomain = oxcaml && Config.multidomain) () =
+    if release < 0 || release > 63 || reserved < 0 || reserved > 31
+       || magic < 0 || magic > 1023 then
       invalid_arg fn
     else
       {dev; release; reserved; no_flat_float_array; fp; tsan; int31; static;
-       no_compression; ansi; oxcaml}
+       no_compression; ansi; oxcaml; magic; stack_checks; asan; multidomain}
 
   let make_zinc =
     make "Misc.RuntimeID.make_zinc"
       ~reserved:0 ~fp:false ~tsan:false ~ansi:false
+      ~stack_checks:false ~asan:false ~multidomain:false
 
   let make_bytecode =
     make "Misc.RuntimeID.make_bytecode" ~fp:false ~tsan:false
+      ~stack_checks:false
 
   let make_native = make "Misc.RuntimeID.make_native"
 
   let is_zinc = function
   | {dev = _; release = _; reserved = 0; no_flat_float_array = _; fp = false;
      tsan = false; int31 = _; static = _; no_compression = _; ansi = false;
-     oxcaml = _} ->
+     oxcaml = _; magic = _; stack_checks = false; asan = false;
+     multidomain = false} ->
       true
   | _ ->
       false
@@ -2239,7 +2252,8 @@ module RuntimeID = struct
   let is_bytecode = function
   | {dev = _; release = _; reserved = _; no_flat_float_array = _; fp = false;
      tsan = false; int31 = _; static = _; no_compression = _; ansi = _;
-     oxcaml = _} -> true
+     oxcaml = _; magic = _; stack_checks = false; asan = _;
+     multidomain = _} -> true
   | _ -> false
 
   let is_native _ = true
@@ -2268,29 +2282,53 @@ module RuntimeID = struct
       bit 3 t.ansi lor
       bit 4 t.oxcaml
     in
-    Printf.sprintf "%c%c%c%c" alpha.[q0] alpha.[q1] alpha.[q2] alpha.[q3]
+    let id =
+      Printf.sprintf "%c%c%c%c" alpha.[q0] alpha.[q1] alpha.[q2] alpha.[q3]
+    in
+    if t.oxcaml then
+      let q4 = t.magic land 0b11111 in
+      let q5 = t.magic lsr 5 in
+      let q6 =
+        bit 0 t.stack_checks lor
+        bit 1 t.asan lor
+        bit 2 t.multidomain
+      in
+      Printf.sprintf "%s%c%c%c" id alpha.[q4] alpha.[q5] alpha.[q6]
+    else
+      id
 
   let of_string s =
-    if String.length s <> 4 then
+    let len = String.length s in
+    if len <> 4 && len <> 7 then
       None
     else
       let convert c =
         match c with
         | '0'..'9' -> Char.code c - Char.code '0'
         | 'a'..'v' -> Char.code c - Char.code 'a' + 10
-        | _ -> min_int
+        | _ -> -1
       in
       let set bit q = (q land (1 lsl bit) <> 0) in
       let q0 = convert s.[0] in
       let q1 = convert s.[1] in
       let q2 = convert s.[2] in
       let q3 = convert s.[3] in
-      if q0 + q1 + q2 + q3 >= 0 then
+      let q4, q5, q6 =
+        if len = 7 then
+          convert s.[4], convert s.[5], convert s.[6]
+        else
+          0, 0, 0
+      in
+      (* Only OxCaml has q4-q6; bits 3 and 4 of q6 are unused *)
+      if q0 lor q1 lor q2 lor q3 lor q4 lor q5 lor q6 >= 0
+         && set 4 q3 = (len = 7) && q6 lsr 3 = 0 then
         Some {dev = set 0 q0; release = ((q1 land 0b11) lsl 4) lor (q0 lsr 1);
-              reserved = ((q2 land 0b11) lsl 2) lor (q1 lsr 2);
+              reserved = ((q2 land 0b11) lsl 3) lor (q1 lsr 2);
               no_flat_float_array = set 2 q2; fp = set 3 q2; tsan = set 4 q2;
               int31 = set 0 q3; static = set 1 q3; no_compression = set 2 q3;
-              ansi = set 3 q3; oxcaml = set 4 q3}
+              ansi = set 3 q3; oxcaml = set 4 q3; magic = (q5 lsl 5) lor q4;
+              stack_checks = set 0 q6; asan = set 1 q6;
+              multidomain = set 2 q6}
       else
         None
 

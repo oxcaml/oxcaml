@@ -441,7 +441,7 @@ let p_list title print = function
 
 let p_runtime_id ({Misc.RuntimeID.dev; release; no_flat_float_array; fp; tsan;
                    int31; static; no_compression; ansi; reserved;
-                   oxcaml} as t) =
+                   oxcaml; magic; stack_checks; asan; multidomain} as t) =
   let version =
     if release > Config.release_number then
       ""
@@ -450,9 +450,10 @@ let p_runtime_id ({Misc.RuntimeID.dev; release; no_flat_float_array; fp; tsan;
         " (Objective Caml 3.12)"
       else if release < 16 then
         Printf.sprintf " (OCaml 4.%02d)" (release - 1)
+      else if oxcaml then
+        Printf.sprintf " (OxCaml 5.%d, magic number %d)" (release - 16) magic
       else
-        Printf.sprintf " (%s 5.%d)"
-          (if oxcaml then "OxCaml" else "OCaml") (release - 16)
+        Printf.sprintf " (OCaml 5.%d)" (release - 16)
   in
   printf "\t%s = Release %d%s%s\n"
     (Misc.RuntimeID.to_string t)
@@ -473,7 +474,13 @@ let p_runtime_id ({Misc.RuntimeID.dev; release; no_flat_float_array; fp; tsan;
   if no_compression then
     printf "\t  - Compiled without support for compressed marshalling\n";
   if ansi then
-    printf "\t  - Windows Unicode support disabled\n"
+    printf "\t  - Windows Unicode support disabled\n";
+  if stack_checks then
+    printf "\t  - Stack checks enabled\n";
+  if asan then
+    printf "\t  - ASAN enabled\n";
+  if multidomain then
+    printf "\t  - Multiple domains enabled\n"
 
 let p_runtime (runtime, id, search) =
   let runtime =

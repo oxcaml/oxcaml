@@ -1302,13 +1302,25 @@ module RuntimeID : sig
     ansi: bool;
       (** [true] if Unicode support on Windows is disabled *)
     oxcaml: bool;
-      (** [true] if this is OxCaml *)
+      (** [true] if this is OxCaml, which is the only case in which the
+          remaining fields are part of the Runtime ID *)
+    magic: int;
+      (** The version in the magic numbers (e.g. 593 for [Caml1999X593]) *)
+    stack_checks: bool;
+      (** [true] if stack checks are required (i.e. configured with
+          {v --enable-stack-checks v}) *)
+    asan: bool;
+      (** [true] if AddressSanitizer (ASAN) is required (i.e. configured with
+          {v --enable-address-sanitizer v}) *)
+    multidomain: bool;
+      (** [true] if multiple domains are allowed (i.e. configured with
+          {v --enable-multidomain v}) *)
   }
 
   val make_zinc: ?dev:bool -> ?release:int
     -> ?no_flat_float_array:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
-    -> ?oxcaml:bool
+    -> ?oxcaml:bool -> ?magic:int
     -> unit -> t
   (** Returns the Zinc Runtime ID for the given parameters (using default values
       from {!Config} and {!Sys} as necessary) *)
@@ -1317,7 +1329,7 @@ module RuntimeID : sig
     -> ?reserved:int -> ?no_flat_float_array:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
     -> ?ansi:bool
-    -> ?oxcaml:bool
+    -> ?oxcaml:bool -> ?magic:int -> ?asan:bool -> ?multidomain:bool
     -> unit -> t
   (** Returns the Bytecode Runtime ID for the given parameters (using default
       values from {!Config} and {!Sys} as necessary) *)
@@ -1326,7 +1338,8 @@ module RuntimeID : sig
     -> ?reserved:int -> ?no_flat_float_array:bool -> ?fp:bool -> ?tsan:bool
     -> ?int31:bool -> ?static:bool -> ?no_compression:bool
     -> ?ansi:bool
-    -> ?oxcaml:bool
+    -> ?oxcaml:bool -> ?magic:int
+    -> ?stack_checks:bool -> ?asan:bool -> ?multidomain:bool
     -> unit -> t
   (** Returns the Native Runtime ID for the given parameters (using default
       values from {!Config} and {!Sys} as necessary) *)
@@ -1341,10 +1354,11 @@ module RuntimeID : sig
   (** [is_native t] is true if [t] can be used as a Native Runtime ID *)
 
   val to_string: t -> string
-  (** Returns the 4-character representation of a {!t} *)
+  (** Returns the representation of a {!t}, which is 7 characters for OxCaml and
+      4 otherwise *)
 
   val of_string: string -> t option
-  (** Converts the 4-character representation back to a {!t} *)
+  (** Converts the representation back to a {!t} *)
 
   val ocamlrun: string -> t -> string
   (** [ocamlrun variant runtime_id] returns the name for the runtime for the

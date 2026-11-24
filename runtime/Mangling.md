@@ -48,9 +48,10 @@ runtime:
 ## Runtime ID
 
 A Runtime ID is a bit string describing a given OCaml runtime. At present,
-20 bits are used, but the format is intended to be trivially extensible.
-Ultimately, the only requirement is that each version and configuration
-generates some kind of unique identifier which can then be used in filenames.
+20 bits are used by OCaml and 33 by OxCaml, but the format is intended to be
+trivially extensible. Ultimately, the only requirement is that each version and
+configuration generates some kind of unique identifier which can then be used in
+filenames.
 
 - Bit 0 (**dev**): Development bit. This should be set for development versions
   of OCaml or for customised compilers. If it is not set, the compiler should be
@@ -88,13 +89,27 @@ generates some kind of unique identifier which can then be used in filenames.
   with `--disable-force-safe-string` (this option was removed in OCaml 5.0,
   meaning this bit is always unset for OCaml 5.0-5.3).
 
+The remaining bits are only present when **OxCaml** is set:
+
+- Bits 20-29 (**magic**): The version in OxCaml's magic numbers (e.g. 593 for
+  `Caml1999X593`). Releases of OxCaml share an OCaml release number, and change
+  this instead.
+- Bit 30 (**stack-checks**): Set if the compiler distribution was configured
+  with `--enable-stack-checks`. Affects the **native** runtime only.
+- Bit 31 (**asan**): Set if the compiler distribution was configured with
+  `--enable-address-sanitizer`.
+- Bit 32 (**multidomain**): Set if the compiler distribution was configured
+  with `--enable-multidomain`.
+
 The bit descriptions are designed such that the default configuration of the
 latest version of the compiler has unset bits. The ordering of the bits is
 designed to mean ID values in the same version of OCaml will usually have the
 same opening sequence of characters (since `--enable-reserved-header-bits` is
 now rarely used) and laying out the characters little-endian in the mangling
 scheme means that the opening two characters of the Runtime ID define its
-version (and consequently its length, should that change in future).
+version (and consequently its length, should that change in future). The
+Runtime ID for OxCaml is 7 characters rather than 4, which **OxCaml** in the
+fourth character indicates.
 
 [^1]: OCaml 3.12.0 was the first version where `ocamlrun` supported the `-vnum`
 argument; the original author had a fantasy of backporting the scheme to the
@@ -110,14 +125,14 @@ A particular configuration of the compiler has one Runtime ID, but this is used
 in three different contexts where certain bits are masked out:
 
 1. _Bytecode Mask_: masks out bits which are only ever set by the native runtime
-   (at present, **fp** and **tsan**).
+   (at present, **fp**, **tsan**, and **stack-checks**).
 2. _Native Mask_: masks out bits which are only ever set by the bytecode runtime
    (at present there aren't any).
 3. _Zinc Mask_: masks out bits which are not related to bytecode portability.
    Where the _Bytecode_ and _Native_ masks relate to _runtimes_, the _Zinc_ mask
    relates to _bytecode images_. The Zinc ID therefore includes:
-   - **release**, **dev**, and **OxCaml** (a given bytecode image targets a
-     specific version of OCaml or OxCaml)
+   - **release**, **dev**, **OxCaml**, and **magic** (a given bytecode image
+     targets a specific version of OCaml or OxCaml)
    - **no-flat-float-array** (code compiled assuming that float arrays are boxed
      will segfault on runtimes which unbox them)
    - **int31**, **static**, and **no-compression** (a bytecode image using
