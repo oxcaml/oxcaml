@@ -19,7 +19,7 @@
 (* Tests for [Code.traverse] and [Code.preorder_traverse], which are implemented
    with an explicit stack: a deep chain of blocks (e.g. the initialization code
    of a large program, with a block per call) must not overflow the stack, and
-   it visits reachable blocks in postorder / preorder without duplicating blocks. *)
+   the visit order must match the former recursive implementation. *)
 
 open Js_of_ocaml_compiler.Code
 
@@ -62,8 +62,8 @@ let%expect_test "diamond" =
   print_orders blocks 0;
   [%expect
     {|
-    fold_children: postorder [3 2 1 0], preorder [0 2 3 1]
-    fold_children_skip_try_body: postorder [3 2 1 0], preorder [0 2 3 1]
+    fold_children: postorder [3 1 2 0], preorder [0 1 3 2]
+    fold_children_skip_try_body: postorder [3 1 2 0], preorder [0 1 3 2]
     |}]
 
 let%expect_test "switch with duplicate targets" =
@@ -80,8 +80,8 @@ let%expect_test "switch with duplicate targets" =
   print_orders blocks 0;
   [%expect
     {|
-    fold_children: postorder [4 1 2 3 0], preorder [0 1 4 2 3]
-    fold_children_skip_try_body: postorder [4 1 2 3 0], preorder [0 1 4 2 3]
+    fold_children: postorder [4 2 3 1 0], preorder [0 2 4 3 1]
+    fold_children_skip_try_body: postorder [4 2 3 1 0], preorder [0 2 4 3 1]
     |}]
 
 let%expect_test "loop" =
@@ -92,8 +92,8 @@ let%expect_test "loop" =
   print_orders blocks 0;
   [%expect
     {|
-    fold_children: postorder [3 2 1 0], preorder [0 1 3 2]
-    fold_children_skip_try_body: postorder [3 2 1 0], preorder [0 1 3 2]
+    fold_children: postorder [2 3 1 0], preorder [0 1 2 3]
+    fold_children_skip_try_body: postorder [2 3 1 0], preorder [0 1 2 3]
     |}]
 
 let%expect_test "self loop at the root" =
@@ -121,8 +121,8 @@ let%expect_test "exception handler" =
   print_orders blocks 0;
   [%expect
     {|
-    fold_children: postorder [5 4 3 2 1 0], preorder [0 4 5 1 3 2]
-    fold_children_skip_try_body: postorder [5 4 0], preorder [0 4 5]
+    fold_children: postorder [5 2 3 1 4 0], preorder [0 1 2 5 3 4]
+    fold_children_skip_try_body: postorder [5 4 0], preorder [0 5 4]
     |}]
 
 let%expect_test "nested exception handlers" =
@@ -142,8 +142,8 @@ let%expect_test "nested exception handlers" =
   print_orders blocks 0;
   [%expect
     {|
-    fold_children: postorder [7 6 5 4 3 2 1 0], preorder [0 6 7 1 4 5 2 3]
-    fold_children_skip_try_body: postorder [7 6 0], preorder [0 6 7]
+    fold_children: postorder [7 3 2 5 4 1 6 0], preorder [0 1 2 3 7 4 5 6]
+    fold_children_skip_try_body: postorder [7 6 0], preorder [0 7 6]
     |}]
 
 let%expect_test "deep chain of blocks does not overflow the stack" =

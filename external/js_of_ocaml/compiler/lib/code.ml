@@ -930,6 +930,11 @@ type 'c fold_blocs = block Addr.Map.t -> Addr.t -> (Addr.t -> 'c -> 'c) -> 'c ->
 type fold_blocs_poly = { fold : 'a. 'a fold_blocs } [@@unboxed]
 
 let traverse { fold } f pc blocks acc =
+  (* Reverse the child list so blocks are visited in the same order as a
+     recursive traversal. Child lists are small (typically 1-2 elements), so
+     the extra cons cells are negligible compared to the map/set operations
+     per block. *)
+  let children pc = List.rev (fold blocks pc (fun pc l -> pc :: l) []) in
   let rec loop visited acc stack =
     match stack with
     | [] -> acc
@@ -938,10 +943,9 @@ let traverse { fold } f pc blocks acc =
         if Addr.Set.mem pc' visited
         then loop visited acc ((pc, succs) :: rem)
         else
-          let children = fold blocks pc' (fun pc l -> pc :: l) [] in
-          loop (Addr.Set.add pc' visited) acc ((pc', children) :: (pc, succs) :: rem)
+          loop (Addr.Set.add pc' visited) acc ((pc', children pc') :: (pc, succs) :: rem)
   in
-  loop (Addr.Set.singleton pc) acc [ pc, fold blocks pc (fun pc l -> pc :: l) [] ]
+  loop (Addr.Set.singleton pc) acc [ pc, children pc ]
 
 let preorder_traverse { fold } f pc blocks acc =
   let rec loop visited acc stack =
@@ -953,7 +957,12 @@ let preorder_traverse { fold } f pc blocks acc =
         else
           let visited = Addr.Set.add pc visited in
           let acc = f pc acc in
-          loop visited acc (fold blocks pc (fun pc' s -> pc' :: s) rem)
+          (* Accumulate children and push via [List.rev_append] so they are
+             popped in fold order, matching a recursive traversal. Child lists
+             are small (typically 1-2 elements), so the extra cons cells are
+             negligible compared to the map/set operations per block. *)
+          let children = fold blocks pc (fun pc' s -> pc' :: s) [] in
+          loop visited acc (List.rev_append children rem)
   in
   loop Addr.Set.empty acc [ pc ]
 

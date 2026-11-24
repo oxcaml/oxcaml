@@ -73,7 +73,10 @@ let rec traverse blocks pc visited pure_blocks funs =
   and enter pc stack =
     BitSet.set visited pc;
     let pure = block blocks pc visited pure_blocks funs in
-    let children = fold_children blocks pc (fun pc l -> pc :: l) [] in
+    (* Reverse the child list so blocks are visited in the same order as a
+       recursive traversal. Child lists are small (typically 1-2 elements), so
+       the extra cons cells are negligible compared to the per-block work. *)
+    let children = List.rev (fold_children blocks pc (fun pc l -> pc :: l) []) in
     loop ((pc, pure, children) :: stack)
   in
   if not (BitSet.mem visited pc) then enter pc [];
