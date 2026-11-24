@@ -1,0 +1,143 @@
+(let code inline(never) size(5)
+       g_1 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let X = %project_value_slot.[g].[X] (my_closure) in
+   let Pfield = %block_load.[`0`] (X) in
+   let int_add = %int_barith.add (x, Pfield) in
+   cont k1 (int_add)
+ in
+ let code inline(never) loopify(never) size(37)
+       `Env_types_lib/F/1_missing_0` (`closure` : val, X : val)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val =
+   let g = closure g_1 @g &my_alloc_region with { X = X } in
+   let Pfield = %block_load.[`0`] (X) in
+   let int_mul = %int_barith.mul (Pfield, 10) in
+   let r = %opaque (int_mul) in
+   let Pmixedfield = %block_load.[`0`] (`closure`) in
+   let h = %block.[`0`].my_alloc_region (Pmixedfield, X, g, r) in
+   let Pmakeblock = %block.[`0`].my_alloc_region (g, r, h) in
+   cont k1 (Pmakeblock)
+ in
+ let code inline(never) size(8)
+       `Env_types_lib/top/0_value_or_null_2` (`closure` : val, x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val * val =
+   (let Pmixedfield = %block_load.[`0`] (`closure`) in
+    apply &my_alloc_region Pmixedfield (1) -> k3 * k2)
+     where k3 (apply_result : imm tagged) =
+       cont k1 (apply_result, x)
+ in
+ let code inline(never) size(18)
+       `Env_types_lib/h/2_value_or_null_3` (`closure` : val, x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val * val * val =
+   let Pmixedfield = %block_load.[`1`] (`closure`) in
+   let Pfield = %block_load.[`0`] (Pmixedfield) in
+   (let Pmixedfield_1 = %block_load.`imm`.[`3`] (`closure`) in
+    let Pmixedfield_2 = %block_load.[`2`] (`closure`) in
+    apply &my_alloc_region Pmixedfield_2 (Pmixedfield_1) -> k4 * k2)
+     where k4 (apply_result : imm tagged) =
+       let Pmixedfield_1 = %block_load.[`0`] (`closure`) in
+       apply &my_alloc_region Pmixedfield_1 (apply_result) -> k3 * k2
+     where k3 (apply_result : imm tagged) =
+       cont k1 (apply_result, x, Pfield)
+ in
+ let code inline(never) size(3)
+       f_4 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let int_add = %int_barith.add (x, 1) in
+   cont k1 (int_add)
+ in
+ let $camlEnv_types_lib__s3 = closure f_4 @f &toplevel in
+ let $camlEnv_types_lib__s4 = Block 0 ($camlEnv_types_lib__s3) in
+ let code inline(never) size(6)
+       top_in_lib_5 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val * val =
+   let `region` = %begin_region () in
+   let ghost_region = %begin_ghost_region () in
+   let `unit` = %end_region (`region`) in
+   let unit_1 = %end_ghost_region (ghost_region) in
+   apply direct(`Env_types_lib/top/0_value_or_null_2` &my_alloc_region)
+      ($camlEnv_types_lib__s4, x) -> k1 * k2
+ in
+ let code inline(never) size(8)
+       h_in_lib_6 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val * val * val =
+   let M1 = %project_value_slot.[h_in_lib].[M1] (my_closure) in
+   let `region` = %begin_region () in
+   let ghost_region = %begin_ghost_region () in
+   let Pfield = %block_load.[`2`] (M1) in
+   let `unit` = %end_region (`region`) in
+   let unit_1 = %end_ghost_region (ghost_region) in
+   apply direct(`Env_types_lib/h/2_value_or_null_3` &my_alloc_region)
+      (Pfield, x) -> k1 * k2
+ in
+ let $camlEnv_types_lib__s5 = Block 0 ($camlEnv_types_lib__s3) in
+ let $camlEnv_types_lib__s8 = closure top_in_lib_5 @top_in_lib &toplevel in
+ let $camlEnv_types_lib__s2 =
+   closure `Env_types_lib/h/2_value_or_null_3`
+     @`Env_types_lib/h/2_value_or_null` &toplevel
+ in
+ let $camlEnv_types_lib__s1 =
+   closure `Env_types_lib/top/0_value_or_null_2`
+     @`Env_types_lib/top/0_value_or_null` &toplevel
+ in
+ let $camlEnv_types_lib__s0 =
+   closure `Env_types_lib/F/1_missing_0` @`Env_types_lib/F/1_missing`
+     &toplevel
+ in
+ (let x = %opaque (3) in
+  let $camlEnv_types_lib__s6 = Block 0 (x) in
+  apply direct(`Env_types_lib/F/1_missing_0` &toplevel)
+     ($camlEnv_types_lib__s5, $camlEnv_types_lib__s6) -> k1 * error)
+   where k1 (M1 : val) =
+     ((let x = %opaque (4) in
+       let $camlEnv_types_lib__s7 = Block 0 (x) in
+       apply direct(`Env_types_lib/F/1_missing_0` &toplevel)
+          ($camlEnv_types_lib__s5, $camlEnv_types_lib__s7) -> k1 * error)
+        where k1 (M2 : val) =
+          let h_in_lib = closure h_in_lib_6 @h_in_lib &toplevel
+          with { M1 = M1 }
+          in
+          let Pfield = %block_load.[`2`] (M2) in
+          let Pfield_1 = %block_load.[`1`] (M2) in
+          let $camlEnv_types_lib__s9 = Block 0 (Pfield_1, Pfield) in
+          let Pfield_2 = %block_load.[`2`] (M1) in
+          let Pfield_3 = %block_load.[`1`] (M1) in
+          let $camlEnv_types_lib__s10 = Block 0 (Pfield_3, Pfield_2) in
+          let $camlEnv_types_lib__s11 =
+            Block 0 ($camlEnv_types_lib__s3,
+                     $camlEnv_types_lib__s4,
+                     $camlEnv_types_lib__s5,
+                     $camlEnv_types_lib__s10,
+                     $camlEnv_types_lib__s9,
+                     $camlEnv_types_lib__s8,
+                     h_in_lib)
+          in
+          cont k ($camlEnv_types_lib__s11)))
+  where k define_root_symbol (module_block) =
+    let field_6 =
+      %block_load.tag[`0`].`size`[`7`].[`6`] ($camlEnv_types_lib__s11)
+    in
+    let $camlEnv_types_lib =
+      Block 0 ($camlEnv_types_lib__s3,
+               $camlEnv_types_lib__s4,
+               $camlEnv_types_lib__s5,
+               $camlEnv_types_lib__s10,
+               $camlEnv_types_lib__s9,
+               $camlEnv_types_lib__s8,
+               field_6)
+    in
+    cont done ($camlEnv_types_lib)
