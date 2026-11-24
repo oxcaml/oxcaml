@@ -80,11 +80,11 @@ val output_range : from_pos:output_pos -> to_pos:output_pos -> asm_line list
 (** Whether peephole optimization has deleted the line at the position. *)
 val deleted : output_pos -> bool
 
-(** A fresh label, defined just before the line at the position. *)
-val insert_label_before : output_pos -> Asm_targets.Asm_label.t
+(** Defines the label just before the line at the position. *)
+val insert_label_before : output_pos -> Asm_targets.Asm_label.t -> unit
 
-(** A fresh label, defined just after the line at the position. *)
-val insert_label_after : output_pos -> Asm_targets.Asm_label.t
+(** Defines the label just after the line at the position. *)
+val insert_label_after : output_pos -> Asm_targets.Asm_label.t -> unit
 
 val peephole_optimize_from : output_pos -> unit
 

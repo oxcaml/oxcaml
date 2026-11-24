@@ -415,19 +415,14 @@ let output_cell (pos : output_pos) =
 
 let deleted pos = not (DLL.is_attached (output_cell pos))
 
-let new_label_line () =
-  let label = Asm_targets.Asm_label.create Asm_targets.Asm_section.Text in
-  label, Directive (Asm_targets.Asm_directives.Directive.new_label label)
+let label_line label =
+  Directive (Asm_targets.Asm_directives.Directive.new_label label)
 
-let insert_label_before pos =
-  let label, line = new_label_line () in
-  DLL.insert_before (output_cell pos) line;
-  label
+let insert_label_before pos label =
+  DLL.insert_before (output_cell pos) (label_line label)
 
-let insert_label_after pos =
-  let label, line = new_label_line () in
-  DLL.insert_after (output_cell pos) line;
-  label
+let insert_label_after pos label =
+  DLL.insert_after (output_cell pos) (label_line label)
 
 let peephole_optimize_from pos =
   if !Oxcaml_flags.x86_peephole_optimize

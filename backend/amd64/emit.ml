@@ -2226,20 +2226,26 @@ let begin_fdo_function (fundecl : Linear.fundecl) ~start =
     Some
       (Fdo_metadata_encode.begin_function !fdo_metadata ~start ~entry_annotation)
 
+(* The labels of the metadata are numbered as DWARF labels are, apart from those
+   of the code: taking the numbers of the code's labels would renumber those of
+   the following functions, which can change their code (e.g. which block
+   [Cfg_merge_blocks] keeps). *)
 let record_fdo_event fdo_function (pos, (instruction : Fdo_instruction.t)) =
   if X86_proc.deleted pos
   then
     Fdo_dropped_counters.register ~reason:Peephole_deleted
       (Fdo_instruction.counters instruction)
   else
-    let record =
-      Fdo_metadata_encode.record_event fdo_function
-        (X86_proc.insert_label_before pos)
-    in
+    let label = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
+    X86_proc.insert_label_before pos label;
+    let record = Fdo_metadata_encode.record_event fdo_function label in
     match instruction with
     | Call counter ->
-      record
-        (Call { return_address = X86_proc.insert_label_after pos; counter })
+      let return_address =
+        L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
+      in
+      X86_proc.insert_label_after pos return_address;
+      record (Call { return_address; counter })
     | Tail_call counter -> record (Tail_call counter)
     | Conditional_branch { taken; fallthrough } ->
       record (Conditional_branch { taken; fallthrough })
@@ -2259,7 +2265,7 @@ let end_fdo_function fdo_function =
   |> List.iter (fun label ->
       Fdo_metadata_encode.record_event fdo_function label Exception_handler);
   List.iter (record_fdo_event fdo_function) (List.rev !fdo_instructions);
-  let finish = L.create Text in
+  let finish = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
   D.define_label finish;
   Fdo_metadata_encode.end_function fdo_function ~finish;
   fdo_instructions := [];
