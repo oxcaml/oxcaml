@@ -486,6 +486,24 @@ let binding instr =
   let variants = Hashtbl.find all_mnemonics base in
   if variants > 1 then mangled () else base
 
+(* Array literals are mutable, so each one is allocated when the generated
+   module is initialised. The instruction descriptors are never mutated, so bind
+   each distinct array literal once and share it between descriptors. *)
+let shared_arrays = Hashtbl.create 512
+
+let shared_array_defs = ref []
+
+let share prefix literal =
+  match Hashtbl.find_opt shared_arrays literal with
+  | Some name -> name
+  | None ->
+    let name = sprintf "%s_%d" prefix (Hashtbl.length shared_arrays) in
+    Hashtbl.add shared_arrays literal name;
+    shared_array_defs := (name, literal) :: !shared_array_defs;
+    name
+
+let share_array prefix elements = share prefix ("[|" ^ elements ^ "|]")
+
 let print_one bind instr =
   let print_ext : ext -> string = function
     | SSE -> "SSE"
@@ -546,7 +564,7 @@ let print_one bind instr =
       let temps =
         Array.map print_temp temps |> Array.to_list |> String.concat ";"
       in
-      "Temp [|" ^ temps ^ "|]"
+      "Temp " ^ share_array "temps" temps
   in
   let print_arg_enc = function
     | RM_r -> "RM_r"
@@ -634,8 +652,8 @@ let print_one bind instr =
   in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
-    | Arg rr -> sprintf "Arg [|%s|]" (print_idxs rr)
-    | Res rr -> sprintf "Res [|%s|]" (print_result_args rr)
+    | Arg rr -> "Arg " ^ share_array "idxs" (print_idxs rr)
+    | Res rr -> "Res " ^ share_array "res" (print_result_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -712,7 +730,8 @@ let print_one bind instr =
   in
   let constructor = String.capitalize_ascii bind in
   let ext =
-    Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
+    Array.map print_ext instr.ext
+    |> Array.to_list |> String.concat ";" |> share_array "ext"
   in
   let args, res =
     match instr.res with
@@ -725,13 +744,16 @@ let print_one bind instr =
       let res_args = print_result_args rr in
       let zeroing_res_args = print_register_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
-      ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
-        sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
+      ( sprintf "(if z then %s else %s)" (share_array "args" args)
+          (share_array "args" (res_args ^ ";" ^ args)),
+        sprintf "(if z then Res %s else Arg %s)"
+          (share_array "res" zeroing_res_args)
+          (share_array "idxs" idxs) )
     | Res rr when instr.flags.z ->
-      ( sprintf "[|%s|]" (print_args instr.args),
-        sprintf "Res [|%s|]" (print_register_args rr) )
+      ( share_array "args" (print_args instr.args),
+        "Res " ^ share_array "res" (print_register_args rr) )
     | (Res_none | Arg _ | Res _) as res ->
-      sprintf "[|%s|]" (print_args instr.args), print_res res
+      share_array "args" (print_args instr.args), print_res res
   in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
@@ -746,11 +768,11 @@ let print_one bind instr =
     (List.filter (fun s -> String.length s > 0)) [bind; b; z]
     |> String.concat " "
   in
-  printf
+  sprintf
     {|
 let %s = {
     id = %s
-  ; ext = [|%s|]
+  ; ext = %s
   ; args = %s
   ; res = %s
   ; imm = %s
@@ -780,8 +802,14 @@ let print_all () =
   Bind_map.iter
     (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind))
     all;
-  print_endline "\ntype nonrec instr = id instr";
-  Bind_map.iter (fun bind instr -> print_one bind instr) all
+  print_endline "\ntype nonrec instr = id instr\n";
+  let instrs =
+    Bind_map.fold (fun bind instr acc -> print_one bind instr :: acc) all []
+  in
+  List.iter
+    (fun (name, literal) -> printf "let %s = %s\n" name literal)
+    (List.rev !shared_array_defs);
+  List.iter print_string (List.rev instrs)
 
 let parse_ext = function
   | "SSE" -> Some SSE
