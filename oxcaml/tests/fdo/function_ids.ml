@@ -2,8 +2,8 @@
    tokens, so inserting one should not rename the others. Additionally, shadowed
    functions or anonymous functons with the same body should be distinguished by
    discriminators. Adding an optional argument should not rename the function
-   body, and compiler-generated functions bound to names (as in classes) should
-   be named by them. *)
+   body, and the functions the compiler generates for a class should be named
+   after the class. *)
 
 let[@inline never] apply f x = f x
 

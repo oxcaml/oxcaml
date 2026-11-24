@@ -57,13 +57,15 @@ let manufacture_symbol proposed_name =
   Symbol.manufacture (Current_unit.get_cu_exn ()) proposed_name
 
 let manufacture_symbol_of_variable v =
-  let name = Variable.canonical_name v in
-  manufacture_symbol name
+  Symbol.manufacture_for_variable (Current_unit.get_cu_exn ()) v
 
-let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
-    =
+let declare_symbol_for_function_slot env ident function_slot ~code_id :
+    Env.t * Symbol.t =
   let symbol =
-    manufacture_symbol (Function_slot.canonical_name function_slot)
+    Symbol.manufacture_for_closure
+      (Current_unit.get_cu_exn ())
+      ~name:(Function_slot.canonical_name function_slot)
+      ~function_slot ~code_id:(Some code_id)
   in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
@@ -3404,17 +3406,20 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     then
       Ident.Map.fold
         (fun ident function_slot (acc, env, symbol_map) ->
-          let env, symbol =
-            declare_symbol_for_function_slot env ident function_slot
-          in
-          let approx =
+          let code_id, function_slot, code =
             match Function_slot.Map.find function_slot approx_map with
             | Value_approximation.Closure_approximation
                 { code_id; function_slot; code; symbol = _ } ->
-              Value_approximation.Closure_approximation
-                { code_id; function_slot; code; symbol = Some symbol }
+              code_id, function_slot, code
             | _ -> assert false
             (* see above *)
+          in
+          let env, symbol =
+            declare_symbol_for_function_slot env ident function_slot ~code_id
+          in
+          let approx =
+            Value_approximation.Closure_approximation
+              { code_id; function_slot; code; symbol = Some symbol }
           in
           let acc = Acc.add_symbol_approximation acc symbol approx in
           acc, env, Function_slot.Map.add function_slot symbol symbol_map)
@@ -3650,8 +3655,9 @@ let close_let_rec acc env ~function_declarations
       named ~body
 
 let wrap_partial_application acc env apply_continuation (apply : IR.apply)
-    approx ~provided ~provided_arity ~missing_arity ~missing_param_modes
-    ~result_arity ~arity ~first_complex_local_param ~result_mode =
+    approx ~callee_code_id ~provided ~provided_arity ~missing_arity
+    ~missing_param_modes ~result_arity ~arity ~first_complex_local_param
+    ~result_mode =
   (* In case of partial application, creates a wrapping function from scratch to
      allow inlining and lifting *)
   let first_complex_local_param =
@@ -3801,6 +3807,14 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         (Partial_application_mode_mismatch_in_lambda
            (Debuginfo.from_location apply.loc)) )
   else
+    (* Name the wrapper after the callee. *)
+    let loc =
+      Debuginfo.Scoped_location.map_scopes
+        (fun scopes ->
+          Debuginfo.Scoped_location.add_partial_application_item ~scopes
+            (Code_id.partial_application_callee callee_code_id))
+        apply.loc
+    in
     let function_declarations =
       [ Function_decl.create ~let_rec_ident:(Some wrapper_id)
           ~let_rec_uid:wrapper_id_duid ~function_slot
@@ -3813,7 +3827,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~params ~params_arity ~removed_params:Ident.Set.empty
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
-          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
+          ~my_ghost_region ~body:fbody ~attr ~loc
           ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
             (* The wrapper isn't in the source: it has no entry counter. *)
           ~free_idents_of_body ~closure_alloc_mode ~first_complex_local_param
@@ -4011,10 +4025,11 @@ let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
   let approx = find_value_approximation_through_symbol acc env callee in
   let code_info =
     match approx with
-    | Closure_approximation { code; _ } ->
+    | Closure_approximation { code_id; code; _ } ->
       let metadata = Code_or_metadata.code_metadata code in
       Some
-        ( Code_metadata.params_arity metadata,
+        ( code_id,
+          Code_metadata.params_arity metadata,
           Code_metadata.result_arity metadata,
           Code_metadata.is_tupled metadata,
           Code_metadata.param_modes metadata,
@@ -4033,7 +4048,8 @@ let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
   match code_info with
   | None -> close_exact_or_unknown_apply acc env apply None ~replace_region:None
   | Some
-      ( params_arity,
+      ( callee_code_id,
+        params_arity,
         result_arity,
         is_tupled,
         param_modes,
@@ -4124,9 +4140,10 @@ let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
              Inlining_helpers.(
                inlined_attribute_on_partial_application_msg Unrolled))
       | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> ());
-      wrap_partial_application acc env apply.continuation apply approx ~provided
-        ~provided_arity ~missing_arity ~missing_param_modes ~result_arity
-        ~arity:params_arity ~first_complex_local_param ~result_mode
+      wrap_partial_application acc env apply.continuation apply approx
+        ~callee_code_id ~provided ~provided_arity ~missing_arity
+        ~missing_param_modes ~result_arity ~arity:params_arity
+        ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
       if not (Flambda_arity.is_one_param_of_kind_value result_arity)

@@ -14,6 +14,10 @@ let[@inline always] mk_adder x = fun[@inline never] y -> x + y
 
 let[@inline always] apply_thrice f x = f (f (f x))
 
+(* Partially applied from e2e_inline.ml with its first argument omitted, so
+   that the frontend builds the wrapper and names this callee. *)
+let[@inline never] labelled ~a ~b = a - b
+
 let[@inline always] iterate_n f init n =
   let rec loop i acc =
     if i >= n then acc else loop (i + 1) (f acc)
@@ -73,6 +77,11 @@ struct
   let[@inline always] scale_all xs =
     List.map (fun[@inline never] x -> x * K.factor) xs
 end
+
+(* Used as a value from e2e_inline.ml: the closure that eta-expands it
+   there is named after this declaration, [E2e_inline_lib.bump], as a copy
+   from this unit. *)
+external bump : int -> int = "caml_e2e_inline_bump_stub"
 
 (* Reached only via [E2e_inline_mid.relay], for the transitive
    inlining case in e2e_inline.ml. *)

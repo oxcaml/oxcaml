@@ -28,6 +28,7 @@ module Scoped_location = struct
     | Sc_method_definition
     | Sc_partial_or_eta_wrapper
     | Sc_lazy
+    | Sc_compiler_generated
 
   let equal_scope_item si1 si2 =
     match si1, si2 with
@@ -37,10 +38,11 @@ module Scoped_location = struct
     | Sc_class_definition, Sc_class_definition
     | Sc_method_definition, Sc_method_definition
     | Sc_partial_or_eta_wrapper, Sc_partial_or_eta_wrapper
-    | Sc_lazy, Sc_lazy -> true
+    | Sc_lazy, Sc_lazy
+    | Sc_compiler_generated, Sc_compiler_generated -> true
     | (Sc_anonymous_function | Sc_value_definition | Sc_module_definition
       | Sc_class_definition | Sc_method_definition | Sc_partial_or_eta_wrapper
-      | Sc_lazy), _ -> false
+      | Sc_lazy | Sc_compiler_generated), _ -> false
 
   type anonymous_counters =
     { next_function : int ref;
@@ -159,19 +161,47 @@ module Scoped_location = struct
       | Cons {item = Sc_class_definition; _} -> dot ~sep:"#" scopes s
       | _ -> dot scopes s
     in
+    (* Translclass binds the method's function as [method_<name>]; the
+       mangling item matches, so the binder's name identifies the function. *)
     cons scopes Sc_method_definition str s
-      ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
+      ~assume_zero_alloc:ZA.Assume_info.none
+      (Some (Function ("method_" ^ s)))
 
   let enter_lazy ~scopes =
     cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
       (Some (Lazy (next_anonymous scopes (fun c -> c.next_lazy))))
 
-  let enter_partial_or_eta_wrapper ~scopes ~loc =
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
-    cons scopes Sc_partial_or_eta_wrapper (dot ~no_parens:() scopes "(partial)")
-      "" ~assume_zero_alloc:ZA.Assume_info.none
-      (Some (Partial_function (line, col, Some file)))
+  (* The wrapper closures of partial applications and of eta-expansions share
+     a scope item; only the former get a mangling item. *)
+  let enter_wrapper ~scopes ~str mangling_item =
+    cons scopes Sc_partial_or_eta_wrapper str ""
+      ~assume_zero_alloc:ZA.Assume_info.none mangling_item
+
+  let partial_str scopes = dot ~no_parens:() scopes "(partial)"
+
+  (* The closure created by a partial application compiled by the frontend.
+     [callee] is the mangling path of the function being applied, empty when
+     it is unknown. *)
+  let enter_partial_application ~scopes ~callee =
+    enter_wrapper ~scopes ~str:(partial_str scopes) (Some (Partial callee))
+
+  (* The eta-expansion of a primitive used as a first-class value. This is not
+     a partial application, so it gets no mangling item: the wrapper is the
+     value the enclosing binding defines. *)
+  let enter_eta_wrapper ~scopes =
+    enter_wrapper ~scopes ~str:(partial_str scopes) None
+
+  (* The closure created by a partial application compiled by the middle end,
+     whose scopes are those of the application site. [str], which names
+     functions in DWARF and assembly output, is left as it is, except that a
+     wrapper without any enclosing scope is named like the frontend's. *)
+  let add_partial_application_item ~scopes callee =
+    let str =
+      match scopes with
+      | Empty -> partial_str scopes
+      | Cons { str; _ } -> str
+    in
+    enter_wrapper ~scopes ~str (Some (Partial callee))
 
   let update_assume_zero_alloc ~scopes ~assume_zero_alloc =
     match scopes with
@@ -189,6 +219,17 @@ module Scoped_location = struct
     match scopes with
     | Empty -> ZA.Assume_info.none
     | Cons { assume_zero_alloc; _ } -> assume_zero_alloc
+
+  (* A function the compiler derives from the function defined by [scopes]:
+     see [Structured_mangling.marker_payload]. The string form, which names
+     functions in DWARF and assembly output, is left as it is, and so is the
+     zero_alloc assumption, which the derived function's body inherits. Its
+     own scope item tells consumers such as FDO that the function is not
+     anonymous: it stands for the function it derives from. *)
+  let enter_compiler_generated ~scopes marker =
+    cons scopes Sc_compiler_generated (str scopes) ""
+      ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
+      (Some (Function (Structured_mangling.marker_payload marker)))
 
   let string_of_scopes ~include_zero_alloc = function
     | Empty -> "<unknown>"
@@ -214,6 +255,14 @@ module Scoped_location = struct
     | Empty -> None
     | Cons { prev = Empty; _ } -> Some scopes
     | Cons { prev } -> outermost_scope prev
+
+  let enclosing_module_scopes scopes =
+    let rec loop = function
+      | Empty -> Empty
+      | Cons { item = Sc_module_definition; _ } as scopes -> scopes
+      | Cons { prev; _ } -> loop prev
+    in
+    loop scopes
 
   let compilation_unit scopes =
     match outermost_scope scopes with
@@ -249,7 +298,7 @@ module Scoped_location = struct
   let map_scopes f t =
     match t with
     | Loc_unknown -> Loc_unknown
-    | Loc_known { loc; scopes } -> Loc_known { loc; scopes = f ~scopes ~loc }
+    | Loc_known { loc; scopes } -> Loc_known { loc; scopes = f scopes }
 end
 
 type item = {
@@ -572,37 +621,26 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg :
+let to_structured_mangling_path dbg :
     Compilation_unit.t Structured_mangling.path =
-  (* Drop the suffix of partial applications, then make sure the path ends with
-     an item identifying the function itself. The scopes already do so when the
-     innermost item is the function's own binding or an anonymous function; in
-     the remaining cases (e.g. a functor body, whose innermost scope is the
-     module it defines, or a body with no location information at all) we
-     append [name], the name the middle end gave the function. *)
-  let rec drop_partials_and_add_function_name ~name
-      (path : Compilation_unit.t Structured_mangling.path)
-      =
-    match path with
-    | Partial_function _ :: path ->
-      drop_partials_and_add_function_name ~name path
-    | Function name' :: _ when String.equal name name' -> path
-    | (Anonymous_function _ | Lazy _) :: _ -> path
-    | Compilation_unit _ :: _ | Inline_marker :: _ | Module _ :: _
-    | Anonymous_module _ :: _ | Class _ :: _ | Function _ :: _ | Stamp _ :: _
-    | [] ->
-      Structured_mangling.Function name :: path
-  in
-  let path_from_debug =
-    match to_items dbg with
-    | [] -> []
-    | item :: _ ->
-      (* CR sspies: The list of debuginfo items can contain more than one item
-         in case of inlining (see [merge]). For the moment, we use the first
-         item. In the future, it would be good to track the original source of
-         the function. See #5099. *)
-      path_of_debug_info_scopes [] item.dinfo_scopes
-  in
-  List.rev path_from_debug
-  |> drop_partials_and_add_function_name ~name
-  |> List.rev
+  match to_items dbg with
+  | [] -> []
+  | item :: _ ->
+    (* CR sspies: The list of debuginfo items can contain more than one item
+       in case of inlining (see [merge]). For the moment, we use the first
+       item. In the future, it would be good to track the original source of
+       the function. See #5099. *)
+    path_of_debug_info_scopes [] item.dinfo_scopes
+
+let add_partial_application_item ~callee t =
+  match t.dbg with
+  | [] ->
+    (* Without location information there is no scope to record the callee in;
+       the wrapper is then named like any other function. *)
+    t
+  | item :: items ->
+    let dinfo_scopes =
+      Scoped_location.add_partial_application_item ~scopes:item.dinfo_scopes
+        callee
+    in
+    { t with dbg = { item with dinfo_scopes } :: items }

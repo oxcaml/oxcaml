@@ -183,7 +183,7 @@ module Relative = struct
           | Sc_module_definition -> Absolute.Module { name; prev }
           | Sc_class_definition -> Absolute.Class { name; prev }
           | Sc_anonymous_function | Sc_method_definition | Sc_value_definition
-          | Sc_lazy | Sc_partial_or_eta_wrapper ->
+          | Sc_lazy | Sc_partial_or_eta_wrapper | Sc_compiler_generated ->
             prev)
     in
     let parent =

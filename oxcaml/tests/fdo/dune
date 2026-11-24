@@ -37,7 +37,8 @@
 ; In both:
 ; - shadowed functions and anonymous functions with the same body get distinct
 ;   discriminators;
-; - functions without a location (as in classes) are named by their binders.
+; - the functions the compiler generates for a class are named after it, told
+;   apart by discriminators.
 
 (rule
  (targets function_ids.output.corrected)

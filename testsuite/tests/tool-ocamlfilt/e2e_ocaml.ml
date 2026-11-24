@@ -313,6 +313,297 @@ module Ordinals = struct
     List.map (fun[@inline never] x -> x + Lazy.force t) xs
 end
 
+(* {1 Anonymous first-class modules}
+
+   The two [(module struct ... end)] bodies are anonymous modules, numbered
+   among the anonymous items of [pick]: [pick.mod_{0}.v] and
+   [pick.mod_{1}.v]. *)
+module type V = sig
+  val v : int -> int
+end
+
+let pick flag : (module V) =
+  if flag
+  then
+    (module struct
+      let[@cold] v x = x + 1
+    end)
+  else
+    (module struct
+      let[@cold] v x = x - 1
+    end)
+
+(* {1 Partial application}
+
+   A partial application that the frontend compiles to a closure (a
+   later labelled argument is supplied while an earlier one is omitted)
+   is marked [partial{<callee>}], with the callee's path as written at
+   the application site. Merely using a primitive as a first-class value
+   ([let neg = ( ~- )]) is an eta-expansion, not a partial application,
+   so it gets no marker: the wrapper simply is [neg]. The middle end
+   marks the wrappers it creates for the partial applications it
+   compiles itself ([curried]) in the same way. *)
+module Partial = struct
+  let[@inline never] labelled ~a ~b = a - b
+
+  let[@inline never] sum3 ~a ~b ~c = a + b + c
+
+  let[@inline never] text ?(indent = 0) ~wrap s =
+    String.make indent ' ' ^ s ^ string_of_int wrap
+
+  let[@inline never] omit_first x = labelled ~b:x
+
+  let neg = ( ~- )
+end
+
+let[@inline never] omit_first_qualified x = Partial.labelled ~b:x
+
+let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
+
+(* Partially applying a partial application applies the original callee
+   to more arguments: the wrapper is [partial{Partial.sum3}], not
+   [partial{first.partial{Partial.sum3}}]. *)
+let first = Partial.sum3 ~a:(Sys.opaque_identity 1)
+
+let second = first ~b:(Sys.opaque_identity 2)
+
+(* Applying a function with optional arguments to a labelled argument only
+   makes the type checker eta-expand the application; the resulting
+   closure is the partial application too: [render.partial{Partial.text}]. *)
+let[@inline never] render l = List.map (Partial.text ~wrap:80) l
+
+(* The eta-expansion of a complete application whose result happens to be a
+   function with optional arguments is a partial application of that result,
+   not of the function applied, which is left unknown: [use_app.partial{?}]
+   rather than [use_app.partial{Stdlib.Sys.opaque_identity}]. *)
+let[@inline never] with_opt ?(opt = 0) b = opt + b
+
+let[@inline never] apply_int (g : int -> int) = g 2
+
+let[@inline never] use_app () = apply_int (Sys.opaque_identity with_opt)
+
+(* {1 Primitives re-exported as values}
+
+   When a signature declares as a [val] what the structure defines as an
+   [external], the compiler wraps the primitive in a closure to fill the
+   module field. The wrapper is named after the value it implements
+   ([Prims.<], [Prims.compare]), not after the primitive. *)
+module Prims : sig
+  val ( < ) : int -> int -> bool
+
+  val compare : int -> int -> int
+end = struct
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external compare : int -> int -> int = "%compare"
+end
+
+(* {1 A named function defined under a capturing [let]}
+
+   [let f = let x = ... in let f ... = ... x ... in f] is an idiom for
+   sharing a value between calls while keeping a named symbol. The inner
+   function keeps its name, [Captured.find_exn.find_exn], even though its
+   binding is the whole body of the outer one. *)
+module Captured = struct
+  let find_exn =
+    let not_found = Not_found in
+    let[@inline never] find_exn t ~f =
+      match List.find_opt f t with None -> raise not_found | Some x -> x
+    in
+    find_exn
+end
+
+(* {1 A functor coerced by its signature}
+
+   When a signature hides items of a functor's body, the compiler wraps
+   the functor in a closure that applies the coercion to its result. The
+   wrapper is named after the functor with the [coerce] marker,
+   [Coerced.Make.{coerce}], and the functor's own body is [Coerced.Make];
+   the latter is how every functor body is named. *)
+module Coerced : sig
+  module type S = sig
+    val x : int
+  end
+
+  module Make (X : S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module type S = sig
+    val x : int
+  end
+
+  module Make (X : S) = struct
+    let[@inline never] helper () = X.x * 2
+
+    let[@inline never] get () = helper () + 1
+  end
+end
+
+module Coerced_inst = Coerced.Make (struct
+  let x = 3
+end)
+
+(* The same, one module deeper: the coercion of [Nested] applies a nested
+   coercion to [Inner], whose functor is named [Nested.Inner.Make.{coerce}]. *)
+module Nested : sig
+  module Inner : sig
+    module Make (X : Coerced.S) : sig
+      val get : unit -> int
+    end
+  end
+end = struct
+  module Inner = struct
+    module Make (X : Coerced.S) = struct
+      let[@inline never] helper () = X.x * 3
+
+      let[@inline never] get () = helper () + 1
+    end
+  end
+end
+
+module Nested_inst = Nested.Inner.Make (struct
+  let x = 4
+end)
+
+(* A functor re-exported under a narrower signature, through a module alias
+   or directly: the field's coercion goes through the alias, and the wrapper
+   is named after the re-exported functor, [Reexport.Make.{coerce}] and
+   [Reexport_direct.Make.{coerce}]. *)
+module Reexport_impl (X : Coerced.S) = struct
+  let[@inline never] helper () = X.x * 3
+
+  let[@inline never] get () = helper () + 2
+end
+
+module Reexport : sig
+  module Make (X : Coerced.S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module Alias = Reexport_impl
+  module Make = Alias
+end
+
+module Reexport_direct : sig
+  module Make (X : Coerced.S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module Make = Reexport_impl
+end
+
+module Reexport_inst = Reexport.Make (struct
+  let x = 5
+end)
+
+module Reexport_direct_inst = Reexport_direct.Make (struct
+  let x = 6
+end)
+
+(* An [external] coerced as an argument of [include functor] is wrapped like
+   one coerced by a signature, and the wrapper is named after the field:
+   [Include_functor.wrap], not [Include_functor.wrap.fn]. *)
+module type WRAP = sig
+  type t
+
+  val wrap : t -> int
+end
+
+module Make_scan (X : WRAP) = struct
+  let[@inline never] scan x = X.wrap x + 1
+end
+
+module Include_functor = struct
+  type t = int
+
+  external wrap : t -> int = "%identity"
+
+  include functor Make_scan
+end
+
+(* {1 A primitive used as a value}
+
+   Passing a primitive such as [Fun.id] as a value eta-expands it into a
+   closure. Every such closure of a primitive does the same thing, so it is
+   named after the primitive's declaration rather than the use site:
+   [First_class.bump] below, and [Stdlib.Fun.id] for [use_id], a copy from
+   [Stdlib__Fun] shown at its definition site (the table excludes
+   stdlib-rooted symbols, so that one is only visible in the object; see
+   [e2e_inline.ml] for the cross-unit case). *)
+module First_class = struct
+  let[@inline never] keep (f : int -> int) = Sys.opaque_identity f
+
+  let[@inline never] use_id () = keep Fun.id
+
+  (* A C external used as a value: its closure is named after the external
+     as declared, [First_class.bump], not after the C symbol or the use
+     site, like the field a signature coercion makes of it. *)
+  external bump : int -> int = "caml_e2e_bump_stub"
+
+  let[@inline never] use_bump () = keep bump
+end
+
+(* {1 Compiler-generated variants of a function}
+
+   A function with optional arguments is split into a wrapper filling in
+   the defaults, which keeps the name, and a body marked [{inner}]:
+   [Generated.escape.{inner}]. A [[@tail_mod_cons]] function gets a
+   destination-passing version marked [{dps}]:
+   [Generated.map.map_loop.{dps}]. *)
+module Generated = struct
+  let[@inline never] escape ?(quote = '"') ?(sep = ',') s =
+    if String.contains s sep
+    then String.make 1 quote ^ s ^ String.make 1 quote
+    else s
+
+  let[@inline never] map l ~f =
+    let[@tail_mod_cons] rec map_loop = function
+      | [] -> []
+      | x :: l -> f x :: map_loop l
+    in
+    map_loop l
+end
+
+(* {1 Arity chunks and class parameters}
+
+   A native function with more than 126 parameters is split into chunks
+   of at most that many; the inner chunks are marked [{curry}]:
+   [Wide.wide.{curry}]. The closure taking a class's parameters creates
+   its objects and is marked [{obj_init}] like the parameterless case:
+   [reader.{obj_init}]. *)
+module Wide = struct
+  let[@inline never] wide ~a0 ~a1 ~a2 ~a3 ~a4 ~a5 ~a6 ~a7 ~a8 ~a9 ~a10 ~a11
+        ~a12 ~a13 ~a14 ~a15 ~a16 ~a17 ~a18 ~a19 ~a20 ~a21 ~a22 ~a23 ~a24 ~a25
+        ~a26 ~a27 ~a28 ~a29 ~a30 ~a31 ~a32 ~a33 ~a34 ~a35 ~a36 ~a37 ~a38 ~a39
+        ~a40 ~a41 ~a42 ~a43 ~a44 ~a45 ~a46 ~a47 ~a48 ~a49 ~a50 ~a51 ~a52 ~a53
+        ~a54 ~a55 ~a56 ~a57 ~a58 ~a59 ~a60 ~a61 ~a62 ~a63 ~a64 ~a65 ~a66 ~a67
+        ~a68 ~a69 ~a70 ~a71 ~a72 ~a73 ~a74 ~a75 ~a76 ~a77 ~a78 ~a79 ~a80 ~a81
+        ~a82 ~a83 ~a84 ~a85 ~a86 ~a87 ~a88 ~a89 ~a90 ~a91 ~a92 ~a93 ~a94 ~a95
+        ~a96 ~a97 ~a98 ~a99 ~a100 ~a101 ~a102 ~a103 ~a104 ~a105 ~a106 ~a107
+        ~a108 ~a109 ~a110 ~a111 ~a112 ~a113 ~a114 ~a115 ~a116 ~a117 ~a118
+        ~a119 ~a120 ~a121 ~a122 ~a123 ~a124 ~a125 ~a126 ~a127 ~a128 ~a129 =
+      a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 +
+      a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24
+      + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 +
+      a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47
+      + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 +
+      a59 + a60 + a61 + a62 + a63 + a64 + a65 + a66 + a67 + a68 + a69 + a70
+      + a71 + a72 + a73 + a74 + a75 + a76 + a77 + a78 + a79 + a80 + a81 +
+      a82 + a83 + a84 + a85 + a86 + a87 + a88 + a89 + a90 + a91 + a92 + a93
+      + a94 + a95 + a96 + a97 + a98 + a99 + a100 + a101 + a102 + a103 + a104
+      + a105 + a106 + a107 + a108 + a109 + a110 + a111 + a112 + a113 + a114
+      + a115 + a116 + a117 + a118 + a119 + a120 + a121 + a122 + a123 + a124
+      + a125 + a126 + a127 + a128 + a129
+end
+
+class reader filename =
+  object
+    val name = String.uppercase_ascii filename
+
+    method name = name
+  end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -345,4 +636,41 @@ let _ =
   ignore (Ordinals.siblings_and_nesting [ 1; -2; 3 ]);
   ignore (Ordinals.labelled_out_of_order 6);
   ignore (Lazy.force Ordinals.thunk);
-  ignore (Ordinals.lazy_then_lambda [ 7 ])
+  ignore (Ordinals.lazy_then_lambda [ 7 ]);
+  ignore (Partial.omit_first 1 ~a:2);
+  ignore (omit_first_qualified 3 ~a:4);
+  ignore (Partial.neg 5);
+  ignore (curried ~b:6);
+  ignore (second ~c:7);
+  ignore (render [ "a" ]);
+  ignore (use_app ());
+  ignore (Wide.wide ~a0:0 ~a1:1 ~a2:2 ~a3:3 ~a4:4 ~a5:5 ~a6:6 ~a7:7 ~a8:8
+     ~a9:9 ~a10:10 ~a11:11 ~a12:12 ~a13:13 ~a14:14 ~a15:15 ~a16:16 ~a17:17
+     ~a18:18 ~a19:19 ~a20:20 ~a21:21 ~a22:22 ~a23:23 ~a24:24 ~a25:25 ~a26:26
+     ~a27:27 ~a28:28 ~a29:29 ~a30:30 ~a31:31 ~a32:32 ~a33:33 ~a34:34 ~a35:35
+     ~a36:36 ~a37:37 ~a38:38 ~a39:39 ~a40:40 ~a41:41 ~a42:42 ~a43:43 ~a44:44
+     ~a45:45 ~a46:46 ~a47:47 ~a48:48 ~a49:49 ~a50:50 ~a51:51 ~a52:52 ~a53:53
+     ~a54:54 ~a55:55 ~a56:56 ~a57:57 ~a58:58 ~a59:59 ~a60:60 ~a61:61 ~a62:62
+     ~a63:63 ~a64:64 ~a65:65 ~a66:66 ~a67:67 ~a68:68 ~a69:69 ~a70:70 ~a71:71
+     ~a72:72 ~a73:73 ~a74:74 ~a75:75 ~a76:76 ~a77:77 ~a78:78 ~a79:79 ~a80:80
+     ~a81:81 ~a82:82 ~a83:83 ~a84:84 ~a85:85 ~a86:86 ~a87:87 ~a88:88 ~a89:89
+     ~a90:90 ~a91:91 ~a92:92 ~a93:93 ~a94:94 ~a95:95 ~a96:96 ~a97:97 ~a98:98
+     ~a99:99 ~a100:100 ~a101:101 ~a102:102 ~a103:103 ~a104:104 ~a105:105
+     ~a106:106 ~a107:107 ~a108:108 ~a109:109 ~a110:110 ~a111:111 ~a112:112
+     ~a113:113 ~a114:114 ~a115:115 ~a116:116 ~a117:117 ~a118:118 ~a119:119
+     ~a120:120 ~a121:121 ~a122:122 ~a123:123 ~a124:124 ~a125:125 ~a126:126
+     ~a127:127 ~a128:128 ~a129:129);
+  ignore (new reader "r")#name;
+  ignore (pick true);
+  ignore (Prims.( < ) 1 2);
+  ignore (Prims.compare 1 2);
+  ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
+  ignore (Coerced_inst.get ());
+  ignore (Nested_inst.get ());
+  ignore (Reexport_inst.get ());
+  ignore (Reexport_direct_inst.get ());
+  ignore (Include_functor.scan 3);
+  ignore (First_class.use_id () 5);
+  ignore (First_class.use_bump () 6);
+  ignore (Generated.escape "a,b");
+  ignore (Generated.map [ 1; 2 ] ~f:(fun x -> x + 1))

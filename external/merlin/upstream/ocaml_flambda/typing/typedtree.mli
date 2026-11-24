@@ -1092,6 +1092,10 @@ and module_coercion =
       { input_repr : Types.module_representation
       ; output_repr : Types.module_representation
       ; pos_cc_list : (int * module_coercion) list
+      ; output_names : string list
+      (* The names of the runtime components of the signature coerced to, in
+         the order of [pos_cc_list], or [] when unknown; they name the
+         wrapper functions that the coercions create. *)
       ; id_pos_list : (Ident.t * int * module_coercion) list
       (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
          the list of fields in the input module *)
@@ -1154,6 +1158,9 @@ and primitive_coercion =
     pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+    pc_name : string;
+    (** The name of the value that the coerced primitive implements, as
+        declared in the signature; it names the wrapper function. *)
   }
 
 and kindtemplate_coercion =
