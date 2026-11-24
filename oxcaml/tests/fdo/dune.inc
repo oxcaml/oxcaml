@@ -1,6 +1,3 @@
-
-; The operations on pseudo-instrumentation counters ([Fdo_counter]).
-
 (executable (name fdo_counters) (modules fdo_counters) (libraries ocamlcommon))
 
 (rule
@@ -13,8 +10,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps fdo_counters.output fdo_counters.output.corrected)
  (action (diff fdo_counters.output fdo_counters.output.corrected)))
-
-; The counters of the cases of the switches compiled to Cmm.
 
 (executable
  (name cmm_switch_counters)
@@ -34,8 +29,6 @@
  (deps cmm_switch_counters.output cmm_switch_counters.output.corrected)
  (action (diff cmm_switch_counters.output cmm_switch_counters.output.corrected)))
 
-; The counters that instruction selection puts in the Cfg.
-
 (executable
  (name selection_counters)
  (modules selection_counters)
@@ -53,8 +46,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps selection_counters.output selection_counters.output.corrected)
  (action (diff selection_counters.output selection_counters.output.corrected)))
-
-; The counters of the terminators that [Simplify_terminator] rewrites.
 
 (executable
  (name simplify_terminator_counters)
@@ -79,8 +70,6 @@
    simplify_terminator_counters.output
    simplify_terminator_counters.output.corrected)))
 
-; The counters through the passes of the SSA pipeline.
-
 (executable (name ssa_counters) (modules ssa_counters) (libraries ocamloptcomp))
 
 (rule
@@ -93,9 +82,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps ssa_counters.output ssa_counters.output.corrected)
  (action (diff ssa_counters.output ssa_counters.output.corrected)))
-
-; The counters on the machine edges of the terminators that [Cfg_to_linear]
-; linearizes.
 
 (executable
  (name cfg_to_linear_counters)
@@ -115,8 +101,6 @@
  (deps cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)
  (action
   (diff cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)))
-
-; The counters of the conditional branches that [Branch_relaxation] relaxes.
 
 (executable
  (name branch_relaxation_counters)
@@ -141,8 +125,6 @@
    branch_relaxation_counters.output
    branch_relaxation_counters.output.corrected)))
 
-; The counters of the blocks that [Cfg_merge_blocks] merges.
-
 (executable
  (name merge_blocks_counters)
  (modules merge_blocks_counters)
@@ -162,16 +144,7 @@
  (action
   (diff merge_blocks_counters.output merge_blocks_counters.output.corrected)))
 
-; Extracting the FDO annotations from dumps.
-
 (executable (name fdo_annotations) (modules fdo_annotations))
-
-; Function identities ([Fdo_function_naming]). function_ids_edited.ml is
-; function_ids.ml with anonymous functions inserted (other functions keep their
-; names), an optional argument added to [opt] (it keeps its name, and gains a
-; stub), and the second [shadowing] removed. In both, shadowed functions and
-; anonymous functions with the same body get distinct discriminators, and
-; functions without a location (as in classes) are named by their binders.
 
 (rule
  (targets function_ids.output.corrected)
@@ -184,6 +157,8 @@
     -c
     -fdo-counters
     -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -194,6 +169,8 @@
     -c
     -fdo-counters
     -fexpr-print-fdo-counters
+    -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -215,11 +192,6 @@
  (deps function_ids.output function_ids.output.corrected)
  (action (diff function_ids.output function_ids.output.corrected)))
 
-; Body hashes ([Fdo_body_hash]). body_hash_edited.ml changes the [keep_*]
-; functions in ways that must keep their hashes, and the [change_*] functions in
-; ways that must change them. Functions with the same hash in both must have the
-; same counters.
-
 (rule
  (targets body_hash.output.corrected)
  (deps body_hash.ml body_hash_edited.ml fdo_annotations.exe)
@@ -232,6 +204,7 @@
     -fdo-counters
     -fexpr-print-fdo-counters
     -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -243,6 +216,7 @@
     -fdo-counters
     -fexpr-print-fdo-counters
     -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -269,10 +243,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps body_hash.output body_hash.output.corrected)
  (action (diff body_hash.output body_hash.output.corrected)))
-
-; The counters attached by [Fdo_instrumentation] during the translation from
-; Lambda: edges of switches, interior and module-level calls, in nested
-; functions, functors and local modules.
 
 (rule
  (targets instrumentation.output.corrected)
@@ -301,12 +271,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps instrumentation.output instrumentation.output.corrected)
  (action (diff instrumentation.output instrumentation.output.corrected)))
-
-; The counters after Simplify: inlined bodies get their call site as inlining
-; context, the functions of inlined functor applications are copies with their
-; own counters, and the counters of removed instructions (inlined calls, folded
-; switches, self tail calls) are dropped. Compilation stops after the middle
-; end, so that only its dropped counters are listed.
 
 (rule
  (targets simplify.output.corrected)
@@ -344,10 +308,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps simplify.output simplify.output.corrected)
  (action (diff simplify.output simplify.output.corrected)))
-
-; The same at -O3 with the reaper, after the reaper (in a directory of its own,
-; so that the module keeps its name). Without local value slots, which CI may
-; enable by default and which remove the code of [R.step].
 
 (rule
  (targets simplify_o3_reaper.output.corrected)
@@ -392,11 +352,6 @@
  (deps simplify_o3_reaper.output simplify_o3_reaper.output.corrected)
  (action (diff simplify_o3_reaper.output simplify_o3_reaper.output.corrected)))
 
-; The counters in Cmm: none of the Flambda translated to Cmm is lost, and none
-; is added. [to_cmm.ml] is also compiled with the inline fast path of
-; [caml_apply], whose two calls share the counter, and [simplify.ml] at -O3 with
-; the reaper.
-
 (rule
  (targets to_cmm.output.corrected)
  (deps to_cmm.ml simplify.ml fdo_annotations.exe)
@@ -413,6 +368,7 @@
      -fdo-counters
      -fexpr-print-fdo-counters
      -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
      -dfexpr-annot-after
      simplify
      -dcmm
@@ -432,6 +388,7 @@
      -fdo-counters
      -fexpr-print-fdo-counters
      -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
      -dfexpr-annot-after
      simplify
      -dcmm
@@ -452,6 +409,7 @@
      -fdo-counters
      -fexpr-print-fdo-counters
      -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
      -dfexpr-annot-after
      reaper
      -dcmm
@@ -483,9 +441,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps to_cmm.output to_cmm.output.corrected)
  (action (diff to_cmm.output to_cmm.output.corrected)))
-
-; The counters of the switches To_cmm turns into a table lookup or a single
-; jump, which the reaper leaves for it: they are dropped.
 
 (rule
  (targets to_cmm_reaper.output.corrected)
@@ -530,9 +485,6 @@
  (deps to_cmm_reaper.output to_cmm_reaper.output.corrected)
  (action (diff to_cmm_reaper.output to_cmm_reaper.output.corrected)))
 
-; The counter of the call of a probe handler, which To_cmm replaces by the
-; probe: it is dropped. Probes are only supported on Linux.
-
 (rule
  (targets to_cmm_probe.output.corrected)
  (deps to_cmm_probe.ml fdo_annotations.exe)
@@ -563,10 +515,6 @@
  (enabled_if (and (= %{context_name} "main") (= %{system} "linux")))
  (deps to_cmm_probe.output to_cmm_probe.output.corrected)
  (action (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
-
-; The counters in Cfg: none of the Cmm selected is lost, and none is added. A
-; self tail call becomes a jump, whose counter is dropped. The Cfg dumps hold
-; every pass that prints one.
 
 (rule
  (targets cfg.output.corrected)
@@ -626,6 +574,7 @@
      -c
      -fdo-counters
      -dcfg
+     -dfdo-dropped-counters
      -dump-into-file
      -color
      never
@@ -654,12 +603,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps cfg.output cfg.output.corrected)
  (action (diff cfg.output cfg.output.corrected)))
-
-; The counters through SSA: those of the Cmm are in the SSA and in the Cfg
-; converted from it, except that of a self tail call, which becomes a jump.
-; [-use-ssa] also checks, by [-ssa-validate], that the Cfg converted from SSA
-; has the counters of the one selected from Cmm, on the same edges and calls.
-; The SSA dumps hold the SSA before and after [Ssa_simplify].
 
 (rule
  (targets ssa.output.corrected)
@@ -738,6 +681,7 @@
      -use-ssa
      -fdo-counters
      -dssa
+     -dfdo-dropped-counters
      -dump-into-file
      -color
      never
@@ -790,10 +734,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps ssa.output ssa.output.corrected)
  (action (diff ssa.output ssa.output.corrected)))
-
-; The counters in Linear: none of the Cmm is lost through the Cfg passes apart
-; from the dropped ones, and none is added. A conditional branch has the
-; counters of its taken edge and of its fallthrough edge.
 
 (rule
  (targets linear.output.corrected)
@@ -912,10 +852,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps linear.output linear.output.corrected)
  (action (diff linear.output linear.output.corrected)))
-
-; End to end through the backend, at -O3, with the SSA pipeline and with the
-; merging of identical blocks: each counter of the Cmm is in the Linear code or
-; dropped, and the Linear code has no other counter.
 
 (rule
  (targets backend_o3.output.corrected)
@@ -1507,9 +1443,6 @@
  (enabled_if (= %{context_name} "main"))
  (deps backend_o3.output backend_o3.output.corrected)
  (action (diff backend_o3.output backend_o3.output.corrected)))
-
-; The counters do not change the generated code, which is compared with and
-; without them, with several sets of flags.
 
 (rule
  (targets codegen.output.corrected)
