@@ -136,34 +136,37 @@ let simplify_exits lam =
         Hashtbl.add exits i r
   in
 
-  let rec count ~try_depth ~tail = function
+  let rec count ~try_depth ~tail_labels = function
   | Lswitch(l, sw, _loc, _kind) ->
-      count_default ~try_depth sw ~tail;
-      count ~try_depth l ~tail:false;
-      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw.sw_consts;
-      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw.sw_blocks
+      count_default ~try_depth sw ~tail_labels;
+      count ~try_depth l ~tail_labels:Static_label.Set.empty;
+      List.iter (fun (_, l) ->
+        count ~try_depth l ~tail_labels) sw.sw_consts;
+      List.iter (fun (_, l) ->
+        count ~try_depth l ~tail_labels) sw.sw_blocks
   | Lstringswitch(l, sw, d, _, _kind) ->
-      count ~try_depth l ~tail:false;
-      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw;
+      count ~try_depth l ~tail_labels:Static_label.Set.empty;
+      List.iter (fun (_, l) -> count ~try_depth l ~tail_labels) sw;
       begin match  d with
       | None -> ()
       | Some d -> match sw with
-        | []|[_] -> count ~try_depth d ~tail
+        | []|[_] -> count ~try_depth d ~tail_labels
         | _ -> (* default will get replicated *)
-            count ~try_depth d ~tail; count ~try_depth d ~tail
+            count ~try_depth d ~tail_labels;
+            count ~try_depth d ~tail_labels
       end
   | Lstaticraise (i,ls) ->
-      incr_exit i 1 try_depth ~tail;
-      List.iter (count ~try_depth ~tail:false) ls
+      incr_exit i 1 try_depth ~tail:(Static_label.Set.mem i tail_labels);
+      List.iter (count ~try_depth ~tail_labels:Static_label.Set.empty) ls
   | Lstaticcatch (l1,(i,[]),Lstaticraise (j,[]), _, _) ->
       (* i will be replaced by j in l1, so each occurrence of i in l1
          increases j's ref count *)
-      count ~try_depth l1 ~tail:true;
+      count ~try_depth l1 ~tail_labels:(Static_label.Set.add i tail_labels);
       let ic = get_exit i in
       incr_exit j ic.count (Misc.Stdlib.Int.max try_depth ic.max_depth)
-        ~tail:(tail && ic.tail_only)
+        ~tail:(Static_label.Set.mem j tail_labels && ic.tail_only)
   | Lstaticcatch(l1, (i,_), l2, r, _) ->
-      count ~try_depth l1 ~tail:true;
+      count ~try_depth l1 ~tail_labels:(Static_label.Set.add i tail_labels);
       (* If l1 does not contain (exit i),
          l2 will be removed, so don't count its exits *)
       if (get_exit i).count > 0 then begin
@@ -172,26 +175,27 @@ let simplify_exits lam =
           | Popped_region -> try_depth - 1
           | Same_region -> try_depth
         in
-        count ~try_depth l2 ~tail
+        count ~try_depth l2 ~tail_labels
       end
   | Ltrywith(l1, _v, _duid, l2, _kind) ->
-      count ~try_depth:(try_depth+1) l1 ~tail:false;
-      count ~try_depth l2 ~tail;
-  | Lregion (l, _) -> count ~try_depth:(try_depth+1) l ~tail
-  | Lexclave l -> count ~try_depth:(try_depth-1) l ~tail
+      count ~try_depth:(try_depth+1) l1 ~tail_labels:Static_label.Set.empty;
+      count ~try_depth l2 ~tail_labels;
+  | Lregion (l, _) -> count ~try_depth:(try_depth+1) l ~tail_labels
+  | Lexclave l -> count ~try_depth:(try_depth-1) l ~tail_labels
   | (Lvar _| Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ |
      Llet _ | Lmutlet _ | Lletrec _ | Lprim _ | Lifthenelse _ |
      Lsequence _ | Lwhile _ | Lfor _ | Lassign _ | Lsend _ |
      Levent _ | Lifused _ ) as lam ->
     Lambda.shallow_iter
-      ~tail:(count ~try_depth ~tail)
-      ~non_tail:(count ~try_depth ~tail:false)
+      ~tail:(count ~try_depth ~tail_labels)
+      ~non_tail:(count ~try_depth ~tail_labels:Static_label.Set.empty)
       lam
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
-  and count_default ~try_depth sw ~tail = match sw.sw_failaction with
+  and count_default ~try_depth sw ~tail_labels =
+  match sw.sw_failaction with
   | None -> ()
   | Some al ->
       let nconsts = List.length sw.sw_consts
@@ -199,13 +203,14 @@ let simplify_exits lam =
       if
         nconsts < sw.sw_numconsts && nblocks < sw.sw_numblocks
       then begin (* default action will occur twice in native code *)
-        count ~try_depth al ~tail; count ~try_depth al ~tail
+        count ~try_depth al ~tail_labels;
+        count ~try_depth al ~tail_labels
       end else begin (* default action will occur once *)
         assert (nconsts < sw.sw_numconsts || nblocks < sw.sw_numblocks) ;
-        count ~try_depth al ~tail
+        count ~try_depth al ~tail_labels
       end
   in
-  count ~try_depth:0 lam ~tail:true;
+  count ~try_depth:0 lam ~tail_labels:Static_label.Set.empty;
 
   (*
      Second pass simplify  ``catch body with (i ...) handler''
