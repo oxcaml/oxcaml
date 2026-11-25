@@ -269,6 +269,7 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
+  | Slice_pattern_unsupported
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -3732,6 +3733,11 @@ let rec has_literal_pattern p =
      has_literal_pattern p
   | Ppat_array (_, ps) ->
      List.exists has_literal_pattern ps
+  | Ppat_slice (_, Pslice_closed ps) ->
+     List.exists has_literal_pattern ps
+  | Ppat_slice (_, Pslice_open { prefix; suffix; _ }) ->
+     List.exists has_literal_pattern prefix
+     || List.exists has_literal_pattern suffix
   | Ppat_tuple (ps, _)
   | Ppat_unboxed_tuple (ps, _) ->
      List.exists (fun (_,p) -> has_literal_pattern p) ps
@@ -4618,6 +4624,7 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+  | Ppat_slice _ -> Error.log_and_raise loc !!penv Slice_pattern_unsupported
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -4844,7 +4851,7 @@ let rec pat_tuple_arity spat =
   | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
-  | Ppat_addr _ | Ppat_deref _ | Ppat_lazy _ | Ppat_unpack _
+  | Ppat_slice _ | Ppat_addr _ | Ppat_deref _ | Ppat_lazy _ | Ppat_unpack _
   | Ppat_extension _ | Ppat_effect _ ->
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
@@ -6692,6 +6699,9 @@ let shallow_iter_ppat f p =
   | Ppat_extension _
   | Ppat_type _ | Ppat_unpack _ -> ()
   | Ppat_array (_, pats) -> List.iter f pats
+  | Ppat_slice (_, Pslice_closed pats) -> List.iter f pats
+  | Ppat_slice (_, Pslice_open { prefix; suffix; _ }) ->
+    List.iter f prefix; List.iter f suffix
   | Ppat_or (p1,p2)
   | Ppat_effect(p1, p2) -> f p1; f p2
   | Ppat_variant (_, arg) -> Option.iter f arg
@@ -14463,6 +14473,8 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Dereference patterns must bind a variable,@ as in %a.@]"
         Style.inline_code "deref_ x"
+  | Slice_pattern_unsupported ->
+      Location.errorf ~loc "@[Slice patterns are not supported yet.@]"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"

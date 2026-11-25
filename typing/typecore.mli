@@ -357,6 +357,7 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
+  | Slice_pattern_unsupported
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
