@@ -343,9 +343,15 @@ module Handler = struct
         }
     | Catch_all
 
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
   type 'body t =
     { pattern : pattern;
-      body : 'body
+      body : 'body;
+      reraise : reraise option
     }
 
   let pattern_to_code = function
@@ -370,8 +376,20 @@ module Handler = struct
       in
       Ast_helper.Pat.construct (lid (Exn.name exn)) payload
 
-  let to_case body_to_code { pattern; body } =
-    Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+  let to_case body_to_code { pattern; body; reraise } =
+    match reraise, pattern with
+    | None, _ ->
+      Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+    | Some { name; notrace }, Exn _ ->
+      let name = Name.to_string name in
+      Ast_helper.Exp.case
+        (Ast_helper.Pat.alias (pattern_to_code pattern) (loc name))
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [Ast_helper.Vb.mk (Ast_helper.Pat.any ()) (body_to_code body)]
+           (apply
+              (ident (if notrace then "raise_notrace" else "raise"))
+              [ident name]))
+    | Some _, Catch_all -> Misc.fatal_errorf "Handler: reraise from catch-all"
 end
 
 module Un_op = struct

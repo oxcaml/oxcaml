@@ -243,6 +243,14 @@ let split_suffix types ~suffix =
   then Some (List.take count types)
   else None
 
+let is_value ty =
+  match ty with
+  | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
+  | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _ | Ty.Arrow _
+    ->
+    true
+  | Ty.Unboxed_tuple _ -> false
+
 let maybe_assert (st : State.t) ~f =
   match st.swarm.assertions with
   | Disabled | Unreachable_only -> f ()
@@ -841,7 +849,8 @@ let can_gen_try (st : State.t) =
   st.swarm.exceptions && st.tries_remaining > 0
   && not (List.is_empty st.exceptions)
 
-let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
+let gen_handler (st : State.t) (env : Env.t) ~gen_body ~can_reraise
+    (exn : Exn.t) =
   let payload =
     match Exn.payload exn with
     | Some ty
@@ -850,10 +859,22 @@ let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
       Some { Binding.name = State.fresh st; ty; is_mutable = false }
     | Some _ | None -> None
   in
+  let reraise =
+    if
+      can_reraise && st.swarm.reraises && Env.can_raise env exn
+      && with_probability st ~probability:Config.reraise_probability
+    then
+      Some
+        { Handler.name = State.fresh st;
+          notrace =
+            with_probability st ~probability:Config.raise_notrace_probability
+        }
+    else None
+  in
   let env = Option.fold payload ~none:env ~some:(Env.extend env) in
-  { Handler.pattern = Exn { exn; payload }; body = gen_body env }
+  { Handler.pattern = Exn { exn; payload }; body = gen_body env; reraise }
 
-let gen_handlers (st : State.t) (env : Env.t) ~gen_body =
+let gen_handlers (st : State.t) (env : Env.t) ~gen_body ~can_reraise =
   let count =
     random_int_in_range st ~min:1
       ~max:(min Config.max_handler_count (List.length st.exceptions))
@@ -866,10 +887,14 @@ let gen_handlers (st : State.t) (env : Env.t) ~gen_body =
     Env.extend_catchable_exceptions env
       (if catch_all then st.exceptions else exceptions)
   in
-  let handlers = List.map (gen_handler st env ~gen_body) exceptions in
+  let handlers =
+    List.map (gen_handler st env ~gen_body ~can_reraise) exceptions
+  in
   let handlers =
     if catch_all
-    then handlers @ [{ Handler.pattern = Catch_all; body = gen_body env }]
+    then
+      handlers
+      @ [{ Handler.pattern = Catch_all; body = gen_body env; reraise = None }]
     else handlers
   in
   body_env, handlers
@@ -1503,17 +1528,8 @@ and gen_raise (st : State.t) (env : Env.t) : Expr.raise =
   { exn; payload; notrace }
 
 and gen_raise_expr (st : State.t) (env : Env.t) ty =
-  (* [raise] can only be given a value type. *)
-  let is_value =
-    match ty with
-    | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
-    | Ty.Array _ | Ty.Bool | Ty.String | Ty.Variant _ | Ty.Or_null _
-    | Ty.Arrow _ ->
-      true
-    | Ty.Unboxed_tuple _ -> false
-  in
   Gen.when_
-    (is_value && not (List.is_empty env.catchable_exceptions))
+    (is_value ty && not (List.is_empty env.catchable_exceptions))
     (fun () -> Expr.Raise (gen_raise st env))
 
 and gen_try_expr (st : State.t) (env : Env.t) ty =
@@ -1525,7 +1541,9 @@ and gen_try_expr (st : State.t) (env : Env.t) ty =
              [ 4, Gen.create (fun () -> gen_value st env ty);
                1, gen_raise_expr st env ty ])
       in
-      let body_env, handlers = gen_handlers st env ~gen_body in
+      let body_env, handlers =
+        gen_handlers st env ~gen_body ~can_reraise:(is_value ty)
+      in
       let body = gen_body body_env in
       Expr.Try { ty; body; handlers })
 
@@ -1810,7 +1828,9 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
         Gen.when_ (can_gen_try st) (fun () ->
             st.tries_remaining <- st.tries_remaining - 1;
             let gen_body env = snd (gen_fun_body st env (depth + 1)) in
-            let body_env, handlers = gen_handlers st env ~gen_body in
+            let body_env, handlers =
+              gen_handlers st env ~gen_body ~can_reraise:true
+            in
             let body = gen_body body_env in
             continue env (Statement.Try { body; handlers }))
       in

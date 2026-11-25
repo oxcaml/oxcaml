@@ -173,9 +173,16 @@ module Handler : sig
         }
     | Catch_all
 
+  (** Raise the caught exception, bound to [name], again after the body. *)
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
   type 'body t =
     { pattern : pattern;
-      body : 'body
+      body : 'body;
+      reraise : reraise option  (** Only for [Exn] patterns. *)
     }
 end
 
