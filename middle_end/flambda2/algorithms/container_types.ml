@@ -197,16 +197,19 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
   exception Found_common_element
 
   let inter_domain_is_non_empty t1 t2 =
-    match
-      merge
-        (fun _ datum1_opt datum2_opt ->
-          match datum1_opt, datum2_opt with
-          | None, None | None, Some _ | Some _, None -> None
-          | Some _, Some _ -> raise Found_common_element)
-        t1 t2
-    with
-    | (_ : _ t) -> false
-    | exception Found_common_element -> true
+    if is_empty t1 || is_empty t2
+    then false
+    else
+      match
+        merge
+          (fun _ datum1_opt datum2_opt ->
+            match datum1_opt, datum2_opt with
+            | None, None | None, Some _ | Some _, None -> None
+            | Some _, Some _ -> raise Found_common_element)
+          t1 t2
+      with
+      | (_ : _ t) -> false
+      | exception Found_common_element -> true
 
   exception More_than_one_binding
 
