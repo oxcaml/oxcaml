@@ -87,7 +87,7 @@ let rec address path event = function
       Debugcom.Remote_value.field v pos
 
 let value_path event env path =
-  match Env.find_value_address path env with
+  match Env.find_value_address ~loc:Location.none path env with
   | addr -> address path event addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))

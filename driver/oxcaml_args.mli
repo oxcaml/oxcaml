@@ -95,6 +95,8 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val float_op_fusion : unit -> unit
+  val no_float_op_fusion : unit -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
@@ -152,7 +154,6 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
-  val reaper_preserve_direct_calls : string -> unit
   val reaper_local_fields : unit -> unit
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit

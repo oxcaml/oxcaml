@@ -392,6 +392,19 @@ let mk_function_layout f =
     Printf.sprintf " Order of functions in the generated assembly (default: %s)"
       default )
 
+let mk_float_op_fusion f =
+  ( "-float-op-fusion",
+    Arg.Unit f,
+    " Allow fusing floating-point operations into single operations that round \
+     only once, where available, e.g. a multiplication and an addition into a \
+     fused multiply-add (default)" )
+
+let mk_no_float_op_fusion f =
+  ( "-no-float-op-fusion",
+    Arg.Unit f,
+    " Do not fuse floating-point operations into single operations that round \
+     only once" )
+
 let mk_name_mangling_scheme f =
   ( "-name-mangling-scheme",
     Arg.Symbol ([ "flat"; "structured" ], f),
@@ -724,19 +737,6 @@ let mk_no_flambda2_reaper f =
     Arg.Unit f,
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
-
-let mk_reaper_preserve_direct_calls f =
-  ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
-    Printf.sprintf
-      " Choose the direct call preservation strategy of the reaper (Flambda2 \
-       only)\n\
-      \      Valid values are: \n\
-      \       \"never\": do not try to preserve direct calls to old functions;\n\
-      \       \"always\": always preserve existing direct calls;\n\
-      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked;\n\
-      \       \"auto\": preserve direct calls only when the reaper is unable \
-       to identify a set of possibly called functions." )
 
 let mk_reaper_local_fields f =
   ( "-reaper-local-fields",
@@ -1545,6 +1545,8 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val float_op_fusion : unit -> unit
+  val no_float_op_fusion : unit -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
@@ -1602,7 +1604,6 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
-  val reaper_preserve_direct_calls : string -> unit
   val reaper_local_fields : unit -> unit
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
@@ -1769,6 +1770,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_zero_alloc_checker_details_extra;
       mk_zero_alloc_checker_join F.zero_alloc_checker_join;
       mk_function_layout F.function_layout;
+      mk_float_op_fusion F.float_op_fusion;
+      mk_no_float_op_fusion F.no_float_op_fusion;
       mk_name_mangling_scheme F.name_mangling_scheme;
       mk_disable_builtin_check F.disable_builtin_check;
       mk_disable_poll_insertion F.disable_poll_insertion;
@@ -1834,7 +1837,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
-      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_reaper_local_fields F.reaper_local_fields;
       mk_no_reaper_local_fields F.no_reaper_local_fields;
       mk_reaper_unbox F.reaper_unbox;
@@ -2206,6 +2208,9 @@ module Oxcaml_options_impl = struct
     | None -> () (* this should not occur as we use Arg.Symbol *)
     | Some layout -> Oxcaml_flags.function_layout := layout
 
+  let float_op_fusion = set' Oxcaml_flags.float_op_fusion
+  let no_float_op_fusion = clear' Oxcaml_flags.float_op_fusion
+
   let name_mangling_scheme s =
     let scheme : Config.name_mangling_scheme option =
       match s with
@@ -2320,24 +2325,6 @@ module Oxcaml_options_impl = struct
   let no_flambda2_reaper = clear Flambda2.enable_reaper
   let flambda2_match_in_match = set Flambda2.match_in_match
   let no_flambda2_match_in_match = clear Flambda2.match_in_match
-
-  let reaper_preserve_direct_calls s =
-    match s with
-    | "never" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set
-            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
-    | "always" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Always
-    | "zero-alloc" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
-    | "auto" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Auto
-    | _ -> () (* This should not occur as we use Arg.Symbol *)
-
   let reaper_local_fields = set Flambda2.reaper_local_fields
   let no_reaper_local_fields = clear Flambda2.reaper_local_fields
   let reaper_unbox = set Flambda2.reaper_unbox
@@ -2809,6 +2796,7 @@ module Extra_params = struct
         | None ->
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
+    | "float-op-fusion" -> set' Oxcaml_flags.float_op_fusion
     | "name-mangling-scheme" -> (
         let scheme : Config.name_mangling_scheme option =
           match v with
@@ -3055,23 +3043,6 @@ module Extra_params = struct
                  (List.map Clflags.Jsoo_effects.to_string
                     Clflags.Jsoo_effects.all)))
     | "reaper" -> set Flambda2.enable_reaper
-    | "reaper-preserve-direct-calls" ->
-        (match String.lowercase_ascii v with
-        | "never" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
-        | "always" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
-        | "zero-alloc" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set Zero_alloc)
-        | "auto" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
-        | _ ->
-            Misc.fatal_error
-              "Syntax: reaper-preserve-direct-calls: \
-               always|never|zero-alloc|auto");
-        true
     | "reaper-local-fields" -> set Flambda2.reaper_local_fields
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->

@@ -446,6 +446,16 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt ~is_cold:(is_cold body) ~cost_metrics ~free_names
   else
+    (* The occurrences of the invariant parameters are still present in
+       [Continuation_handler.free_names], as [Let_cont.create_recursive]
+       requires. *)
+    let free_names_of_handlers =
+      Continuation.Lmap.fold
+        (fun _ handler free_names ->
+          Name_occurrences.union free_names
+            (Continuation_handler.free_names handler))
+        handlers Name_occurrences.empty
+    in
     let handlers =
       Continuation.Lmap.map
         (Continuation_handler.to_continuation_handler
@@ -453,6 +463,7 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
         handlers
     in
     Let_cont.create_recursive ~invariant_params handlers ~body:(to_expr0 body)
+      ~free_names_of_handlers:(Known free_names_of_handlers)
     |> create ~is_cold:(is_cold body) ~cost_metrics ~free_names
 
 let create_switch are_rebuilding ~is_cold switch =

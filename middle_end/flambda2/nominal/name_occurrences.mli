@@ -54,6 +54,13 @@ val count_variable : t -> Variable.t -> Num_occurrences.t
 
 val count_variable_normal_mode : t -> Variable.t -> Num_occurrences.t
 
+val count_variable_by_name_mode :
+  t -> Variable.t -> Num_occurrences.By_name_mode.t
+
+(** [Num_occurrences.By_name_mode.needed_by_phantom_let] applied to the
+    occurrence counts of the variable in [t]. *)
+val variable_needed_by_phantom_let : t -> Variable.t -> bool
+
 val singleton_variable : Variable.t -> Name_mode.t -> t
 
 val add_variable : t -> Variable.t -> Name_mode.t -> t

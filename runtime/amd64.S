@@ -194,6 +194,12 @@ G(name):
 #define DW_OP_deref               0x06
 #define DW_OP_plus_uconst         0x23
 
+/* The operand of DW_OP_breg is a signed LEB128, so a single byte can only
+   encode -64..63: larger non-negative offsets silently decode as negative.
+   SLEB128_2 always uses two bytes, which is valid for 0..8191; each use must
+   be guarded by an assembly-time range check. */
+#define SLEB128_2(x) (((x) & 0x7f) | 0x80), (((x) >> 7) & 0x7f)
+
 /******************************************************************************/
 /* Unrolled iteration. */
 /******************************************************************************/
@@ -1111,12 +1117,13 @@ LBL(108):
            since if we got here via an exception that may have been clobbered.
            However, we now know we're the innermost frame (since we're running),
            so we can get the right stack pointer from Caml_state->c_stack. */
-        .ifge 8*domain_field_caml_c_stack - 128
-        .error "Caml_state(c_stack) out of range for LEB128 encoding"
+        .ifge 8*domain_field_caml_c_stack - 8192
+        .error "Caml_state(c_stack) out of range for 2-byte SLEB128"
         .endif
         .cfi_escape DW_CFA_def_cfa_expression, 4 + 2,                 \
             /* load Caml_state(c_stack) */                            \
-          DW_OP_breg + DW_REG_r14, 0x80 + 8*domain_field_caml_c_stack, 0, DW_OP_deref, \
+          DW_OP_breg + DW_REG_r14,                                    \
+            SLEB128_2(8*domain_field_caml_c_stack), DW_OP_deref,      \
           DW_OP_plus_uconst,                                          \
              SIZEOF_C_STACK_LINK  /* struct c_stack_link */ +         \
              6*8 /* callee save regs */ +                             \
@@ -1786,15 +1793,22 @@ CFI_STARTPROC
 6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
-        .cfi_escape DW_CFA_def_cfa_expression, 3+3+2, \
-          DW_OP_breg + DW_REG_rsp,                    \
-            16 /* exn */ +                            \
-            8 /* gc_regs slot (unused) */ +           \
-            8 /* C_STACK_SP for DWARF (unused) */ +   \
-            16 * Stack_padding_word +                  \
-            Handler_parent, DW_OP_deref,              \
-          DW_OP_plus_uconst, Stack_sp, DW_OP_deref,   \
+    /* Offset from %rsp to the parent field of this fiber's handler */
+#define RUNSTACK_PARENT_OFFSET                  \
+  (16 /* exn */ +                               \
+   8 /* gc_regs slot (unused) */ +              \
+   8 /* C_STACK_SP for DWARF (unused) */ +      \
+   16 * Stack_padding_word +                    \
+   Handler_parent)
+        .ifge RUNSTACK_PARENT_OFFSET - 8192
+        .error "RUNSTACK_PARENT_OFFSET out of range for 2-byte SLEB128"
+        .endif
+        .cfi_escape DW_CFA_def_cfa_expression, 4+3+2,           \
+          DW_OP_breg + DW_REG_rsp,                              \
+            SLEB128_2(RUNSTACK_PARENT_OFFSET), DW_OP_deref,     \
+          DW_OP_plus_uconst, Stack_sp, DW_OP_deref,             \
           DW_OP_plus_uconst, RETADDR_ENTRY_SIZE
+#undef RUNSTACK_PARENT_OFFSET
 #endif
         movq    %rdi, %rax /* first argument */
         CHECK_STACK_ALIGNMENT;

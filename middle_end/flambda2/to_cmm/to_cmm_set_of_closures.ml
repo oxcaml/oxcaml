@@ -244,9 +244,7 @@ end = struct
           let function_symbol =
             Function_slot.Map.find function_slot closure_symbols
           in
-          List.rev_append
-            (P.define_symbol (R.symbol res ~ty:Cmm.typ_int function_symbol))
-            acc
+          List.rev_append (P.define_symbol (R.symbol res function_symbol)) acc
       in
       match code_id with
       | Code_id { code_id; only_full_applications } -> (
@@ -275,7 +273,7 @@ end = struct
           in
           ( acc,
             rev_append_chunks ~for_static_sets
-              [Cmm.Word_int; Cmm.Word_int]
+              [Cmm.Word_code_pointer; Cmm.Word_int]
               chunk_acc,
             Backend_var.Set.empty,
             slot_offset + size,
@@ -304,7 +302,7 @@ end = struct
           in
           ( acc,
             rev_append_chunks ~for_static_sets
-              [Cmm.Word_int; Cmm.Word_int; Cmm.Word_int]
+              [Cmm.Word_code_pointer; Cmm.Word_int; Cmm.Word_code_pointer]
               chunk_acc,
             Backend_var.Set.empty,
             slot_offset + size,
@@ -408,7 +406,9 @@ module Dynamic = Make_layout_filler (struct
      evaluated last. *)
   let simple ~dbg env res simple =
     let To_cmm_env.{ env; res; expr = { cmm; free_vars; effs } } =
-      C.simple ~dbg env res simple
+      (* it's unclear that inlining effectful expressions is beneficial *)
+      C.simple ~consider_inlining_effectful_expressions:false ~dbg env res
+        simple
     in
     `Expr cmm, free_vars, env, res, effs
 
@@ -521,7 +521,7 @@ let transl_cold_attrib (cold : bool) : Cmm.codegen_option list =
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
-    ~(translate_expr : translate_expr) =
+    ~free_names_of_body ~(translate_expr : translate_expr) =
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -562,16 +562,20 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
-        Env.create_bound_parameter env (my_region, my_region_duid)
+        Env.create_bound_parameter env
+          (my_region, my_region_duid, ~needed_by_phantom_let:false)
       in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let env, ghost_region =
-        Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
+        Env.create_bound_parameter env
+          (my_ghost_region, my_ghost_region_duid, ~needed_by_phantom_let:false)
       in
       env, Some region, Some ghost_region
   in
   (* Translate the arg list and body *)
-  let env, fun_params = C.function_bound_parameters env params in
+  let env, fun_params =
+    C.function_bound_parameters env params ~free_names_of_body
+  in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
     translate_expr env res body
   in
@@ -643,12 +647,13 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
         ~is_my_closure_used
         ~my_alloc_mode
         ~my_depth:_
-        ~free_names_of_body:_
+        ~free_names_of_body
       ->
       try
         params_and_body0 env res code_id ~result_arity ~fun_dbg
           ~zero_alloc_attribute ~return_continuation ~exn_continuation params
-          ~body ~my_closure ~is_my_closure_used ~my_alloc_mode ~translate_expr
+          ~body ~my_closure ~is_my_closure_used ~my_alloc_mode
+          ~free_names_of_body ~translate_expr
       with Misc.Fatal_error as e ->
         let bt = Printexc.get_raw_backtrace () in
         Format.eprintf
@@ -686,8 +691,7 @@ let let_static_set_of_closures0 env res closure_symbols
     with
     | Some (function_slot_offset, function_slot) -> (
       match Function_slot.Map.find function_slot closure_symbols with
-      | closure_symbol ->
-        function_slot_offset, R.symbol res ~ty:Cmm.typ_int closure_symbol
+      | closure_symbol -> function_slot_offset, R.symbol res closure_symbol
       | exception Not_found ->
         Misc.fatal_errorf "No closure symbol for function slot %a"
           Function_slot.print function_slot)
@@ -744,7 +748,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
      g
 *)
 let lift_set_of_closures env res ~body ~bound_vars layout set
-    ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
+    ~(translate_expr : translate_expr) ~num_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
   let comp_unit = Current_unit.get_cu_exn () in
   let dbg = Env.add_inlined_debuginfo env (Set_of_closures.debuginfo set) in
@@ -779,19 +783,18 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
       (fun (env, res) cid v ->
         let sym =
           C.symbol ~dbg
-            (R.symbol res ~ty:Cmm.typ_int
-               (Function_slot.Map.find cid closure_symbols))
+            (R.symbol res (Function_slot.Map.find cid closure_symbols))
         in
         Env.bind_variable env res v ~defining_expr:sym
           ~free_vars_of_defining_expr:Backend_var.Set.empty
-          ~num_normal_occurrences_of_bound_vars
+          ~num_occurrences_of_bound_vars
           ~effects_and_coeffects_of_defining_expr:Ece.pure_can_be_duplicated)
       (env, res) cids bound_vars
   in
   translate_expr env res body
 
 let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
-    (layout : Slot_offsets.Layout.t) ~num_normal_occurrences_of_bound_vars
+    (layout : Slot_offsets.Layout.t) ~num_occurrences_of_bound_vars
     ~(closure_alloc_mode : Alloc_mode.For_allocations.t)
     ~(translate_expr : translate_expr) =
   let fun_decls = Set_of_closures.function_decls set in
@@ -828,7 +831,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   let defining_expr = Env.simple csoc free_vars in
   let env, res =
     Env.bind_variable_to_primitive env res soc_var ~inline:Env.Do_not_inline
-      ~defining_expr ~effects_and_coeffects_of_defining_expr:effs
+      ~needed_by_phantom_let:false ~defining_expr
+      ~effects_and_coeffects_of_defining_expr:effs
   in
   (* Get from the env the cmm variable that was created and bound to the
      compiled set of closures. *)
@@ -866,7 +870,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
         | Some (defining_expr, effects_and_coeffects_of_defining_expr) ->
           Env.bind_variable env res v ~defining_expr
             ~free_vars_of_defining_expr:s_free_vars
-            ~num_normal_occurrences_of_bound_vars
+            ~num_occurrences_of_bound_vars
             ~effects_and_coeffects_of_defining_expr)
       (env, res)
       (Function_slot.Lmap.keys decls)
@@ -875,14 +879,14 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   translate_expr env res body
 
 let let_dynamic_set_of_closures env res ~body ~bound_vars
-    ~num_normal_occurrences_of_bound_vars set closure_alloc_mode
+    ~num_occurrences_of_bound_vars set closure_alloc_mode
     ~(translate_expr : translate_expr) =
   let layout = layout_for_set_of_closures env set in
   if layout.empty_env
   then
     lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
-      ~num_normal_occurrences_of_bound_vars
+      ~num_occurrences_of_bound_vars
   else
     let_dynamic_set_of_closures0 env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars set layout ~closure_alloc_mode
+      ~num_occurrences_of_bound_vars set layout ~closure_alloc_mode
       ~translate_expr

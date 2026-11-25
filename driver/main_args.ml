@@ -213,20 +213,21 @@ let mk_I_manifest f =
   \    to the -I flag, but specifies available files directly instead of\n\
   \    adding whole directories to the search path. Each line of the\n\
   \    manifest file should be in the format\n\
-  \    'file|manifest <basename> <actual_path>', where 'file' means\n\
-  \    that the line describes a file that the compiler can reference,\n\
-  \    'manifest' means that the compiler should read the specified\n\
-  \    manifest file recursively, <basename> is the name under which the\n\
-  \    compiler looks the file up (used as-is, so it must not contain a\n\
-  \    directory component), <actual_path> is where this file is in the\n\
-  \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
-  \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
-  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
-  \    resolved through manifest entries; if the entry's <actual_path> does\n\
-  \    not retain the extension, the companion object files ('foo.o',\n\
-  \    'lib.a') are resolved the same way and must therefore be listed as\n\
-  \    separate manifest entries."
+  \    'f|m <basename> <actual_path> [x]', where 'f' means that the line\n\
+  \    describes a file that the compiler can reference, 'm' means that\n\
+  \    the compiler should read the specified manifest file recursively,\n\
+  \    <basename> is the name under which the compiler looks the file up\n\
+  \    (used as-is, so it must not contain a directory component),\n\
+  \    <actual_path> is where this file is in the filesystem (relative to\n\
+  \    [$MANIFEST_FILES_ROOT]), and 'x' is an optional flag that\n\
+  \    indicates a cmi file's corresponding cmx file is guaranteed to be\n\
+  \    present. The manifest file passed to the [-I-manifest] flag should\n\
+  \    itself be relative to [$MANIFEST_FILES_ROOT]. When linking, files\n\
+  \    given on the command line by their bare names (e.g. 'foo.cmx' or\n\
+  \    'lib.cmxa') are also resolved through manifest entries; if the\n\
+  \    entry's <actual_path> does not retain the extension, the companion\n\
+  \    object files ('foo.o', 'lib.a') are resolved the same way and must\n\
+  \    therefore be listed as separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
@@ -661,6 +662,12 @@ let mk_dcounters f =
 
 let mk_dprofile f =
   "-dprofile", Arg.Unit f, Profile.options_doc
+
+let mk_dprofile_level f =
+  "-dprofile-level", Arg.Int f,
+  "<n>  Set the level of detail of -dprofile, -dtimings and -dcounters: \
+   0 disables them, 1 records the main passes (default), 2 also records the \
+   passes run for each function or continuation"
 
 let mk_dgranularity f =
   "-dgranularity",
@@ -1373,6 +1380,7 @@ module type Compiler_options = sig
   val _dtimings_precision : int -> unit
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
+  val _dprofile_level : int -> unit
   val _dgranularity : string -> unit
   val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
@@ -1694,6 +1702,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -2016,6 +2025,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -2543,10 +2553,13 @@ module Default = struct
     let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
-    let _dprofile () = profile_columns := Profile.all_columns
-    let _dtimings () = profile_columns := [`Time]
+    let _dprofile () = set_profile_columns Profile.all_columns
+    let _dprofile_level n =
+      if n < 0 then raise (Arg.Bad "-dprofile-level: must not be negative");
+      set_profile_level n
+    let _dtimings () = set_profile_columns [`Time]
     let _dtimings_precision n = timings_precision := n
-    let _dcounters () = profile_columns := [`Counters]
+    let _dcounters () = set_profile_columns [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
     let _dprofile_output s =
       Compenv.check_relative_path

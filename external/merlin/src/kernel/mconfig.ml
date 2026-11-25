@@ -722,6 +722,8 @@ let ocaml_ignored_flags =
     "-no-ssa-simplify";
     "-ssa-validate";
     "-no-ssa-validate";
+    "-float-op-fusion";
+    "-no-float-op-fusion";
     "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
@@ -915,6 +917,7 @@ let ocaml_ignored_parametrized_flags =
     "-zero-alloc-checker-details-cutoff";
     "-zero-alloc-checker-join";
     "-dgranularity";
+    "-dprofile-level";
     "-flambda2-expert-cont-lifting-budget";
     "-vectorize-max-block-size";
     "-save-ir-before";
@@ -947,7 +950,6 @@ let ocaml_ignored_parametrized_flags =
     "-debug-long-frames-threshold";
     "-flambda2-expert-max-function-simplify-run";
     "-llvm-flags";
-    "-reaper-preserve-direct-calls";
     "-save-ir-after";
     "-X";
     "-dissector-max-linker-parallelism";

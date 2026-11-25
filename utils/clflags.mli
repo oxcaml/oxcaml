@@ -51,7 +51,7 @@ val set_int_arg :
 val set_float_arg :
     int option -> Float_arg_helper.parsed ref -> float -> float option -> unit
 
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
@@ -326,7 +326,11 @@ val keep_locs : bool ref
 val opaque : bool ref
 val default_timings_precision : int
 val timings_precision : int ref
+val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
+val profile_level : int ref
+val set_profile_columns : profile_column list -> unit
+val set_profile_level : int -> unit
 val profile_granularity : profile_granularity_level ref
 val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
@@ -429,7 +433,7 @@ module Compiler_ir : sig
 end
 
 module Compiler_pass : sig
-  type t = Parsing | Typing | Lambda | Middle_end
+  type t = Parsing | Typing | Transl | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
          | Register_allocation | Llvmize
   val of_string : string -> t option

@@ -1,4 +1,4 @@
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type shape_format = Old_merlin | Debugging_shapes
 type include_dir =
   { path : string;
@@ -56,7 +56,9 @@ let debug               = ref false
 let unsafe              = ref false
 let opaque              = ref false
 let unboxed_types       = ref false
+let all_profile_columns : profile_column list = [ `Time; `Alloc; `Counters ]
 let profile_columns     = ref []
+let profile_level       = ref 0
 let dwarf_pedantic      = ref false
 let gdwarf_config_shape_eval_depth = ref None
 let type_to_shape_max_depth = ref None

@@ -165,10 +165,12 @@ type address_head =
 
 val address_head : address -> address_head
 
-val find_value_address: Path.t -> t -> address
-val find_module_address: Path.t -> t -> address
-val find_class_address: Path.t -> t -> address
-val find_constructor_address: Path.t -> t -> address
+(* The [find_*_address] functions raise a lookup error at [loc] if forcing the
+   address projects from a module that contains unrepresentable items. *)
+val find_value_address: loc:Location.t -> Path.t -> t -> address
+val find_module_address: loc:Location.t -> Path.t -> t -> address
+val find_class_address: loc:Location.t -> Path.t -> t -> address
+val find_constructor_address: loc:Location.t -> Path.t -> t -> address
 
 val find_module_address_head : Location.t -> Path.t -> t -> address_head
 
@@ -385,10 +387,6 @@ val lookup_jkind :
 val lookup_module_path:
   ?use:bool -> loc:Location.t -> load:bool -> Longident.t -> t ->
     Path.t * mode_with_locks
-(* Raises a lookup error if the module at [path] is projected out of a module
-   that is not representable. *)
-val check_module_path_representable:
-  loc:Location.t -> Path.t -> t -> unit
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:

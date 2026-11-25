@@ -1,0 +1,2 @@
+f foo.cmi 00/foo
+f foo.cmx 01/bad x

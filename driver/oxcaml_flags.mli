@@ -106,6 +106,12 @@ end
 
 
 val function_layout : Function_layout.t ref
+
+(** Whether the backend may fuse floating-point operations into single
+    operations that round only once, e.g. a multiplication and an addition
+    into a fused multiply-add. *)
+val float_op_fusion : bool ref
+
 val disable_builtin_check : bool ref
 val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
@@ -121,7 +127,6 @@ val ssa_simplify : bool ref
 val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
-type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
 type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
@@ -168,7 +173,6 @@ module Flambda2 : sig
     val join_algorithm : join_algorithm
     val function_result_types : function_result_types
     val enable_reaper : bool
-    val reaper_preserve_direct_calls : reaper_preserve_direct_calls
     val reaper_local_fields : bool
     val reaper_unbox : bool
     val reaper_max_unbox_size : int
@@ -193,7 +197,6 @@ module Flambda2 : sig
     join_algorithm : join_algorithm;
     function_result_types : function_result_types;
     enable_reaper : bool;
-    reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
@@ -217,7 +220,6 @@ module Flambda2 : sig
   val join_depth : int or_default ref
   val join_algorithm : join_algorithm or_default ref
   val enable_reaper : bool or_default ref
-  val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
   val reaper_local_fields : bool or_default ref
   val reaper_unbox : bool or_default ref
   val reaper_max_unbox_size : int or_default ref

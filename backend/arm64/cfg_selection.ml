@@ -30,9 +30,10 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
   | Fivetwelve_aligned ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_mask
-    | Word_val | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned ) as
-    chunk ->
+    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+    | Word_static_block | Word_code_pointer | Word_out_of_heap_data_pointer
+    | Word_mask | Word_val | Double | Onetwentyeight_unaligned
+    | Onetwentyeight_aligned ) as chunk ->
     Cmm.size_of_memory_chunk chunk
 
 let is_offset chunk n =
@@ -206,20 +207,27 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     match[@ocaml.warning "-fragile-match"] args with
     | [Cop (Cmulf Float64, args, _)] -> Rewritten (specific Inegmulf, args)
     | _ -> Use_default)
-  (* Recognize floating-point multiply and add/sub *)
+  (* Recognize floating-point multiply and add/sub. These fused operations round
+     only once, so may change the output. *)
   | Caddf Float64 -> (
-    match[@ocaml.warning "-fragile-match"] args with
-    | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
-      ->
-      Rewritten (specific Imuladdf, arg :: args)
-    | _ -> Use_default)
+    if not !Oxcaml_flags.float_op_fusion
+    then Use_default
+    else
+      match[@ocaml.warning "-fragile-match"] args with
+      | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
+        ->
+        Rewritten (specific Imuladdf, arg :: args)
+      | _ -> Use_default)
   | Csubf Float64 -> (
-    match[@ocaml.warning "-fragile-match"] args with
-    | [arg; Cop (Cmulf Float64, args, _)] ->
-      Rewritten (specific Imulsubf, arg :: args)
-    | [Cop (Cmulf Float64, args, _); arg] ->
-      Rewritten (specific Inegmulsubf, arg :: args)
-    | _ -> Use_default)
+    if not !Oxcaml_flags.float_op_fusion
+    then Use_default
+    else
+      match[@ocaml.warning "-fragile-match"] args with
+      | [arg; Cop (Cmulf Float64, args, _)] ->
+        Rewritten (specific Imulsubf, arg :: args)
+      | [Cop (Cmulf Float64, args, _); arg] ->
+        Rewritten (specific Inegmulsubf, arg :: args)
+      | _ -> Use_default)
   | Cpackf32 -> Rewritten (specific (Isimd Zip1_f32), args)
   (* Recognize floating-point square root *)
   | Cextcall { func = "sqrt" | "sqrtf" | "caml_neon_float64_sqrt"; _ } ->

@@ -156,7 +156,8 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
   match memory_chunk_of_kind kind with
   | Word_val -> Word_int
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+    | Word_code_pointer | Word_out_of_heap_data_pointer | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned
     | Word_mask ) as mem ->
@@ -190,7 +191,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
       To_cmm_env.inline_variable ?consider_inlining_effectful_expressions env
         res v)
     ~symbol:(fun s ->
-      let sym = To_cmm_result.symbol res ~ty:Cmm.typ_int s in
+      let sym = To_cmm_result.symbol res s in
       (* CR mshinwell: fix debuginfo? *)
       To_cmm_env.
         { env;
@@ -270,7 +271,7 @@ let name_static res name =
   Name.pattern_match name
     ~var:(fun v -> `Var v)
     ~symbol:(fun s ->
-      `Static_data [symbol_address (To_cmm_result.symbol res ~ty:Cmm.typ_int s)])
+      `Static_data [symbol_address (To_cmm_result.symbol res s)])
 
 let rec const_static cst : Cmm.data_item list =
   match Reg_width_const.descr cst with
@@ -356,19 +357,39 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, free_vars, env, res, effs
 
-let bound_parameters_aux ~f env l =
-  let flambda_vars = Bound_parameters.vars_and_uids l in
+let bound_parameters_aux ~f ~needed_by_phantom_let env l =
+  let flambda_vars =
+    List.map
+      (fun bp ->
+        let var, debug_uid = Bound_parameter.var_and_uid bp in
+        var, debug_uid, ~needed_by_phantom_let:(needed_by_phantom_let var))
+      (Bound_parameters.to_list l)
+  in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
   let vars =
     List.map2 (fun v v' -> v, f v') cmm_vars (Bound_parameters.to_list l)
   in
   env, vars
 
-let continuation_bound_parameters env l =
-  bound_parameters_aux ~f:param_machtype_of_kinded_parameter env l
+let continuation_bound_parameters env l ~num_occurrences_of_params =
+  let needed_by_phantom_let var =
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_params))
+      var
+  in
+  bound_parameters_aux ~f:param_machtype_of_kinded_parameter
+    ~needed_by_phantom_let env l
 
-let function_bound_parameters env l =
-  bound_parameters_aux ~f:machtype_of_kinded_parameter env l
+let function_bound_parameters env l ~free_names_of_body =
+  let needed_by_phantom_let var =
+    match (free_names_of_body : _ Or_unknown.t) with
+    | Unknown -> false
+    | Known free_names ->
+      Name_occurrences.variable_needed_by_phantom_let free_names var
+  in
+  bound_parameters_aux ~f:machtype_of_kinded_parameter ~needed_by_phantom_let
+    env l
 
 let invalid res ~message =
   let message_sym, res =
@@ -379,7 +400,7 @@ let invalid res ~message =
       in
       let res =
         Cmm_helpers.emit_string_constant
-          (To_cmm_result.symbol res ~ty:Cmm.typ_int message_sym)
+          (To_cmm_result.symbol res message_sym)
           message []
         |> To_cmm_result.add_archive_data_items res
       in
@@ -389,7 +410,7 @@ let invalid res ~message =
       message_sym, res
     | Some message_sym -> message_sym, res
   in
-  let cmm_symbol = To_cmm_result.symbol res ~ty:Cmm.typ_int message_sym in
+  let cmm_symbol = To_cmm_result.symbol res message_sym in
   Cmm.Cinvalid { message; symbol = cmm_symbol }, res
 
 module Update_kind = struct

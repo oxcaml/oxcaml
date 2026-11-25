@@ -32,10 +32,10 @@ val instance:
 val to_bytecode :
   Compile_common.info ->
   Typedtree.implementation ->
-  Instruct.instruction list * Compilation_unit.Set.t *
-    Lambda.main_module_block_format
+  (Instruct.instruction list * Compilation_unit.Set.t *
+    Lambda.main_module_block_format) option
 (** [to_bytecode info typed] takes a typechecked implementation
-    and returns its bytecode.
+    and returns its bytecode, or [None] if [-stop-after transl].
 *)
 
 val emit_bytecode :

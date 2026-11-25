@@ -21,6 +21,9 @@ type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
   | Int
+  | Static_block
+  | Code_pointer
+  | Out_of_heap_data_pointer
   | Float
   | Vec128
   | Vec256
@@ -43,6 +46,12 @@ let typ_addr = [| Addr |]
 
 let typ_int = [| Int |]
 
+let typ_static_block = [| Static_block |]
+
+let typ_code_pointer = [| Code_pointer |]
+
+let typ_out_of_heap_data_pointer = [| Out_of_heap_data_pointer |]
+
 let typ_float = [| Float |]
 
 let typ_float32 = [| Float32 |]
@@ -62,6 +71,9 @@ let string_of_machtype_component (comp : machtype_component) =
   | Val -> "Val"
   | Addr -> "Addr"
   | Int -> "Int"
+  | Static_block -> "Static_block"
+  | Code_pointer -> "Code_pointer"
+  | Out_of_heap_data_pointer -> "Out_of_heap_data_pointer"
   | Float -> "Float"
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
@@ -73,25 +85,31 @@ let string_of_machtype_component (comp : machtype_component) =
 (** [machtype_component]s are partially ordered as follows:
 
     {v
-      Addr     Float32     Float     Vec128     Vec256     Vec512   Mask   Valx2
-       ^
-       |
-      Val
-       ^
-       |
-      Int
+            Addr
+            ^  ^
+           /    \
+         Val   Out_of_heap_data_pointer
+         ^ ^
+        /   \
+      Int   Static_block
     v}
+    (all of the [machtype_component]s not in the diagram are unordered relative
+    to every other [machtype_component].)
 
     In particular, [Addr] must be above [Val], to ensure that if there is a join
     point between a code path yielding [Addr] and one yielding [Val] then the
     result is treated as a derived pointer into the heap (i.e. [Addr]). (Such a
     result may not be live across any call site or a fatal compiler error will
-    result.) The order is used only in selection, Valx2 is generated after
-    selection. *)
+    result.) [Out_of_heap_data_pointer] is below [Addr] so it can be used for
+    pointer arithmetic and loads/stores. The order is used only in selection,
+    Valx2 is generated after selection. *)
 
 let lub_component comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> Int
+  | Static_block, Static_block -> Static_block
+  | Static_block, (Int | Val) | (Int | Val), Static_block -> Val
+  | Static_block, Addr | Addr, Static_block -> Addr
   | Int, Val -> Val
   | Int, Addr -> Addr
   | Val, Int -> Val
@@ -100,14 +118,30 @@ let lub_component comp1 comp2 =
   | Addr, Int -> Addr
   | Addr, Addr -> Addr
   | Addr, Val -> Addr
+  | Out_of_heap_data_pointer, Out_of_heap_data_pointer ->
+    Out_of_heap_data_pointer
+  | Out_of_heap_data_pointer, (Int | Addr | Val | Static_block)
+  | (Int | Addr | Val | Static_block), Out_of_heap_data_pointer ->
+    Addr
+  | Code_pointer, Code_pointer -> Code_pointer
   | Float, Float -> Float
   | Float32, Float32 -> Float32
   | Vec128, Vec128 -> Vec128
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
   | Mask, Mask -> Mask
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | ( (Int | Addr | Val | Static_block),
+      (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | Code_pointer, Out_of_heap_data_pointer
+  | Out_of_heap_data_pointer, Code_pointer
+  | ( (Code_pointer | Out_of_heap_data_pointer),
+      ( Int | Addr | Val | Static_block | Float | Float32 | Vec128 | Vec256
+      | Vec512 | Mask ) )
+  | ( ( Int | Addr | Val | Static_block | Float | Float32 | Vec128 | Vec256
+      | Vec512 | Mask ),
+      (Code_pointer | Out_of_heap_data_pointer) )
+  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      (Int | Addr | Val | Static_block) )
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -125,6 +159,9 @@ let lub_component comp1 comp2 =
 let ge_component comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> true
+  | Static_block, Static_block -> true
+  | (Val | Addr), Static_block -> true
+  | Static_block, (Int | Val | Addr) | Int, Static_block -> false
   | Int, Addr -> false
   | Int, Val -> false
   | Val, Int -> true
@@ -133,14 +170,28 @@ let ge_component comp1 comp2 =
   | Addr, Int -> true
   | Addr, Addr -> true
   | Addr, Val -> true
+  | Addr, Out_of_heap_data_pointer -> true
+  | Out_of_heap_data_pointer, Out_of_heap_data_pointer -> true
+  | Code_pointer, Code_pointer -> true
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
   | Mask, Mask -> true
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | Code_pointer, Out_of_heap_data_pointer
+  | Out_of_heap_data_pointer, Code_pointer
+  | ( (Code_pointer | Out_of_heap_data_pointer),
+      ( Int | Val | Addr | Static_block | Float | Float32 | Vec128 | Vec256
+      | Vec512 | Mask ) )
+  | ( ( Int | Val | Addr | Static_block | Float | Float32 | Vec128 | Vec256
+      | Vec512 | Mask ),
+      (Code_pointer | Out_of_heap_data_pointer) ) ->
+    false
+  | ( (Int | Addr | Val | Static_block),
+      (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask) )
+  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask),
+      (Int | Addr | Val | Static_block) )
   | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
   | Mask, (Float | Float32)
@@ -407,6 +458,9 @@ type memory_chunk =
   | Sixteen_signed
   | Thirtytwo_unsigned
   | Thirtytwo_signed
+  | Word_static_block
+  | Word_code_pointer
+  | Word_out_of_heap_data_pointer
   | Word_int
   | Word_mask
   | Word_val
@@ -423,7 +477,9 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_mask | Word_val | Double -> 8
+  | Word_int | Word_static_block | Word_code_pointer
+  | Word_out_of_heap_data_pointer | Word_mask | Word_val | Double ->
+    8
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
@@ -946,16 +1002,19 @@ let rank_machtype_component : machtype_component -> int = function
   | Mask -> 7
   | Float32 -> 8
   | Valx2 -> 9
+  | Code_pointer -> 10
+  | Static_block -> 11
+  | Out_of_heap_data_pointer -> 12
 
 let compare_machtype_component
     (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+     | Valx2 | Static_block | Code_pointer | Out_of_heap_data_pointer ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
     (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
-     | Valx2 ) as left :
+     | Valx2 | Static_block | Code_pointer | Out_of_heap_data_pointer ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1104,6 +1163,9 @@ let equal_memory_chunk left right =
   | Thirtytwo_unsigned, Thirtytwo_unsigned -> true
   | Thirtytwo_signed, Thirtytwo_signed -> true
   | Word_int, Word_int -> true
+  | Word_static_block, Word_static_block -> true
+  | Word_code_pointer, Word_code_pointer -> true
+  | Word_out_of_heap_data_pointer, Word_out_of_heap_data_pointer -> true
   | Word_mask, Word_mask -> true
   | Word_val, Word_val -> true
   | Single { reg = regl }, Single { reg = regr } -> equal_float_width regl regr
@@ -1116,97 +1178,135 @@ let equal_memory_chunk left right =
   | Fivetwelve_aligned, Fivetwelve_aligned -> true
   | ( Byte_unsigned,
       ( Byte_signed | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Byte_signed,
       ( Byte_unsigned | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Word_int | Word_mask | Word_val | Single _ | Double
+      | Thirtytwo_unsigned | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_int,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
+  | ( Word_static_block,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
+      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
+  | ( Word_code_pointer,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
+      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
+  | ( Word_out_of_heap_data_pointer,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_mask | Word_val | Single _ | Double
+      | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_mask,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_val | Single _
       | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_val,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Single _
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Single _
       | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Double,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Onetwentyeight_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_aligned | Twofiftysix_unaligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Onetwentyeight_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_unaligned | Twofiftysix_unaligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Twofiftysix_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Twofiftysix_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Fivetwelve_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_aligned ) )
   | ( Fivetwelve_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned ) )
   | ( Single _,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+      | Word_code_pointer | Word_out_of_heap_data_pointer | Word_mask | Word_val
       | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) ) ->
@@ -1219,19 +1319,22 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Static_block | Code_pointer | Out_of_heap_data_pointer ->
     false
 
 let is_int (m : machtype_component) =
   match m with
   | Int -> true
-  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Static_block | Code_pointer | Out_of_heap_data_pointer ->
     false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
+  | Static_block | Code_pointer | Out_of_heap_data_pointer ->
     false
 
 let is_exn_handler (flag : ccatch_flag) =

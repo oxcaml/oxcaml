@@ -67,7 +67,7 @@ module Number : sig
 
   val of_integral_bits : NumberTy.Base.t -> int64 -> t
 
-  val to_code : t -> Parsetree.expression
+  val to_code : unboxed:bool -> t -> Parsetree.expression
 end
 
 module Ty : sig
@@ -165,6 +165,21 @@ module Exn : sig
   val to_code : t -> Parsetree.structure_item option
 end
 
+(** Effects, each with a handler function that runs a computation and resumes
+    every [perform] with a function of its payload. *)
+module Eff : sig
+  type t =
+    { id : int;
+      payload : Ty.t;  (** A value type. *)
+      result : Ty.t  (** The type of [perform]. A value type. *)
+    }
+
+  val equal : t -> t -> bool
+
+  (** The declaration of the effect and of its handler function. *)
+  val to_code : t -> Parsetree.structure_item list
+end
+
 module Handler : sig
   type pattern =
     | Exn of
@@ -173,9 +188,16 @@ module Handler : sig
         }
     | Catch_all
 
+  (** Raise the caught exception, bound to [name], again after the body. *)
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
   type 'body t =
     { pattern : pattern;
-      body : 'body
+      body : 'body;
+      reraise : reraise option  (** Only for [Exn] patterns. *)
     }
 end
 
@@ -209,6 +231,8 @@ module Bin_op : sig
     | Max
     | Min_num
     | Max_num
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -242,7 +266,10 @@ end
 
 module Expr : sig
   type t =
-    | Const of Number.t
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
     | Bool_const of bool
     | String_const of string
     | String_length of t
@@ -332,6 +359,27 @@ module Expr : sig
               (** Each function must be a [Lambda]. *)
           body : t
         }  (** Local mutually recursive functions. *)
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;  (** A value type. *)
+          body : t;
+          resume : t  (** A function from the payload of [eff] to its result. *)
+        }
+        (** Evaluates [body] in a handler of [eff], which resumes every
+            [perform] with [resume] applied to its payload. *)
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;  (** A [Lambda], allocated on the stack. *)
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
+        }  (** Not a tail call, as a local function cannot be one. *)
 
   and raise =
     { exn : Exn.t;

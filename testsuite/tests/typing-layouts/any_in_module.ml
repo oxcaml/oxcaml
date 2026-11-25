@@ -23,44 +23,12 @@ module M : S = struct
   let y = 43
 end
 
-let x = M.x
+let y = M.y
 [%%expect{|
 module M : S
 Line 7, characters 8-11:
-7 | let x = M.x
+7 | let y = M.y
             ^^^
-Error: This path projects from a module that contains unrepresentable items.
-Line 3, characters 2-11:
-3 |   val x : t
-      ^^^^^^^^^
-  "x" is not representable.
-  The layout of t is any
-    because of the definition of t at line 2, characters 2-14.
-  But the layout of t must be representable
-    because it's the type of an item in a module being projected from.
-|}]
-
-let y = M.y
-[%%expect{|
-Line 1, characters 8-11:
-1 | let y = M.y
-            ^^^
-Error: This path projects from a module that contains unrepresentable items.
-Line 3, characters 2-11:
-3 |   val x : t
-      ^^^^^^^^^
-  "x" is not representable.
-  The layout of t is any
-    because of the definition of t at line 2, characters 2-14.
-  But the layout of t must be representable
-    because it's the type of an item in a module being projected from.
-|}]
-
-let f (module M : S) = M.x
-[%%expect{|
-Line 1, characters 23-26:
-1 | let f (module M : S) = M.x
-                           ^^^
 Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
@@ -89,11 +57,6 @@ Line 3, characters 2-11:
 |}]
 
 (* We can project out of the module if we know [t]'s layout. *)
-let f (type a : value) (module M : S with type t = a) = M.x
-[%%expect{|
-val f : (module S with type t = 'a) -> 'a = <fun>
-|}]
-
 let f (type a : value) (module M : S with type t = a) = M.y
 [%%expect{|
 val f : (module S with type t = 'a) -> int = <fun>
@@ -851,17 +814,18 @@ module type S = sig
   kind_ k
   type t : k
   val x : t
+  val y : int
 end
 [%%expect{|
-module type S = sig kind_ k type t : k val x : t end
+module type S = sig kind_ k type t : k val x : t val y : int end
 |}]
 
 module F(M : S) = struct
-  let f () = M.x
+  let f () = M.y
 end
 [%%expect{|
 Line 2, characters 13-16:
-2 |   let f () = M.x
+2 |   let f () = M.y
                  ^^^
 Error: This path projects from a module that contains unrepresentable items.
 Line 4, characters 2-11:
@@ -875,12 +839,12 @@ Line 4, characters 2-11:
 |}]
 
 module F(M : S with kind_ k = value) = struct
-  let f () = M.x
+  let f () = M.y
 end
 [%%expect{|
 module F :
-  functor (M : sig kind_ k = value type t val x : t end) ->
-    sig val f : unit -> M.t end
+  functor (M : sig kind_ k = value type t val x : t val y : int end) ->
+    sig val f : unit -> int end
 |}]
 
 (* Interaction with GADTs *)
@@ -924,4 +888,69 @@ module rec M : sig val f : int -> int end = struct
 end
 [%%expect{|
 module rec M : sig val f : int -> int end
+|}]
+
+(* Regression test: typing identifiers in signature contexts does not force
+   addresses unnecessarily. *)
+
+module M = struct
+  let x = 42
+end
+
+module F(M : sig val x : int end) = M
+[%%expect{|
+module M : sig val x : int end
+module F : functor (M : sig val x : int end) -> sig val x : int end
+|}]
+
+module type S = sig
+  open F (M)
+  module type T = module type of struct let y = x end
+end
+[%%expect{|
+module type S = sig module type T = sig val y : int @@ stateless end end
+|}]
+
+(* Regression test: aliasable strengthening turns submodules into aliases,
+   which does not require the enclosing module to be representable. A functor
+   parameter is not aliasable, so the functor case needs a nested module. *)
+
+module M : sig
+  type t : any
+  val x : t
+  module O : sig end
+end = struct
+  type t = int
+  let x = 0
+  module O = struct end
+end
+[%%expect{|
+module M : sig type t : any val x : t module O : sig end end
+|}]
+
+(* Test printing an exception declared in a module with unrepresentable values.
+
+   The toplevel can't identify the constructor for exceptions missing runtime
+   addresses, so it falls back to an untyped printer. (We observe the same
+   behavior when constructing exceptions through a functor application [F(A).E],
+   for example.) *)
+
+let saved = ref Exit
+
+module M : sig
+  type t : any
+  val x : t
+  exception E of bool
+end = struct
+  type t = int
+  let x = 0
+  exception E of bool
+  let () = saved := E false
+end
+
+let _ = !saved;;
+[%%expect{|
+val saved : exn ref = {contents = Stdlib.Exit}
+module M : sig type t : any val x : t exception E of bool end
+- : exn = M.E 0
 |}]

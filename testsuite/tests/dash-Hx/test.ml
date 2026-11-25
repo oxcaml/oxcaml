@@ -18,6 +18,7 @@
       succeeds, or with -open-cmi, which fails because C is forced dynamic.
 *)
 
+ocamlrunparam += ",b=0";
 subdirectories = "liba libb libc libd";
 readonly_files = "transitive.ml alias.ml open_cmi.ml uses_d.ml uses_a.ml";
 setup-ocamlopt.byte-build-env;

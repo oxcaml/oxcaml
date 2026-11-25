@@ -2015,7 +2015,13 @@ module Analysis = struct
         Index.Map.print Simple_in_one_joined_env.print ppf simples)
       ppf definitions_in_joined_envs
 
-  let create ~external_ids ~joined_envs definitions_in_joined_envs =
+  let create ~external_ids ~joined_envs ~params definitions_in_joined_envs =
+    let param_simples =
+      List.fold_left
+        (fun params bound_param ->
+          Simple.Set.add (Bound_parameter.simple bound_param) params)
+        Simple.Set.empty params
+    in
     let canonical_definitions_at_normal_mode =
       Variable_in_target_env.Map.filter_map
         (fun _name (simples, kind) ->
@@ -2029,9 +2035,15 @@ module Analysis = struct
                     Misc.fatal_errorf "Join does not include environment %a"
                       Index.print env_id
                 in
-                TE.get_canonical_simple_exn typing_env simple
-                  ~min_name_mode:Name_mode.normal
-                |> Simple_in_one_joined_env.create)
+                let canonical_simple =
+                  TE.get_canonical_simple_exn typing_env simple
+                    ~min_name_mode:Name_mode.normal
+                in
+                (* The parameters are bound at normal mode but don't actually
+                   exist at the use! *)
+                if Simple.Set.mem canonical_simple param_simples
+                then raise Not_found;
+                Simple_in_one_joined_env.create canonical_simple)
               (simples : Simples_in_joined_envs.t :> Simple.t Index.Map.t)
           with
           | exception Not_found -> None
@@ -2156,7 +2168,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
   target_env
 
 let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
-    ~cut_after source_tenv joined_envs =
+    ~cut_after ~params source_tenv joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -2187,7 +2199,9 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
       symbol_projections_to_join
   in
   let target_env = ME.final_typing_env ~meet_expanded_head target_env in
-  let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
+  let join_analysis =
+    Analysis.create ~external_ids ~joined_envs ~params bindings
+  in
   target_env, join_analysis
 
 (* Exposed to the outside world with a different type *)
