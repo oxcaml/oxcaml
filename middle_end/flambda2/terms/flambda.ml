@@ -273,16 +273,15 @@ and apply_renaming_continuations_handlers_t0
            else k', handler')
          (Continuation.Lmap.bindings continuation_handlers))
   in
-  let num_occurrences_of_invariant_params' =
+  let num_occurrences' =
     apply_renaming_num_occurrences num_occurrences_of_invariant_params renaming
   in
   if
     continuation_handlers == continuation_handlers'
-    && num_occurrences_of_invariant_params
-       == num_occurrences_of_invariant_params'
+    && num_occurrences_of_invariant_params == num_occurrences'
   then t
   else
-    { num_occurrences_of_invariant_params = num_occurrences_of_invariant_params';
+    { num_occurrences_of_invariant_params = num_occurrences';
       continuation_handlers = continuation_handlers'
     }
 
