@@ -307,7 +307,7 @@ jobs:
         run: |
           disable_testcases="$DISABLE_TESTCASES"
           if [ -n "$disable_testcases" ]; then
-            rm -rfv $disable_testcases
+            find $disable_testcases -type f | xargs rm
           fi
 
       - name: Install custom OxCaml LLVM
