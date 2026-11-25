@@ -92,13 +92,7 @@ let
         ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch
       ];
 
-      # Skip the upstream testsuite for this bootstrap compiler. When built
-      # with our clang-based stdenv on the 26.05 toolchain,
-      # testsuite/tests/unicode fails: it compiles modules with non-ASCII
-      # source filenames and the UTF-8 bytes of the object filenames reach
-      # clang octal-escaped (e.g. '$350246213.o'), so linking fails. This
-      # compiler only exists to bootstrap oxcaml, which runs its own `make ci`
-      # afterwards.
+      # This compiler only exists to bootstrap OxCaml.
       doCheck = false;
     };
 
@@ -929,14 +923,11 @@ stdenv.mkDerivation {
       runHook preCheck
     ''
     + lib.optionalString ocamltest ''
-      # The testsuite/tests/unicode test compiles modules with non-ASCII source
-      # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
-      # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
-      # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
-      # This exercises unicode source filenames, which we don't use; drop the test
-      # so the rest of `make ci` runs.
-      rm -rf testsuite/tests/unicode
-      make SHELL="$SHELL" ci
+      # See https://github.com/NixOS/nixpkgs/issues/419771.
+      # The filenames in testsuite/tests/unicode get mangled by the cc and ld
+      # wrappers used by nix with clang: the magic shell variables disable them.
+      NIX_CC_USE_RESPONSE_FILE=0 NIX_LD_USE_RESPONSE_FILE=0 \
+        make SHELL="$SHELL" ci
     ''
     + lib.optionalString withJsoo ''
       # The tests of the js_of_ocaml that the package ships, as built with it.
