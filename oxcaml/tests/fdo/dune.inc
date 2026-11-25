@@ -579,137 +579,142 @@
     backend_o3_merge_blocks_linear)
    (with-stderr-to
     backend_o3_cmm.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
-     backend_o3_cmm/linear.cmx linear.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dcmm -color
+     never -o backend_o3_cmm/linear.cmx linear.ml))
    (with-stderr-to
     backend_o3_linear.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dlinear
      -dfdo-dropped-counters -color never -o backend_o3_linear/linear.cmx
      linear.ml))
    (with-stderr-to
     backend_o3_cmm.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
-     backend_o3_cmm/cfg.cmx cfg.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dcmm -color
+     never -o backend_o3_cmm/cfg.cmx cfg.ml))
    (with-stderr-to
     backend_o3_linear.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dlinear
      -dfdo-dropped-counters -color never -o backend_o3_linear/cfg.cmx cfg.ml))
    (with-stderr-to
     backend_o3_cmm.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
-     backend_o3_cmm/to_cmm.cmx to_cmm.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dcmm -color
+     never -o backend_o3_cmm/to_cmm.cmx to_cmm.ml))
    (with-stderr-to
     backend_o3_linear.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dlinear
      -dfdo-dropped-counters -color never -o backend_o3_linear/to_cmm.cmx
      to_cmm.ml))
    (with-stderr-to
     backend_o3_cmm.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
-     backend_o3_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dcmm -color
+     never -o backend_o3_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_linear.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dlinear
      -dfdo-dropped-counters -color never -o backend_o3_linear/to_cmm_reaper.cmx
      to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_cmm.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dcmm -color never -o
-     backend_o3_cmm/simplify.cmx simplify.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dcmm -color
+     never -o backend_o3_cmm/simplify.cmx simplify.ml))
    (with-stderr-to
     backend_o3_linear.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -dlinear
+    (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -fdo-counters -dlinear
      -dfdo-dropped-counters -color never -o backend_o3_linear/simplify.cmx
      simplify.ml))
    (with-stderr-to
     backend_o3_ssa_cmm.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
-     backend_o3_ssa_cmm/linear.cmx linear.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters -dcmm
+     -color never -o backend_o3_ssa_cmm/linear.cmx linear.ml))
    (with-stderr-to
     backend_o3_ssa_linear.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/linear.cmx
-     linear.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters
+     -dlinear -dfdo-dropped-counters -color never -o
+     backend_o3_ssa_linear/linear.cmx linear.ml))
    (with-stderr-to
     backend_o3_ssa_cmm.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
-     backend_o3_ssa_cmm/cfg.cmx cfg.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters -dcmm
+     -color never -o backend_o3_ssa_cmm/cfg.cmx cfg.ml))
    (with-stderr-to
     backend_o3_ssa_linear.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/cfg.cmx
-     cfg.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters
+     -dlinear -dfdo-dropped-counters -color never -o
+     backend_o3_ssa_linear/cfg.cmx cfg.ml))
    (with-stderr-to
     backend_o3_ssa_cmm.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
-     backend_o3_ssa_cmm/to_cmm.cmx to_cmm.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters -dcmm
+     -color never -o backend_o3_ssa_cmm/to_cmm.cmx to_cmm.ml))
    (with-stderr-to
     backend_o3_ssa_linear.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/to_cmm.cmx
-     to_cmm.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters
+     -dlinear -dfdo-dropped-counters -color never -o
+     backend_o3_ssa_linear/to_cmm.cmx to_cmm.ml))
    (with-stderr-to
     backend_o3_ssa_cmm.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
-     backend_o3_ssa_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters -dcmm
+     -color never -o backend_o3_ssa_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_ssa_linear.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters
+     -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_ssa_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_ssa_cmm.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dcmm -color never -o
-     backend_o3_ssa_cmm/simplify.cmx simplify.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters -dcmm
+     -color never -o backend_o3_ssa_cmm/simplify.cmx simplify.ml))
    (with-stderr-to
     backend_o3_ssa_linear.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o backend_o3_ssa_linear/simplify.cmx
-     simplify.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -fdo-counters
+     -dlinear -dfdo-dropped-counters -color never -o
+     backend_o3_ssa_linear/simplify.cmx simplify.ml))
    (with-stderr-to
     backend_o3_merge_blocks_cmm.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
-     never -o backend_o3_merge_blocks_cmm/linear.cmx linear.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dcmm -color never -o backend_o3_merge_blocks_cmm/linear.cmx
+     linear.ml))
    (with-stderr-to
     backend_o3_merge_blocks_linear.linear.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/linear.cmx linear.ml))
    (with-stderr-to
     backend_o3_merge_blocks_cmm.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
-     never -o backend_o3_merge_blocks_cmm/cfg.cmx cfg.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dcmm -color never -o backend_o3_merge_blocks_cmm/cfg.cmx
+     cfg.ml))
    (with-stderr-to
     backend_o3_merge_blocks_linear.cfg.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/cfg.cmx cfg.ml))
    (with-stderr-to
     backend_o3_merge_blocks_cmm.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
-     never -o backend_o3_merge_blocks_cmm/to_cmm.cmx to_cmm.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dcmm -color never -o backend_o3_merge_blocks_cmm/to_cmm.cmx
+     to_cmm.ml))
    (with-stderr-to
     backend_o3_merge_blocks_linear.to_cmm.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/to_cmm.cmx to_cmm.ml))
    (with-stderr-to
     backend_o3_merge_blocks_cmm.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
-     never -o backend_o3_merge_blocks_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dcmm -color never -o
+     backend_o3_merge_blocks_cmm/to_cmm_reaper.cmx to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_merge_blocks_linear.to_cmm_reaper.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/to_cmm_reaper.cmx to_cmm_reaper.ml))
    (with-stderr-to
     backend_o3_merge_blocks_cmm.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dcmm -color
-     never -o backend_o3_merge_blocks_cmm/simplify.cmx simplify.ml))
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dcmm -color never -o
+     backend_o3_merge_blocks_cmm/simplify.cmx simplify.ml))
    (with-stderr-to
     backend_o3_merge_blocks_linear.simplify.cmx.dump
-    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -dlinear
-     -dfdo-dropped-counters -color never -o
+    (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata
+     -fdo-counters -dlinear -dfdo-dropped-counters -color never -o
      backend_o3_merge_blocks_linear/simplify.cmx simplify.ml))
    (with-stdout-to
     backend_o3.output.corrected
@@ -773,7 +778,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/body_hash.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/body_hash.cmx body_hash.ml)
    (with-stdout-to
     body_hash.default.with.code
@@ -800,7 +805,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/cfg.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/cfg.cmx cfg.ml)
    (with-stdout-to
     cfg.default.with.code
@@ -827,7 +832,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/function_ids.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/function_ids.cmx function_ids.ml)
    (with-stdout-to
     function_ids.default.with.code
@@ -856,7 +861,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/instrumentation.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/instrumentation.cmx instrumentation.ml)
    (with-stdout-to
     instrumentation.default.with.code
@@ -884,7 +889,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/linear.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/linear.cmx linear.ml)
    (with-stdout-to
     linear.default.with.code
@@ -911,7 +916,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/simplify.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/simplify.cmx simplify.ml)
    (with-stdout-to
     simplify.default.with.code
@@ -938,7 +943,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/to_cmm.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/to_cmm.cmx to_cmm.ml)
    (with-stdout-to
     to_cmm.default.with.code
@@ -965,7 +970,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/to_cmm_probe.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/to_cmm_probe.cmx to_cmm_probe.ml)
    (with-stdout-to
     to_cmm_probe.default.with.code
@@ -993,7 +998,7 @@
     (pipe-stdout
      (run objdump -dr codegen_default_without/to_cmm_reaper.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -fdo-metadata -color never -o
     codegen_default_with/to_cmm_reaper.cmx to_cmm_reaper.ml)
    (with-stdout-to
     to_cmm_reaper.default.with.code
@@ -1021,7 +1026,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/body_hash.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/body_hash.cmx body_hash.ml)
    (with-stdout-to
     body_hash.o3.with.code
@@ -1048,7 +1053,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/cfg.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/cfg.cmx cfg.ml)
    (with-stdout-to
     cfg.o3.with.code
@@ -1075,7 +1080,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/function_ids.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/function_ids.cmx function_ids.ml)
    (with-stdout-to
     function_ids.o3.with.code
@@ -1102,7 +1107,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/instrumentation.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/instrumentation.cmx instrumentation.ml)
    (with-stdout-to
     instrumentation.o3.with.code
@@ -1129,7 +1134,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/linear.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/linear.cmx linear.ml)
    (with-stdout-to
     linear.o3.with.code
@@ -1156,7 +1161,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/simplify.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/simplify.cmx simplify.ml)
    (with-stdout-to
     simplify.o3.with.code
@@ -1183,7 +1188,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/to_cmm.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/to_cmm.cmx to_cmm.ml)
    (with-stdout-to
     to_cmm.o3.with.code
@@ -1210,7 +1215,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/to_cmm_probe.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/to_cmm_probe.cmx to_cmm_probe.ml)
    (with-stdout-to
     to_cmm_probe.o3.with.code
@@ -1237,7 +1242,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_without/to_cmm_reaper.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -fdo-metadata -color never -o
     codegen_o3_with/to_cmm_reaper.cmx to_cmm_reaper.ml)
    (with-stdout-to
     to_cmm_reaper.o3.with.code
@@ -1264,7 +1269,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/body_hash.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/body_hash.cmx body_hash.ml)
    (with-stdout-to
     body_hash.ssa.with.code
@@ -1291,7 +1296,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/cfg.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/cfg.cmx cfg.ml)
    (with-stdout-to
     cfg.ssa.with.code
@@ -1318,7 +1323,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/function_ids.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/function_ids.cmx function_ids.ml)
    (with-stdout-to
     function_ids.ssa.with.code
@@ -1345,7 +1350,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/instrumentation.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/instrumentation.cmx instrumentation.ml)
    (with-stdout-to
     instrumentation.ssa.with.code
@@ -1372,7 +1377,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/linear.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/linear.cmx linear.ml)
    (with-stdout-to
     linear.ssa.with.code
@@ -1399,7 +1404,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/simplify.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/simplify.cmx simplify.ml)
    (with-stdout-to
     simplify.ssa.with.code
@@ -1426,7 +1431,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/to_cmm.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/to_cmm.cmx to_cmm.ml)
    (with-stdout-to
     to_cmm.ssa.with.code
@@ -1453,7 +1458,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/to_cmm_probe.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/to_cmm_probe.cmx to_cmm_probe.ml)
    (with-stdout-to
     to_cmm_probe.ssa.with.code
@@ -1480,7 +1485,7 @@
     (pipe-stdout
      (run objdump -dr codegen_ssa_without/to_cmm_reaper.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -use-ssa -fdo-metadata -color never -o
     codegen_ssa_with/to_cmm_reaper.cmx to_cmm_reaper.ml)
    (with-stdout-to
     to_cmm_reaper.ssa.with.code
@@ -1507,7 +1512,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/body_hash.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/body_hash.cmx body_hash.ml)
    (with-stdout-to
     body_hash.o3_ssa.with.code
@@ -1534,7 +1539,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/cfg.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/cfg.cmx cfg.ml)
    (with-stdout-to
     cfg.o3_ssa.with.code
@@ -1561,7 +1566,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/function_ids.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/function_ids.cmx function_ids.ml)
    (with-stdout-to
     function_ids.o3_ssa.with.code
@@ -1588,7 +1593,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/instrumentation.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/instrumentation.cmx instrumentation.ml)
    (with-stdout-to
     instrumentation.o3_ssa.with.code
@@ -1616,7 +1621,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/linear.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/linear.cmx linear.ml)
    (with-stdout-to
     linear.o3_ssa.with.code
@@ -1643,7 +1648,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/simplify.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/simplify.cmx simplify.ml)
    (with-stdout-to
     simplify.o3_ssa.with.code
@@ -1670,7 +1675,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/to_cmm.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/to_cmm.cmx to_cmm.ml)
    (with-stdout-to
     to_cmm.o3_ssa.with.code
@@ -1697,7 +1702,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/to_cmm_probe.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/to_cmm_probe.cmx to_cmm_probe.ml)
    (with-stdout-to
     to_cmm_probe.o3_ssa.with.code
@@ -1724,7 +1729,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_ssa_without/to_cmm_reaper.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-counters -color never -o
+   (run %{bin:ocamlopt.opt} -c -O3 -use-ssa -fdo-metadata -color never -o
     codegen_o3_ssa_with/to_cmm_reaper.cmx to_cmm_reaper.ml)
    (with-stdout-to
     to_cmm_reaper.o3_ssa.with.code
@@ -1753,7 +1758,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/body_hash.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/body_hash.cmx body_hash.ml)
    (with-stdout-to
     body_hash.o3_merge_blocks.with.code
@@ -1782,7 +1787,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/cfg.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/cfg.cmx cfg.ml)
    (with-stdout-to
     cfg.o3_merge_blocks.with.code
@@ -1810,7 +1815,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/function_ids.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/function_ids.cmx function_ids.ml)
    (with-stdout-to
     function_ids.o3_merge_blocks.with.code
@@ -1840,7 +1845,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/instrumentation.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/instrumentation.cmx instrumentation.ml)
    (with-stdout-to
     instrumentation.o3_merge_blocks.with.code
@@ -1869,7 +1874,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/linear.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/linear.cmx linear.ml)
    (with-stdout-to
     linear.o3_merge_blocks.with.code
@@ -1898,7 +1903,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/simplify.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/simplify.cmx simplify.ml)
    (with-stdout-to
     simplify.o3_merge_blocks.with.code
@@ -1927,7 +1932,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/to_cmm.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/to_cmm.cmx to_cmm.ml)
    (with-stdout-to
     to_cmm.o3_merge_blocks.with.code
@@ -1956,7 +1961,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/to_cmm_probe.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/to_cmm_probe.cmx to_cmm_probe.ml)
    (with-stdout-to
     to_cmm_probe.o3_merge_blocks.with.code
@@ -1986,7 +1991,7 @@
     (pipe-stdout
      (run objdump -dr codegen_o3_merge_blocks_without/to_cmm_reaper.o)
      (run %{dep:tools/filter_objdump.sh})))
-   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-counters -color never
+   (run %{bin:ocamlopt.opt} -c -O3 -cfg-merge-blocks -fdo-metadata -color never
     -o codegen_o3_merge_blocks_with/to_cmm_reaper.cmx to_cmm_reaper.ml)
    (with-stdout-to
     to_cmm_reaper.o3_merge_blocks.with.code
