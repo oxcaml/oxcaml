@@ -1495,6 +1495,8 @@ do_resume: {
       }
 
       Alloc_small(cont, 2, Cont_tag, Enter_gc);
+      /* Callbacks run by the allocation may have reallocated the stack */
+      old_stack = domain_state->current_stack;
 
       sp -= 4;
       sp[0] = Val_long(domain_state->trap_sp_off);
