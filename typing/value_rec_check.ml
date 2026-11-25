@@ -489,8 +489,8 @@ sig
       Ignore. *)
 
   val unguarded : t -> Ident.t list -> Ident.t list
-  (** unguarded e l: the list of all identifiers in l that are dereferenced or
-      returned in the environment e. *)
+  (** unguarded e l: the list of all identifiers in l that are dereferenced,
+      returned, or immutably guarded in the environment e. *)
 
   val immutably_guarded : t -> Ident.t list -> Ident.t list
   (** immutably_guarded e l: the list of all identifiers in l that are
