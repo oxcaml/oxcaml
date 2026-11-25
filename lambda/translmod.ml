@@ -1439,8 +1439,10 @@ let transl_toplevel_item ~transl_ctx item =
          with "open" (PR#8133) *)
       set_toplevel_unique_name id;
       let scopes = enter_module_definition ~scopes id in
-      let lam = transl_module ~transl_ctx:{ transl_ctx with scopes}
-                  Tcoerce_none (Some(Lident (Ident.name id))) modl in
+      let lam =
+        transl_module ~transl_ctx:{ transl_ctx with scopes}
+          Tcoerce_none (Some(Lident (Ident.name id))) modl
+      in
       toploop_setvalue id lam
   | Tstr_recmodule bindings ->
       let idents = List.filter_map (fun mb -> mb.mb_id) bindings in

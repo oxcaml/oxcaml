@@ -1354,8 +1354,10 @@ and transl_exp0 ~in_new_scope ~transl_ctx (layout : Lambda.layout) e =
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
       let mod_scopes = enter_anonymous_module ~scopes in
-      let lam = !transl_module ~transl_ctx:{transl_ctx with scopes = mod_scopes}
-                  Tcoerce_none None modl in
+      let lam =
+        !transl_module ~transl_ctx:{transl_ctx with scopes = mod_scopes}
+          Tcoerce_none None modl
+      in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~transl_ctx layout body)
   | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->

@@ -524,7 +524,8 @@ let rec build_object_init_0
       let envs = if top then None else Some env in
       let ((_,inh_init), obj_init) =
         build_object_init ~transl_ctx cl_table obj params (envs,[]) copy_env
-          cl in
+          cl
+      in
       let obj_init =
         if ids = []
         then obj_init
