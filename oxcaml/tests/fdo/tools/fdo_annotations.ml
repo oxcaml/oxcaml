@@ -20,7 +20,8 @@
 
    - [check <dump a> <dump b>] prints the counters of [dump a] that are neither
    in [dump b] nor dropped in it, then those of [dump b] that are not in [dump
-   a]: both lists are empty when a compilation loses no counter. *)
+   a]: both lists are empty when a compilation loses no counter, apart from
+   those of code removed as unreachable (see [Fdo_dropped_counters]). *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
@@ -59,10 +60,18 @@ module Annotation = struct
     Kind.to_string kind ^ ": " ^ contents
 end
 
-(* The index just after the string literal starting at [i]. *)
+(* The index just after the string literal starting at [i]. Cmm dumps print the
+   string literals of data unescaped, so a literal also ends at the end of its
+   line, and of the dump. *)
 let end_of_string dump i =
   let rec go i =
-    match dump.[i] with '\\' -> go (i + 2) | '"' -> i + 1 | _ -> go (i + 1)
+    if i >= String.length dump
+    then String.length dump
+    else
+      match dump.[i] with
+      | '\\' -> go (i + 2)
+      | '"' | '\n' -> i + 1
+      | _ -> go (i + 1)
   in
   go (i + 1)
 
