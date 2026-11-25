@@ -248,7 +248,7 @@ let profile_granularity : profile_granularity_level ref = ref File_level (* -dgr
 let set_profile_columns columns =
   profile_columns := columns;
   if columns = [] then profile_level := 0
-  else if !profile_level = 0 then profile_level := 1
+  else if !profile_level = 0 then profile_level := max_int
 
 let set_profile_level level =
   profile_level := level;
