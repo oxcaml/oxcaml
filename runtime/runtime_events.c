@@ -25,6 +25,7 @@
 #include "caml/startup_aux.h"
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdatomic.h>
 #include <string.h>
 #include <sys/stat.h>
