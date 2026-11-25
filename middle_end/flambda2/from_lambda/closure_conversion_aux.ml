@@ -63,9 +63,13 @@ module IR = struct
           obj : simple
         }
 
+  type callee =
+    | Ident of Ident.t
+    | Code of Code_id.t
+
   type apply =
     { kind : apply_kind;
-      func : Ident.t;
+      func : callee;
       args : simple list;
       continuation : Continuation.t;
       exn_continuation : exn_continuation;
@@ -97,6 +101,11 @@ module IR = struct
     match simple with
     | Var id -> Ident.print ppf id
     | Const cst -> Printlambda.structured_constant ppf cst
+
+  let print_callee ppf callee =
+    match callee with
+    | Ident id -> Ident.print ppf id
+    | Code code_id -> Code_id.print ppf code_id
 
   let print_named ppf (named : named) =
     match named with
@@ -169,12 +178,7 @@ module Env = struct
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
       at_toplevel : bool;
-      lcodes : lcode Ident.Map.t
-    }
-
-  and lcode =
-    { code_id : Code_id.t;
-      metadata_approximation : value_approximation
+      lcodes : Code_id.t Ident.Map.t
     }
 
   let current_unit t = t.current_unit
@@ -233,19 +237,13 @@ module Env = struct
       lcodes
     }
 
-  let declare_lcode t id ~code_id ~metadata_approximation =
-    let lcode = { code_id; metadata_approximation } in
-    { t with lcodes = Ident.Map.add id lcode t.lcodes }
+  let declare_lcode t id ~code_id =
+    { t with lcodes = Ident.Map.add id code_id t.lcodes }
 
-  let find_lcode_exn t id =
+  let lcode_code_id t id =
     match Ident.Map.find_opt id t.lcodes with
-    | Some lcode -> lcode
+    | Some code_id -> code_id
     | None -> Misc.fatal_errorf "%a is not bound to [Lcode]" Ident.print id
-
-  let lcode_code_id t id = (find_lcode_exn t id).code_id
-
-  let lcode_metadata_approximation t id =
-    (find_lcode_exn t id).metadata_approximation
 
   let is_lcode t id = Ident.Map.mem id t.lcodes
 
@@ -442,11 +440,18 @@ module Acc = struct
                  "Closure_conversion: approximation loader returned an \
                   approximation of kind %a for symbol %a"
                  Flambda_kind.print kind Symbol.print symbol
+           | Lcode_approximation { code_id; code = _ } ->
+             Misc.fatal_errorf
+               "Closure_conversion: approximation loader returned the code %a \
+                of a template's instantiation for symbol %a"
+               Code_id.print code_id Symbol.print symbol
            | Value_const _ | Closure_approximation _ | Block_approximation _ ->
              ());
         let rec filter_inlinable approx =
           match (approx : Env.value_approximation) with
-          | Unknown _ | Value_symbol _ | Value_const _ -> approx
+          | Unknown _ | Value_symbol _ | Value_const _ | Lcode_approximation _
+            ->
+            approx
           | Block_approximation (tag, shape, approxs, alloc_mode) ->
             let approxs = Array.map filter_inlinable approxs in
             Value_approximation.Block_approximation
@@ -580,6 +585,10 @@ module Acc = struct
          indirection *)
       Misc.fatal_errorf "Symbol %a approximated to symbol %a" Symbol.print
         symbol Symbol.print s
+    | Lcode_approximation { code_id; code = _ } ->
+      Misc.fatal_errorf
+        "Symbol %a approximated to the code %a of a template's instantiation"
+        Symbol.print symbol Code_id.print code_id
     | Unknown _ | Closure_approximation _ | Block_approximation _
     | Value_const _ ->
       (* We need all defined symbols to be present in [symbol_approximations],
@@ -595,8 +604,12 @@ module Acc = struct
         Code_id.Map.add code_id approx t.lcode_approximations
     }
 
-  let find_lcode_approximation t code_id =
-    Code_id.Map.find_opt code_id t.lcode_approximations
+  let lcode_approximation t code_id =
+    match Code_id.Map.find_opt code_id t.lcode_approximations with
+    | Some approx -> approx
+    | None ->
+      Misc.fatal_errorf "No approximation for the code %a of an [Lcode]"
+        Code_id.print code_id
 
   let symbol_approximations t = t.symbol_approximations
 

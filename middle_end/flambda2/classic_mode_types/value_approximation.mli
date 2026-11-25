@@ -26,6 +26,12 @@ type 'code t =
         code : 'code;
         symbol : Symbol.t option
       }
+  | Lcode_approximation of
+      { code_id : Code_id.t;
+        code : 'code
+      }
+      (** The code of a template's instantiation ([Lambda.Lcode]), which has no
+          closure. *)
   | Block_approximation of
       Tag.Scannable.t
       * Flambda_kind.Scannable_block_shape.t

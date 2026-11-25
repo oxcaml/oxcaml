@@ -838,6 +838,11 @@ let rec type_from_closure_conversion_approx ~machine_width
   | Closure_approximation { code_id; function_slot; code = _; symbol } ->
     MTC.static_closure_with_this_code ~this_function_slot:function_slot
       ~closure_symbol:symbol ~code_id
+  | Lcode_approximation { code_id; code = _ } ->
+    Misc.fatal_errorf
+      "Code %a of a template's instantiation has no closure, so it can't be \
+       the approximation of a symbol"
+      Code_id.print code_id
 
 let create_from_closure_conversion_approx ~machine_width ~resolver
     (symbols : _ Value_approximation.t Symbol.Map.t) : t =
@@ -853,7 +858,7 @@ let create_from_closure_conversion_approx ~machine_width ~resolver
         (* We already added a symbol definition above *)
         t
       | Value_const _ | Value_symbol _ | Block_approximation _
-      | Closure_approximation _ ->
+      | Closure_approximation _ | Lcode_approximation _ ->
         let ty = type_from_closure_conversion_approx ~machine_width approx in
         (* Symbols without approximations must still be defined. *)
         let t =
@@ -1183,7 +1188,7 @@ end = struct
           match approx with
           | Unknown _ -> sym :: defined_symbols_without_equations, cached
           | Value_const _ | Value_symbol _ | Block_approximation _
-          | Closure_approximation _ ->
+          | Closure_approximation _ | Lcode_approximation _ ->
             ( defined_symbols_without_equations,
               Name.Map.add (Name.symbol sym)
                 ( type_from_closure_conversion_approx ~machine_width approx,

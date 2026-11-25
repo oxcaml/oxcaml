@@ -67,9 +67,14 @@ module IR : sig
           obj : simple
         }
 
+  type callee =
+    | Ident of Ident.t
+    | Code of Code_id.t
+        (** The code bound to a [Lambda.Lcode], which has no closure. *)
+
   type apply =
     { kind : apply_kind;
-      func : Ident.t;
+      func : callee;
       args : simple list;
       continuation : Continuation.t;
       exn_continuation : exn_continuation;
@@ -97,6 +102,8 @@ module IR : sig
     }
 
   val print_simple : Format.formatter -> simple -> unit
+
+  val print_callee : Format.formatter -> callee -> unit
 
   val print_named : Format.formatter -> named -> unit
 end
@@ -132,18 +139,10 @@ module Env : sig
   val clear_local_bindings : t -> t
 
   (** Declare an identifier bound to [Lambda.Lcode], with the code ID of its
-      code and an approximation giving only the code's metadata, so that calls
-      to it can be closed before the code itself. *)
-  val declare_lcode :
-    t ->
-    Ident.t ->
-    code_id:Code_id.t ->
-    metadata_approximation:value_approximation ->
-    t
+      code. *)
+  val declare_lcode : t -> Ident.t -> code_id:Code_id.t -> t
 
   val lcode_code_id : t -> Ident.t -> Code_id.t
-
-  val lcode_metadata_approximation : t -> Ident.t -> value_approximation
 
   val is_lcode : t -> Ident.t -> bool
 
@@ -306,12 +305,12 @@ module Acc : sig
   val eval_branch_free_names :
     t -> f:(t -> t * 'a) -> Name_occurrences.t * t * 'a
 
-  (** The approximation of a closure of the code bound to a [Lambda.Lcode]
-      (although no such closure exists), once the code has been closed. *)
+  (** The approximation of the code bound to a [Lambda.Lcode]. Until the code
+      has been closed, it only gives the code's metadata, so that calls to it
+      can be closed before the code itself. *)
   val add_lcode_approximation : t -> Code_id.t -> Env.value_approximation -> t
 
-  val find_lcode_approximation :
-    t -> Code_id.t -> Env.value_approximation option
+  val lcode_approximation : t -> Code_id.t -> Env.value_approximation
 
   val cost_metrics : t -> Cost_metrics.t
 

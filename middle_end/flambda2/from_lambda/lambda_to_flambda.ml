@@ -476,15 +476,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     match Env.get_unboxed_product_fields env id with
     | None ->
       let kind =
-        if CCenv.is_lcode ccenv id
-        then
-          (* [id] can only be the function of an application (see
-             [Closure_conversion.close_apply]). *)
-          Flambda_kind.With_subkind.any_value
-        else
-          match CCenv.find_simple_to_substitute_exn ccenv id with
-          | exception Not_found -> snd (CCenv.find_var ccenv id)
-          | _, kind -> kind
+        match CCenv.find_simple_to_substitute_exn ccenv id with
+        | exception Not_found -> snd (CCenv.find_var ccenv id)
+        | _, kind -> kind
       in
       let arity_component =
         Flambda_arity.Component_for_creation.Singleton kind
@@ -901,7 +895,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                     let current_alloc_region = Env.current_alloc_region env in
                     let apply : IR.apply =
                       { kind = Method { kind = meth_kind; obj };
-                        func = meth;
+                        func = Ident meth;
                         continuation = k;
                         exn_continuation;
                         args = List.flatten args;
@@ -1255,9 +1249,8 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
     (k_exn : Continuation.t) : Expr_with_acc.t =
   cps_non_tail_list acc env ccenv ap_args
     (fun acc env ccenv args args_arity ->
-      cps_non_tail_var "func" acc env ccenv ap_func
-        Flambda_kind.With_subkind.any_value
-        (fun acc env ccenv func _func_arity ->
+      cps_callee acc env ccenv ap_func
+        (fun acc env ccenv func ->
           let exn_continuation : IR.exn_continuation =
             { exn_handler = k_exn;
               extra_args = extra_args_for_exn_continuation env k_exn
@@ -1290,6 +1283,16 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
           wrap_return_continuation acc env ccenv apply)
         k_exn)
     k_exn
+
+and cps_callee acc env ccenv (ap_func : L.lambda) k k_exn =
+  match[@warning "-fragile-match"] ap_func with
+  | Lvar id when CCenv.is_lcode ccenv id ->
+    k acc env ccenv (IR.Code (CCenv.lcode_code_id ccenv id))
+  | _ ->
+    cps_non_tail_var "func" acc env ccenv ap_func
+      Flambda_kind.With_subkind.any_value
+      (fun acc env ccenv func _func_arity -> k acc env ccenv (IR.Ident func))
+      k_exn
 
 and cps_tail acc env ccenv (lam : L.lambda) (k : Continuation.t)
     (k_exn : Continuation.t) : Expr_with_acc.t =
@@ -1945,7 +1948,7 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
               code_fun ))
         lcodes
     in
-    let ccenv = CC.declare_lcodes ccenv lcodes in
+    let acc, ccenv = CC.declare_lcodes acc ccenv lcodes in
     let acc = CC.close_lcodes acc ccenv lcodes in
     cps_tail acc env ccenv lam return_continuation exn_continuation
   in

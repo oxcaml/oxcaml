@@ -44,7 +44,10 @@ val close_let_rec :
     instantiates, must all be declared before any of them is closed by
     [close_lcodes]. *)
 val declare_lcodes :
-  Env.t -> (Ident.t * Template_id.t * Function_decl.t) list -> Env.t
+  Acc.t ->
+  Env.t ->
+  (Ident.t * Template_id.t * Function_decl.t) list ->
+  Acc.t * Env.t
 
 (** Close the code of instantiations of templates, which have no closure. *)
 val close_lcodes :

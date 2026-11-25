@@ -366,7 +366,8 @@ module Inlining = struct
     | Some (Value_const _)
     | Some (Block_approximation _) ->
       assert false
-    | Some (Closure_approximation { code; _ }) ->
+    | Some (Closure_approximation { code; _ } | Lcode_approximation { code; _ })
+      ->
       let metadata = Code_or_metadata.code_metadata code in
       (* CR-someday mshinwell/bclement: we should handle tupled functions
          correctly here rather than bailing out. (Tupled functions have detupled
@@ -1542,7 +1543,9 @@ let simplify_block_load acc body_env ~block ~field ~result_kind :
     simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
   | Unknown _ -> Unknown
-  | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
+  | Closure_approximation _ | Lcode_approximation _ | Value_symbol _
+  | Value_const _ ->
+    Not_a_block
   | Block_approximation (_tag, _shape, approx, _alloc_mode) -> (
     let approx =
       let i = Target_ocaml_int.to_int field in
@@ -1944,8 +1947,6 @@ let close_exact_or_unknown_apply acc env
        return_arity
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
-  (* The code of a template's instantiation has no closure. *)
-  let is_lcode = Env.is_lcode env func in
   let mode =
     let current_region, current_ghost_region =
       match replace_region with
@@ -1965,7 +1966,9 @@ let close_exact_or_unknown_apply acc env
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
-      | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
+      | Some
+          ( Closure_approximation { code_id; code = code_or_meta; _ }
+          | Lcode_approximation { code_id; code = code_or_meta } ) ->
         let meta = Code_or_metadata.code_metadata code_or_meta in
         if Code_metadata.is_tupled meta
         then
@@ -1993,7 +1996,7 @@ let close_exact_or_unknown_apply acc env
                 "Wrong arity for direct OCaml function call to %a@ (expected \
                  parameters (%a) and result (%a),@ found arguments (%a) and \
                  return (%a)):@ %a@ code metadata:@ %a"
-                Ident.print func Flambda_arity.print
+                IR.print_callee func Flambda_arity.print
                 (Code_metadata.params_arity meta)
                 Flambda_arity.print result_arity_from_code Flambda_arity.print
                 args_arity Flambda_arity.print return_arity
@@ -2037,19 +2040,18 @@ let close_exact_or_unknown_apply acc env
     in
     let yielding = Apply.Yielding.from_lambda yielding in
     let callee =
-      if is_lcode
-      then (
+      match func with
+      | Ident func ->
+        if can_erase_callee then None else Some (find_simple_from_id env func)
+      | Code _ ->
         (match call_kind with
         | Function { function_call = Direct _ } -> ()
         | Function
             { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
         | Method _ | C_call _ | Effect _ ->
           Misc.fatal_errorf "Template instantiation %a must be called directly"
-            Ident.print func);
-        None)
-      else if can_erase_callee
-      then None
-      else Some (find_simple_from_id env func)
+            IR.print_callee func);
+        None
     in
     let apply =
       Apply.create ~callee ~continuation:(Return continuation)
@@ -3288,15 +3290,13 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     ( Function_slot.Map.add function_slot approx by_function_slot,
       function_code_ids ) )
 
-let metadata_only_closure_approximation decl ~code_id : Env.value_approximation
-    =
+let metadata_only_code decl ~code_id =
   let compilation_unit = Current_unit.get_cu_exn () in
   (* The only fields of metadata which are used for this pass are params_arity,
      param_modes, is_tupled, first_complex_local_param, result_mode, and
      result_arity. We try to populate the different fields as much as possible,
      but put dummy values when they are not yet computed or simply too expensive
      to compute for the other fields. *)
-  let function_slot = Function_decl.function_slot decl in
   let params = Function_decl.params decl in
   let params_arity = Function_decl.params_arity decl in
   let param_modes =
@@ -3344,9 +3344,7 @@ let metadata_only_closure_approximation decl ~code_id : Env.value_approximation
       ~relative_history:Inlining_history.Relative.empty ~loopify:Never_loopify
       ~template_key:None
   in
-  let code = Code_or_metadata.create_metadata_only metadata in
-  Value_approximation.Closure_approximation
-    { code_id; function_slot; code; symbol = None }
+  Code_or_metadata.create_metadata_only metadata
 
 let close_functions acc external_env ~current_alloc_region ~current_region
     function_declarations =
@@ -3428,7 +3426,14 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (fun approx_map decl ->
         let function_slot = Function_decl.function_slot decl in
         let code_id = Function_slot.Map.find function_slot function_code_ids in
-        let approx = metadata_only_closure_approximation decl ~code_id in
+        let approx =
+          Value_approximation.Closure_approximation
+            { code_id;
+              function_slot;
+              code = metadata_only_code decl ~code_id;
+              symbol = None
+            }
+        in
         Function_slot.Map.add function_slot approx approx_map)
       Function_slot.Map.empty func_decl_list
   in
@@ -3569,18 +3574,21 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     acc, Lifted symbols_with_approx
   else acc, Dynamic (set_of_closures, alloc_mode, approximations)
 
-let declare_lcodes env lcodes =
+let declare_lcodes acc env lcodes =
   List.fold_left
-    (fun env (lcode, _template, decl) ->
+    (fun (acc, env) (lcode, _template, decl) ->
       let code_id =
         Code_id.create ~name:(Ident.name lcode) ~slot_stamp:None
           ~debug:(Debuginfo.from_location (Function_decl.loc decl))
           (Current_unit.get_cu_exn ())
       in
-      Env.declare_lcode env lcode ~code_id
-        ~metadata_approximation:
-          (metadata_only_closure_approximation decl ~code_id))
-    env lcodes
+      let acc =
+        Acc.add_lcode_approximation acc code_id
+          (Lcode_approximation
+             { code_id; code = metadata_only_code decl ~code_id })
+      in
+      acc, Env.declare_lcode env lcode ~code_id)
+    (acc, env) lcodes
 
 let close_lcode acc env ~lcode ~template decl =
   (match Function_decl.calling_convention decl with
@@ -3608,18 +3616,14 @@ let close_lcode acc env ~lcode ~template decl =
           ~function_slots_from_idents:(Ident.Map.singleton lcode function_slot)
           ~approx_map:
             (Function_slot.Map.singleton function_slot
-               (Env.lcode_metadata_approximation env lcode))
+               (Acc.lcode_approximation acc code_id))
           ~template_key:(template_key template) function_declarations)
   in
   let acc = Acc.with_free_names free_names acc in
   let acc = Acc.with_seen_a_function acc seen_a_function in
   Acc.add_lcode_approximation acc code_id
-    (Value_approximation.Closure_approximation
-       { code_id;
-         function_slot;
-         code = Function_slot.Map.find function_slot approxs;
-         symbol = None
-       })
+    (Value_approximation.Lcode_approximation
+       { code_id; code = Function_slot.Map.find function_slot approxs })
 
 let close_lcodes acc env lcodes =
   List.fold_left
@@ -3753,9 +3757,16 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
       Misc.fatal_errorf
         "Partial application of %a, whose code metadata states that it is \
          never partially applied"
-        Ident.print apply.func
+        IR.print_callee apply.func
   in
-  let wrapper_id = Ident.create_local ("partial_" ^ Ident.name apply.func) in
+  let wrapper_id =
+    let func_name =
+      match apply.func with
+      | Ident id -> Ident.name id
+      | Code code_id -> Code_id.name code_id
+    in
+    Ident.create_local ("partial_" ^ func_name)
+  in
   let wrapper_id_duid = Flambda_debug_uid.none in
   (* CR sspies: In the future, improve the debugging UIDs here if possible. *)
   let function_slot =
@@ -3777,7 +3788,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
          partial application of %a in [Closure_conversion]@ (location: %s):@ \
          provided_arity = %a@ missing_arity (unarized) = (%a)@ \
          missing_param_modes = (%a)"
-        Ident.print apply.func
+        IR.print_callee apply.func
         (Debuginfo.Scoped_location.string_of_scoped_location
            ~include_zero_alloc:false apply.loc)
         Flambda_arity.print provided_arity
@@ -3871,7 +3882,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     List.fold_left
       (fun ids -> function
         | IR.Var id -> Ident.Set.add id ids | IR.Const _ -> ids)
-      (Ident.Set.singleton apply.func)
+      (match apply.func with
+      | Ident id -> Ident.Set.singleton id
+      | Code _ -> Ident.Set.empty)
       all_args
   in
   let closure_alloc_mode, first_complex_local_param =
@@ -4100,20 +4113,15 @@ type call_args_split =
 
 let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
   let approx =
-    if Env.is_lcode env apply.func
-    then
-      match
-        Acc.find_lcode_approximation acc (Env.lcode_code_id env apply.func)
-      with
-      | Some approx -> approx
-      | None -> Env.lcode_metadata_approximation env apply.func
-    else
+    match apply.func with
+    | Ident id ->
       find_value_approximation_through_symbol acc env
-        (find_simple_from_id env apply.func)
+        (find_simple_from_id env id)
+    | Code code_id -> Acc.lcode_approximation acc code_id
   in
   let code_info =
     match approx with
-    | Closure_approximation { code; _ } ->
+    | Closure_approximation { code; _ } | Lcode_approximation { code; _ } ->
       let metadata = Code_or_metadata.code_metadata code in
       Some
         ( Code_metadata.params_arity metadata,
@@ -4129,7 +4137,7 @@ let close_apply_function acc env (apply : IR.apply) : Expr_with_acc.t =
         Misc.fatal_errorf
           "Unexpected approximation for callee %a in [Closure_conversion], \
            expected a closure approximation."
-          Ident.print apply.func
+          IR.print_callee apply.func
       else None
   in
   match code_info with

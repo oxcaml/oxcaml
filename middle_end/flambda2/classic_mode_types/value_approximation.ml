@@ -26,6 +26,10 @@ type 'code t =
         code : 'code;
         symbol : Symbol.t option
       }
+  | Lcode_approximation of
+      { code_id : Code_id.t;
+        code : 'code
+      }
   | Block_approximation of
       Tag.Scannable.t
       * Flambda_kind.Scannable_block_shape.t
@@ -36,7 +40,7 @@ let rec print fmt = function
   | Unknown _ -> Format.fprintf fmt "?"
   | Value_symbol sym -> Symbol.print fmt sym
   | Value_const i -> Reg_width_const.print fmt i
-  | Closure_approximation { code_id; _ } ->
+  | Closure_approximation { code_id; _ } | Lcode_approximation { code_id; _ } ->
     Format.fprintf fmt "[%a]" Code_id.print code_id
   | Block_approximation (tag, _shape, fields, _) ->
     let len = Array.length fields in
@@ -53,7 +57,7 @@ let rec print fmt = function
 let is_unknown = function
   | Unknown _ -> true
   | Value_symbol _ | Value_const _ | Closure_approximation _
-  | Block_approximation _ ->
+  | Lcode_approximation _ | Block_approximation _ ->
     false
 
 let rec free_names ~code_free_names approx =
@@ -76,3 +80,5 @@ let rec free_names ~code_free_names approx =
       Name_occurrences.add_code_id free_names code_id Name_mode.normal
     in
     Name_occurrences.add_function_slot_in_types free_names function_slot
+  | Lcode_approximation { code_id; code } ->
+    Name_occurrences.add_code_id (code_free_names code) code_id Name_mode.normal
