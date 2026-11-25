@@ -135,6 +135,18 @@
 
 #undef HAS_VPCLMULQDQ
 
+#undef HAS_AVX512VBMI
+
+#undef HAS_AVX512VBMI2
+
+#undef HAS_VAES
+
+#undef HAS_AVX512BITALG
+
+#undef HAS_AVX512VPOPCNTDQ
+
+#undef HAS_AVX512IFMA
+
 #undef WITH_NONEXECSTACK_NOTE
 
 /* Define WITH_NONEXECSTACK_NOTE when an explicit ".note.GNU-stack" section

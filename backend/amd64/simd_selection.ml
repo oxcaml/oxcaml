@@ -141,10 +141,10 @@ let select_operation_aes ~dbg:_ op args =
   then None
   else
     match op with
-    | "caml_aes_dec" -> sse_or_avx aesdec vaesdec args
-    | "caml_aes_declast" -> sse_or_avx aesdeclast vaesdeclast args
-    | "caml_aes_enc" -> sse_or_avx aesenc vaesenc args
-    | "caml_aes_enclast" -> sse_or_avx aesenclast vaesenclast args
+    | "caml_aes_dec" -> sse_or_avx aesdec vaesdec_X_X_Xm128 args
+    | "caml_aes_declast" -> sse_or_avx aesdeclast vaesdeclast_X_X_Xm128 args
+    | "caml_aes_enc" -> sse_or_avx aesenc vaesenc_X_X_Xm128 args
+    | "caml_aes_enclast" -> sse_or_avx aesenclast vaesenclast_X_X_Xm128 args
     | "caml_aes_imc" -> sse_or_avx aesimc vaesimc args
     | "caml_aes_keygenassist" ->
       let i, args = extract_constant args ~max:255 op in

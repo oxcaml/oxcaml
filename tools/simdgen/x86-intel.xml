@@ -1,6 +1,7 @@
 <!-- Local corrections: VPMOVM2* and VPBROADCASTM* forms include their k source;
      missing AVX512VL VCVTUDQ2PS/VCVTPS2PD forms are included; immediate widths
-     for VPSRAD, VPSRAQ, VPALIGNR and VCVTPS2PH are consistent across variants. -->
+     for VPSRAD, VPSRAQ, VPALIGNR and VCVTPS2PH are consistent across variants;
+     unmasked permutex2var_epi8 forms include VPERMT2B. -->
 <intrinsics_list version="3.6.9" date="07/12/2024">
 <intrinsic name="_addcarryx_u32" tech="Other">
 	<return etype="UI8" type="unsigned char" varname="dst" />
@@ -133622,6 +133623,7 @@ ENDFOR
 dst[MAX:256] := 0
 	</operation>
 	<instruction form="ymm, ymm, ymm" name="VPERMI2B" xed="VPERMI2B_YMMu8_MASKmskw_YMMu8_YMMu8_AVX512" />
+	<instruction form="ymm, ymm, ymm" name="VPERMT2B" xed="VPERMT2B_YMMu8_MASKmskw_YMMu8_YMMu8_AVX512" />
 	<CPUID>AVX512_VBMI</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -133718,6 +133720,7 @@ ENDFOR
 dst[MAX:128] := 0
 	</operation>
 	<instruction form="xmm, xmm, xmm" name="VPERMI2B" xed="VPERMI2B_XMMu8_MASKmskw_XMMu8_XMMu8_AVX512" />
+	<instruction form="xmm, xmm, xmm" name="VPERMT2B" xed="VPERMT2B_XMMu8_MASKmskw_XMMu8_XMMu8_AVX512" />
 	<CPUID>AVX512_VBMI</CPUID>
 	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
@@ -133964,6 +133967,7 @@ ENDFOR
 dst[MAX:512] := 0
 	</operation>
 	<instruction form="zmm, zmm, zmm" name="VPERMI2B" xed="VPERMI2B_ZMMu8_MASKmskw_ZMMu8_ZMMu8_AVX512" />
+	<instruction form="zmm, zmm, zmm" name="VPERMT2B" xed="VPERMT2B_ZMMu8_MASKmskw_ZMMu8_ZMMu8_AVX512" />
 	<CPUID>AVX512_VBMI</CPUID>
 	<header>immintrin.h</header>
 	<category>Swizzle</category>

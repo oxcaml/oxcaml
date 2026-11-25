@@ -42,6 +42,12 @@ module Extension = struct
       | AES
       | AVX512_BF16
       | VPCLMULQDQ
+      | AVX512_VBMI
+      | AVX512_VBMI2
+      | VAES
+      | AVX512_BITALG
+      | AVX512_VPOPCNTDQ
+      | AVX512_IFMA
 
     let rank = function
       | POPCNT -> 0
@@ -67,6 +73,12 @@ module Extension = struct
       | AES -> 20
       | AVX512_BF16 -> 21
       | VPCLMULQDQ -> 22
+      | AVX512_VBMI -> 23
+      | AVX512_VBMI2 -> 24
+      | VAES -> 25
+      | AVX512_BITALG -> 26
+      | AVX512_VPOPCNTDQ -> 27
+      | AVX512_IFMA -> 28
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -98,6 +110,12 @@ module Extension = struct
     | AVX512VL -> "AVX512VL"
     | AVX512_BF16 -> "AVX512BF16"
     | VPCLMULQDQ -> "VPCLMULQDQ"
+    | AVX512_VBMI -> "AVX512VBMI"
+    | AVX512_VBMI2 -> "AVX512VBMI2"
+    | VAES -> "VAES"
+    | AVX512_BITALG -> "AVX512BITALG"
+    | AVX512_VPOPCNTDQ -> "AVX512VPOPCNTDQ"
+    | AVX512_IFMA -> "AVX512IFMA"
 
   let generation = function
     | POPCNT -> "Nehalem+"
@@ -122,6 +140,12 @@ module Extension = struct
     | AVX512VL -> "SkylakeXeon+"
     | AVX512_BF16 -> "Cooperlake+"
     | VPCLMULQDQ -> "Icelake+"
+    | AVX512_VBMI -> "Cannonlake+"
+    | AVX512_VBMI2 -> "Icelake+"
+    | VAES -> "Icelake+"
+    | AVX512_BITALG -> "Icelake+"
+    | AVX512_VPOPCNTDQ -> "Icelake+"
+    | AVX512_IFMA -> "Cannonlake+"
 
   let enabled_by_default = function
     (* Extension defaults follow configure-time CPU detection.
@@ -147,13 +171,20 @@ module Extension = struct
     | AVX512VL -> Config.has_avx512vl
     | AVX512_BF16 -> Config.has_avx512bf16
     | VPCLMULQDQ -> Config.has_vpclmulqdq
+    | AVX512_VBMI -> Config.has_avx512vbmi
+    | AVX512_VBMI2 -> Config.has_avx512vbmi2
+    | VAES -> Config.has_vaes
+    | AVX512_BITALG -> Config.has_avx512bitalg
+    | AVX512_VPOPCNTDQ -> Config.has_avx512vpopcntdq
+    | AVX512_IFMA -> Config.has_avx512ifma
     | PREFETCHW | PREFETCHWT1 -> false
 
   let all =
     Set.of_list
       [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
         CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F; AVX512DQ; AVX512CD;
-        AVX512BW; AVX512VL; AES; AVX512_BF16; VPCLMULQDQ ]
+        AVX512BW; AVX512VL; AES; AVX512_BF16; VPCLMULQDQ; AVX512_VBMI;
+        AVX512_VBMI2; VAES; AVX512_BITALG; AVX512_VPOPCNTDQ; AVX512_IFMA ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -175,11 +206,19 @@ module Extension = struct
     | AVX512F, AVX512_BF16
     | CLMUL, VPCLMULQDQ
     | AVX, VPCLMULQDQ
+    | AVX512F, AVX512_VBMI
+    | AVX512F, AVX512_VBMI2
+    | AES, VAES
+    | AVX2, VAES
+    | AVX512F, AVX512_BITALG
+    | AVX512F, AVX512_VPOPCNTDQ
+    | AVX512F, AVX512_IFMA
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
        AVX512DQ | AVX512CD | AVX512BW | AVX512VL | AES | AVX512_BF16 |
-       VPCLMULQDQ), _
+       VPCLMULQDQ | AVX512_VBMI | AVX512_VBMI2 | VAES | AVX512_BITALG |
+       AVX512_VPOPCNTDQ | AVX512_IFMA), _
        -> false
 
   let rec fix set less =
@@ -255,6 +294,12 @@ module Extension = struct
       | AVX512VL -> enabled AVX512VL
       | AVX512_BF16 -> enabled AVX512_BF16
       | VPCLMULQDQ -> enabled VPCLMULQDQ
+      | AVX512_VBMI -> enabled AVX512_VBMI
+      | AVX512_VBMI2 -> enabled AVX512_VBMI2
+      | VAES -> enabled VAES
+      | AVX512_BITALG -> enabled AVX512_BITALG
+      | AVX512_VPOPCNTDQ -> enabled AVX512_VPOPCNTDQ
+      | AVX512_IFMA -> enabled AVX512_IFMA
     in
     Array.for_all enabled instr.ext
 end
