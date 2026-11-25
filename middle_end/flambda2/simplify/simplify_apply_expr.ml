@@ -1520,7 +1520,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
   down_to_up dacc
     (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
-let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
+let simplify_apply0 ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
   match simplify_apply_shared dacc apply with
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up
@@ -1556,3 +1556,50 @@ let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
       simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types
         ~down_to_up
     | Effect op -> simplify_effect_op dacc apply op ~down_to_up)
+
+let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
+  let denv = DA.denv dacc in
+  match Apply.continuation apply with
+  | Return cont when DE.has_lifted_params denv cont ->
+    (* The return continuation of an [apply] cannot have extra arguments, so
+       calls returning to a lifted continuation must go through a wrapper adding
+       the lifted params.
+
+       Note that we must not touch the exception continuation, even though it
+       might have been also lifted: we will already add the lifted params when
+       simplifying the body of the wrapper (which contains the rewritten [apply]
+       with the wrapper continuation as a return continuation), so adding the
+       lifted params now would add them twice. *)
+    let params =
+      List.mapi
+        (fun i kind ->
+          BP.create
+            (Variable.create (Printf.sprintf "result%d" i) (KS.kind kind))
+            kind Flambda_debug_uid.none)
+        (Flambda_arity.unarize (Apply.return_arity apply))
+      |> Bound_parameters.create
+    in
+    let wrapper_cont = Continuation.rename cont in
+    let handler =
+      Apply_cont.create cont
+        ~args:(Bound_parameters.simples params)
+        ~dbg:(Apply.dbg apply)
+      |> Expr.create_apply_cont
+    in
+    let handler =
+      Continuation_handler.create params ~handler ~free_names_of_handler:Unknown
+        ~is_exn_handler:false ~is_cold:false
+    in
+    let apply = Apply.with_continuation apply (Return wrapper_cont) in
+    let expr =
+      Let_cont.create_non_recursive wrapper_cont handler
+        ~body:(Expr.create_apply apply) ~free_names_of_body:Unknown
+    in
+    simplify_expr dacc expr ~down_to_up
+  | Return _ | Never_returns ->
+    let apply =
+      Apply.with_exn_continuation apply
+        (DE.add_lifted_args_to_exn_continuation denv
+           (Apply.exn_continuation apply))
+    in
+    simplify_apply0 ~simplify_expr ~rebuild_expr dacc apply ~down_to_up

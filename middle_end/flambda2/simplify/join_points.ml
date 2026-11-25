@@ -129,8 +129,7 @@ let add_extra_params_from_join_analysis denv analysis use_envs_with_ids' =
   in
   denv, extra_params_and_args
 
-let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
-    ~previous_extra_params_and_args =
+let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids =
   let definition_scope = DE.get_continuation_scope denv in
   let extra_lifted_consts_in_use_envs =
     LCS.all_defined_symbols consts_lifted_after_fork
@@ -148,11 +147,8 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
   in
   let extra_params_and_args =
     match cse_join_result with
-    | None -> previous_extra_params_and_args
-    | Some cse_join_result ->
-      (* CR gbury: the order of the EPA should not matter here *)
-      EPA.concat ~outer:cse_join_result.extra_params
-        ~inner:previous_extra_params_and_args
+    | None -> EPA.empty
+    | Some cse_join_result -> cse_join_result.extra_params
   in
   let denv, use_envs_with_ids' =
     introduce_extra_params_for_join denv use_envs_with_ids
@@ -315,7 +311,7 @@ let compute_use_env_with_ids ?replay ~is_recursive ~params use =
   use_env, U.id use, U.use_kind use
 
 let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
-    ~consts_lifted_after_fork ~params ~previous_extra_params_and_args =
+    ~consts_lifted_after_fork ~params =
   (* Augment the environment at each use with the parameter definitions and
      associated equations. *)
   match uses with
@@ -325,26 +321,9 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
          match U.use_kind use with
          | Inlinable -> true
          | Non_inlinable _ -> false ->
-    (* First add the extra params and args equations in the typing env *)
-    let ((use_env, _use_id, _use_kind) as use) =
+    let use_env, _use_id, _use_kind =
       compute_use_env_with_ids ?replay ~is_recursive ~params use
     in
-    let use_tenv =
-      match
-        introduce_extra_params_in_use_env previous_extra_params_and_args use
-      with
-      | Some (use_env, _, _) -> use_env
-      | None ->
-        (* CR gbury: This case means that the EPA rewrite states the apply_cont
-           is actually invalid. This should not happen currently as lifted cont
-           epas do not generate invalid rewrites.
-
-           We could try and handle this case by replacing the continuation's
-           handler with an [Invalid] *)
-        Misc.fatal_errorf
-          "Apply_cont of a single-use inlinable continuation is Invalid."
-    in
-    let use_env = DE.with_typing_env use_env use_tenv in
     (* There is only one use of the continuation and it is inlinable. No join
        calculations are required.
 
@@ -377,8 +356,13 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
       DE.set_at_unit_toplevel_state handler_env
         (DE.at_unit_toplevel env_at_fork)
     in
+    (* Likewise, lifted parameters for any lifted continuations must come from
+       the fork environment. *)
+    let handler_env =
+      DE.inherit_lifted_continuations ~from:env_at_fork handler_env
+    in
     { handler_env;
-      extra_params_and_args = previous_extra_params_and_args;
+      extra_params_and_args = EPA.empty;
       is_single_inlinable_use = true;
       escapes = false
     }
@@ -408,17 +392,13 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         let denv = DE.define_parameters denv ~extra:false ~params in
         Profile.record_call ~accumulate:true ~level:2 "join" (fun () ->
             join ?cut_after denv params ~consts_lifted_after_fork
-              ~use_envs_with_ids ~previous_extra_params_and_args)
+              ~use_envs_with_ids)
       else
         (* Define parameters with basic equations from the subkinds *)
         let denv =
           DE.add_parameters_with_unknown_types denv ~extra:false params
         in
-        let denv =
-          DE.add_parameters_with_unknown_types denv ~extra:true
-            (EPA.extra_params previous_extra_params_and_args)
-        in
-        denv, None, previous_extra_params_and_args
+        denv, None, EPA.empty
     in
     let handler_env = DE.with_join_analysis join_analysis handler_env in
     let only_cold_uses =

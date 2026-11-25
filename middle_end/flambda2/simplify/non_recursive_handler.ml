@@ -16,18 +16,20 @@
 type t =
   { cont : Continuation.t;
     params : Bound_parameters.t;
-    lifted_params : Lifted_cont_params.t;
+    lifted_params : Bound_parameters.t;
+    lifted_free_vars : Lifted_free_var.t list;
     handler : Flambda.Expr.t;
     is_exn_handler : bool;
     can_be_lifted : bool;
     is_cold : bool
   }
 
-let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~can_be_lifted
-    ~is_cold =
+let create ~cont ~params ~lifted_params ~lifted_free_vars ~handler
+    ~is_exn_handler ~can_be_lifted ~is_cold =
   { cont;
     params;
     lifted_params;
+    lifted_free_vars;
     handler;
     is_exn_handler;
     can_be_lifted;
@@ -37,12 +39,14 @@ let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~can_be_lifted
 let with_can_be_lifted can_be_lifted t = { t with can_be_lifted }
 
 let[@ocamlformat "disable"] print ppf
-    { cont; params; lifted_params; handler; is_exn_handler; can_be_lifted; is_cold }
+    { cont; params; lifted_params; lifted_free_vars; handler; is_exn_handler;
+      can_be_lifted; is_cold }
     =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hv 1>(cont@ %a)@]@ \
       @[<hv 1>(params@ %a)@]@ \
       @[<hv 1>(lifted_params@ %a)@]@ \
+      @[<hv 1>(lifted_free_vars@ %a)@]@ \
       @[<hv 1>(is_exn_handler@ %b)@]@ \
       @[<hv 1>(can_be_lifted@ %b)@]@ \
       @[<hv 1>(is_cold@ %b)@]@ \
@@ -50,7 +54,9 @@ let[@ocamlformat "disable"] print ppf
     )@]"
     Continuation.print cont
     Bound_parameters.print params
-    Lifted_cont_params.print lifted_params
+    Bound_parameters.print lifted_params
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_free_var.print)
+    lifted_free_vars
     is_exn_handler
     can_be_lifted
     is_cold
@@ -60,16 +66,10 @@ let with_handler handler t = { t with handler }
 
 let rename_params t =
   let params = Bound_parameters.rename t.params in
-  let params_renaming =
-    Bound_parameters.renaming t.params ~guaranteed_fresh:params
-  in
-  let lifted_params, lifted_params_renaming =
-    Lifted_cont_params.rename t.lifted_params
-  in
-  (* The order of composition of renamings should not matter, since we expect
-     the params and lifted params to be distinct. *)
-  let renaming =
-    Renaming.compose ~first:params_renaming ~second:lifted_params_renaming
+  let renaming = Bound_parameters.renaming t.params ~guaranteed_fresh:params in
+  (* The [lifted_params] are part of the [params]. *)
+  let lifted_params =
+    Bound_parameters.apply_renaming t.lifted_params renaming
   in
   let handler = Flambda.Expr.apply_renaming t.handler renaming in
   { t with params; lifted_params; handler }

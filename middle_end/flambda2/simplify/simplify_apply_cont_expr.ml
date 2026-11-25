@@ -157,6 +157,7 @@ let rebuild_apply_cont ~args ~rewrite_id apply_cont uacc ~after_rebuild =
   create_apply_cont ~apply_cont_to_expr
 
 let simplify_apply_cont dacc apply_cont ~down_to_up =
+  let apply_cont = DE.add_lifted_args_to_apply_cont (DA.denv dacc) apply_cont in
   let { S.simples = args; simple_tys = arg_types } =
     S.simplify_simples dacc (AC.args apply_cont)
   in
