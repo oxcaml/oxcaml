@@ -74,7 +74,7 @@ type test =
         configs : (string * string list) list
       }
       (** Compiles each source with each named set of flags, with and without
-          counters, and checks that the code is the same. *)
+          counters and the metadata, and checks that the code is the same. *)
 
 let enabled_if ~platform =
   let equal var value = List (atoms ["="; var; "\"" ^ value ^ "\""]) in
@@ -167,7 +167,7 @@ let stanzas = function
                     [ field "progn"
                         (mkdir [dir "without"; dir "with"]
                         @ build "without" []
-                        @ build "with" ["-fdo-counters"]) ] ];
+                        @ build "with" ["-fdo-metadata"]) ] ];
               field "rule"
                 [ field "alias" [Atom "runtest"];
                   enabled_if ~platform:Linux;
@@ -382,13 +382,14 @@ let tests =
         compare_sets (dump "cmm") (dump "linear")
         ::
         (if String.equal source "to_cmm.ml" then [] else [list (dump "linear")]));
-    (* End to end through the backend, at -O3, with the SSA pipeline and with
-       the merging of identical blocks, and with the flags of CI. *)
+    (* End to end through the backend and the emission of the metadata, at -O3,
+       with the SSA pipeline and with the merging of identical blocks, and with
+       the flags of CI. *)
     pipeline "backend_o3" ~ci_flags:true
       ~configs:
-        [ "", ["-O3"];
-          "_ssa", ["-O3"; "-use-ssa"];
-          "_merge_blocks", ["-O3"; "-cfg-merge-blocks"] ]
+        [ "", ["-O3"; "-fdo-metadata"];
+          "_ssa", ["-O3"; "-use-ssa"; "-fdo-metadata"];
+          "_merge_blocks", ["-O3"; "-cfg-merge-blocks"; "-fdo-metadata"] ]
       ~sources:
         ["linear.ml"; "cfg.ml"; "to_cmm.ml"; "to_cmm_reaper.ml"; "simplify.ml"]
       ~stages:
