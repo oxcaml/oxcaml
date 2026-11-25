@@ -13,6 +13,36 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+module Experimental = struct
+  module Feature = Experimental_feature_registry
+
+  let settings : (Feature.t, bool) Hashtbl.t =
+    Hashtbl.create (List.length Feature.all)
+
+  let is_enabled feature =
+    match Hashtbl.find_opt settings feature with
+    | Some enabled -> enabled
+    | None -> false
+
+  let set_enabled feature ~enabled =
+    Hashtbl.replace settings feature enabled
+
+  let set_universe (minimum_level : Feature.review_level option) =
+    List.iter
+      (fun feature ->
+        let enabled =
+          match minimum_level with
+          | None -> false
+          | Some Ai_reviewed -> true
+          | Some Human_reviewed ->
+            match Feature.review_level feature with
+            | Ai_reviewed -> false
+            | Human_reviewed -> true
+        in
+        set_enabled feature ~enabled)
+      Feature.all
+end
+
 let dump_cfg = ref false                (* -dcfg *)
 let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)

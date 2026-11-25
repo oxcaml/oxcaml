@@ -278,11 +278,47 @@ let mk_no_cfg_copy_propagation f =
     Arg.Unit f,
     " Disables copy propagation before register allocation" )
 
-let mk_experimental_optimizations f =
-  ( "-experimental-optimizations",
+let experimental_universes =
+  [
+    ("none", None);
+    ("ai-reviewed", Some Experimental_feature_registry.Ai_reviewed);
+    ("human-reviewed", Some Experimental_feature_registry.Human_reviewed);
+  ]
+
+(* Names are shared by the command-line and OCAMLPARAM parsers. The boolean
+   is the state selected by the command-line option, or by an environment
+   parameter whose value is 1. *)
+let experimental_feature_options =
+  List.concat_map
+    (fun feature ->
+      let name = Experimental_feature_registry.flag_name feature in
+      [
+        ("experimental-" ^ name, feature, true);
+        ("no-experimental-" ^ name, feature, false);
+      ])
+    Experimental_feature_registry.all
+
+let mk_experimental_universe f =
+  ( "-experimental-universe",
+    Arg.Symbol (List.map fst experimental_universes, f),
+    " Select registered experimental features by minimum review level \
+     (default: none)" )
+
+let mk_experimental_features f =
+  List.map
+    (fun (name, feature, enabled) ->
+      ( "-" ^ name,
+        Arg.Unit (fun () -> f feature ~enabled),
+        Printf.sprintf " %s experimental feature %s"
+          (if enabled then "Enable" else "Disable")
+          (Experimental_feature_registry.flag_name feature) ))
+    experimental_feature_options
+
+let mk_test_optimizations f =
+  ( "-test-optimizations",
     Arg.Unit f,
-    " Enable a bundle of experimental codegen optimizations that are not yet \
-     on by default (subject to change)" )
+    " Enable the codegen test bundle and the ai-reviewed experimental universe"
+  )
 
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
@@ -1529,7 +1565,12 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val cfg_copy_propagation : unit -> unit
   val no_cfg_copy_propagation : unit -> unit
-  val experimental_optimizations : unit -> unit
+
+  val experimental_feature :
+    Experimental_feature_registry.t -> enabled:bool -> unit
+
+  val experimental_universe : string -> unit
+  val test_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
@@ -1753,7 +1794,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_cfg_copy_propagation F.cfg_copy_propagation;
       mk_no_cfg_copy_propagation F.no_cfg_copy_propagation;
-      mk_experimental_optimizations F.experimental_optimizations;
+      mk_experimental_universe F.experimental_universe;
+      mk_test_optimizations F.test_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
@@ -1941,6 +1983,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_x F.x;
     ]
     @ mk_jsoo_opt F.jsoo_opt
+    @ mk_experimental_features F.experimental_feature
 end
 
 let set_dissector_partition_size f =
@@ -2523,16 +2566,30 @@ module Oxcaml_options_impl = struct
   let jsir_inlined_frames () = Clflags.jsir_inlined_frames := true
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
+  let experimental_feature = Oxcaml_flags.Experimental.set_enabled
 
-  (* Bundle of experimental codegen optimizations enabled by
-     [-experimental-optimizations]. *)
-  let experimental_optimizations () =
+  let experimental_universe value =
+    match
+      List.find_opt
+        (fun (name, _) -> String.equal name value)
+        experimental_universes
+    with
+    | Some (_, level) -> Oxcaml_flags.Experimental.set_universe level
+    | None ->
+        Compenv.fatal
+          (Printf.sprintf
+             "Unknown experimental universe %S (expected one of: %s)" value
+             (String.concat ", " (List.map fst experimental_universes)))
+
+  (* Testing preset: the legacy codegen bundle plus reviewed experiments. *)
+  let test_optimizations () =
     x86_peephole_optimize ();
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_value_propagation_flow ();
-    use_ssa ()
+    use_ssa ();
+    Oxcaml_flags.Experimental.set_universe (Some Ai_reviewed)
 end
 
 module type Debugging_options = sig
@@ -2635,6 +2692,23 @@ module Debugging_options_impl = struct
 end
 
 module Extra_params = struct
+  let read_experimental_feature ppf name value =
+    (* [Option.fold] also works when the generated feature type is empty. *)
+    Option.fold ~none:false
+      ~some:(fun (_, feature, enabled_by_one) ->
+        let enabled = Compenv.check_bool ppf name value in
+        (* [check_bool] warns and returns false for an invalid value. In that
+           case, leave the selection unchanged. *)
+        (match value with
+        | "0" | "1" ->
+            Oxcaml_flags.Experimental.set_enabled feature
+              ~enabled:(if enabled_by_one then enabled else not enabled)
+        | _ -> ());
+        true)
+      (List.find_opt
+         (fun (parameter, _, _) -> String.equal parameter name)
+         experimental_feature_options)
+
   let read_param ppf position name v =
     let set option =
       let b = Compenv.check_bool ppf name v in
@@ -2734,9 +2808,12 @@ module Extra_params = struct
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
     | "cfg-copy-propagation" -> set' Oxcaml_flags.cfg_copy_propagation
-    | "experimental-optimizations" ->
+    | "experimental-universe" ->
+        Oxcaml_options_impl.experimental_universe v;
+        true
+    | "test-optimizations" ->
         if Compenv.check_bool ppf name v then
-          Oxcaml_options_impl.experimental_optimizations ();
+          Oxcaml_options_impl.test_optimizations ();
         true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
@@ -3083,7 +3160,9 @@ module Extra_params = struct
     | "no-manual-module-init" ->
         Oxcaml_flags.manual_module_init := false;
         true
-    | _ -> Extra_options.read_one_param ppf name v
+    | _ ->
+        read_experimental_feature ppf name v
+        || Extra_options.read_one_param ppf name v
 end
 
 module type Optcomp_options = sig

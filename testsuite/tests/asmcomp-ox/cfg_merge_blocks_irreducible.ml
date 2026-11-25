@@ -1,6 +1,6 @@
 (* TEST
  flags += " -O3";
- flags += " -experimental-optimizations";
+ flags += " -test-optimizations";
  flags += " -dcfg-invariants";
  only-default-codegen;
  native;

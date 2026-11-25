@@ -7,6 +7,15 @@
 (rule
  (copy# ../runtime/float32.c float32.c))
 
+; Share the compiler's registry without linking its frontend libraries.
+(rule
+ (copy# %{workspace_root}/experimental_feature_registry.ml
+  experimental_feature_registry.ml))
+
+(rule
+ (copy# %{workspace_root}/experimental_feature_registry.mli
+  experimental_feature_registry.mli))
+
 (library
  (name merlin_kernel)
  (public_name merlin-lib.kernel)
