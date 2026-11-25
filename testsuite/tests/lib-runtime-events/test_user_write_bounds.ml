@@ -1,5 +1,9 @@
 (* TEST
- include runtime_events;
+ {
+   include runtime_events;
+   { bytecode; }
+   { native; }
+ }
 *)
 
 (* Check that [Runtime_events.User.write] rejects a length returned by an
