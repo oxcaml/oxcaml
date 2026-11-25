@@ -37,7 +37,7 @@ let annots arm =
 
 let int n = Cmm.Cconst_int (n, dbg)
 
-let symbol sym_name : Cmm.symbol = { sym_name; sym_global = Global }
+let symbol sym_name = Cmm.global_symbol ~ty:Cmm.typ_code_pointer sym_name
 
 let apply index args : Cmm.expression =
   Cop
@@ -45,6 +45,7 @@ let apply index args : Cmm.expression =
         { result_type = Cmm.typ_int;
           region = Rc_normal;
           callees = None;
+          returns = true;
           callsite_counter = Some (call_counter index)
         },
       args,

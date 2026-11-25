@@ -124,7 +124,10 @@ case 3: fdo_annotation("Test.f":0:00000001:0:branch(2)) 7)
   cfg, added:
 
 calls:
-(let v/13 (app callsite_counter("Test.f":0:00000001:0:call) G:"h" x/11 int)
+(let
+  v/13
+    (app callsite_counter("Test.f":0:00000001:0:call) G:"h":code_pointer x/11
+      int)
   (+ (app callsite_counter("Test.f":0:00000001:1:call) g/12 v/13 int) 2))
   Ssa_of_cmm:
     B0: call h(x/B0.0) callsite_counter("Test.f":0:00000001:0:call) may_raise -> B1
@@ -148,7 +151,8 @@ calls:
 
 tail calls:
 (if (<s x/15 0) fdo_annotation("Test.f":0:00000001:0:branch(1))
-  (app callsite_counter("Test.f":0:00000001:0:call) G:"h" x/15 int)
+  (app callsite_counter("Test.f":0:00000001:0:call) G:"h":code_pointer x/15
+    int)
   fdo_annotation("Test.f":0:00000001:0:branch(2))
   (app callsite_counter("Test.f":0:00000001:1:call) g/16 x/15 int))
   Ssa_of_cmm:
@@ -178,7 +182,8 @@ tail calls:
 
 self tail call:
 (if (<s x/17 0) fdo_annotation("Test.f":0:00000001:0:branch(1))
-  (app callsite_counter("Test.f":0:00000001:0:call) G:"f" (+ x/17 2) int)
+  (app callsite_counter("Test.f":0:00000001:0:call) G:"f":code_pointer
+    (+ x/17 2) int)
   fdo_annotation("Test.f":0:00000001:0:branch(2)) x/17)
   Ssa_of_cmm:
     B0: switch(v0) | 0 -> B2 fdo_annotation("Test.f":0:00000001:0:branch(2)) | 1 -> B1 fdo_annotation
