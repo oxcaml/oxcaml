@@ -32,8 +32,8 @@ end
     full, [t] is unchanged. *)
 val fill : 'a t -> 'a -> scheduler:Typing_scheduler.t -> 'a Fill_result.t
 
-(** [upon t ~run ~cancel ~scheduler] registers a handler on [t]. Each handler is
-    run, cancelled or dropped, at most once:
+(** [upon t ~guard ~run ~cancel ~scheduler] registers a handler on [t]. Each
+    handler is run, cancelled or dropped, at most once:
     - [run v] once [t] is filled with [v]. If [t] is already full, it is
       enqueued immediately.
     - [cancel ()] if [t] is cancelled by {!cancel_all}.
@@ -41,9 +41,11 @@ val fill : 'a t -> 'a -> scheduler:Typing_scheduler.t -> 'a Fill_result.t
 
     Both run in the monitor current when [upon] is called (see
     {!Typing_scheduler.Monitor}), not the one current when [t] is filled or
-    cancelled. *)
+    cancelled. The handler holds [guard] until it has run, been cancelled or
+    been dropped. *)
 val upon :
   'a t ->
+  guard:Typing_guard.t ->
   run:('a -> unit) ->
   cancel:(unit -> unit) ->
   scheduler:Typing_scheduler.t ->

@@ -1987,8 +1987,8 @@ let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
 
 let upon_shape_later = Defined_later.Fun.create ~name:"Ctype.upon_shape"
 
-let upon_shape env ty ~run ~default =
-  Defined_later.Fun.get upon_shape_later env ty ~run ~default
+let upon_shape env ty ~guard ~run ~default =
+  Defined_later.Fun.get upon_shape_later env ty ~guard ~run ~default
 
 module Placeholder = struct
   (** A solver variable that stands for the kind of a type variable, until it is
@@ -2053,7 +2053,7 @@ let kind_with_placeholders env (ty : Types.type_expr) =
 let crossing_of_kind kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind)
 
 let rec when_crossing_of_kind_known env ~kind
-    ~(placeholders : Placeholder.t list) ~known =
+    ~(placeholders : Placeholder.t list) ~guard ~known =
   let crossing = crossing_of_kind kind in
   if
     Mode.Crossing.equal crossing
@@ -2069,7 +2069,7 @@ let rec when_crossing_of_kind_known env ~kind
         Ldd.solve_lfp p.ldd_var kind_of_p;
         when_crossing_of_kind_known env ~kind
           ~placeholders:(List.rev_append new_placeholders placeholders)
-          ~known
+          ~guard ~known
       in
       let[@inline always] default () =
         solve (rounded_up_kind env p.type_var) ~new_placeholders:[]
@@ -2081,7 +2081,7 @@ let rec when_crossing_of_kind_known env ~kind
       if Types.get_level p.type_var = Btype.generic_level
       then default ()
       else
-        upon_shape env p.type_var
+        upon_shape env p.type_var ~guard
           ~run:(fun _ ->
             let kind_of_p = kind_with_placeholders env p.type_var in
             solve kind_of_p ~new_placeholders:(Placeholder.Ctx.take ()))
@@ -2091,18 +2091,27 @@ let rec when_crossing_of_kind_known env ~kind
    [later] (i.e. a mode variable) *)
 let[@inline always] when_crossing_of_kind_known_eager env ~kind ~placeholders
     ~known ~later =
-  let known_now = ref None in
-  let run_later = ref None in
-  when_crossing_of_kind_known env ~kind ~placeholders ~known:(fun crossing ->
-      match !run_later with
-      | None -> known_now := Some crossing
-      | Some run -> run (known crossing));
-  match !known_now with
-  | Some crossing -> known crossing
-  | None ->
-    let result, ~run = later () in
-    run_later := Some run;
-    result
+  let crossing = crossing_of_kind kind in
+  if
+    Mode.Crossing.equal crossing
+      (Axis_lattice.to_mode_crossing (Ldd.round_down kind))
+  then (* Known already, so no need for a guard. *)
+    known crossing
+  else
+    let guard = Typing_guard.create () in
+    let known_now = ref None in
+    let run_later = ref None in
+    when_crossing_of_kind_known env ~kind ~placeholders ~guard
+      ~known:(fun crossing ->
+        match !run_later with
+        | None -> known_now := Some crossing
+        | Some run -> run (known crossing));
+    match !known_now with
+    | Some crossing -> known crossing
+    | None ->
+      let result, ~run = later guard in
+      run_later := Some run;
+      result
 
 let[@inline always] when_crossing_of_type_known env ty ~known
     ~when_crossing_of_kind_known =
@@ -2132,11 +2141,14 @@ let is_unconstrained_var (ty : Types.type_expr) =
 (* For an unconstrained [ty], we delay immediately instead of allocating
    a placeholder via [kind_with_placeholders]. *)
 let upon_crossing_of_type_fast env ty ~cross ~later =
-  let result, ~run = later () in
+  let guard = Typing_guard.create () in
+  let result, ~run = later guard in
   let known crossing = run (cross crossing) in
-  upon_shape env ty
+  upon_shape env ty ~guard
     ~run:(fun _ ->
-      when_crossing_of_type_known env ty ~known ~when_crossing_of_kind_known)
+      when_crossing_of_type_known env ty ~known
+        ~when_crossing_of_kind_known:(fun env ~kind ~placeholders ~known ->
+          when_crossing_of_kind_known env ~kind ~placeholders ~guard ~known))
     ~default:(fun () -> known (crossing_of_type env ty));
   result
 

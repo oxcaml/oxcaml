@@ -88,30 +88,36 @@ end
 module Job = struct
   type t = unit -> unit
 
-  module With_monitor = struct
+  module With_context = struct
     type nonrec t =
       { job : t;
-        monitor : Monitor.t
-      }
-
-    let create job ~monitor = { job; monitor }
-
-    let run { monitor; job } = Monitor.run_job monitor job
-  end
-
-  module With_skip = struct
-    type t =
-      { job : With_monitor.t;
+        monitor : Monitor.t;
+        guard : Typing_guard.t;
         mutable skip : bool
       }
 
-    let create job = { job; skip = false }
+    let create job ~guard ~monitor =
+      Typing_guard.acquire guard;
+      { job; monitor; guard; skip = false }
 
-    let run t = if not t.skip then With_monitor.run t.job
+    let run { monitor; job; skip; guard } =
+      if not skip
+      then
+        (* [Misc.try_finally] inlined *)
+        match Monitor.run_job monitor job with
+        | () -> Typing_guard.release guard
+        | exception e ->
+          Typing_guard.release guard;
+          raise e
+
+    let undo t = t.skip <- true
+
+    (* A skipped job's [acquire] has been undone. *)
+    let drop t = if not t.skip then Typing_guard.release t.guard
   end
 end
 
-type t = { jobs : Job.With_skip.t Queue.t }
+type t = { jobs : Job.With_context.t Queue.t }
 
 module Change = struct
   (** To support backtracking in the scheduler, we need to backtrack on [add]
@@ -121,12 +127,12 @@ module Change = struct
       - For [take], we log the [job] taken from the scheduler.
       - For [clear], we log the jobs that were removed. *)
   type nonrec t =
-    | Add of Job.With_skip.t
-    | Take of t * Job.With_skip.t
-    | Clear of t * Job.With_skip.t Queue.t
+    | Add of Job.With_context.t
+    | Take of t * Job.With_context.t
+    | Clear of t * Job.With_context.t Queue.t
 
   let undo = function
-    | Add job -> job.skip <- true
+    | Add job -> Job.With_context.undo job
     | Take (t, job) ->
       (* [job]'s effects should be undone, thus requeuing is ok. *)
       Queue.add job t.jobs
@@ -140,12 +146,12 @@ include With_backtracking.Make (Change)
 
 let create () = { jobs = Queue.create () }
 
-let add ?(monitor = Monitor.current ()) t job =
+let add ?(monitor = Monitor.current ()) ~guard t job =
   if
     Language_extension.(
       is_at_least Omnidirectionality Omnidirectionality.Scheduler_policy.Delayed)
   then (
-    let job = Job.(job |> With_monitor.create ~monitor |> With_skip.create) in
+    let job = Job.With_context.create job ~monitor ~guard in
     log (Add job);
     Queue.add job t.jobs)
   else Monitor.run_job monitor job
@@ -159,7 +165,7 @@ let take t =
 let run t =
   while not (Queue.is_empty t.jobs) do
     let next_job = take t in
-    Job.With_skip.run next_job
+    Job.With_context.run next_job
   done
 
 let clear t =
@@ -167,4 +173,5 @@ let clear t =
   then (
     let jobs = Queue.create () in
     Queue.transfer t.jobs jobs;
+    Queue.iter Job.With_context.drop jobs;
     log (Clear (t, jobs)))

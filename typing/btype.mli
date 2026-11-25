@@ -66,16 +66,34 @@ val subject_level: int
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
-val with_new_pool :
-  level:int ->
-  (unit -> 'a) ->
-  'a
-  * transient_expr list
-  * Jkind_types.Sort.t list
-  * type_shape Typing_ivar.t list
-        (* [with_new_pool ~level f] executes [f] and returns the type and sort
-           nodes that were created at level [level] and above, and the ivars
-           left in the pool *)
+(** A pool holds the nodes, sorts, mode variables and [Tivar]s to process
+    when leaving a generalization point (see [Ctype.with_local_level_gen]).
+    Pools form a tree, whose current path is the stack of pools. *)
+type pool
+
+(** [with_new_pool ~level ~exit f] runs [f] in a new pool at [level], a child
+    of the current pool. Once [f] returns, the pool is left: [exit pool]
+    processes its contents (see {!take_pool_contents}), in the pool, which is
+    then closed.
+
+    The pool may be re-entered after it is closed (see {!with_pool}). It is
+    then left again automatically. *)
+val with_new_pool : level:int -> exit:(pool -> unit) -> (unit -> 'a) -> 'a
+
+val pool_level : pool -> int
+
+type pool_contents =
+  { nodes : transient_expr list;
+    sorts : Jkind_types.Sort.t list;
+    tivars : transient_expr list;
+    modes : Mode.packed_var list
+  }
+
+(** Empties a pool, returning its contents since it was created or last left:
+    the nodes, sorts and mode variables at its level and above, and the [Tivar]s
+    added by {!add_to_ivar_pool}. *)
+val take_pool_contents : pool -> pool_contents
+
 val add_to_pool: level:int -> transient_expr -> unit
         (* Add a type node to the pool associated to the level (which should
            be the level of the type node).
@@ -83,19 +101,33 @@ val add_to_pool: level:int -> transient_expr -> unit
 val add_to_sort_pool: level:int -> Jkind_types.Sort.t -> unit
         (* Like [add_to_pool], but adds a sort to the pool. *)
 
-(** Iterate over the type nodes of the pool for [level] *)
-val iter_pool : level:int -> (transient_expr -> unit) -> unit
+(** Add a mode variable at [level] to the pool for [level] (only with mode
+    polymorphism). Do nothing if [level = generic_level] or
+    [level = lowest_level]. *)
+val add_to_mode_pool : level:int -> Mode.packed_var -> unit
 
-(** Add an ivar waited on at [level] to the pool for [level], if it has
-    handlers. *)
-val add_to_ivar_pool : level:int -> type_shape Typing_ivar.t -> unit
+(** Add a [Tivar] waited on at [level] to the pool for [level]. *)
+val add_to_ivar_pool : level:int -> transient_expr -> unit
+
+(** Iterate over the [Tivar]s of the pool for [level] (see
+    {!add_to_ivar_pool}). Some may have been lowered, or linked. *)
+val iter_ivar_pool : level:int -> (transient_expr -> unit) -> unit
+
+(** Empty the [Tivar]s of the pool for [level], returning them. *)
+val take_ivar_pool : level:int -> transient_expr list
 
 (** Whether [with_new_pool] is running, i.e. some pool other than the initial
     one is open. *)
 val in_generalization_scope : unit -> bool
 
-(** Empty the ivars of the pool for [level], returning them. *)
-val take_ivar_pool : level:int -> type_shape Typing_ivar.t list
+(** The current pool, which may be closed. *)
+val current_pool : unit -> pool
+
+(** [with_pool pool f] runs [f] in [pool] (e.g. a suspended constraint, in the
+    pool it was created in), on the path from [pool] to the initial pool. The
+    closed pools on this path are re-entered: once [f] returns, those to which
+    something was added are left again, innermost first. *)
+val with_pool : pool -> (unit -> 'a) -> 'a
 
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)

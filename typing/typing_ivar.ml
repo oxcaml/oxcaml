@@ -4,17 +4,33 @@ module Handler = struct
   type 'a t =
     { run : 'a -> unit;
       cancel : unit -> unit;
-      monitor : Typing_scheduler.Monitor.t
+      monitor : Typing_scheduler.Monitor.t;
+      guard : Typing_guard.t
     }
 
-  let create ~run ~cancel =
-    { run; cancel; monitor = Typing_scheduler.Monitor.current () }
+  let create ~run ~cancel ~guard =
+    Typing_guard.acquire guard;
+    { run; cancel; monitor = Typing_scheduler.Monitor.current (); guard }
+
+  (* [schedule t job] passes [t]'s hold on its guard to [job]: [job] acquires
+     it before [t] releases it. Under the eager policy, [job] runs (and may
+     raise) before [Typing_scheduler.add] returns. *)
+  let schedule t job ~scheduler =
+    match
+      Typing_scheduler.add ~monitor:t.monitor ~guard:t.guard scheduler job
+    with
+    | () -> Typing_guard.release t.guard
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      Typing_guard.release t.guard;
+      Printexc.raise_with_backtrace exn bt
 
   let schedule_run t ~value ~scheduler =
-    Typing_scheduler.add ~monitor:t.monitor scheduler (fun () -> t.run value)
+    schedule t (fun () -> t.run value) ~scheduler
 
-  let schedule_cancel t ~scheduler =
-    Typing_scheduler.add ~monitor:t.monitor scheduler t.cancel
+  let schedule_cancel t ~scheduler = schedule t t.cancel ~scheduler
+
+  let drop t = Typing_guard.release t.guard
 end
 
 module Cell = struct
@@ -86,11 +102,11 @@ let fill t value ~scheduler : _ Fill_result.t =
     List.iter (Handler.schedule_run ~value ~scheduler) (List.rev handlers);
     Ok
 
-let upon t ~run ~cancel ~scheduler =
+let upon t ~guard ~run ~cancel ~scheduler =
   match cell t with
-  | Full value -> Typing_scheduler.add scheduler (fun () -> run value)
+  | Full value -> Typing_scheduler.add scheduler ~guard (fun () -> run value)
   | Empty handlers ->
-    set_cell t (Empty (Handler.create ~run ~cancel :: handlers))
+    set_cell t (Empty (Handler.create ~guard ~run ~cancel :: handlers))
 
 let take_handlers t =
   match cell t with
@@ -104,7 +120,8 @@ let cancel_all ts ~scheduler =
   List.concat_map take_handlers ts
   |> List.iter (Handler.schedule_cancel ~scheduler)
 
-let drop_all ts = List.iter (fun t -> ignore (take_handlers t)) ts
+let drop_all ts =
+  List.iter (fun t -> List.iter Handler.drop (take_handlers t)) ts
 
 let merge t1 t2 ~f ~scheduler =
   if not (Union_find.same t1 t2)

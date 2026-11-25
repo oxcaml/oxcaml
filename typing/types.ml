@@ -1243,6 +1243,7 @@ type change =
   | Czero_alloc : Zero_alloc.Change.t -> change
   | Cscheduler : Typing_scheduler.Change.t -> change
   | Civar : Typing_ivar.Change.t -> change
+  | Cguard : Typing_guard.Change.t -> change
   | Cldd : Ldd.Change.t -> change
 
 type changes =
@@ -1263,6 +1264,7 @@ let () =
   Zero_alloc.set_log (fun change -> log_change (Czero_alloc change));
   Typing_scheduler.set_log (fun change -> log_change (Cscheduler change));
   Typing_ivar.set_log (fun change -> log_change (Civar change));
+  Typing_guard.set_log (fun change -> log_change (Cguard change));
   Ldd.set_log (fun change -> log_change (Cldd change))
 
 (* constructor and accessors for [field_kind] *)
@@ -1734,6 +1736,7 @@ let undo_change = function
   | Czero_alloc c -> Zero_alloc.Change.undo c
   | Cscheduler c -> Typing_scheduler.Change.undo c
   | Civar c -> Typing_ivar.Change.undo c
+  | Cguard c -> Typing_guard.Change.undo c
   | Cldd c -> Ldd.Change.undo c
 
 type snapshot = changes ref * With_backtracking.Stamp.Snapshot.t

@@ -313,22 +313,49 @@ module type Solver_mono = sig
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
 
+  (** A variable, of any object. *)
+  type packed_var
+
+  (** [Btype.add_to_mode_pool]: each variable is added to the pool of its level
+      when it is created (unless it is generic or persistent), to be generalized
+      when leaving the pool (see {!generalize_var}). *)
+  val add_to_pool_later : (packed_var -> unit) Defined_later.Fun.t
+
+  val var_level : packed_var -> int
+
+  (** [lower_var ~level v] lowers the level of [v] to [level]. *)
+  val lower_var : level:int -> packed_var -> log:changes ref option -> unit
+
   (** Moves a variable [u] whose level is above [current_level] and below
       [generic_level] to [generic_level + i], where [i] is the difference
       between [u.level] and [current_level] (the same is then done to all of
-      [u]'s children) *)
+      [u]'s children).
+
+      Live variables are only partially generalized, and partial generics that
+      are no longer live are generalized (see {!section:partial}). *)
   val generalize_topology :
-    current_level:int -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
+    current_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    log:changes ref option ->
+    unit
 
   (** Generalizes a variable whose level is above [current_level], by putting
       its level to [generic_level], and all its children above [current_level]
-      to [generic_level + i] for some nonzero [i]. *)
+      to [generic_level + i] for some nonzero [i]. As [generalize_topology],
+      live variables are only partially generalized. *)
   val generalize :
     current_level:int ->
     'a obj ->
     ('a, 'l * 'r) mode ->
     log:changes ref option ->
     unit
+
+  (** [generalize_var ~current_level v] generalizes [v], whose level is above
+      [current_level], as [generalize]: if it is live, it is only partially
+      generalized. Returns whether [v] is (still) a partial generic. *)
+  val generalize_var :
+    current_level:int -> packed_var -> log:changes ref option -> bool
 
   (** Generalizes all reachable variables whose level is above [current_level],
       whose value is fully determined, by putting their level to
@@ -345,6 +372,41 @@ module type Solver_mono = sig
       types, and is called at the start of every cmi save. *)
   val reset_persistent_id : unit -> unit
 
+  (** {2:partial Partial generalization}
+
+      A guard (see [Typing_guard]) is a suspended constraint, that may update
+      some variables after they are generalized. A variable is guarded by the
+      guards that may update it: guards propagate eagerly (like levels) along
+      the constraints recorded in the variables, along which updates propagate.
+      A variable is live while one of its guards has not been released.
+      Generalization does not generalize the live variables it reaches: they
+      become partial generics, which are generalized by a later generalization
+      reaching them once they are no longer live. Instantiation copies a partial
+      generic like a generic variable, and records the copy of a live one as an
+      instance, which has the guards of the original (so is live while it is).
+      Changes to a live partial generic (its bounds, and the constraints with
+      other variables) are forwarded to its instances, by [flush_forwards]. *)
+
+  (** Guards the variables of a mode with a guard. *)
+  val guard_mode :
+    log:changes ref option ->
+    Typing_guard.t ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    unit
+
+  (** Raised by [flush_forwards] if a forwarded change cannot be made. *)
+  exception Forward_failure : 'a obj * 'a error_raw -> exn
+
+  (** Forwards the pending changes to partial generics to their instances. Must
+      be called after mutating operations (with the same log).
+
+      @raise Forward_failure *)
+  val flush_forwards : log:changes ref option -> unit
+
+  (** Forgets the pending changes (e.g. because they are undone). *)
+  val discard_forwards : unit -> unit
+
   (** If the variable has not yet been copied within the same [copy_scope],
       [copy] copies all reachable variables whose level lies within the window
       \[[copy_from_level], [copy_below_level]). If [copy_to_level] is given, the
@@ -359,6 +421,7 @@ module type Solver_mono = sig
     copy_below_level:int ->
     ?copy_to_level:int ->
     ?cause:[`Save | `Restore | `Neither] ->
+    log:changes ref option ->
     'a obj ->
     ('a, 'l * 'r) mode ->
     ('a, 'l * 'r) mode

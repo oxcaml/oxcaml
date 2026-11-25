@@ -355,11 +355,33 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       mutable subst : 'a var option;
           (** Similar to Tsubst in a type, the [subst] field holds an optional
               copy used during instantiation *)
-      mutable gencopy : 'a var option
+      mutable gencopy : 'a var option;
           (** Calls to [generalize_structure] creates additional copies to make
               sure the bounds of a generalize structure is rigid: [gencopy]
               caches such copies *)
+      mutable guards : Typing_guard.Set.t;
+          (** The guards whose updates may reach the variable. The variable is
+              live (may still be updated) iff one of them has not been released.
+          *)
+      mutable partial : bool;
+          (** Whether the variable is a partial generic: its pool has been
+              generalized, but the variable was live, so it was not generalized.
+              Instantiation copies it, like a generic variable. *)
+      mutable instances : 'a instance list
+          (** The copies of a live partial generic. Changes to the variable are
+              forwarded to them (see [forward]). *)
     }
+
+  (** A copy of a partial generic, made by instantiation. *)
+  and 'a instance =
+    { scope : int;  (** The copy scope that made the copy *)
+      copy : 'a var;
+      src_level : int
+          (** The level the copy was made at. The original is generic for the
+              instance while its level is above [src_level]. *)
+    }
+
+  and anyvar = Var : 'a var -> anyvar [@@unboxed]
 
   and 'b lmorphvar = ('b, left_only) morphvar
 
@@ -372,8 +394,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
-  type anyvar = Var : 'a var -> anyvar [@@unboxed]
-
   let get_key dst (Amorphvar (v, m, _)) = Key (dst, v.id, m)
 
   module VarSet = Set.Make (Int)
@@ -385,6 +405,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvupper : 'a var * 'a rmorphvar VarMap.t -> change
     | Clevel : 'a var * int -> change
     | Cgencopy : 'a var * 'a var option -> change
+    | Cguards : 'a var * Typing_guard.Set.t -> change
+    | Cpartial : 'a var * bool -> change
+    | Cinstances : 'a var * 'a instance list -> change
 
   type changes = change list
 
@@ -399,6 +422,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvupper (v, vupper) -> v.vupper <- vupper
     | Clevel (v, level) -> v.level <- level
     | Cgencopy (v, copy) -> v.gencopy <- copy
+    | Cguards (v, guards) -> v.guards <- guards
+    | Cpartial (v, partial) -> v.partial <- partial
+    | Cinstances (v, instances) -> v.instances <- instances
 
   let empty_changes = []
 
@@ -411,7 +437,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type copy_change =
     | Coptcopy : 'a C.obj * int * 'a var * 'a var option -> copy_change
 
-  type copy_scope = { mutable saved_copies : copy_change list }
+  type copy_scope =
+    { mutable saved_copies : copy_change list;
+      scope_id : int  (** Identifies the instances made in the scope *)
+    }
 
   type ('a, 'd) mode =
     | Amode :
@@ -843,6 +872,86 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        (since this is for meet, not join) *)
     if C.le obj a b then a_hint else hint_biased_meet obj a a_hint b b_hint
 
+  (** Changes to partial generics, to be forwarded to their instances (see
+      [flush_forwards]). The instance is given if only that instance is
+      concerned. *)
+  type forward =
+    | Forward_lower :
+        'a C.obj * 'a var * 'a * ('a, left_only) Comp_hint.t
+        -> forward
+    | Forward_upper :
+        'a C.obj * 'a var * 'a * ('a, right_only) Comp_hint.t
+        -> forward
+    | Forward_vlower :
+        'a C.obj * 'a var * 'a lmorphvar * 'a var option
+        -> forward
+    | Forward_vupper :
+        'a C.obj * 'a var * 'a rmorphvar * 'a var option
+        -> forward
+    | Forward_equate : 'a C.obj * 'a var * 'a var -> forward
+
+  let forwards : forward Queue.t = Queue.create ()
+
+  let is_live v = Typing_guard.Set.is_live v.guards
+
+  let set_guards ~log v guards =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cguards (v, v.guards) :: !log);
+    v.guards <- guards
+
+  let set_instances ~log v instances =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cinstances (v, v.instances) :: !log);
+    v.instances <- instances
+
+  (* [add_guard ~log guard v] guards [v] with the live [guard], and propagates
+     it along the constraints recorded in [v], like levels: an update to [v]
+     propagates along them. The propagation stops at variables already guarded
+     by [guard]. *)
+  let rec add_guard : type a. log:_ -> Typing_guard.t -> a var -> unit =
+   fun ~log guard v ->
+    if not (Typing_guard.Set.mem guard v.guards)
+    then begin
+      set_guards ~log v (Typing_guard.Set.add guard v.guards);
+      add_guard_to_children ~log guard v;
+      (* The instances of [v] see its updates, so are live while it is. *)
+      List.iter (fun { copy; _ } -> add_guard ~log guard copy) v.instances
+    end
+
+  and add_guard_to_children : type a. log:_ -> Typing_guard.t -> a var -> unit
+      =
+   fun ~log guard v ->
+    let add _ (Amorphvar (u, _, _)) = add_guard ~log guard u in
+    VarMap.iter add v.vlower;
+    VarMap.iter add v.vupper
+
+  (* A variable has instances from when it is partially generalized until it is
+     generalized, so they see all of its updates. *)
+  let forwarding v = not (List.is_empty v.instances)
+
+  (* [on_new_constraints ~log v ~old_map new_map ~forward] handles the
+     constraints of [new_map] not in [old_map], about to be recorded in [v]:
+     they are forwarded to the instances of [v] (as [forward mv]), and guarded
+     by its live guards. *)
+  let[@inline always] on_new_constraints ~log v ~old_map new_map ~forward =
+    let forwarding = forwarding v and live = is_live v in
+    if forwarding || live
+    then
+      VarMap.iter
+        (fun key (Amorphvar (u, _, _) as mv) ->
+          if not (VarMap.mem key old_map)
+          then begin
+            if forwarding then Queue.add (forward mv) forwards;
+            if live
+            then
+              Typing_guard.Set.iter_live
+                (fun guard -> add_guard ~log guard u)
+                v.guards
+          end)
+        new_map
+
   (** Calling [update_lower ~log obj v a a_hint] assumes that
       [not (a <= v.lower)]. Arguments are not checked and used directly. They
       must satisfy the INVARIANT listed above. *)
@@ -852,7 +961,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
     v.lower <- C.join obj v.lower a;
-    v.lower_hint <- hint_biased_join obj a a_hint v.lower v.lower_hint
+    v.lower_hint <- hint_biased_join obj a a_hint v.lower v.lower_hint;
+    if forwarding v then Queue.add (Forward_lower (obj, v, a, a_hint)) forwards
 
   (** Calling [update_upper ~log obj v a a_hint] assumes that
       [not (v.upper <= a)]. Arguments are not checked and used directly. They
@@ -863,26 +973,31 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
     v.upper <- C.meet obj v.upper a;
-    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint
+    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint;
+    if forwarding v then Queue.add (Forward_upper (obj, v, a, a_hint)) forwards
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
-  let set_vlower ~allow_rigid ~log v vlower =
+  let set_vlower ~allow_rigid ~log obj v vlower =
     if not allow_rigid
     then fatal_if_rigid "update lower variable constraints of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cvlower (v, v.vlower) :: !log);
+    on_new_constraints ~log v ~old_map:v.vlower vlower ~forward:(fun mv ->
+        Forward_vlower (obj, v, mv, None));
     v.vlower <- vlower
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
-  let set_vupper ~allow_rigid ~log v vupper =
+  let set_vupper ~allow_rigid ~log obj v vupper =
     if not allow_rigid
     then fatal_if_rigid "update upper variable constraints of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
+    on_new_constraints ~log v ~old_map:v.vupper vupper ~forward:(fun mv ->
+        Forward_vupper (obj, v, mv, None));
     v.vupper <- vupper
 
   (** Function used internally by copy, where [changes] maintains the cleanup
@@ -901,6 +1016,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Cgencopy (v, v.gencopy) :: !log);
     v.gencopy <- copy
+
+  let set_partial ~log v partial =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cpartial (v, v.partial) :: !log);
+    v.partial <- partial
 
   (** When called, graph must be fixed so maintain INVARIANT *)
   let set_level ~allow_rigid ~log v level =
@@ -1437,7 +1558,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let src = C.src dst g in
     let x = Amorphvar (v, g'f, g'f_hint) in
     let key = get_key src x in
-    set_vlower ~allow_rigid ~log u (VarMap.add key x u.vlower);
+    set_vlower ~allow_rigid ~log src u (VarMap.add key x u.vlower);
     find_error
       (fun (Amorphvar (w, h, h_hint)) ->
         let gh = C.compose dst (C.disallow_left g) h in
@@ -1470,7 +1591,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let src = C.src dst f in
     let x = Amorphvar (u, f'g, f'g_hint) in
     let key = get_key src x in
-    set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper);
+    set_vupper ~allow_rigid ~log src v (VarMap.add key x v.vupper);
     find_error
       (fun (Amorphvar (w, h, h_hint)) ->
         let fh = C.compose dst (C.disallow_right f) h in
@@ -1539,7 +1660,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let key = get_key dst x in
       if VarMap.mem key v.vlower
       then ()
-      else set_vlower ~allow_rigid ~log v (VarMap.add key x v.vlower)
+      else set_vlower ~allow_rigid ~log dst v (VarMap.add key x v.vlower)
 
   let add_vupper_nocheck : type a b l.
       allow_rigid:bool ->
@@ -1560,7 +1681,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let key = get_key dst x in
       if VarMap.mem key v.vupper
       then ()
-      else set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper)
+      else set_vupper ~allow_rigid ~log dst v (VarMap.add key x v.vupper)
 
   (* Proof of soundness for [add_vlower_reversed].
 
@@ -1644,7 +1765,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       push_upper_bound ~allow_rigid ~log dst v f f_hint u;
       (* We are tightening u.lower to f v.lower.
            This is sound by ARGUMENT 1 above *)
-      set_vlower ~allow_rigid ~log v (VarMap.add key x v.vlower);
+      set_vlower ~allow_rigid ~log src v (VarMap.add key x v.vlower);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
           let fh = C.compose dst (C.disallow_left f) h in
@@ -1684,7 +1805,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then ()
     else begin
       push_lower_bound ~allow_rigid ~log dst v f f_hint u;
-      set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper);
+      set_vupper ~allow_rigid ~log src v (VarMap.add key x v.vupper);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
           let fh = C.compose dst (C.disallow_right f) h in
@@ -1709,8 +1830,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ (Amorphvar (v, _, _)) -> v.level <= level)
         u.vlower
     in
-    set_vlower ~allow_rigid ~log u vlower_le;
-    set_vupper ~allow_rigid ~log u vupper_lt;
+    set_vlower ~allow_rigid ~log dst u vlower_le;
+    set_vupper ~allow_rigid ~log dst u vupper_lt;
     VarMap.iter
       (fun _ (Amorphvar (v, f, f_hint)) ->
         add_vupper_reversed ~allow_rigid ~log H.Pinpoint.unknown dst v u f
@@ -1725,19 +1846,80 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       information is as precise as it can get *)
     if C.le dst u.upper u.lower
     then begin
-      set_vlower ~allow_rigid ~log u VarMap.empty;
-      set_vupper ~allow_rigid ~log u VarMap.empty
+      set_vlower ~allow_rigid ~log dst u VarMap.empty;
+      set_vupper ~allow_rigid ~log dst u VarMap.empty
     end
+
+  let weaken ~log obj u level =
+    set_partial ~log u false;
+    (* A partial generic lowered below its level is no longer
+       generic: its instances are equated with it. *)
+    let monomorphic, generic =
+      List.partition (fun i -> level <= i.src_level) u.instances
+    in
+    (* Partial generics are at the level of their pool, and their instances
+       are made in the scope of their binding, so all are monomorphic here. If
+       this holds, [weaken] can just equate all instances. *)
+    assert (List.is_empty generic);
+    if not (List.is_empty monomorphic)
+    then (
+      set_instances ~log u generic;
+      List.iter
+        (fun { copy; scope = _; src_level = _ } ->
+          Queue.add (Forward_equate (obj, u, copy)) forwards)
+        monomorphic)
 
   let update_level_v : type a. log:_ -> a C.obj -> int -> a var -> unit =
    fun ~log dst level u ->
     if u.level > level
     then begin
+      (* A partial generic lowered to [level] is no longer generic for the
+         instances made at or below [level] (levels are well-scoped here:
+         both the instances and the variables [u] was lowered to are in the
+         scope of [u]'s pool): they are equated with it. *)
+      if u.partial || not (List.is_empty u.instances)
+      then weaken ~log dst u level;
       set_level ~allow_rigid:true ~log u level;
       update_level_finalize ~allow_rigid:true ~log dst level u
     end
 
   let vars = ref []
+
+  type objvar = Objvar : 'a C.obj * 'a var -> objvar
+
+  type packed_var = objvar
+
+  (* [partially_generalize_v ~log obj ~level u] makes the live variable [u],
+     which is being generalized at [level], a partial generic: it may still be
+     updated by a suspended constraint, so it is not generalized. So are the
+     variables it records constraints with, which are live too (guards
+     propagate along them). Partial generics are at the level of their pool. *)
+  let partially_generalize_v ~log obj ~level u =
+    let seen = ref VarSet.empty and todo = ref [] in
+    let rec collect : type a. a C.obj -> a var -> unit =
+     fun obj u ->
+      if
+        level <= u.level && u.level < generic_level && (not u.partial)
+        && not (VarSet.mem u.id !seen)
+      then (
+        seen := VarSet.add u.id !seen;
+        todo := Objvar (obj, u) :: !todo;
+        let collect_morphvar _ (Amorphvar (v, f, _)) =
+          collect (C.src obj f) v
+        in
+        VarMap.iter collect_morphvar u.vlower;
+        VarMap.iter collect_morphvar u.vupper)
+    in
+    collect obj u;
+    List.iter
+      (fun (Objvar (obj, v)) ->
+        update_level_v ~log obj level v;
+        set_partial ~log v true)
+      !todo
+
+  let add_instance ~log v ~scope ~src_level copy =
+    set_instances ~log v ({ scope; copy; src_level } :: v.instances);
+    Typing_guard.Set.iter_live (fun guard -> add_guard ~log guard copy) v.guards
 
   let live_id = ref 0
 
@@ -1758,9 +1940,36 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     decr persistent_id;
     id
 
-  let fresh ?(neg = false) ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper
-      ~level obj =
-    let id = if neg then next_persistent_id () else next_live_id () in
+  let add_to_pool_later =
+    Defined_later.Fun.create ~name:"Btype.add_to_mode_pool"
+
+  let add_to_pool obj v =
+    if v.level < generic_level
+    then Defined_later.Fun.get add_to_pool_later (Objvar (obj, v))
+
+  (* A new variable with [id], not in any pool. *)
+  let create ~id ~level ~upper ~upper_hint ~lower ~lower_hint ~vlower ~vupper =
+    let var =
+      { level;
+        upper;
+        upper_hint;
+        lower;
+        lower_hint;
+        vlower;
+        vupper;
+        id;
+        gencopy = None;
+        subst = None;
+        guards = Typing_guard.Set.empty;
+        partial = false;
+        instances = []
+      }
+    in
+    vars := Var var :: !vars;
+    var
+
+  (* A new live variable, in the pool of its level. *)
+  let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let upper, upper_hint =
       match upper, upper_hint with
       | None, None -> C.max obj, Comp_hint.Max
@@ -1777,22 +1986,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
-    let gencopy = None in
-    let subst = None in
     let var =
-      { level;
-        upper;
-        upper_hint;
-        lower;
-        lower_hint;
-        vlower;
-        vupper;
-        id;
-        gencopy;
-        subst
-      }
+      create ~id:(next_live_id ()) ~level ~upper ~upper_hint ~lower ~lower_hint
+        ~vlower ~vupper
     in
-    vars := Var var :: !vars;
+    add_to_pool obj var;
     var
 
   let unhint_morphvar (Amorphvar (v, f, _)) =
@@ -1825,15 +2023,26 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       Forall v in the reachable set of variables from u:
         v.level = generic_level + (v.level - current_level) *)
   let rec generalize_topology_v : type a.
-      log:_ -> current_level:int -> a var -> unit =
-   fun ~log ~current_level u ->
+      log:_ -> a C.obj -> current_level:int -> a var -> unit =
+   fun ~log obj ~current_level u ->
     if u.level <= current_level || u.level >= generic_level
     then ()
+    else if is_live u
+    then
+      (* A live variable may still be updated by a suspended constraint, so is
+         only partially generalized. *)
+      begin if not u.partial
+      then partially_generalize_v ~log obj ~level:(current_level + 1) u
+      end
     else begin
+      (* A partial generic that is no longer live is generalized, so its
+         instances no longer see its updates. So is a weakened one. *)
+      if u.partial then set_partial ~log u false;
+      if not (List.is_empty u.instances) then set_instances ~log u [];
       let new_level = generic_level + (u.level - current_level) in
       set_level ~allow_rigid:true ~log u new_level;
-      let do_gen _ (Amorphvar (v, _f, _f_hint)) =
-        generalize_topology_v ~log ~current_level v
+      let do_gen _ (Amorphvar (v, f, _f_hint)) =
+        generalize_topology_v ~log (C.src obj f) ~current_level v
       in
       VarMap.iter do_gen u.vupper;
       VarMap.iter do_gen u.vlower
@@ -1867,7 +2076,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let generalize_v : type a.
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
-    generalize_topology_v ~log ~current_level u;
+    generalize_topology_v ~log dst ~current_level u;
     update_level_v ~log dst generic_level u
 
   (* generalize_structure first moves a variable to generic_level (like generalize does).
@@ -1902,16 +2111,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         current_level < u.level || u.level = generic_level
       [generalize_topology_v] and [update_level] do nothing. We check it here
       to optimize away the subsequent checks *)
-    if u.level <= current_level || u.level = generic_level
+    if
+      u.level <= current_level || u.level = generic_level || u.partial
+      || is_live u
     then ()
     else begin
       (* we optimize away vlower and vuppers if bounds are tight *)
       if C.le dst u.upper u.lower
       then begin
-        set_vlower ~allow_rigid:true ~log u VarMap.empty;
-        set_vupper ~allow_rigid:true ~log u VarMap.empty
+        set_vlower ~allow_rigid:true ~log dst u VarMap.empty;
+        set_vupper ~allow_rigid:true ~log dst u VarMap.empty
       end;
-      generalize_topology_v ~log ~current_level u;
+      generalize_topology_v ~log dst ~current_level u;
       update_level_v ~log dst generic_level u;
       let vlower_above_current =
         VarMap.filter
@@ -1939,42 +2150,35 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       end
     end
 
-  let generalize_topology (type a l r) ~current_level (a : (a, l * r) mode) ~log
-      =
+  let generalize_topology (type a l r) ~current_level (obj : a C.obj)
+      (a : (a, l * r) mode) ~log =
+    let gen _ (Amorphvar (v, f, _)) =
+      generalize_topology_v ~log (C.src obj f) ~current_level v
+    in
     match a with
-    | Amodevar (Amorphvar (v, _f, _f_hint)) ->
-      generalize_topology_v ~log ~current_level v
+    | Amodevar mv -> gen () mv
     | Amode _ -> ()
-    | Amodejoin (_, _, mvs) ->
-      VarMap.iter
-        (fun _ (Amorphvar (v, _f, _f_hint)) ->
-          generalize_topology_v ~log ~current_level v)
-        mvs
-    | Amodemeet (_, _, mvs) ->
-      VarMap.iter
-        (fun _ (Amorphvar (v, _f, _f_hint)) ->
-          generalize_topology_v ~log ~current_level v)
-        mvs
+    | Amodejoin (_, _, mvs) -> VarMap.iter gen mvs
+    | Amodemeet (_, _, mvs) -> VarMap.iter gen mvs
 
   let generalize (type a l r) ~current_level (obj : a C.obj)
       (a : (a, l * r) mode) ~log =
+    let gen _ (Amorphvar (v, f, _)) =
+      generalize_v ~log (C.src obj f) ~current_level v
+    in
     match a with
-    | Amodevar (Amorphvar (v, f, _f_hint)) ->
-      let obj = C.src obj f in
-      generalize_v ~log obj ~current_level v
+    | Amodevar mv -> gen () mv
     | Amode _ -> ()
-    | Amodejoin (_, _, mvs) ->
-      VarMap.iter
-        (fun _ (Amorphvar (v, f, _f_hint)) ->
-          let obj = C.src obj f in
-          generalize_v ~log obj ~current_level v)
-        mvs
-    | Amodemeet (_, _, mvs) ->
-      VarMap.iter
-        (fun _ (Amorphvar (v, f, _f_hint)) ->
-          let obj = C.src obj f in
-          generalize_v ~log obj ~current_level v)
-        mvs
+    | Amodejoin (_, _, mvs) -> VarMap.iter gen mvs
+    | Amodemeet (_, _, mvs) -> VarMap.iter gen mvs
+
+  let var_level (Objvar (_, v)) = v.level
+
+  let lower_var ~level (Objvar (obj, v)) ~log = update_level_v ~log obj level v
+
+  let generalize_var ~current_level (Objvar (obj, v)) ~log =
+    generalize_v ~log obj ~current_level v;
+    v.partial
 
   let generalize_structure (type a l r) ~current_level (obj : a C.obj)
       (a : (a, l * r) mode) ~log =
@@ -1996,7 +2200,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           generalize_structure_v ~log obj ~current_level v)
         mvs
 
-  let fresh_mode_copy_scope () = { saved_copies = [] }
+  let next_copy_scope_id = ref 0
+
+  let fresh_mode_copy_scope () =
+    incr next_copy_scope_id;
+    { saved_copies = []; scope_id = !next_copy_scope_id }
 
   let undo_copy_change = function
     | Coptcopy (dst, update_to_level, v, copy) ->
@@ -2027,12 +2235,16 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       copy_below_level:int ->
       copy_to_level:int option ->
       cause:[`Save | `Restore | `Neither] ->
+      log:_ ->
       a C.obj ->
       a var ->
       a var =
-   fun ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level ~cause obj
-       v ->
-    let in_window = v.level >= copy_from_level && v.level < copy_below_level in
+   fun ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level ~cause ~log
+       obj v ->
+    let in_window =
+      (v.level >= copy_from_level && v.level < copy_below_level)
+      || (v.partial && cause = `Neither && copy_from_level = generic_level)
+    in
     if cause = `Restore then assert (v.id < 0);
     if not in_window
     then v
@@ -2047,18 +2259,33 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         match v.subst with
         | Some v' -> v'
         | None ->
+          (* Added to a pool once at its final level, unless persistent (as
+             stored in cmi files). *)
+          let id =
+            if cause = `Save then next_persistent_id () else next_live_id ()
+          in
           let copy =
-            fresh ~neg:(cause = `Save) ~upper:v.upper ~lower:v.lower
-              ~level:v.level obj
+            create ~id ~level:v.level ~upper:v.upper
+              ~upper_hint:(Comp_hint.Unknown v.upper) ~lower:v.lower
+              ~lower_hint:(Comp_hint.Unknown v.lower) ~vlower:VarMap.empty
+              ~vupper:VarMap.empty
           in
           set_optcopy ~changes:copy_scope obj ~target_level v (Some copy);
+          if v.partial
+          then begin
+            (* A copy of a partial generic made at the generic level (e.g. by
+               [generic_instance]) is itself a partial generic. *)
+            if Option.is_none copy_to_level then set_partial ~log copy true;
+            add_instance ~log v ~scope:copy_scope.scope_id
+              ~src_level:target_level copy
+          end;
           let vupper =
             VarMap.fold
               (fun _ (Amorphvar (u, f, f_hint)) acc ->
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                    ~copy_to_level ~cause src u
+                    ~copy_to_level ~cause ~log src u
                 in
                 let x = Amorphvar (ucopy, f, f_hint) in
                 VarMap.add (get_key obj x) x acc)
@@ -2070,7 +2297,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                    ~copy_to_level ~cause src u
+                    ~copy_to_level ~cause ~log src u
                 in
                 let x = Amorphvar (ucopy, f, f_hint) in
                 VarMap.add (get_key obj x) x acc)
@@ -2078,13 +2305,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           in
           copy.vupper <- vupper;
           copy.vlower <- vlower;
+          (* The constraints of the copy are recorded directly. *)
+          Typing_guard.Set.iter_live
+            (fun guard -> add_guard_to_children ~log guard copy)
+            copy.guards;
           set_level ~allow_rigid:true ~log:None copy target_level;
+          if cause <> `Save then add_to_pool obj copy;
           copy)
       end
 
   let copy (type a l r) ~copy_scope ~copy_from_level ~copy_below_level
-      ?copy_to_level ?(cause = `Neither) (obj : a C.obj) (a : (a, l * r) mode) :
-      (a, l * r) mode =
+      ?copy_to_level ?(cause = `Neither) ~log (obj : a C.obj)
+      (a : (a, l * r) mode) : (a, l * r) mode =
     (* We never want to copy variables above [generic_level]. *)
     assert (copy_below_level <= generic_level + 1);
     Option.iter
@@ -2100,7 +2332,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let obj = C.src obj f in
       let vcopy =
         copy_v ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level
-          ~cause obj v
+          ~cause ~log obj v
       in
       if vcopy == v then a else Amodevar (Amorphvar (vcopy, f, f_hint))
     | Amode _ -> a
@@ -2111,7 +2343,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let src = C.src obj f in
             let vcopy =
               copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                ~copy_to_level ~cause src v
+                ~copy_to_level ~cause ~log src v
             in
             let x = Amorphvar (vcopy, f, f_hint) in
             VarMap.add (get_key obj x) x acc)
@@ -2125,7 +2357,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let src = C.src obj f in
             let vcopy =
               copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                ~copy_to_level ~cause src v
+                ~copy_to_level ~cause ~log src v
             in
             let x = Amorphvar (vcopy, f, f_hint) in
             VarMap.add (get_key obj x) x acc)
@@ -2152,6 +2384,134 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let obj = C.src obj f in
           update_level_v ~log obj level v)
         mvs
+
+  exception Forward_failure : 'a C.obj * 'a error_raw -> exn
+
+  (* The copy of [v] in the instance [scope] at [level] (made lazily, with the
+     structure of [v]), if [v] is a partial generic. *)
+  let instance_of : type a.
+      log:_ ->
+      scope:int ->
+      level:int ->
+      src_level:int ->
+      a C.obj ->
+      a var ->
+      a var =
+   fun ~log ~scope ~level ~src_level obj v ->
+    if not v.partial
+    then v
+    else
+      match List.find_opt (fun i -> i.scope = scope) v.instances with
+      | Some { copy; _ } -> copy
+      | None ->
+        let copy =
+          fresh ~upper:v.upper ~upper_hint:v.upper_hint ~lower:v.lower
+            ~lower_hint:v.lower_hint ~level obj
+        in
+        add_instance ~log v ~scope ~src_level copy;
+        VarMap.iter
+          (fun _ mv ->
+            Queue.add (Forward_vlower (obj, v, mv, Some copy)) forwards)
+          v.vlower;
+        VarMap.iter
+          (fun _ mv ->
+            Queue.add (Forward_vupper (obj, v, mv, Some copy)) forwards)
+          v.vupper;
+        copy
+
+  let id_morphvar v = Amorphvar (v, C.id, Comp_hint.Morph_hint.Id)
+
+  let fail_mvmv obj = function
+    | Ok () -> ()
+    | Error (left, left_hint, right, right_hint) ->
+      raise (Forward_failure (obj, { left; left_hint; right; right_hint }))
+
+  let forward_one ~log forward =
+    let pp = H.Pinpoint.unknown in
+    let instances (type a) (u : a var) (only : a var option) =
+      match only with
+      | Some copy -> List.filter (fun i -> i.copy == copy) u.instances
+      | None -> u.instances
+    in
+    match forward with
+    | Forward_lower (obj, u, a, a_hint) ->
+      List.iter
+        (fun { copy; _ } ->
+          match
+            submode_cmv ~allow_rigid:false ~log pp obj a a_hint
+              (id_morphvar copy)
+          with
+          | Ok () -> ()
+          | Error (right, right_hint) ->
+            raise
+              (Forward_failure
+                 (obj, { left = a; left_hint = a_hint; right; right_hint })))
+        u.instances
+    | Forward_upper (obj, u, a, a_hint) ->
+      List.iter
+        (fun { copy; _ } ->
+          match
+            submode_mvc ~allow_rigid:false ~log pp obj (id_morphvar copy) a
+              a_hint
+          with
+          | Ok () -> ()
+          | Error (left, left_hint) ->
+            raise
+              (Forward_failure
+                 (obj, { left; left_hint; right = a; right_hint = a_hint })))
+        u.instances
+    | Forward_vlower (obj, u, Amorphvar (w, f, f_hint), only) ->
+      List.iter
+        (fun { copy; scope; src_level; _ } ->
+          let w =
+            instance_of ~log ~scope ~level:copy.level ~src_level (C.src obj f) w
+          in
+          fail_mvmv obj
+            (submode_mvmv ~allow_rigid:false ~log pp obj
+               (Amorphvar (w, f, f_hint))
+               (id_morphvar copy)))
+        (instances u only)
+    | Forward_vupper (obj, u, Amorphvar (w, f, f_hint), only) ->
+      List.iter
+        (fun { copy; scope; src_level; _ } ->
+          let w =
+            instance_of ~log ~scope ~level:copy.level ~src_level (C.src obj f) w
+          in
+          fail_mvmv obj
+            (submode_mvmv ~allow_rigid:false ~log pp obj (id_morphvar copy)
+               (Amorphvar (w, f, f_hint))))
+        (instances u only)
+    | Forward_equate (obj, u, copy) ->
+      fail_mvmv obj
+        (submode_mvmv ~allow_rigid:false ~log pp obj (id_morphvar u)
+           (id_morphvar copy));
+      fail_mvmv obj
+        (submode_mvmv ~allow_rigid:false ~log pp obj (id_morphvar copy)
+           (id_morphvar u))
+
+  let flush_forwards ~log =
+    match
+      while not (Queue.is_empty forwards) do
+        forward_one ~log (Queue.take forwards)
+      done
+    with
+    | () -> ()
+    | exception exn ->
+      Queue.clear forwards;
+      raise exn
+
+  let discard_forwards () = Queue.clear forwards
+
+  let guard_mode (type a l r) ~log guard (_ : a C.obj) (m : (a, l * r) mode) =
+    if Typing_guard.is_live guard
+    then begin
+      let add (Amorphvar (v, _, _)) = add_guard ~log guard v in
+      match m with
+      | Amode _ -> ()
+      | Amodevar mv -> add mv
+      | Amodejoin (_, _, mvs) -> VarMap.iter (fun _ mv -> add mv) mvs
+      | Amodemeet (_, _, mvs) -> VarMap.iter (fun _ mv -> add mv) mvs
+    end
 
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
