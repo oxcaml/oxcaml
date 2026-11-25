@@ -8,7 +8,8 @@ let save unit filename =
     (fun () ->
       let ppf = out |> Format.formatter_of_out_channel in
       let fexpr = unit |> Flambda_to_fexpr.conv in
-      Print_fexpr.flambda_unit ppf fexpr;
+      Flambda2_ui.Flambda_colours.without_colours ~f:(fun () ->
+          Print_fexpr.flambda_unit ppf fexpr);
       Format.pp_print_flush ppf ())
 
 let dump_text filename =
@@ -40,7 +41,9 @@ let () =
     (* CR Keryan: Changing filename kills function slot matching because of
        freshly generated computation unit name *)
     let temp_file =
-      Filename.temp_file ("roundtrip_" ^ Filename.remove_extension file) ".fl"
+      Filename.temp_file
+        ("roundtrip_" ^ Filename.remove_extension (Filename.basename file))
+        ".fl"
     in
     save unit temp_file;
     let unit' =
