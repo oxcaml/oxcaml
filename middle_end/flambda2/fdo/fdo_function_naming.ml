@@ -65,7 +65,6 @@ module Leading_tokens = struct
         List.iter (fun (p : L.lparam) -> ident p.name) params
       | Lletrec (bindings, _body) ->
         List.iter (fun (b : L.rec_binding) -> ident b.id) bindings
-      | Lcode ({ code_name; _ }, _body) -> ident code_name
       | Lstaticcatch (_body, (_label, params), _handler, _pop_region, _layout)
         ->
         List.iter (fun (id, _debug_uid, _layout) -> ident id) params
@@ -87,7 +86,9 @@ module Leading_tokens = struct
       | Lapply _ | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lifthenelse _
       | Lsequence _ | Lwhile _ | Lsend _ | Levent _ | Lregion _ | Lexclave _
       | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
-        ());
+        ()
+      | Lcode _ ->
+        Misc.fatal_error "Fdo_function_naming: [Lcode] inside a function");
       L.iter_head_constructor term lam
     in
     (try

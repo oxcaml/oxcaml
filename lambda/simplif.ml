@@ -40,9 +40,6 @@ let rec eliminate_ref id = function
   | Lfunction lfun as lam ->
       check_function_escape id lfun;
       lam
-  | Lcode (code, body) ->
-      (* The code of instantiations can't refer to [id]. *)
-      Lcode (code, eliminate_ref id body)
   | Llet(str, kind, v, duid, e1, e2) ->
       Llet(str, kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, duid, e1, e2) ->
@@ -110,6 +107,8 @@ let rec eliminate_ref id = function
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
+  | Lcode _ ->
+      Misc.fatal_error "Simplif.eliminate_ref: [Lcode] inside a [let]"
 
 (* Simplification of exits *)
 

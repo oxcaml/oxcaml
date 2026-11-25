@@ -1385,7 +1385,6 @@ let rec try_to_find_location lam =
   | Lfunction { loc; _ }
   | Lkindtemplate { ktmpl_body = { loc; _ }; _ }
   | Ltemplate { loc; _ }
-  | Lcode ({ code_fun = { loc; _ }; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
@@ -1407,7 +1406,8 @@ let rec try_to_find_location lam =
   | Lifused (_, lam)
   | Lregion (lam, _)
   | Lexclave lam
-  | Ltrywith (lam, _, _, _, _) ->
+  | Ltrywith (lam, _, _, _, _)
+  | Lcode (_, lam) ->
     try_to_find_location lam
   | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
@@ -4171,8 +4171,11 @@ let may_allocate_in_region lam =
     | ( Lapply _  | Lkindinstantiate _ | Linstantiate _ | Llet _ | Lmutlet _
       | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
       | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _
-      | Lsend _ | Levent _ | Lifused _ | Lcode _) as lam ->
+      | Lsend _ | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
+    | Lcode _ ->
+       Misc.fatal_error
+         "Lambda.may_allocate_in_region: [Lcode] inside a function or region"
   in
   if not Config.stack_allocation then false
   else begin
