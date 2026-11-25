@@ -286,7 +286,7 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
   let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
   match op with
   | And | Or -> make lhs rhs
-  | Div | Rem ->
+  | Div | Rem | Unsigned_div | Unsigned_rem ->
     (* Assume right-to-left evaluation rather than binding the operands, so
        differences in exception order remain observable. *)
     make lhs rhs
@@ -951,7 +951,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
         in
         let expr =
           match binop with
-          | (Div | Rem)
+          | (Div | Rem | Unsigned_div | Unsigned_rem)
             when (not (NumberTy.is_floating_point inner_ty))
                  && not (Env.can_raise env Exn.Division_by_zero) ->
             safe_div_or_rem st inner_ty binop ~lhs ~rhs
