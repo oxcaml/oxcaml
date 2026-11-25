@@ -135,6 +135,7 @@ module type Oxcaml_options = sig
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
   val fdo_counters : unit -> unit
+  val fdo_metadata : unit -> unit
   val fdo_names : unit -> unit
   val fdo_dropped_counters : unit -> unit
   val dfdo_dropped_counters : unit -> unit

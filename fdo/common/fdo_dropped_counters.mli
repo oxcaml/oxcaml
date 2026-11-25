@@ -85,6 +85,9 @@ module Reason : sig
 
   (** A stable code for the reason, as recorded in the FDO metadata section. *)
   val to_int : t -> int
+
+  (** The reason of a code, if any. *)
+  val of_int : int -> t option
 end
 
 (* Simplify also loses some counts by conflating counters rather than dropping
@@ -148,7 +151,8 @@ val register : reason:Reason.t -> Fdo_annotation.t -> unit
 val register_all : t -> unit
 
 (** Records that the emitted code has these counters, so that {!registered}
-    leaves them out. Only the emitters that write the FDO metadata call it. *)
+    leaves them out. Only the emitters that can write the FDO metadata call it,
+    whether or not they write it. *)
 val record_emitted : Fdo_annotation.t -> unit
 
 (** The registered counters, apart from those recorded as emitted. *)

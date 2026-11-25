@@ -189,6 +189,7 @@
   fdo_counter
   fdo_annotation
   fdo_dropped_counters
+  fdo_metadata_format
   file_sections
   lru
   id_counter

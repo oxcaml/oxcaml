@@ -29,6 +29,8 @@
 module D = Asm_targets.Asm_directives
 module L = Asm_targets.Asm_label
 module Hash = Fdo_counter.Position_hash
+module Metadata_format = Fdo_metadata_format
+module Counter_table = Metadata_format.Counter_table
 
 module Event = struct
   type t =
@@ -48,53 +50,10 @@ module Event = struct
     | Exception_handler
 end
 
-(* What a decoder does when the instruction at an entry's address executes. *)
-module Action = struct
-  type t =
-    | Count_taken of Fdo_counter.Hashed.t
-    | Count_fallthrough of Fdo_counter.Hashed.t
-    | Count_executed of Fdo_counter.Hashed.t
-    | Count_call of
-        { return_address : L.t;
-          counter : Fdo_counter.Hashed.t
-        }
-    | Count_tail_call of Fdo_counter.Hashed.t
-    | Count_indirect_jump of
-        { target : L.t;
-          counter : Fdo_counter.Hashed.t
-        }
-    | Unwind_to_handler
-
-  (* The flags byte of the format, without the sharing bit. *)
-  let flags t =
-    let on_taken = 2 and on_fallthrough = 1 in
-    let code, on =
-      match t with
-      | Count_call _ -> 0, on_taken
-      | Count_tail_call _ -> 1, on_taken
-      | Count_taken _ -> 2, on_taken
-      | Count_fallthrough _ -> 2, on_fallthrough
-      | Count_executed _ -> 2, on_taken lor on_fallthrough
-      | Unwind_to_handler -> 3, on_taken lor on_fallthrough
-      | Count_indirect_jump _ -> 4, on_taken
-    in
-    (code lsl 2) lor on
-
-  let counter = function
-    | Count_taken counter
-    | Count_fallthrough counter
-    | Count_executed counter
-    | Count_tail_call counter
-    | Count_call { counter; _ }
-    | Count_indirect_jump { counter; _ } ->
-      Some counter
-    | Unwind_to_handler -> None
-end
-
 module Entry = struct
   type t =
     { address : L.t;
-      action : Action.t
+      action : L.t Metadata_format.Action.t
     }
 end
 
@@ -156,15 +115,10 @@ let hash_annotation t annotation =
 let add_entry fn address action =
   fn.rev_entries <- { Entry.address; action } :: fn.rev_entries
 
-let add_counters fn address (action : Fdo_counter.Hashed.t -> Action.t) counters
-    =
-  (* Sort outermost position first to group counters with shared inlining
-     contexts. *)
-  List.map List.rev counters
-  |> List.sort_uniq (List.compare Hash.compare)
-  |> List.iter (function
-    | [] -> ()
-    | rev_counter -> add_entry fn address (action (List.rev rev_counter)))
+let add_counters fn address
+    (action : Fdo_counter.Hashed.t -> L.t Metadata_format.Action.t) counters =
+  List.sort_uniq (List.compare Hash.compare) counters
+  |> List.iter (fun counter -> add_entry fn address (action counter))
 
 let record_body t ~function_ ~body_hash =
   add_first t.body_hashes
@@ -216,71 +170,11 @@ let set_dropped t dropped =
          (fun (counter, reason) -> reason, hash_counter t counter)
          (Fdo_dropped_counters.to_list dropped)
 
-(* CR-someday yusumez: consider emitting this metadata as an FDO-only DWARF
-   compilation unit in .debug_info instead, with vendor tags and attributes, the
-   innermost position of each stack inline and the rest as references to a trie
-   of inlining contexts. Standard DWARF tools could then read it, and new
-   attributes would not break older decoders. *)
-
-(*= A fragment of the .debug_fdo_metadata section, for one compilation unit
-    (the linker concatenates them):
-
-    fragment:
-      "FDOM"            4 bytes
-      length            u64    bytes after this field, to skip the fragment
-      version           uleb
-      functions         uleb n, then n x function
-      bodies            uleb n, then n x (function hash u32, body hash u32)
-      names             uleb n, then n x (hash u32, .debug_str offset u32)
-      dropped           uleb n, then n x (reason u8, counter)
-
-    function:
-      start             u64    absolute address
-      length            uleb   bytes of code
-      entries           uleb n, then n x entry   (not sorted by offset)
-
-    entry:
-      offset            uleb   from the function's start
-      flags             u8
-      operands                 by action, see below
-
-    flags:
-       7  6  5  4  3  2  1  0
-      +-----+--+--------+-----+
-      |0  0 |s | action |t  f |   t, f: on taken, on fallthrough
-      +-----+--+--------+-----+   s: the counter is shared (see below)
-
-      action                code  t f   operands
-      Count_taken             2   1 0   counter
-      Count_fallthrough       2   0 1   counter
-      Count_executed          2   1 1   counter
-      Count_call              0   1 0   call length (uleb), counter
-      Count_tail_call         1   1 0   counter
-      Count_indirect_jump     4   1 0   target offset (uleb), counter
-      Unwind_to_handler       3   1 1   none (s = 0)
-
-    counter, innermost position first:
-      s = 0:            uleb n, then n x hash u32
-      s = 1:            uleb drop, uleb n, then n x hash u32, put in front of
-                        the previous counter without its [drop] innermost
-                        hashes
-*)
-
-(* The previous counter starts empty in each function and tracks the last entry
-   that had one (in metadata order, not execution order). A call's return
-   address is its address plus its length, so returns need no entries. An
-   indirect jump counts only when it lands at its target. An exception handler
-   unwinds the decoder's call stack to the nearest frame of its function (or
-   clears it if none); under recursion, that may not be the frame that caught
-   the exception. All labels of a function live in one text section, so offsets
-   are assembler constants. *)
-let version = 19
-
 (* CR-someday yusumez: This section directive is ELF syntax, so the metadata
    does not assemble on macOS, which would need a Mach-O section. *)
 let section =
   Asm_targets.Asm_section.Custom
-    { names = [".debug_fdo_metadata"];
+    { names = [Metadata_format.section_name];
       flags = Some "";
       args = ["@progbits"];
       is_delayed = false
@@ -314,10 +208,6 @@ module Writer = struct
 
   let hash t hash = int32 t (Hash.to_int32 hash)
 
-  let hashes t hashes =
-    uleb t (List.length hashes);
-    List.iter (hash t) hashes
-
   let raw_string t s = Buffer.add_string t s
 
   let directive t emit =
@@ -330,65 +220,62 @@ module Writer = struct
     directive t (fun () -> D.delta_uleb128 ~upper ~lower)
 end
 
-let rec uleb_size n = if n < 0x80 then 1 else 1 + uleb_size (n lsr 7)
-
-(* Returns [(drop, push)]: how many innermost hashes of [previous] to drop and
-   the hashes of [counter] (innermost first) to prepend in their place. *)
-let unshared ~previous counter =
-  let rec drop_common previous counter =
-    match previous, counter with
-    | x :: previous, y :: counter when Hash.equal x y ->
-      drop_common previous counter
-    | _ -> List.length previous, List.rev counter
-  in
-  drop_common (List.rev previous) (List.rev counter)
-
-(* Returns the counter the next entry is encoded relative to. *)
-let encode_entry w ~start ~previous ({ address; action } : Entry.t) =
+(* All labels of a function live in one text section, so offsets are assembler
+   constants. *)
+let encode_entry w table ~start ({ address; action } : Entry.t) =
   Writer.delta w ~upper:address ~lower:start;
-  let flags = Action.flags action in
-  match Action.counter action with
-  | None ->
-    Writer.byte w flags;
-    previous
-  | Some counter ->
-    let drop, push = unshared ~previous counter in
-    let n = List.length counter and m = List.length push in
-    let shared =
-      uleb_size drop + uleb_size m + (4 * m) < uleb_size n + (4 * n)
-    in
-    Writer.byte w (flags lor if shared then 32 else 0);
-    (match action with
-    | Count_call { return_address; _ } ->
-      Writer.delta w ~upper:return_address ~lower:address
-    | Count_indirect_jump { target; _ } ->
-      Writer.delta w ~upper:target ~lower:start
-    | Count_taken _ | Count_fallthrough _ | Count_executed _ | Count_tail_call _
-    | Unwind_to_handler ->
-      ());
-    if shared
-    then (
-      Writer.uleb w drop;
-      Writer.hashes w push)
-    else Writer.hashes w counter;
-    counter
+  Writer.byte w
+    (Metadata_format.Kind.to_flags (Metadata_format.Kind.of_action action));
+  Option.iter
+    (fun (operand : L.t Metadata_format.Operand.t) ->
+      match operand with
+      | Return_address return_address ->
+        Writer.delta w ~upper:return_address ~lower:address
+      | Target target -> Writer.delta w ~upper:target ~lower:start)
+    (Metadata_format.Action.operand action);
+  Option.iter
+    (fun counter -> Writer.uleb w (Counter_table.Builder.add table counter))
+    (Metadata_format.Action.counter action)
 
-let encode_function w ({ start; finish; entries } : Function.t) =
+let encode_function w table ({ start; finish; entries } : Function.t) =
   Writer.label w start;
   Writer.delta w ~upper:finish ~lower:start;
   Writer.uleb w (List.length entries);
-  let (_ : Fdo_counter.Hashed.t) =
-    List.fold_left
-      (fun previous entry -> encode_entry w ~start ~previous entry)
-      [] entries
+  List.iter (encode_entry w table ~start) entries
+
+(* The table of every counter of the fragment, which precedes the functions and
+   the dropped counters that refer to it: encoding them only finds their
+   indexes. *)
+let counter_table t functions =
+  let table = Counter_table.Builder.create () in
+  let add counter =
+    let (_ : int) = Counter_table.Builder.add table counter in
+    ()
   in
-  ()
+  List.iter
+    (fun ({ entries; _ } : Function.t) ->
+      List.iter
+        (fun ({ action; _ } : Entry.t) ->
+          Option.iter add (Metadata_format.Action.counter action))
+        entries)
+    functions;
+  List.iter (fun (_, counter) -> add counter) t.dropped;
+  table
+
+let encode_counter_table w table =
+  let nodes = Counter_table.Builder.nodes table in
+  Writer.uleb w (List.length nodes);
+  List.iter
+    (fun ({ hash; context } : Counter_table.Node.t) ->
+      Writer.hash w hash;
+      Writer.uleb w (match context with None -> 0 | Some index -> index + 1))
+    nodes
 
 let sorted_bindings table =
   Hash.Tbl.fold (fun key value acc -> (key, value) :: acc) table []
   |> List.sort (fun (a, _) (b, _) -> Hash.compare a b)
 
-let encode_tables w t =
+let encode_tables w table t =
   Writer.uleb w (Hash.Tbl.length t.body_hashes);
   List.iter
     (fun (hash, body_hash) ->
@@ -407,7 +294,7 @@ let encode_tables w t =
   List.iter
     (fun (reason, counter) ->
       Writer.byte w (Fdo_dropped_counters.Reason.to_int reason);
-      Writer.hashes w counter)
+      Writer.uleb w (Counter_table.Builder.add table counter))
     t.dropped
 
 let emit_section t =
@@ -419,17 +306,19 @@ let emit_section t =
   then (
     let w = Writer.create () in
     let functions = List.rev t.functions in
+    let table = counter_table t functions in
     let after_length = L.create section in
     let fragment_end = L.create section in
     D.switch_to_section section;
-    Writer.raw_string w "FDOM";
+    Writer.raw_string w Metadata_format.magic;
     Writer.directive w (fun () ->
         D.between_labels_64_bit ~upper:fragment_end ~lower:after_length ();
         D.define_label after_length);
-    Writer.uleb w version;
+    Writer.uleb w Metadata_format.version;
+    encode_counter_table w table;
     Writer.uleb w (List.length functions);
-    List.iter (encode_function w) functions;
-    encode_tables w t;
+    List.iter (encode_function w table) functions;
+    encode_tables w table t;
     Writer.directive w (fun () -> D.define_label fragment_end);
     (* Emits the names, and forgets them: with -g, DWARF emission emits its own
        strings later. *)

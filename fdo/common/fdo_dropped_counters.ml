@@ -77,6 +77,25 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump -> 12
     | Linear_branch_relaxed -> 13
     | Peephole_deleted -> 14
+
+  let all =
+    [ Inlined_call;
+      Inlined_call_without_counter;
+      Self_tail_call_to_jump;
+      Switch_to_single_arm;
+      Switch_with_identical_arms;
+      Switch_to_lookup_table;
+      Cmm_switch_collapsed;
+      Probe_handler_call;
+      Cfg_self_tail_call_to_jump;
+      Cfg_branch_to_jump;
+      Cfg_blocks_merged;
+      Ssa_self_tail_call_to_jump;
+      Linear_branch_to_jump;
+      Linear_branch_relaxed;
+      Peephole_deleted ]
+
+  let of_int n = List.find_opt (fun reason -> to_int reason = n) all
 end
 
 module Counter_map = Map.Make (Fdo_counter)

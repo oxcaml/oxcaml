@@ -158,6 +158,12 @@ val llvm_path : string option ref
 val llvm_flags : string ref
 
 val fdo_counters : bool ref
+val fdo_metadata : bool ref
+
+(** Whether to attach FDO counters to the code: with [-fdo-counters], or with
+    another flag that needs them. *)
+val fdo_counters_enabled : unit -> bool
+
 val fdo_names : bool ref
 val fdo_dropped_counters : bool ref
 

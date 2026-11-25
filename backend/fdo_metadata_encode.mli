@@ -29,7 +29,7 @@
 (** Encodes the [".debug_fdo_metadata"] section for a compilation unit. For each
     function, records the addresses of instrumented instructions and exception
     handlers so a profile decoder can attribute sampled branches to FDO
-    counters. *)
+    counters. The format is described in [Fdo_metadata_format]. *)
 
 (** An instrumented instruction or exception handler recorded at a label. *)
 module Event : sig
