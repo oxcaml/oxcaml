@@ -2206,6 +2206,7 @@ let begin_fdo_function (fundecl : Linear.fundecl) ~start =
   else
     let entry = fundecl.fun_fdo_entry_annotation in
     let entry_annotation = Fdo_annotation.With_body_hash.annotation entry in
+    Fdo_dropped_counters.record_emitted entry_annotation;
     (* The body hash belongs to the compiled function itself, identified by the
        entry counter with an empty inlining stack. *)
     let function_ =
@@ -2236,6 +2237,9 @@ let record_fdo_event fdo_function (pos, (instruction : Fdo_instruction.t)) =
     Fdo_dropped_counters.register ~reason:Peephole_deleted
       (Fdo_instruction.counters instruction)
   else
+    let () =
+      Fdo_dropped_counters.record_emitted (Fdo_instruction.counters instruction)
+    in
     let label = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
     X86_proc.insert_label_before pos label;
     let record = Fdo_metadata_encode.record_event fdo_function label in

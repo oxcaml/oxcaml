@@ -276,6 +276,8 @@ let set_dropped t dropped =
    are assembler constants. *)
 let version = 19
 
+(* CR-someday yusumez: This section directive is ELF syntax, so the metadata
+   does not assemble on macOS, which would need a Mach-O section. *)
 let section =
   Asm_targets.Asm_section.Custom
     { names = [".debug_fdo_metadata"];

@@ -80,6 +80,7 @@ module Reason = struct
 end
 
 module Counter_map = Map.Make (Fdo_counter)
+module Counter_set = Set.Make (Fdo_counter)
 
 type t = Reason.t Counter_map.t
 
@@ -114,9 +115,23 @@ let register ~reason annotation =
 
 let register_all t = registered_in_unit := union !registered_in_unit t
 
-let registered () = !registered_in_unit
+let emitted_in_unit = ref Counter_set.empty
 
-let reset () = registered_in_unit := empty
+let record_emitted annotation =
+  emitted_in_unit
+    := List.fold_left
+         (fun emitted counter -> Counter_set.add counter emitted)
+         !emitted_in_unit
+         (Fdo_annotation.to_list annotation)
+
+let registered () =
+  Counter_map.filter
+    (fun counter _ -> not (Counter_set.mem counter !emitted_in_unit))
+    !registered_in_unit
+
+let reset () =
+  registered_in_unit := empty;
+  emitted_in_unit := Counter_set.empty
 
 let without_registering f =
   let saved = !registered_in_unit in
