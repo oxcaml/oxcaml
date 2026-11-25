@@ -44,8 +44,8 @@ let arr_sum arr =
 arr_sum:
   movq  %rax, %rdx
   movq  -8(%rdx), %rbx
-  salq  $8, %rbx
-  shrq  $17, %rbx
+  salq  $22, %rbx
+  shrq  $31, %rbx
   orq   $1, %rbx
   leaq  -2(%rbx), %rdi
   cmpq  $1, %rdi

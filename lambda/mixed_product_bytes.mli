@@ -60,6 +60,11 @@ val has_value_and_flat : t -> bool
 
 val value_prefix_len : t -> int
 
+(** Whether a native-code mixed block with these contents has a layout word
+    before its first field: that is, whether its value prefix is too long for
+    the scan mask in the block's header. *)
+val has_layout_word : t -> bool
+
 val size_in_words : t -> int
 
 val all_value : t -> bool

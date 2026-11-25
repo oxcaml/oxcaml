@@ -4,9 +4,9 @@
  { expect; expect.opt; }
 *)
 
-(* There is a cap on the number of elements in the scannable prefix. The error
-   is reported when the mixed tuple is built, since [t_capped] doesn't get a
-   decl. *)
+(* There was once a cap (254) on the number of elements in the scannable
+   prefix, with an error reported when the mixed tuple was built. These exceed
+   it. *)
 type ptr = string
 type t_capped =
     ptr * ptr * ptr * ptr * ptr * ptr * ptr * ptr *
@@ -94,18 +94,25 @@ let capped : t_capped =
   )
 [%%expect{|
 val p : ptr = "p"
-Lines 3-21, characters 2-3:
- 3 | ..(
- 4 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 5 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 6 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 7 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-...
-18 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-19 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-20 |     #1.0
-21 |   )
-Error: Mixed tuples may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+val capped : t_capped =
+  ("p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   <abstr>)
 |}]
 
 type ('a : any) t_any_capped =
@@ -233,18 +240,25 @@ let float_u_capped_err : float# t_any_capped =
     #1.0
   )
 [%%expect{|
-Lines 2-20, characters 2-3:
- 2 | ..(
- 3 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 4 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 5 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 6 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-...
-17 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-18 |     p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-19 |     #1.0
-20 |   )
-Error: Mixed tuples may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+val float_u_capped_err : float# t_any_capped =
+  ("p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p", "p",
+   <abstr>)
 |}]
 
 (* Shapes of layout-polymorphic tuples contain splices, so they are checked
@@ -302,18 +316,7 @@ let poly_capped_err =
   let _ = mk #1.0 in
   ()
 [%%expect{|
-Lines 3-21, characters 4-5:
- 3 | ....(
- 4 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 5 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 6 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
- 7 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-...
-18 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-19 |       p, p, p, p, p, p, p, p, p, p, p, p, p, p, p,
-20 |       x
-21 |     )
-Error: Mixed blocks may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+val poly_capped_err : unit = ()
 |}]
 
 (* regression test: boxed vs unboxed labeled tuples report the right errors *)

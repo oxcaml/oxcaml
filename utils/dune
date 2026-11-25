@@ -57,4 +57,35 @@
    (bash
     "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
 
+(rule
+ (targets header_bits.ml)
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c header_bits.ml.c)
+  (:h ../runtime/caml/header_bits.h))
+ (action
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
+
 (include_subdirs unqualified)
+
+; Merlin can be built without the rest of this repository, so it has a copy of
+; the generated [Header_bits]. Check that the copy is up to date; promote to
+; update it. C preprocessors differ in the blank lines they emit, so the copy
+; has none.
+(rule
+ (targets header_bits.ml.no-blank-lines)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run sed "/^[[:space:]]*$/d" %{dep:header_bits.ml}))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff
+   %{dep:../external/merlin/src/ocaml/utils/header_bits.ml}
+   header_bits.ml.no-blank-lines)))

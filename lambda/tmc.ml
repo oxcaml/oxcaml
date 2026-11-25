@@ -161,11 +161,16 @@ end = struct
       | _ when not (Clflags.target_is_native ()) -> field
       | All_value -> field
       | Shape shape ->
+        (* The position is an offset in words, so allow for any layout word. *)
+        let layout_word =
+          if Mixed_product_bytes.(has_layout_word (count (Product shape)))
+          then 1 else 0
+        in
         let shape =
           Mixed_block_shape.of_mixed_block_elements shape
             ~print_locality:(fun ppf () -> Format.pp_print_string ppf "()")
         in
-        Mixed_block_shape.lookup_singleton_field shape field
+        layout_word + Mixed_block_shape.lookup_singleton_field shape field
     in
     Lconst (Const_base (Const_int pos))
 

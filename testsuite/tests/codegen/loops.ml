@@ -231,8 +231,8 @@ end
 M.f:
   movq  %rax, %rsi
   movq  -8(%rsi), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
+  salq  $22, %rax
+  shrq  $32, %rax
   movq  %rax, %rbx
   shrq  $63, %rbx
   movabsq $6148914691236517206, %rdi

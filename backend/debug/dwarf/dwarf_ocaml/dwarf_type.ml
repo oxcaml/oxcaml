@@ -364,9 +364,29 @@ let create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       |> attribute_list_with_optional_name name)
     ()
 
-let create_record_die ~reference ~parent_proto_die ?name ~fields () =
+(* The size in bytes of the layout word, if any, at the start of a block whose
+   fields have the given layouts. A mixed block has one if more values precede
+   its first non-value than the scan mask in its header can describe. *)
+let layout_word_size (layouts : RL.t list) =
+  let rec value_prefix_len len (layouts : RL.t list) =
+    match layouts with
+    | [] -> None
+    | Value :: layouts -> value_prefix_len (len + 1) layouts
+    | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+      | Vec512 | Mask | Word | Untagged_immediate )
+      :: _ ->
+      Some len
+  in
+  match value_prefix_len 0 layouts with
+  | Some len when len >= Header_bits.scan_mask_bits -> Arch.size_addr
+  | Some _ | None -> 0
+
+let create_record_die ~reference ~parent_proto_die ?name
+    ?(first_field_offset = 0) ~fields () =
   let total_size =
-    List.fold_left (fun acc (_, field_size, _) -> acc + field_size) 0 fields
+    List.fold_left
+      (fun acc (_, field_size, _) -> acc + field_size)
+      first_field_offset fields
   in
   let structure =
     Proto_die.create ~parent:(Some parent_proto_die)
@@ -376,7 +396,7 @@ let create_record_die ~reference ~parent_proto_die ?name ~fields () =
         |> attribute_list_with_optional_name name)
       ()
   in
-  let offset = ref 0 in
+  let offset = ref first_field_offset in
   List.iter
     (fun (field_name, field_size, field_die) ->
       let field =
@@ -722,7 +742,9 @@ let create_complex_variant_die ~ctx ~reference ~parent_proto_die ?name
         Debugging_the_compiler.add
           ~reference:(Proto_die.reference subvariant)
           constructor_name;
-        let offset = ref 0 in
+        let offset =
+          ref (layout_word_size (List.map (fun (_, _, ly) -> ly) fields))
+        in
         List.iter
           (fun (field_name, field_type, ly) ->
             let member_size = RL.size_in_memory ly in
@@ -1315,6 +1337,13 @@ and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
   | Func ->
     create_typedef_die ~reference ~parent_proto_die ?name fallback_value_die
   | Record { fields; kind = Record_mixed } ->
+    let first_field_offset =
+      layout_word_size
+        (List.map
+           (fun ({ field_type; label = _ } : string RS.mixed_block_field) ->
+             RS.runtime_layout field_type)
+           fields)
+    in
     let fields =
       List.map
         (fun ({ field_type; label } : string RS.mixed_block_field) ->
@@ -1324,7 +1353,8 @@ and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
           label, RL.size_in_memory element, die field_type)
         fields
     in
-    create_record_die ~reference ~parent_proto_die ?name ~fields ()
+    create_record_die ~reference ~parent_proto_die ?name ~first_field_offset
+      ~fields ()
   | Record
       { fields = [{ field_type; label }];
         kind = Record_attribute_unboxed layout

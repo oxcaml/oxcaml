@@ -112,6 +112,19 @@ val function_bound_parameters :
 val invalid :
   To_cmm_result.t -> message:string -> Cmm.expression * To_cmm_result.t
 
+(** The symbol of a static layout block with the given scan words (see
+    [Cmm_helpers.mixed_block_layout_words]). The block is emitted the first time
+    it is asked for in a compilation unit. *)
+val layout_block :
+  To_cmm_result.t -> words:nativeint list -> Cmm.symbol * To_cmm_result.t
+
+(** The symbol of the layout block for mixed blocks of the given shape, if they
+    have a layout word. *)
+val mixed_block_layout :
+  To_cmm_result.t ->
+  Flambda_kind.Mixed_block_shape.t ->
+  Cmm.symbol option * To_cmm_result.t
+
 module Update_kind : sig
   type t
 

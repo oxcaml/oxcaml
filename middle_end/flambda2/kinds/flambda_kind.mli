@@ -117,8 +117,15 @@ module Mixed_block_shape : sig
 
   val flat_suffix : t -> flat_suffix_element array
 
+  (** The number of words taken by the fields. *)
   val size_in_words : t -> int
 
+  (** Whether blocks of this shape have a layout word before their first field
+      (see [Mixed_product_bytes.has_layout_word]). *)
+  val has_layout_word : t -> bool
+
+  (** The offset of a field from the start of the block, allowing for any layout
+      word. *)
   val offset_in_words : t -> int -> int
 
   val equal : t -> t -> bool

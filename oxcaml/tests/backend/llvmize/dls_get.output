@@ -35,10 +35,10 @@ L101:
   %23 = load i64, ptr addrspace(1) %22
   store i64 %23, ptr %8
   %24 = load i64, ptr %8
-  %25 = shl i64 %24, 8
+  %25 = shl i64 %24, 22
   store i64 %25, ptr %9
   %26 = load i64, ptr %9
-  %27 = lshr i64 %26, 17
+  %27 = lshr i64 %26, 31
   store i64 %27, ptr %10
   %28 = load i64, ptr %5
   %29 = load i64, ptr %10

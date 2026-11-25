@@ -400,8 +400,8 @@ double_loop_no_definition_at_beginning:
 double_loop_no_definition_at_beginning.f:
   movq  24(%rbx), %rsi
   movq  -8(%rsi), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
+  salq  $22, %rdi
+  shrq  $31, %rdi
   cmpq  %rdi, %rax
   jae   .L0
   movq  16(%rbx), %rbx

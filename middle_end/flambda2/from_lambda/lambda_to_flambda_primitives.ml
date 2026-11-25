@@ -1890,6 +1890,7 @@ let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
         ~align:0 )
 
 let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
+  let has_layout_word = MPB.has_layout_word (MPB.count (Product shape)) in
   let shape =
     Mixed_block_shape.of_mixed_block_elements shape
       ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -1903,7 +1904,10 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
       Misc.fatal_errorf "%s: expected mixed block element to be a value"
         prim_name
   in
-  let imm = Target_ocaml_int.of_int machine_width field_index in
+  (* The primitives this is for take the field's offset in words, not its index,
+     so allow for any layout word. *)
+  let layout_word = if has_layout_word then 1 else 0 in
+  let imm = Target_ocaml_int.of_int machine_width (layout_word + field_index) in
   check_non_negative_imm imm prim_name;
   imm, field_kind
 
@@ -2111,12 +2115,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
           Debuginfo.print_compact dbg
     in
+    (* Offsets are from the start of the block, so include any layout word. *)
+    let layout_word_bytes =
+      if MPB.has_layout_word (MPB.count (Product shape)) then 8 else 0
+    in
     let idx_raw_value =
       Int64.add
         (Int64.shift_left
            (Int64.of_int (BC.on_64_bit_arch gap_bytes))
            MPB.block_index_offset_bits)
-        (Int64.of_int (BC.on_64_bit_arch offset_bytes))
+        (Int64.of_int (layout_word_bytes + BC.on_64_bit_arch offset_bytes))
     in
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->

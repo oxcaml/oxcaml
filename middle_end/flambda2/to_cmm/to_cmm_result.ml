@@ -26,7 +26,9 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
-    invalid_message_symbols : Symbol.t String.Map.t
+    invalid_message_symbols : Symbol.t String.Map.t;
+    layout_block_symbols : Symbol.t String.Map.t
+        (* Keyed by the layout block's scan words: see [layout_block_key]. *)
   }
 
 let create ~module_symbol ~reachable_names =
@@ -38,7 +40,8 @@ let create ~module_symbol ~reachable_names =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
-    invalid_message_symbols = String.Map.empty
+    invalid_message_symbols = String.Map.empty;
+    layout_block_symbols = String.Map.empty
   }
 
 (* Symbol handling
@@ -176,6 +179,18 @@ let add_invalid_message_symbol t symbol ~message =
 
 let invalid_message_symbol t ~message =
   String.Map.find_opt message t.invalid_message_symbols
+
+let layout_block_key ~words =
+  String.concat "," (List.map (Printf.sprintf "%nx") words)
+
+let add_layout_block_symbol t symbol ~words =
+  { t with
+    layout_block_symbols =
+      String.Map.add (layout_block_key ~words) symbol t.layout_block_symbols
+  }
+
+let layout_block_symbol t ~words =
+  String.Map.find_opt (layout_block_key ~words) t.layout_block_symbols
 
 let to_cmm r =
   (* Make sure the module symbol is defined *)

@@ -72,7 +72,7 @@ spill_slot_lifetime:
   jb    <hidden GC jump pad>
 .L4:
   leaq  8(%r15), %rax
-  movabsq $72057594037932032, %rbx
+  movabsq $4899911996532592640, %rbx
   movq  %rbx, -8(%rax)
   vmovsd (%rsp), %xmm1
   vmovsd %xmm1, (%rax)

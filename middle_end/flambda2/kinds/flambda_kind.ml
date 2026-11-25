@@ -297,11 +297,16 @@ module Mixed_block_shape = struct
       (fun acc x -> acc + Flat_suffix_element0.size_in_words x)
       t.value_prefix_size t.flat_suffix
 
+  let has_layout_word t =
+    Array.length t.flat_suffix > 0
+    && t.value_prefix_size >= Header_bits.scan_mask_bits
+
   let offset_in_words t index =
+    let layout_word = if has_layout_word t then 1 else 0 in
     if index <= t.value_prefix_size
-    then index
+    then layout_word + index
     else
-      let o = ref t.value_prefix_size in
+      let o = ref (layout_word + t.value_prefix_size) in
       let flat = index - t.value_prefix_size in
       for i = 0 to flat - 1 do
         o := !o + Flat_suffix_element0.size_in_words t.flat_suffix.(i)

@@ -2197,7 +2197,7 @@ Error: This type definition does not satisfy its kind annotation
 |}]
 
 (****************************************************************************)
-(* Test 22: Product components counted correctly for the value prefix limit *)
+(* Test 22: Value prefixes on each side of the former limit of 254 *)
 
 type eight_values :
   value & value & value & value & value & value & value & value
@@ -2369,18 +2369,24 @@ type r_255_f64 =
     f64 : float#;
   }
 [%%expect{|
-Lines 1-18, characters 0-3:
- 1 | type r_255_f64 =
- 2 |   { a : thirty_two_values#;
- 3 |     b : thirty_two_values#;
- 4 |     c : thirty_two_values#;
- 5 |     d : thirty_two_values#;
-...
-15 |     f254 : string;
-16 |     f255 : #(string * unit#);
-17 |     f64 : float#;
-18 |   }
-Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+type r_255_f64 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : #(string * unit#);
+  f64 : float#;
+}
 |}]
 
 (****************************************************************)
