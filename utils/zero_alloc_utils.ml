@@ -154,7 +154,7 @@ module Tag = struct
 
     let compare = Components.compare Bool.compare
 
-    let contains = Components.get
+    let mem = Components.get
 
     let subset = Components.lessequal (fun r1 r2 -> (not r1) || r2)
 

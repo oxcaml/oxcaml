@@ -42,9 +42,9 @@ module Tag : sig
 
     val compare : t -> t -> int
 
-    val contains : tag -> t -> bool
-
     val intersection : t -> t -> t option
+
+    val mem : tag -> t -> bool
 
     val subset : t -> t -> bool
 
