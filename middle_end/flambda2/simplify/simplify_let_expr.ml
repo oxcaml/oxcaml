@@ -294,6 +294,10 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
          to do anything here. *)
       data_flow
     | Not_in_a_closure ->
+      (* CR gbury: instead of recording lifted constants piece by piece, we could
+         simply give it the full accumulator at the end of the downwards
+         traversal. *)
+        if debug () then Format.eprintf "### LIFTING ###@\n%a@." LCS.print lifted_constants_from_defining_expr;
       Flow.Acc.record_lifted_constants lifted_constants_from_defining_expr
         data_flow
   in
@@ -306,10 +310,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up bound_pattern ~body =
   let module L = Flambda.Let in
   let original_dacc = dacc in
-  (* Remember then clear the lifted constants memory in [DA] so we can easily
-     find out which constants are generated during simplification of the
-     defining expression and the [body]. *)
-  let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
+  let prior_lifted_constants = DA.get_lifted_constants dacc in
   (* Simplify the defining expression. *)
   let defining_expr = L.defining_expr let_expr in
   match
@@ -354,9 +355,8 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
          of the defining expression. (Not even in the case of a
          [Set_of_closures] binding, since "let symbol" is disallowed under a
          lambda.) *)
-      let lifted_constants_from_defining_expr = DA.get_lifted_constants dacc in
-      let dacc =
-        DA.add_to_lifted_constant_accumulator dacc prior_lifted_constants
+      let lifted_constants_from_defining_expr =
+        LCS.diff prior_lifted_constants (DA.get_lifted_constants dacc)
       in
       let rewrite_id = Named_rewrite_id.create () in
       let dacc =

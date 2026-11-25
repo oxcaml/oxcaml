@@ -34,7 +34,7 @@ let empty () =
     { stack = [];
       map = Continuation.Map.empty;
       extra = Continuation.Map.empty;
-      lifted_constants = Lifted_constant_state.empty;
+      lifted_constants = [];
       dummy_toplevel_cont = wrong_dummy_toplevel_cont
     }
   in
@@ -480,15 +480,16 @@ let normalize_lifted_constant_aux lifted_constant (elt : cont_info) =
   in
   elt
 
-let normalize_lifted_constants_aux lifted_constants elt =
-  Lifted_constant_state.fold lifted_constants ~init:elt
-    ~f:(fun elt lifted_constant ->
-      normalize_lifted_constant_aux lifted_constant elt)
+let normalize_lifted_constants_aux lifted_constants_list elt =
+  List.fold_left (fun acc lifted_constants ->
+      Lifted_constant_state.fold lifted_constants ~init:acc
+        ~f:(fun elt lifted_constant ->
+            normalize_lifted_constant_aux lifted_constant elt
+          )) elt lifted_constants_list
 
 let record_lifted_constants lifted_constants (t : t) =
   { t with
-    lifted_constants =
-      Lifted_constant_state.union lifted_constants t.lifted_constants
+    lifted_constants = lifted_constants :: t.lifted_constants;
   }
 
 (* Normalisation *)

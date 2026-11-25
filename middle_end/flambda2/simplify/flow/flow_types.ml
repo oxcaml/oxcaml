@@ -193,7 +193,7 @@ module Acc = struct
     { stack : Continuation_info.t list;
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
-      lifted_constants : Lifted_constant_state.t;
+      lifted_constants : Lifted_constant_state.t list;
       dummy_toplevel_cont : Continuation.t
     }
 
@@ -220,7 +220,7 @@ module Acc = struct
       print_stack stack
       print_map map
       print_extra extra
-      Lifted_constant_state.print lifted_constants
+      (Format.pp_print_list Lifted_constant_state.print) lifted_constants
 end
 
 (* Result of the flow analysis: reachable code ids *)

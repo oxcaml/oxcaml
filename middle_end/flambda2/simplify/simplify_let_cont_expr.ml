@@ -55,7 +55,8 @@ type simplify_let_cont_data =
 
 type after_downwards_traversal_of_body_data =
   { denv_for_join : DE.t;
-    handlers : Original_handlers.t
+    handlers : Original_handlers.t;
+    lifted_constants_before_body : LCS.t;
   }
 
 type handler_after_downwards_traversal =
@@ -1008,10 +1009,13 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
       let uses = Continuation_uses.add_use uses use in
       Continuation_uses.get_arg_types_by_use_id uses
     in
+    let consts_lifted_after_fork =
+      LCS.diff data.after_downwards_traversal_of_body.lifted_constants_before_body (DA.get_lifted_constants dacc)
+    in
     let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
       prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~replay
         ~lifted_params
-        ~consts_lifted_after_fork:(DA.get_lifted_constants dacc)
+        ~consts_lifted_after_fork
         ~is_recursive (Continuation.sort cont)
         (if is_exn_handler then Some cont else None)
         [use] ~arg_types_by_use_id
@@ -1157,6 +1161,7 @@ and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
   let down_to_up =
     down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
       lifted_conts ~down_to_up
+      ~lifted_constants_before_body:data.after_downwards_traversal_of_body.lifted_constants_before_body
   in
   specialize_continuation_if_needed ~simplify_expr dacc data
     (fun dacc (data : after_downwards_traversal_of_body_and_handlers_data) ->
@@ -1229,6 +1234,11 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
     Bound_parameters.append params
       (Lifted_cont_params.bound_parameters lifted_params)
   in
+  if debug () then
+    Format.eprintf "*** JOIN ***@\n%a@\n%a@."
+      LCS.print consts_lifted_after_fork
+      Bound_parameters.print params
+  ;
   let join_result =
     (* We add to the continuation uses (and therefore to the handler env) the
        params added by the eventual lifting of continuations. *)
@@ -1516,9 +1526,10 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~simplified_body
       let denv = DE.set_at_unit_toplevel_state denv at_unit_toplevel in
       let denv = if is_cold then DE.mark_as_cold denv else denv in
       let is_cold = DE.is_cold denv in
+      if debug () then Format.eprintf "%a@." Continuation.print cont;
       let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
         prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~lifted_params
-          ~consts_lifted_after_fork:(DA.get_lifted_constants dacc)
+          ~consts_lifted_after_fork:(LCS.diff data.lifted_constants_before_body (DA.get_lifted_constants dacc))
           ~is_recursive:false ~replay:None (Continuation.sort cont)
           (if is_exn_handler then Some cont else None)
           (Continuation_uses.get_uses uses)
@@ -1657,7 +1668,7 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
     simplify_handlers data dacc ~simplify_expr ~down_to_up ~denv_for_join
       ~simplified_body
 
-and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
+and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join ~lifted_constants_before_body
     lifted_conts ~down_to_up =
   match lifted_conts with
   | [] -> down_to_up
@@ -1673,13 +1684,13 @@ and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
        of k' after there are lifted out from the handler of k. *)
     let actual_denv = DE.denv_for_lifted_continuation ~denv_for_join ~denv in
     let data : after_downwards_traversal_of_body_data =
-      { denv_for_join = actual_denv; handlers }
+      { denv_for_join = actual_denv; handlers; lifted_constants_before_body }
     in
     let down_to_up =
       after_downwards_traversal_of_body ~simplify_expr data ~down_to_up
     in
     down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
-      other_lifted_handlers ~down_to_up
+      ~lifted_constants_before_body other_lifted_handlers ~down_to_up
 
 let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     (data : simplify_let_cont_data) ~down_to_up =
@@ -1821,12 +1832,15 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
   in
   let dacc = DA.with_continuation_uses_env dacc ~cont_uses_env in
   let body = data.body in
-  let data : after_downwards_traversal_of_body_data =
-    { denv_for_join; handlers }
-  in
+  let lifted_constants_before_body = DA.get_lifted_constants dacc in
   simplify_expr dacc body
-    ~down_to_up:
-      (after_downwards_traversal_of_body ~simplify_expr data ~down_to_up)
+    ~down_to_up:(fun dacc simplified_body ->
+        let data : after_downwards_traversal_of_body_data =
+          { denv_for_join; handlers;
+            lifted_constants_before_body; }
+        in
+        after_downwards_traversal_of_body ~simplify_expr data ~down_to_up dacc simplified_body
+      )
 
 let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
   (* This is the entry point to simplify a let cont expression. The only thing

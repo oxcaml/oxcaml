@@ -488,8 +488,9 @@ let is_lifted_constant_used uacc body lifted_constant =
   let bound = LC.bound_static lifted_constant in
   let is_in_free_names =
     Name_occurrences.inter_domain_is_non_empty
-      (Bound_static.free_names bound)
-      (RE.free_names body)
+      (Name_occurrences.with_only_names_and_code_ids_promoting_newer_version_of
+         (RE.free_names body))
+         (Bound_static.free_names bound)
   in
   let speculative_toplevel, keep_code_id, code_ids_live =
     match UA.reachable_code_ids uacc with

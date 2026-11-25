@@ -113,7 +113,7 @@ module Acc : sig
     { stack : Continuation_info.t list;
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
-      lifted_constants : Lifted_constant_state.t;
+      lifted_constants : Lifted_constant_state.t list;
       dummy_toplevel_cont : Continuation.t
     }
 

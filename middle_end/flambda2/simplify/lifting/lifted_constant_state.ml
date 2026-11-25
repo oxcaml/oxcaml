@@ -16,63 +16,60 @@
 
 module LC = Lifted_constant
 
-type t =
-  | Empty
-  | Leaf of LC.t
-  | Leaf_array of { ts : LC.t array }
-  | Union of
-      { t1 : t;
-        t2 : t
-      }
+type t = {
+  constants : LC.t list;
+  n : int;
+}
 
-let print ppf t =
-  let to_list t =
-    let rec to_list t acc =
-      match t with
-      | Empty -> acc
-      | Leaf const -> const :: acc
-      | Leaf_array { ts } -> List.rev (Array.to_list ts) @ acc
-      | Union { t2; t1 } -> to_list t1 (to_list t2 acc)
-    in
-    to_list t []
-  in
-  Format.fprintf ppf "@[<hov 1>(%a)@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space LC.print)
-    (to_list t)
+let empty = {
+  constants = []; n = 0;
+}
 
-let empty = Empty
+let is_empty t = t.n = 0
 
-let is_empty t =
-  match t with Empty -> true | Leaf _ | Leaf_array _ | Union _ -> false
-
-let singleton const = Leaf const
-
-let singleton_list_of_constants constants =
-  match constants with
-  | [] -> empty
-  | [constant] -> singleton constant
-  | _ :: _ -> Leaf_array { ts = Array.of_list constants }
+let of_list constants =
+  { constants; n = List.length constants; }
 
 let add t const =
-  if is_empty t then Leaf const else Union { t2 = Leaf const; t1 = t }
+  { constants = const :: t.constants; n = t.n + 1 }
 
-let union t1 t2 =
-  match t1, t2 with
-  | Empty, Empty -> Empty
-  | Empty, (Leaf _ | Leaf_array _ | Union _) -> t2
-  | (Leaf _ | Leaf_array _ | Union _), Empty -> t1
-  | (Leaf _ | Leaf_array _ | Union _), t2 -> Union { t2 = t1; t1 = t2 }
+let add_list t l =
+  { constants = List.rev_append l t.constants; n = t.n + List.length l; }
 
-let[@inline] fold t ~init ~f =
-  let rec loop init = function
-    | Empty -> init
-    | Leaf const -> f init const
-    | Leaf_array { ts } -> ArrayLabels.fold_left ts ~init ~f
-    | Union { t2; t1 } ->
-      let init = loop init t2 in
-      loop init t1
+let diff t t' =
+  (* make sure [t] is the "smaller" one *)
+  let t, t' = if t.n > t'.n then t', t else t, t' in
+  (* Ensure that [t] is indeed an ancestor of [t'] *)
+  if false && Flambda_features.check_invariants () then begin
+    let rec drop k = function
+      | l when k <= 0 -> l
+      | [] -> []
+      | _ :: r -> drop (k - 1) r
+    in
+    if not (t.constants == drop (t'.n - t.n) t'.constants) then
+      Misc.fatal_errorf "[Lifted_constant_state.diff]: expected one of the LCS.t to be an ancestor of the other, but that is not the case !"
+  end;
+  (* Avoid re-allocating a whole list. In practice, the result of the diff
+     is short-lived (and in particular is outlived by the arguments), so
+     that's fine. *)
+  { constants = t'.constants; n = t'.n - t.n; }
+
+let print ppf t =
+  (* CR gbury: this might be more efficient by going through an array instead of a list
+     built twice *)
+  let rec take acc n = function
+    | [] -> List.rev acc
+    | x :: r -> if n <= 0 then List.rev acc else take (x :: acc) (n - 1) r
   in
-  loop init t
+  Format.fprintf ppf "@[<hov 1>(%a)@]"
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space LC.print) (take [] t.n t.constants)
+
+let fold t ~init ~f =
+  let rec loop acc n = function
+    | [] -> acc
+    | const :: r -> if n <= 0 then acc else loop (f acc const) (n - 1) r
+  in
+  loop init t.n t.constants
 
 let all_defined_symbols t =
   fold t ~init:Symbol.Set.empty ~f:(fun symbols const ->
@@ -316,8 +313,8 @@ module Sorted = struct
        first (and we will later do fold_lefts on these). Since the sorting is
        stable, if we want to have in the output constants ordered in the same
        order they were created, we neeed to rev the list here. *)
-    let ts = Array.of_list (List.rev (LC.Set.elements set)) in
-    SCC.sort (Leaf_array { ts })
+    let st = of_list (List.rev (LC.Set.elements set)) in
+    SCC.sort st
 
   let pop_lifted_constants_to_place t ~bound_names =
     Profile.record_call ~accumulate:true "lifted-constants-pop" (fun () ->
