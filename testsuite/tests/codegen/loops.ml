@@ -49,7 +49,7 @@ loop_code_layout:
 loop_code_layout.cold:
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let for_loop_layout n f =
   for i = 0 to n do
@@ -82,7 +82,7 @@ for_loop_layout:
 .L2:
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: loop peeling could avoid repeating List.hd *)
 let loop_with_non_dominating_load x l =
@@ -110,7 +110,7 @@ loop_with_non_dominating_load:
   jg    .L0
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: Closure values are reloaded in the loop,
@@ -153,7 +153,7 @@ f.do_work:
   cmpq  $100, %rdi
   jle   .L0
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: noop loop could be eliminated
@@ -172,7 +172,7 @@ noop_loop:
 .L1:
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: We should replace a multiplication with a constant in a loop with
@@ -205,7 +205,7 @@ f:
 .L1:
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 module M = struct
   type f64 = Float_u.t
@@ -259,7 +259,7 @@ M.f:
 .L1:
   vxorpd %xmm0, %xmm0, %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: We should branch first and loop afterwards.*)
@@ -295,7 +295,7 @@ loop_invariant_code:
   movl  $1, %eax
   addq  $24, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: The loop should have a fall-through check. *)
 type t = { mutable next : t or_null }
@@ -312,4 +312,4 @@ match_loop:
 .L1:
   movq  %rbx, %rax
   jmp   .L0
-|}]
+|}, Arm64{||}]

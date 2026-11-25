@@ -37,7 +37,7 @@ one_or_two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/1783 *)
@@ -87,4 +87,4 @@ spill_slot_lifetime:
 spill_slot_lifetime.get_one:
   vmovsd <hidden PC-relative offset>(%rip), %xmm0
   ret
-|}]
+|}, Arm64{||}]

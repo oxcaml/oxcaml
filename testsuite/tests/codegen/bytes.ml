@@ -22,7 +22,7 @@ bytes_get_uint8:
   movzbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_uint8 (buf : bytes) (i : int) (v : int) =
   Bytes.unsafe_set buf i v
@@ -33,7 +33,7 @@ bytes_set_uint8:
   movb  %dil, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 
 let bytes_get_int8 (buf : bytes) (i : int) =
@@ -44,7 +44,7 @@ bytes_get_int8:
   movsbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_uint16 (buf : bytes) (i : int) =
   Bytes.unsafe_get_uint16_ne buf i
@@ -54,7 +54,7 @@ bytes_get_uint16:
   movzwq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_uint16 (buf : bytes) (i : int) (v : int) =
   Bytes.unsafe_set_uint16_ne buf i v
@@ -65,7 +65,7 @@ bytes_set_uint16:
   movw  %di, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int16 (buf : bytes) (i : int) =
   Bytes.unsafe_get_int16_ne buf i
@@ -75,7 +75,7 @@ bytes_get_int16:
   movswq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int32 (buf : bytes) (i : int) =
   Bytes.unsafe_get_int32_ne buf i
@@ -84,7 +84,7 @@ bytes_get_int32:
   sarq  $1, %rbx
   movslq (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int32 (buf : bytes) (i : int) (v : Int32_u.t) =
   Bytes.unsafe_set_int32_ne buf i v
@@ -94,7 +94,7 @@ bytes_set_int32:
   movl  %edi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64 (buf : bytes) (i : int) =
   Bytes.unsafe_get_int64_ne buf i
@@ -103,7 +103,7 @@ bytes_get_int64:
   sarq  $1, %rbx
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int64 (buf : bytes) (i : int) (v : Int64_u.t) =
   Bytes.unsafe_set_int64_ne buf i v
@@ -113,7 +113,7 @@ bytes_set_int64:
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_float32 (buf : bytes) (i : int) =
   Bytes.unsafe_get_float32_ne buf i
@@ -122,7 +122,7 @@ bytes_get_float32:
   sarq  $1, %rbx
   vmovss (%rax,%rbx), %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_float32 (buf : bytes) (i : int) (v : Float32_u.t) =
   Bytes.unsafe_set_float32_ne buf i v
@@ -132,7 +132,7 @@ bytes_set_float32:
   vmovss %xmm0, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_int64 (s : string) (i : int) =
   String.unsafe_get_int64_ne s i
@@ -141,7 +141,7 @@ string_get_int64:
   sarq  $1, %rbx
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_float32 (s : string) (i : int) =
   String.unsafe_get_float32_ne s i
@@ -150,7 +150,7 @@ string_get_float32:
   sarq  $1, %rbx
   vmovss (%rax,%rbx), %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: The first [movslq] could be [movl] *)
 (* CR ttebbi: mov + bswap could be movbe *)
@@ -163,7 +163,7 @@ bytes_get_int32_bswap:
   bswap %eax
   movslq %eax, %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64_bswap (buf : bytes) (i : int) =
   Int64_u.bswap (Bytes.unsafe_get_int64_ne buf i)
@@ -173,7 +173,7 @@ bytes_get_int64_bswap:
   movq  (%rax,%rbx), %rax
   bswap %rax
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: This bounds check is way too long, even given the complex
    length encoding. If we use an unsigned right shift to untag the int, then
@@ -204,7 +204,7 @@ bytes_safe_get_int32:
   movq  $0, 272(%r14)
   call  caml_raise_exn@PLT
 .L1:
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
@@ -213,7 +213,7 @@ let bytes_get_int64_indexed_by_int64
 bytes_get_int64_indexed_by_int64:
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int64_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) (v : Int64_u.t) =
@@ -223,7 +223,7 @@ bytes_set_int64_indexed_by_int64:
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int8_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
@@ -233,7 +233,7 @@ bytes_get_int8_indexed_by_int64:
   movsbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int8_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) (v : int) =
@@ -244,7 +244,7 @@ bytes_set_int8_indexed_by_int64:
   movb  %dil, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int32_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
@@ -253,7 +253,7 @@ let bytes_get_int32_indexed_by_int64
 bytes_get_int32_indexed_by_int64:
   movslq (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int32_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) (v : Int32_u.t) =
@@ -263,7 +263,7 @@ bytes_set_int32_indexed_by_int64:
   movl  %edi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_float32_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
@@ -272,7 +272,7 @@ let bytes_get_float32_indexed_by_int64
 bytes_get_float32_indexed_by_int64:
   vmovss (%rax,%rbx), %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_float32_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) (v : Float32_u.t) =
@@ -282,7 +282,7 @@ bytes_set_float32_indexed_by_int64:
   vmovss %xmm0, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64_indexed_by_int32
     (buf : bytes) (i : Int32_u.t) =
@@ -291,7 +291,7 @@ let bytes_get_int64_indexed_by_int32
 bytes_get_int64_indexed_by_int32:
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int64_indexed_by_int32
     (buf : bytes) (i : Int32_u.t) (v : Int64_u.t) =
@@ -301,7 +301,7 @@ bytes_set_int64_indexed_by_int32:
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64_indexed_by_int16
     (buf : bytes) (i : int16#) =
@@ -310,7 +310,7 @@ let bytes_get_int64_indexed_by_int16
 bytes_get_int64_indexed_by_int16:
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int64_indexed_by_int16
     (buf : bytes) (i : int16#) (v : Int64_u.t) =
@@ -320,7 +320,7 @@ bytes_set_int64_indexed_by_int16:
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_get_int64_indexed_by_int8
     (buf : bytes) (i : int8#) =
@@ -329,7 +329,7 @@ let bytes_get_int64_indexed_by_int8
 bytes_get_int64_indexed_by_int8:
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let bytes_set_int64_indexed_by_int8
     (buf : bytes) (i : int8#) (v : Int64_u.t) =
@@ -339,7 +339,7 @@ bytes_set_int64_indexed_by_int8:
   movq  %rdi, (%rax,%rbx)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_int8_indexed_by_int64
     (s : string) (i : Int64_u.t) =
@@ -349,7 +349,7 @@ string_get_int8_indexed_by_int64:
   movsbq (%rax,%rbx), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_int32_indexed_by_int64
     (s : string) (i : Int64_u.t) =
@@ -358,7 +358,7 @@ let string_get_int32_indexed_by_int64
 string_get_int32_indexed_by_int64:
   movslq (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_int64_indexed_by_int64
     (s : string) (i : Int64_u.t) =
@@ -367,7 +367,7 @@ let string_get_int64_indexed_by_int64
 string_get_int64_indexed_by_int64:
   movq  (%rax,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let string_get_float32_indexed_by_int64
     (s : string) (i : Int64_u.t) =
@@ -376,7 +376,7 @@ let string_get_float32_indexed_by_int64
 string_get_float32_indexed_by_int64:
   vmovss (%rax,%rbx), %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: We convert the loaded char to int before comparing against a
    constant, this could be a comparison against an untagged constant instead. *)
@@ -392,7 +392,7 @@ string_unsafe_get_and_use:
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
@@ -404,7 +404,7 @@ str_length:
   subq  %rax, %rbx
   leaq  1(%rbx,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let buf_length (b : bytes) = Bytes.length b
 [%%expect_asm X86_64{|
@@ -416,7 +416,7 @@ buf_length:
   subq  %rax, %rbx
   leaq  1(%rbx,%rbx), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 let u8_to_int_unsafe_set (x : bytes) (y : Uint8_u.t) =
@@ -426,7 +426,7 @@ u8_to_int_unsafe_set:
   movb  %bl, (%rax)
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let unsafe_get_u8_to_int (x : bytes) =
   Uint8_u.to_int (Bytes.unsafe_get_int8_u_indexed_by_int64 x #0L)
@@ -435,4 +435,4 @@ unsafe_get_u8_to_int:
   movzbq (%rax), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]

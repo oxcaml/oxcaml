@@ -445,8 +445,12 @@ jobs:
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Promote failed tests and capture diffs
-        # Compute the diff for an arbitrary job, we expect all to have the same diff
-        if: failure() && matrix.name == 'default (x86_64-linux)'
+        # Compute the diff for an arbitrary job, we expect all to have the same
+        # diff, except for [%%expect_asm] tests, which differ by architecture
+        # (and should not differ by OS).
+        if: >-
+          failure() && (matrix.name == 'default (x86_64-linux)'
+            || contains(matrix.name, 'aarch64'))
         continue-on-error: true
         run: bash tools/ci/actions/promote-and-capture-diff.sh promote-failed
 

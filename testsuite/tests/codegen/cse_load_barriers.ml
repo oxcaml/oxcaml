@@ -24,7 +24,7 @@ no_barrier:
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 (* The load after [Atomic.get] must not be merged with the one before. *)
 let load_across_atomic_get (r : int ref) (flag : int Atomic.t) =
@@ -42,7 +42,7 @@ load_across_atomic_get:
   ret
 .L0:
   ret
-|}]
+|}, Arm64{||}]
 
 (* [cpu_relax] is used to spin on a memory location, so the load after it
    must not be merged with the one before. *)
@@ -62,4 +62,4 @@ load_across_cpu_relax:
   leaq  -1(%rbx,%rax), %rax
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]

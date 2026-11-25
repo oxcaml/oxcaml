@@ -31,7 +31,7 @@ Variant_as_index.get:
 .L0:
   movq  8(%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: The mutable breaks the optimization to access
@@ -60,7 +60,7 @@ Variant_with_uneven_mutability.get:
 .L0:
   movq  (%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 module Or_pattern_on_mutable = struct
@@ -74,7 +74,7 @@ end
 Or_pattern_on_mutable.get:
   movq  (%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 type t =
@@ -92,7 +92,7 @@ let variant_id (t : t) : int =
 [%%expect_asm X86_64{|
 variant_id:
   ret
-|}]
+|}, Arm64{||}]
 
 let last_two (t : t) : bool =
   match t with
@@ -107,7 +107,7 @@ last_two:
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 (* CR ttebbi: This could be done looking at a single bit, and should certainly
     be branchfree.
@@ -130,7 +130,7 @@ even_variant:
 .L0:
   movl  $1, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 let map_to_constants (t : t) : int =
   match t with
@@ -143,7 +143,7 @@ map_to_constants:
   movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 let map_to_float_constants (t : t) : float# =
   match t with
@@ -156,7 +156,7 @@ map_to_float_constants:
   movq  <hidden PC-relative offset>(%rip), %rbx
   vmovsd -4(%rbx,%rax,4), %xmm0
   ret
-|}]
+|}, Arm64{||}]
 
 type t =
   | C of int
@@ -171,7 +171,7 @@ boxed_variant_id:
   movzbq -8(%rax), %rax
   leaq  1(%rax,%rax), %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: Constant match results could be implemented branch-free. *)
@@ -193,7 +193,7 @@ map_to_constants_two:
 .L0:
   movl  $3, %eax
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: We could eliminate jump tables when all the
@@ -243,7 +243,7 @@ unnecessary_match:
   movl  $7, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-|}]
+|}, Arm64{||}]
 
 
 type t =
@@ -316,4 +316,4 @@ double_match:
   movq  %rsi, 64(%r14)
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]

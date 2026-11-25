@@ -21,7 +21,7 @@ f_unboxed_unit:
 .L0:
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: This could be a loop to avoid closures. *)
@@ -73,7 +73,7 @@ mutual_recursion.g:
   addq  $24, %rbx
   addq  $-60, %rax
   jmp   camlTOP3__f_3_8_code@PLT
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: This could be a loop to avoid closures. *)
@@ -121,7 +121,7 @@ f:
   movq  (%rbx), %rdi
   addq  $8, %rsp
   jmp   *%rdi
-|}]
+|}, Arm64{||}]
 
 
 let inline_identical x =
@@ -131,7 +131,7 @@ let inline_identical x =
 inline_identical:
   addq  $2, %rax
   ret
-|}]
+|}, Arm64{||}]
 
 
 (* CR ttebbi: The rsp adjustment could be done in the GC trampoline. *)
@@ -149,7 +149,7 @@ just_one_allocation:
   movq  %rbx, %rax
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 
 let catch_exit =
@@ -180,7 +180,7 @@ catch_exit.(fun):
   movl  $1, %eax
   addq  $8, %rsp
   ret
-|}]
+|}, Arm64{||}]
 
 let nontail_exit =
   let[@inline never] exit () = raise Exit in
@@ -197,7 +197,7 @@ nontail_exit.(fun):
   movl  $1, %eax
   call  camlTOP8__exit_13_28_code@PLT
 .L0:
-|}]
+|}, Arm64{||}]
 
 type p = #(int * int * int * int * int)
 type q = #(p * p * p * p * p)
@@ -213,4 +213,4 @@ tailcall_nonreturning_large_result.loop:
 tailcall_nonreturning_large_result.(fun):
   movl  $1, %eax
   jmp   camlTOP11__loop_15_32_code@PLT
-|}]
+|}, Arm64{||}]
