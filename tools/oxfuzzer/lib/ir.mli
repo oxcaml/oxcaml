@@ -165,6 +165,21 @@ module Exn : sig
   val to_code : t -> Parsetree.structure_item option
 end
 
+(** Effects, each with a handler function that runs a computation and resumes
+    every [perform] with a function of its payload. *)
+module Eff : sig
+  type t =
+    { id : int;
+      payload : Ty.t;  (** A value type. *)
+      result : Ty.t  (** The type of [perform]. A value type. *)
+    }
+
+  val equal : t -> t -> bool
+
+  (** The declaration of the effect and of its handler function. *)
+  val to_code : t -> Parsetree.structure_item list
+end
+
 module Handler : sig
   type pattern =
     | Exn of
@@ -339,6 +354,18 @@ module Expr : sig
               (** Each function must be a [Lambda]. *)
           body : t
         }  (** Local mutually recursive functions. *)
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;  (** A value type. *)
+          body : t;
+          resume : t  (** A function from the payload of [eff] to its result. *)
+        }
+        (** Evaluates [body] in a handler of [eff], which resumes every
+            [perform] with [resume] applied to its payload. *)
 
   and raise =
     { exn : Exn.t;

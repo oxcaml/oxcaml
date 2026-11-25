@@ -66,6 +66,10 @@ let max_recursion_fuel = 3
    compiler bug (https://github.com/oxcaml/oxcaml/issues/8139) *)
 let unused_recursive_functions = false
 
+let max_effect_count = 6
+
+let max_handle_count = 8
+
 let max_probability = 10_000
 
 (* Probabilities out of [max_probability], conditional on reaching each
@@ -165,7 +169,8 @@ module Swarm = struct
       partial_applications : bool;
       recursive_functions : bool;
       wide_functions : bool;
-      reraises : bool
+      reraises : bool;
+      effects : bool
     }
 
   let create random_state =
@@ -203,7 +208,8 @@ module Swarm = struct
       partial_applications = Random.State.bool random_state;
       recursive_functions = Random.State.bool random_state;
       wide_functions = Random.State.bool random_state;
-      reraises = Random.State.bool random_state
+      reraises = Random.State.bool random_state;
+      effects = Random.State.bool random_state
     }
 
   let to_string t =
@@ -236,7 +242,8 @@ module Swarm = struct
       "partial_applications", t.partial_applications;
       "recursive_functions", t.recursive_functions;
       "wide_functions", t.wide_functions;
-      "reraises", t.reraises ]
+      "reraises", t.reraises;
+      "effects", t.effects ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> List.cons
          (Format.sprintf "  assertions = %s"

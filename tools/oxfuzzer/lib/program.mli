@@ -4,6 +4,7 @@ val create :
   swarm:Config.Swarm.t ->
   record_types:Ir.Ty.record list ->
   exceptions:Ir.Exn.t list ->
+  effects:Ir.Eff.t list ->
   variant_types:Ir.Ty.variant list ->
   functions:Ir.Function.t list ->
   toplevel_decls:(Ir.Binding.t * Ir.Expr.t) list ->

@@ -335,6 +335,99 @@ module Exn = struct
                  (loc (name t)))))
 end
 
+module Eff = struct
+  type t =
+    { id : int;
+      payload : Ty.t;
+      result : Ty.t
+    }
+
+  let equal left right = Int.equal left.id right.id
+
+  let constructor_name { id; _ } = Format.sprintf "Eff_%d" id
+
+  let handler_name { id; _ } = Format.sprintf "handle_%d" id
+
+  let effect_lid = ldot "Effect" "t"
+
+  (* [Effect.Deep.name] *)
+  let deep name = loc (Longident.Ldot (ldot "Effect" "Deep", loc name))
+
+  (* [type _ Effect.t += Eff_i : payload -> result Effect.t] *)
+  let declaration ({ payload; result; _ } as t) =
+    Ast_helper.Str.type_extension
+      (Ast_helper.Te.mk
+         ~params:[Ast_helper.Typ.any None, (NoVariance, NoInjectivity)]
+         effect_lid
+         [ Ast_helper.Te.decl
+             ~args:
+               (Parsetree.Pcstr_tuple
+                  [Ast_helper.Type.constructor_arg (Ty.to_code payload)])
+             ~res:(Ast_helper.Typ.constr effect_lid [Ty.to_code result])
+             (loc (constructor_name t)) ])
+
+  (* [let handle_i f (resume : payload -> result) = Effect.Deep.try_with f () {
+     effc }], where [effc] resumes the continuation of [Eff_i v] with [resume
+     v]. The annotation keeps [result] from escaping the scope of the locally
+     abstract type of [effc]. *)
+  let handler ({ payload; result; _ } as t) =
+    let a = Ast_helper.Typ.constr (lid "a") [] in
+    let continuation =
+      Ast_helper.Typ.constr (deep "continuation") [a; Ast_helper.Typ.any None]
+    in
+    let resume =
+      function_
+        [ value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "k"))
+               (Some continuation) []) ]
+        (apply
+           (Ast_helper.Exp.ident (deep "continue"))
+           [ident "k"; apply (ident "resume") [ident "v"]])
+    in
+    let effc =
+      Ast_helper.Exp.function_
+        [ { pparam_loc = Location.none;
+            pparam_desc = Pparam_newtype (loc "a", None)
+          };
+          value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "eff"))
+               (Some (Ast_helper.Typ.constr effect_lid [a]))
+               []) ]
+        { mode_annotations = [];
+          ret_mode_annotations = [];
+          ret_type_constraint = None
+        }
+        (Pfunction_body
+           (Ast_helper.Exp.match_ (ident "eff")
+              [ Ast_helper.Exp.case
+                  (Ast_helper.Pat.construct
+                     (lid (constructor_name t))
+                     (Some ([], Ast_helper.Pat.var (loc "v"))))
+                  (Ast_helper.Exp.construct (lid "Some") (Some resume));
+                Ast_helper.Exp.case (Ast_helper.Pat.any ())
+                  (Ast_helper.Exp.construct (lid "None") None) ]))
+    in
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.var (loc (handler_name t)))
+          (function_
+             [ value_param (Ast_helper.Pat.var (loc "f"));
+               value_param
+                 (Ast_helper.Pat.constraint_
+                    (Ast_helper.Pat.var (loc "resume"))
+                    (Some (Ty.to_code (Ty.Arrow (payload, result))))
+                    []) ]
+             (apply
+                (Ast_helper.Exp.ident (deep "try_with"))
+                [ ident "f";
+                  unit_;
+                  Ast_helper.Exp.record [deep "effc", effc] None ])) ]
+
+  let to_code t = [declaration t; handler t]
+end
+
 module Handler = struct
   type pattern =
     | Exn of
@@ -643,6 +736,16 @@ module Expr = struct
         { functions : (Name.t * t) list;
           body : t
         }
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;
+          body : t;
+          resume : t
+        }
 
   and raise =
     { exn : Exn.t;
@@ -859,6 +962,20 @@ module Expr = struct
       Ast_helper.Exp.let_ Immutable Recursive
         (List.map binding functions)
         (to_code body)
+    | Perform { eff; arg } ->
+      apply
+        (qualified_ident "Effect" "perform")
+        [ Ast_helper.Exp.construct
+            (lid (Eff.constructor_name eff))
+            (Some (to_code arg)) ]
+    | Handle { eff; ty; body; resume } ->
+      constrain ty
+        (apply
+           (ident (Eff.handler_name eff))
+           [ function_
+               [value_param (Ast_helper.Pat.construct (lid "()") None)]
+               (constrain ty (to_code body));
+             to_code resume ])
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
