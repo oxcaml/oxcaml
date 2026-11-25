@@ -29,8 +29,6 @@ module Tag : sig
     | Exception
     | Diverge
 
-  type tag := t (* for scoping inside [Nonempty_set] *)
-
   val all : t list
 
   val compare : t -> t -> int
@@ -38,6 +36,8 @@ module Tag : sig
   val print : Format.formatter -> t -> unit
 
   module Nonempty_set : sig
+    type tag := t
+
     type t
 
     val compare : t -> t -> int
