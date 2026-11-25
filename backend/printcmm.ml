@@ -310,6 +310,7 @@ let operation d = function
   | Ccmpi c -> integer_comparison c
   | Caddv -> "+v"
   | Cadda -> "+a"
+  | Cadd_pointer -> "+p"
   | Cnegf Float64 -> "~f"
   | Cabsf Float64 -> "absf"
   | Caddf Float64 -> "+f"

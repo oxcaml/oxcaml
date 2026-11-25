@@ -257,6 +257,7 @@ let oper_result_type = function
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
+  | Cadd_pointer -> typ_out_of_heap_data_pointer
   | Cnegf Float64
   | Cabsf Float64
   | Caddf Float64

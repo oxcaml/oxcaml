@@ -581,7 +581,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-  | Ccmpi _ | Caddv | Cadda
+  | Ccmpi _ | Caddv | Cadda | Cadd_pointer
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
   | Ccmpf _

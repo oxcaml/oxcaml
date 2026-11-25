@@ -653,14 +653,23 @@ let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
+let rec add_int_out_of_heap_ptr c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match c1, c2 with
+      | c, (Cconst_int (0, _) | Cconst_natint (0n, _)) -> c
+      | Cop (Cadd_pointer, [c1; offset], _), c2 ->
+        add_int_out_of_heap_ptr c1 (add_int offset c2 dbg) dbg
+      | c1, c2 -> Cop (Cadd_pointer, [c1; c2], dbg))
+
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
   (* The [add_int_addr] case is only used for string access, and it seems
      unlikely that the more complicated optimizations done for [add_int] will
      apply.
 
-     For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
+     For out-of-heap accesses, we use [add_int_out_of_heap_ptr], thus allowing
+     more CSE. *)
   if ptr_out_of_heap
-  then add_int c1 c2 dbg
+  then add_int_out_of_heap_ptr c1 c2 dbg
   else
     match c1, c2 with
     | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
@@ -2005,13 +2014,13 @@ let addr_array_length_shifted hdr dbg = lsr_const hdr wordsize_shift dbg
    The optional ?typ argument is the C-- type of the result. By default, it is
    Addr, meaning we are constructing a derived pointer into the heap. If we know
    the pointer is outside the heap (this is the case for bigarray indexing), we
-   give type Int instead. *)
+   give type Out_of_heap_data_pointer instead. *)
 
 let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some Int -> Caddi
+    | Some Out_of_heap_data_pointer -> Cadd_pointer
     | _ -> assert false
   in
   match ofs with
@@ -4943,7 +4952,7 @@ let entry_point namelist =
   let call i =
     let f =
       Cop
-        ( Cadda,
+        ( Cadd_pointer,
           [ cconst_symbol table_symbol;
             Cop (Cmuli, [Cconst_int (Arch.size_addr, dbg ()); i], dbg ()) ],
           dbg () )
@@ -5540,7 +5549,8 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
     load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
   in
   let addr ~ba_data_p ~index =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Out_of_heap_data_pointer (Misc.log2 elt_size) ba_data_p
+      index dbg
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
@@ -5550,7 +5560,9 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
     bind "index" index (fun index ->
         bind "ba_data" ba_data_p (fun ba_data_p ->
             let addr = addr ~ba_data_p ~index in
-            let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+            let addr' =
+              binary Cadd_pointer ~dbg addr (int ~dbg (elt_size / 2))
+            in
             box_complex dbg
               (load ~dbg elt_chunk Mutable ~addr)
               (load ~dbg elt_chunk Mutable ~addr:addr')))
@@ -5572,7 +5584,8 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
     load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
   in
   let addr ~ba_data_p ~index =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Out_of_heap_data_pointer (Misc.log2 elt_size) ba_data_p
+      index dbg
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
@@ -5584,7 +5597,9 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
         bind "index" index (fun index ->
             bind "ba_data" ba_data_p (fun ba_data_p ->
                 let addr = addr ~ba_data_p ~index in
-                let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+                let addr' =
+                  binary Cadd_pointer ~dbg addr (int ~dbg (elt_size / 2))
+                in
                 return_unit dbg
                   (sequence
                      (store ~dbg elt_chunk Assignment ~addr
