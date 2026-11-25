@@ -172,7 +172,8 @@ let construct_joined_level envs_with_levels ~env_at_fork ~allowed ~joined_types
   in
   let defined_vars, binding_times =
     List.fold_left
-      (fun (defined_vars, binding_times) (_env_at_use, _id, _use_kind, t) ->
+      (fun (defined_vars_before, binding_times) (_env_at_use, _id, _use_kind, t)
+         ->
         let defined_vars_this_level =
           Variable.Map.filter
             (fun var _ -> variable_is_in_new_level var)
@@ -188,12 +189,16 @@ let construct_joined_level envs_with_levels ~env_at_fork ~allowed ~joined_types
                   "Cannot join levels that disagree on the kind of \
                    [defined_vars] (%a and %a for %a)"
                   K.print kind1 K.print kind2 Variable.print var)
-            defined_vars defined_vars_this_level
+            defined_vars_before defined_vars_this_level
         in
         let binding_times_this_level =
           Binding_time.Map.filter_map
             (fun _ vars ->
-              let vars = Variable.Set.filter variable_is_in_new_level vars in
+              let not_already_bound var =
+                variable_is_in_new_level var
+                && not (Variable.Map.mem var defined_vars_before)
+              in
+              let vars = Variable.Set.filter not_already_bound vars in
               if Variable.Set.is_empty vars then None else Some vars)
             (TEL.variables_by_binding_time t)
         in
