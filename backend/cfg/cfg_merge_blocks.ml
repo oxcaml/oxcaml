@@ -27,8 +27,8 @@ end = struct
       false
 
   let terminator_dbg_in_frame_descr : Cfg.terminator -> bool = function
-    | Call _ | Prim { op = Probe _; label_after = _ } -> true
-    | Call_no_return { alloc; stack_ofs; _ }
+    | Call _ | Call_no_return _ | Prim { op = Probe _; label_after = _ } -> true
+    | External_call_no_return { alloc; stack_ofs; _ }
     | Prim { op = External { alloc; stack_ofs; _ }; label_after = _ } ->
       alloc || stack_ofs > 0
     | Invalid { stack_ofs; _ } -> stack_ofs > 0
