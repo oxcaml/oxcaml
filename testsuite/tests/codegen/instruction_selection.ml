@@ -252,8 +252,8 @@ branch_and_return:
   ret
 |}]
 
-(* CR mshinwell: Branching on a boolean returned by a call should test the
-   tagged value directly, rather than untagging it first. *)
+(* Branching on a boolean returned by a call should test the tagged value
+   directly, rather than untagging it first. *)
 let branch_on_call_result (f : int -> bool) x =
   if f x then x else 7
 [%%expect_asm X86_64{|
@@ -267,14 +267,13 @@ branch_on_call_result:
   call  *%rsi
 .L0:
   movq  %rax, %rbx
-  sarq  $1, %rbx
   movq  (%rsp), %rax
-  testq %rbx, %rbx
-  je    .L1
+  cmpq  $1, %rbx
+  jne   .L1
+  movl  $15, %eax
   addq  $8, %rsp
   ret
 .L1:
-  movl  $15, %eax
   addq  $8, %rsp
   ret
 |}]
@@ -292,14 +291,13 @@ branch_on_negated_call_result:
   call  *%rsi
 .L0:
   movq  %rax, %rbx
-  sarq  $1, %rbx
   movq  (%rsp), %rax
-  testq %rbx, %rbx
-  je    .L1
-  movl  $15, %eax
+  cmpq  $1, %rbx
+  jne   .L1
   addq  $8, %rsp
   ret
 .L1:
+  movl  $15, %eax
   addq  $8, %rsp
   ret
 |}]
@@ -319,23 +317,22 @@ branch_on_two_call_results:
   call  *%rdi
 .L0:
   movq  %rax, %rdi
-  sarq  $1, %rdi
   movq  (%rsp), %rbx
   movq  16(%rsp), %rax
-  testq %rdi, %rdi
+  cmpq  $1, %rdi
   je    .L2
   movq  (%rbx), %rdi
   call  *%rdi
 .L1:
   movq  %rax, %rbx
-  sarq  $1, %rbx
   movq  8(%rsp), %rax
-  testq %rbx, %rbx
-  je    .L2
-  addq  $24, %rsp
-  ret
+  cmpq  $1, %rbx
+  jne   .L3
 .L2:
   movl  $15, %eax
+  addq  $24, %rsp
+  ret
+.L3:
   addq  $24, %rsp
   ret
 |}]
@@ -353,15 +350,13 @@ branch_on_and_return_call_result:
   movq  %rdi, %rbx
   call  *%rsi
 .L0:
-  movq  %rax, %rbx
-  sarq  $1, %rbx
-  movq  (%rsp), %rdi
-  testq %rbx, %rbx
-  je    .L1
-  movq  %rdi, %rax
+  movq  (%rsp), %rbx
+  cmpq  $1, %rax
+  jne   .L1
   addq  $8, %rsp
   ret
 .L1:
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
