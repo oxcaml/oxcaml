@@ -148,7 +148,7 @@ module Allocation_source : sig
   val meet :
     meet_args:('args -> 'args -> 'args) -> 'args t -> 'args t -> 'args t
 
-  val allocates_other_than_calling_arguments : 'args t -> bool
+  val is_allocation_other_than_calling_arguments : 'args t -> bool
 
   val top : 'args t
 

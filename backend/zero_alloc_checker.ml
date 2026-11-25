@@ -879,7 +879,7 @@ end = struct
     let args_with_top (top : Top.t) args =
       if
         (not (Args.has_witnesses args))
-        && Allocation_source.allocates_other_than_calling_arguments
+        && Allocation_source.is_allocation_other_than_calling_arguments
              top.allocation_source
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
@@ -889,7 +889,7 @@ end = struct
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
         if
-          Allocation_source.allocates_other_than_calling_arguments
+          Allocation_source.is_allocation_other_than_calling_arguments
             top.allocation_source
         then
           Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
@@ -1194,7 +1194,7 @@ end = struct
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
         Witnesses.is_empty witnesses
-        && Allocation_source.allocates_other_than_calling_arguments
+        && Allocation_source.is_allocation_other_than_calling_arguments
              w.allocation_source
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
@@ -1226,7 +1226,7 @@ end = struct
       if
         Transform.has_witnesses tr
         || not
-             (Allocation_source.allocates_other_than_calling_arguments
+             (Allocation_source.is_allocation_other_than_calling_arguments
                 w.allocation_source)
       then Join (Join.tr_with_top tr w)
       else top
@@ -1234,7 +1234,7 @@ end = struct
       if
         Join.has_witnesses j
         || not
-             (Allocation_source.allocates_other_than_calling_arguments
+             (Allocation_source.is_allocation_other_than_calling_arguments
                 w.allocation_source)
       then Join (Join.add_top j w)
       else top
@@ -1294,7 +1294,7 @@ end = struct
       if
         (Join.has_safe j || Option.is_some (Join.get_top j))
         && (not (Join.has_witnesses j))
-        && Allocation_source.allocates_other_than_calling_arguments
+        && Allocation_source.is_allocation_other_than_calling_arguments
              w.allocation_source
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
