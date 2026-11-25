@@ -13,12 +13,9 @@ in
 let code to_hex_7 deleted in
 let $camlTo_hex__immstring_2 = "To_hex.Stdlib.Exit" in
 let $camlTo_hex__immstring_1 = "Pervasives.array_bound_error" in
-let $camlTo_hex__Pmakeblock_5 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring_0)
-in
 apply ccall
   ($`*extern*`.caml_register_named_value : val * val -> val)
-    ($camlTo_hex__immstring_1, $camlTo_hex__Pmakeblock_5)
+    ($camlTo_hex__immstring_1, $camlTo_hex__block_4)
     -> k1 * error
   where k1 (param) =
     cont k
@@ -33,7 +30,7 @@ apply ccall
       in
       cont k1 pop(regular k1) (Pmakeblock)
     in
-    let $camlTo_hex__failwith_6 = closure failwith_0_1 @failwith &toplevel in
+    let $camlTo_hex__failwith_5 = closure failwith_0_1 @failwith &toplevel in
     let code loopify(never) size(10) newer_version_of(invalid_arg_1)
           invalid_arg_1_1 (s : val)
             my_closure &my_alloc_region my_depth
@@ -45,13 +42,13 @@ apply ccall
       in
       cont k1 pop(regular k1) (Pmakeblock)
     in
-    let $camlTo_hex__invalid_arg_7 =
+    let $camlTo_hex__invalid_arg_6 =
       closure invalid_arg_1_1 @invalid_arg &toplevel
     in
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall) =
-         let $camlTo_hex__Exit_8 =
+         let $camlTo_hex__Exit_7 =
            Block immutable_unique
            248 ($camlTo_hex__immstring_2, Pccall)
          in
@@ -70,7 +67,7 @@ apply ccall
                  | 0 -> k (y)
                  | 1 -> k (x)
          in
-         let $camlTo_hex__min_9 = closure min_2_1 @min &toplevel in
+         let $camlTo_hex__min_8 = closure min_2_1 @min &toplevel in
          let code loopify(never) size(21) newer_version_of(max_3)
                max_3_1 (x : val, y : val)
                  my_closure &my_alloc_region my_depth
@@ -86,7 +83,7 @@ apply ccall
                  | 0 -> k (y)
                  | 1 -> k (x)
          in
-         let $camlTo_hex__max_10 = closure max_3_1 @max &toplevel in
+         let $camlTo_hex__max_9 = closure max_3_1 @max &toplevel in
          let code loopify(never) size(15) newer_version_of(abs_4)
                abs_4_1 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -100,7 +97,7 @@ apply ccall
                let int_neg = %int_barith.sub (0, x) in
                cont k (int_neg)
          in
-         let $camlTo_hex__abs_11 = closure abs_4_1 @abs &toplevel in
+         let $camlTo_hex__abs_10 = closure abs_4_1 @abs &toplevel in
          let code loopify(never) size(2) newer_version_of(lnot_5)
                lnot_5_1 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -109,11 +106,11 @@ apply ccall
            let int_xor = %int_uarith.not (x) in
            cont k (int_xor)
          in
-         let $camlTo_hex__lnot_12 = closure lnot_5_1 @lnot &toplevel in
-         let $camlTo_hex__Pmakeblock_13 =
-           Block 0 ($camlTo_hex__failwith_6,
-                    $camlTo_hex__invalid_arg_7,
-                    $camlTo_hex__Exit_8,
+         let $camlTo_hex__lnot_11 = closure lnot_5_1 @lnot &toplevel in
+         let $camlTo_hex__Pmakeblock_12 =
+           Block 0 ($camlTo_hex__failwith_5,
+                    $camlTo_hex__invalid_arg_6,
+                    $camlTo_hex__Exit_7,
                     $`*predef*`.caml_exn_Match_failure,
                     $`*predef*`.caml_exn_Assert_failure,
                     $`*predef*`.caml_exn_Invalid_argument,
@@ -126,10 +123,10 @@ apply ccall
                     $`*predef*`.caml_exn_Division_by_zero,
                     $`*predef*`.caml_exn_Sys_blocked_io,
                     $`*predef*`.caml_exn_Undefined_recursive_module,
-                    $camlTo_hex__min_9,
-                    $camlTo_hex__max_10,
-                    $camlTo_hex__abs_11,
-                    $camlTo_hex__lnot_12,
+                    $camlTo_hex__min_8,
+                    $camlTo_hex__max_9,
+                    $camlTo_hex__abs_10,
+                    $camlTo_hex__lnot_11,
                     4611686018427387903,
                     -4611686018427387904)
          in
@@ -146,7 +143,7 @@ apply ccall
                let int_add = %int_barith.add (n, staticcatch_result) in
                cont k (int_add)
          in
-         let $camlTo_hex__char_hex_14 =
+         let $camlTo_hex__char_hex_13 =
            closure char_hex_6_1 @char_hex &toplevel
          in
          let code loopify(never) size(97) newer_version_of(to_hex_7)
@@ -162,7 +159,7 @@ apply ccall
               | 1 -> k3
               where k3 =
                 apply direct(invalid_arg_1_1 &my_alloc_region)
-                  ($camlTo_hex__invalid_arg_7 : _ -> imm tagged)
+                  ($camlTo_hex__invalid_arg_6 : _ -> imm tagged)
                     ($camlTo_hex__immstring_3)
                     -> never * k1)
              where k2 (prim : imm) =
@@ -199,7 +196,7 @@ apply ccall
                               let x = %tag_imm (prim_3) in
                               ((let int_lsr = %int_shift.lsr (x, 4i) in
                                 apply direct(char_hex_6_1 &my_alloc_region)
-                                  ($camlTo_hex__char_hex_14 : _ -> imm tagged
+                                  ($camlTo_hex__char_hex_13 : _ -> imm tagged
                                    )
                                     (int_lsr)
                                     -> k4 * k1)
@@ -222,7 +219,7 @@ apply ccall
                                      apply
                                             direct(char_hex_6_1
                                             &my_alloc_region)
-                                       ($camlTo_hex__char_hex_14
+                                       ($camlTo_hex__char_hex_13
                                         : _ -> imm tagged)
                                          (int_and)
                                          -> k4 * k1)
@@ -256,10 +253,10 @@ apply ccall
                             where k3 =
                               cont k1 pop(regular k1) ($camlTo_hex__block_4))))
          in
-         let $camlTo_hex__to_hex_15 = closure to_hex_7_1 @to_hex &toplevel in
+         let $camlTo_hex__to_hex_14 = closure to_hex_7_1 @to_hex &toplevel in
          let $camlTo_hex =
-           Block 0 ($camlTo_hex__Pmakeblock_13,
-                    $camlTo_hex__char_hex_14,
-                    $camlTo_hex__to_hex_15)
+           Block 0 ($camlTo_hex__Pmakeblock_12,
+                    $camlTo_hex__char_hex_13,
+                    $camlTo_hex__to_hex_14)
          in
          cont done ($camlTo_hex))

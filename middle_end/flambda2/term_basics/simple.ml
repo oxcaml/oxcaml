@@ -206,11 +206,16 @@ module With_debuginfo = struct
 
     let compare (s1, dbg1) (s2, dbg2) =
       let c = compare s1 s2 in
-      if c <> 0 then c else Debuginfo.compare dbg1 dbg2
+      if c <> 0 || not !Dwarf_flags.gdwarf_may_alter_codegen
+      then c
+      else Debuginfo.compare dbg1 dbg2
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let hash = Hashtbl.hash
+    let hash ((s, _) as t) =
+      if !Dwarf_flags.gdwarf_may_alter_codegen
+      then Hashtbl.hash t
+      else Int_ids.Simple.hash s
 
     let print ppf (simple, dbg) =
       let open! Misc.Sexp in
