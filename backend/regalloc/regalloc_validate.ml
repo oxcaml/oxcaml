@@ -628,41 +628,33 @@ end = struct
       rematerialized : (InstructionId.t, basic Instruction.t) Hashtbl.t
     }
 
-  (* Checks the rematerialization the allocator recorded for the added
-     instruction [instr] (cf. [Regalloc_rematerializations]) against the
-     description, and returns the description-level instruction the equation
-     transfer is to use for [instr]: the recorded source instruction, with the
-     pseudo-register whose stamp was recorded (call it [reg]) as its result.
+  (* [instr] must recompute the value of the description pseudo-register named
+     by the recorded stamp (call it [reg]). The caller has checked
+     [is_rematerialized_shape], so the same arguments produce the same value. We
+     check:
 
-     The transfer thereby treats [instr] as computing the value of [reg] from
-     the values of the source's arguments where [instr] stands. For the
-     description alone to justify this, we check that:
+     - Same operation: the recorded source is in the description, has exactly
+     one result, and has the same [desc] as [instr].
 
-     - [instr] has the same [desc] as the source, which is a description
-     instruction with exactly one result;
+     - Stable values: the source's arguments and result, and every register on
+     the move chain to [reg], are pseudo-registers with exactly one definition
+     outside any cycle. Each is therefore assigned at most once per function
+     execution.
 
-     - the source's result and arguments, and every register on the chain from
-     [reg] back to the source's result, are pseudo-registers with exactly one
-     definition, in a block that is not part of any cycle: such a register is
-     assigned at most once per execution of the function, so it keeps the same
-     value once defined, and the source's result is then equal to the source
-     applied to its arguments wherever both are defined;
+     - Same value: [reg] is the source's result, or is reached from it through
+     moves between registers of the same machtype.
 
-     - [reg] is the source's result, or is reached from it through moves between
-     registers of the same machtype (each move defining the next register of the
-     chain).
+     - Safe load placement: the source load's original block strictly dominates
+     [instr]'s block, so the copy does not introduce a speculative load.
 
-     The equations check the source's arguments at [instr], but do not prove
-     that the source has already executed: the copy itself discharges the result
-     equation. For loads we separately require the source's original block to
-     strictly dominate the copy's block. Split inserts copies at block entry, so
-     their sources must be in earlier blocks. Using the description's source
-     block also covers sources subsequently deleted as dead code. Since basic
-     instructions cannot raise, the source executed before every exit from that
-     block in the original CFG, making the copy non-speculative.
-     [Regalloc_split_utils.is_rematerializable_shape] then ensures the same
-     arguments produce the same value (immutable non-atomic loads, constants,
-     pure arithmetic). *)
+     - Valid operands: [instr] has matching argument/result arities and known
+     locations.
+
+     We return the source's description arguments and [reg] as its result. The
+     equation transfer separately checks that the copy receives those argument
+     values and does not clobber other live values. It does not establish that
+     the source load executed: the copy itself discharges the result
+     equation. *)
   let verify_rematerialization ctx t ~label (instr : basic Cfg.instruction) :
       basic Instruction.t =
     let id = instr.id in
@@ -762,6 +754,10 @@ end = struct
       definition.def_register
     in
     let res = check_chain ~visited:[] rematerialized in
+    (* Copies are inserted at block entry, so a load's source must be in an
+       earlier block. Use its original block even if dead-code elimination
+       removed the source. Basic instructions cannot raise, so every exit from
+       that block executed the load in the original CFG. *)
     (match instr.desc with
     | Op (Load _) ->
       let source_label = Hashtbl.find t.instruction_labels source in
