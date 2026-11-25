@@ -117,7 +117,7 @@ class Toolchain:
                     "-flambda2-match-in-match",
                     "-flambda2-join-algorithm",
                     "n-way",
-                    "-experimental-optimizations",
+                    "-test-optimizations",
                     "-no-ssa-validate",
                     "-no-float-op-fusion",
                     "-caml-apply-inline-fast-path",

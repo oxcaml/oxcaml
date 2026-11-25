@@ -278,11 +278,11 @@ let mk_no_cfg_copy_propagation f =
     Arg.Unit f,
     " Disables copy propagation before register allocation" )
 
-let mk_experimental_optimizations f =
-  ( "-experimental-optimizations",
+let mk_test_optimizations f =
+  ( "-test-optimizations",
     Arg.Unit f,
-    " Enable a bundle of experimental codegen optimizations that are not yet \
-     on by default (subject to change)" )
+    " Enable a bundle of codegen optimizations for testing (subject to change)"
+  )
 
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
@@ -1529,7 +1529,7 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val cfg_copy_propagation : unit -> unit
   val no_cfg_copy_propagation : unit -> unit
-  val experimental_optimizations : unit -> unit
+  val test_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
@@ -1753,7 +1753,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_cfg_copy_propagation F.cfg_copy_propagation;
       mk_no_cfg_copy_propagation F.no_cfg_copy_propagation;
-      mk_experimental_optimizations F.experimental_optimizations;
+      mk_test_optimizations F.test_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
@@ -2524,9 +2524,8 @@ module Oxcaml_options_impl = struct
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
-  (* Bundle of experimental codegen optimizations enabled by
-     [-experimental-optimizations]. *)
-  let experimental_optimizations () =
+  (* Bundle of codegen optimizations enabled by [-test-optimizations]. *)
+  let test_optimizations () =
     x86_peephole_optimize ();
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
@@ -2734,9 +2733,9 @@ module Extra_params = struct
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
     | "cfg-copy-propagation" -> set' Oxcaml_flags.cfg_copy_propagation
-    | "experimental-optimizations" ->
+    | "test-optimizations" ->
         if Compenv.check_bool ppf name v then
-          Oxcaml_options_impl.experimental_optimizations ();
+          Oxcaml_options_impl.test_optimizations ();
         true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail

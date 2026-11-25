@@ -657,7 +657,7 @@ let ocaml_ignored_flags =
     "-dzero-alloc";
     "-dletreclambda";
     "-dcounters";
-    "-experimental-optimizations";
+    "-test-optimizations";
     "-vectorize";
     "-no-vectorize";
     "-dvectorize";

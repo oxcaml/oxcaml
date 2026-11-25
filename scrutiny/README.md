@@ -11,7 +11,7 @@ The process is the same.
 
 The metadata checker, status table generation, and CI check are implemented.
 The compiler integration described below—generated per-feature flags,
-universe selection, and replacement of `-experimental-optimizations`—is
+universe selection, and selecting a universe through `-test-optimizations`—is
 planned for a follow-up.
 
 ## Code layout
@@ -48,14 +48,37 @@ backend/debug/dwarf/call_sites/SCRUTINY
   and `-no-experimental-<name>` flags apply on top, in command-line order, so
   a universe sets the baseline and single features can be added or removed
   from it.
-- The default test suite runs with every experimental flag off, unless explicitly
-  overriden.
+- The default test suite runs with every experimental flag off, unless
+  explicitly overridden.
 - When a feature is promoted (enabled by default), its flag is renamed
   without the prefix or removed entirely. The prefix therefore always means
   "not yet promoted". Options that have become invariants are removed.
-- `-experimental-optimizations` predates this scheme and is a bundle of
-  older codegen options. It should be replaced by
-  `-experimental-universe=<ai-reviewed>`.
+
+### Testing preset
+
+`-test-optimizations` (formerly `-experimental-optimizations`) enables a
+bundle of already-reviewed codegen options. Those options have their own
+flags outside the `-experimental-*` namespace and do not need `SCRUTINY`
+registrations or review headers. Being off by default does not itself put a
+feature under this workflow.
+
+The flag currently enables only that bundle, including its register-allocation
+parameter settings. Once universe selection is implemented, it will also
+select `-experimental-universe=ai-reviewed`. These remain separate operations:
+selecting a universe affects only registered features. In particular,
+`-experimental-universe=none` after the testing preset will disable registered
+features but leave the older bundle enabled. Individual flags retain their
+normal command-line ordering.
+
+The preset is intended for CI, regression tests and fuzzing, not as an
+optimization level. Registered features need not be optimizations. Once the
+preset selects a universe, tests using it will opt into new features as they
+join that universe, so their expected assembly may change. Tests that require
+a fixed configuration should use explicit flags instead.
+
+CI enables the preset with `OCAMLPARAM=_,test-optimizations=1`. CI must retain
+coverage of both the older bundle and the registered features once universe
+selection is implemented.
 
 ## Files
 
