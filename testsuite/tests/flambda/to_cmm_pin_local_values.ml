@@ -55,6 +55,21 @@ let[@inline never] try_region a b =
     let u, v = p in
     y + u + v - 3000 - (2 * b)
 
+(* As above, with the [try] in [exclave_] position: the body of the [try] then
+   allocates in the caller's region, which is not begun in this function, but
+   the [End_try_region] of the handler still frees those allocations. *)
+
+let[@inline never] try_exclave a b =
+  exclave_
+    (try
+       let q = Sys.opaque_identity (stack_ (a, b)) in
+       let x = fst q in
+       if b > 0 then raise (E x) else stack_ (0, 0)
+     with E y ->
+       let p = Sys.opaque_identity (stack_ (b + 1000, b + 2000)) in
+       let u, v = p in
+       stack_ (y + u + v - 3000 - (2 * b), 0))
+
 (* [Is_int] of a local value does not read memory, but moving it past the end
    of the region keeps the pointer live across the allocations that follow,
    where the memory has been reused. A GC there takes the word before the
@@ -175,6 +190,7 @@ let () =
   Printf.printf "join: %d\n"
     (join 10 20 (Sys.opaque_identity true) (Sys.opaque_identity true));
   Printf.printf "try_region: %d\n" (try_region 10 20);
+  Printf.printf "try_exclave: %d\n" (fst (try_exclave 10 20));
   Printf.printf "boxed_float: %d\n"
     (boxed_float 10. 20. (Sys.opaque_identity true));
   Printf.printf "loop_carried: %d\n"

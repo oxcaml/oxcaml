@@ -45,6 +45,11 @@ let reachable (graph : graph) seeds =
 type acc =
   { mutable region_graph : graph;
     mutable begun_regions : Variable.Set.t;
+    mutable try_parent_regions : Variable.Set.t;
+        (* The regions in which the bodies of the [try]s of the body allocate,
+           that is, the parents of its try regions. [End_try_region] frees
+           everything allocated in the parent region since the try region was
+           begun. *)
     mutable ended_regions : Variable.Set.t;
     mutable value_graph : graph;
     mutable local_allocs : (Variable.t * Variable.t) list;
@@ -155,8 +160,18 @@ let record_alloc acc var (alloc_mode : Alloc_mode.For_allocations.t) =
 
 let record_prim acc var (prim : P.t) =
   match[@ocaml.warning "-4"] prim with
-  | Variadic ((Begin_region _ | Begin_try_region _), _) ->
+  | Variadic (Begin_region _, _) ->
     acc.begun_regions <- Variable.Set.add var acc.begun_regions
+  | Variadic (Begin_try_region _, parents) ->
+    acc.begun_regions <- Variable.Set.add var acc.begun_regions;
+    List.iter
+      (fun parent ->
+        match var_of_simple parent with
+        | None -> ()
+        | Some parent ->
+          acc.try_parent_regions
+            <- Variable.Set.add parent acc.try_parent_regions)
+      parents
   | Unary ((End_region _ | End_try_region _), region) -> (
     match var_of_simple region with
     | None -> ()
@@ -457,6 +472,7 @@ let rewrite ~params ~my_region ~my_ghost_region body =
     let acc =
       { region_graph = Variable.Map.empty;
         begun_regions = Variable.Set.empty;
+        try_parent_regions = Variable.Set.empty;
         ended_regions = Variable.Set.empty;
         value_graph = Variable.Map.empty;
         local_allocs = [];
@@ -489,10 +505,20 @@ let rewrite ~params ~my_region ~my_ghost_region body =
              same function body"
             Variable.print region)
       acc.ended_regions;
+    (* A value may be freed in the body if it is allocated in a region begun in
+       the body, or in the parent region of a try region begun in the body
+       (allocations in the body of a [try] go to the parent region, and the
+       [End_try_region] of the handler frees them; the parent may be a region of
+       the caller, such as [my_region] when the [try] is in [exclave_]
+       position). *)
+    let freed_regions =
+      reachable acc.region_graph
+        (Variable.Set.union acc.begun_regions acc.try_parent_regions)
+    in
     let seeds =
       List.fold_left
         (fun seeds (var, region) ->
-          if Variable.Set.mem region local_regions
+          if Variable.Set.mem region freed_regions
           then Variable.Set.add var seeds
           else seeds)
         Variable.Set.empty acc.local_allocs
@@ -500,7 +526,7 @@ let rewrite ~params ~my_region ~my_ghost_region body =
     let seeds =
       List.fold_left
         (fun seeds (k, region) ->
-          if not (Variable.Set.mem region local_regions)
+          if not (Variable.Set.mem region freed_regions)
           then seeds
           else
             match Continuation.Map.find_opt k acc.cont_params with

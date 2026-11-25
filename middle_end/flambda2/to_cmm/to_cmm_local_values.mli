@@ -23,11 +23,15 @@
 
     The sources are allocations whose [Alloc_mode] is [Local] and the results of
     applications whose return mode is [Maybe_alloc_stack], when the region
-    concerned is begun in the body. Values flow through [Simple] bindings,
-    primitives whose result is of kind [Value], and continuation parameters
-    (including the extra parameters of exception continuations). A block is not
-    tainted by its fields: a block on the heap, or in a region enclosing the
-    body, cannot point into a region ended in the body.
+    concerned is begun in the body or is the parent of a try region begun in the
+    body (the body of a [try] allocates in the parent region, and the
+    [End_try_region] of the handler frees those allocations; the parent may be a
+    region of the caller when the [try] is in [exclave_] position). Values flow
+    through [Simple] bindings, primitives whose result is of kind [Value], and
+    continuation parameters (including the extra parameters of exception
+    continuations). A block is not tainted by its fields: a block on the heap,
+    or in a region enclosing the body, cannot point into a region ended in the
+    body.
 
     Every region ended in the body is checked to have been begun in the body,
     and not to be an alias of a region passed in as a parameter. Ending a region
