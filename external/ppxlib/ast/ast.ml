@@ -130,7 +130,6 @@ and direction_flag = Asttypes.direction_flag = Upto | Downto
 (* Order matters, used in polymorphic comparison *)
 and private_flag = Asttypes.private_flag = Private | Public
 and mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
-and atomic_flag = Asttypes.atomic_flag = Nonatomic | Atomic
 and access_flag = Asttypes.access_flag = Immutable_access | Mutable_access | Atomic_access
 and virtual_flag = Asttypes.virtual_flag = Virtual | Concrete
 and override_flag = Asttypes.override_flag = Override | Fresh
@@ -1528,7 +1527,6 @@ class virtual map =
     method direction_flag : direction_flag -> direction_flag= fun x -> x
     method private_flag : private_flag -> private_flag= fun x -> x
     method mutable_flag : mutable_flag -> mutable_flag= fun x -> x
-    method atomic_flag : atomic_flag -> atomic_flag= fun x -> x
     method access_flag : access_flag -> access_flag= fun x -> x
     method virtual_flag : virtual_flag -> virtual_flag= fun x -> x
     method override_flag : override_flag -> override_flag= fun x -> x
@@ -2813,7 +2811,6 @@ class virtual iter =
     method direction_flag : direction_flag -> unit= fun _ -> ()
     method private_flag : private_flag -> unit= fun _ -> ()
     method mutable_flag : mutable_flag -> unit= fun _ -> ()
-    method atomic_flag : atomic_flag -> unit= fun _ -> ()
     method access_flag : access_flag -> unit= fun _ -> ()
     method virtual_flag : virtual_flag -> unit= fun _ -> ()
     method override_flag : override_flag -> unit= fun _ -> ()
@@ -3730,7 +3727,6 @@ class virtual ['acc] fold =
     method direction_flag : direction_flag -> 'acc -> 'acc= fun _ acc -> acc
     method private_flag : private_flag -> 'acc -> 'acc= fun _ acc -> acc
     method mutable_flag : mutable_flag -> 'acc -> 'acc= fun _ acc -> acc
-    method atomic_flag : atomic_flag -> 'acc -> 'acc= fun _ acc -> acc
     method access_flag : access_flag -> 'acc -> 'acc= fun _ acc -> acc
     method virtual_flag : virtual_flag -> 'acc -> 'acc= fun _ acc -> acc
     method override_flag : override_flag -> 'acc -> 'acc= fun _ acc -> acc
@@ -4893,8 +4889,6 @@ class virtual ['acc] fold_map =
     method private_flag : private_flag -> 'acc -> (private_flag * 'acc)=
       fun x acc -> (x, acc)
     method mutable_flag : mutable_flag -> 'acc -> (mutable_flag * 'acc)=
-      fun x acc -> (x, acc)
-    method atomic_flag : atomic_flag -> 'acc -> (atomic_flag * 'acc)=
       fun x acc -> (x, acc)
     method access_flag : access_flag -> 'acc -> (access_flag * 'acc)=
       fun x acc -> (x, acc)
@@ -6508,7 +6502,6 @@ class virtual ['ctx] map_with_context =
       fun _ctx x -> x
     method mutable_flag : 'ctx -> mutable_flag -> mutable_flag=
       fun _ctx x -> x
-    method atomic_flag : 'ctx -> atomic_flag -> atomic_flag= fun _ctx x -> x
     method access_flag : 'ctx -> access_flag -> access_flag= fun _ctx x -> x
     method virtual_flag : 'ctx -> virtual_flag -> virtual_flag=
       fun _ctx x -> x
@@ -7910,11 +7903,6 @@ class virtual ['res] lift =
         match x with
         | Immutable -> self#constr "Immutable" []
         | Mutable -> self#constr "Mutable" []
-    method atomic_flag : atomic_flag -> 'res=
-      fun x ->
-        match x with
-        | Nonatomic -> self#constr "Nonatomic" []
-        | Atomic -> self#constr "Atomic" []
     method access_flag : access_flag -> 'res=
       fun x ->
         match x with
@@ -9548,8 +9536,6 @@ class virtual ['ctx,'res] lift_map_with_context =
     method private_flag : 'ctx -> private_flag -> (private_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method mutable_flag : 'ctx -> mutable_flag -> (mutable_flag * 'res)=
-      fun ctx x -> (x, (self#other ctx x))
-    method atomic_flag : 'ctx -> atomic_flag -> (atomic_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method access_flag : 'ctx -> access_flag -> (access_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))

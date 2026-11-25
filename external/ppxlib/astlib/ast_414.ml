@@ -35,8 +35,6 @@ module Asttypes = struct
 
   type mutable_flag (*IF_CURRENT = Asttypes.mutable_flag *) = Immutable | Mutable
 
-  type atomic_flag (*IF_CURRENT = Asttypes.atomic_flag *) = Nonatomic | Atomic
-
   type access_flag (*IF_CURRENT = Asttypes.access_flag *) =
     | Immutable_access
     | Mutable_access
