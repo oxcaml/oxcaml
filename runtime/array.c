@@ -1096,6 +1096,8 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLassert (Tag_val(idx) == 0);
   value res;
   mlsize_t depth = Wosize_val(idx);
+  /* We check for [Double_array_tag] even if [FLAT_FLOAT_ARRAY] is false,
+     because [float# array]s are always flat float arrays in bytecode. */
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
@@ -1134,6 +1136,8 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLparam3 (base, idx, v);
   CAMLassert (Tag_val(idx) == 0);
   mlsize_t depth = Wosize_val(idx);
+  /* We check for [Double_array_tag] even if [FLAT_FLOAT_ARRAY] is false,
+     because [float# array]s are always flat float arrays in bytecode. */
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
