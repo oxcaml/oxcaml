@@ -22,6 +22,23 @@ let[@inline never] exclave_both_arms a b c =
   in
   if c then exclave_ finish 1 else exclave_ finish 2
 
+(* As above, but the local value reaches the read through a continuation
+   parameter (the join point of the [if]). *)
+
+let[@inline never] join (a : int) (b : int) c d =
+  let q =
+    if c
+    then Sys.opaque_identity (stack_ (a, b))
+    else Sys.opaque_identity (stack_ (b, a))
+  in
+  let x = fst q in
+  let finish y =
+    let p = Sys.opaque_identity (stack_ (y + 1000, y + 2000)) in
+    let u, v = p in
+    x + u + v - 3000 - (2 * y)
+  in
+  if d then exclave_ finish 1 else exclave_ finish 2
+
 (* Issue #8114: the read of [q] is used in the handler of the [try], after the
    region of the [try] has ended. *)
 
@@ -70,6 +87,8 @@ let[@inline never] is_int n c k =
 let () =
   Printf.printf "exclave_both_arms: %d\n"
     (exclave_both_arms 10 20 (Sys.opaque_identity true));
+  Printf.printf "join: %d\n"
+    (join 10 20 (Sys.opaque_identity true) (Sys.opaque_identity true));
   Printf.printf "try_region: %d\n" (try_region 10 20);
   let k = Int64.float_of_bits 0x300L in
   let corrupted = ref 0 in
