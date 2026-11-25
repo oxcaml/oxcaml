@@ -839,6 +839,9 @@ let ocaml_ignored_flags =
     "-link-jsir";
     "-jsir-inlined-frames"
   ]
+  @ List.concat_map Experimental_feature_registry.all ~f:(fun feature ->
+      let name = Experimental_feature_registry.flag_name feature in
+      [ "-experimental-" ^ name; "-no-experimental-" ^ name ])
 
 let ocaml_ignored_parametrized_flags =
   [ "-experimental-universe";

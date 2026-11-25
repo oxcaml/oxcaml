@@ -11,8 +11,8 @@ The process is the same.
 
 The metadata checker, status table generation, CI check, build-time registry,
 and native compiler's per-feature flags, universe selection and testing preset
-are implemented. Merlin handling of generated per-feature switches remains
-planned for a follow-up.
+are implemented. Merlin derives its ignored per-feature switches from the same
+registry, so new registrations need no separate Merlin update.
 
 ## Code layout
 
