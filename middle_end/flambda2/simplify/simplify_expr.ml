@@ -28,6 +28,31 @@ let rebuild_terminator (terminator : Simplified_expr.simplified_terminator) uacc
     Simplify_switch_expr.rebuild_switch simplified_switch uacc ~after_rebuild
   | Simplified_invalid invalid -> EB.rebuild_invalid uacc invalid ~after_rebuild
 
+let simplified_expr_header dacc =
+  match DE.closure_info (DA.denv dacc) with
+  | Not_in_a_closure -> "During Simplify (toplevel)"
+  | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
+    "During Simplify (??)"
+  | Closure
+      { code_id;
+        return_continuation = _;
+        exn_continuation = _;
+        my_closure = _;
+        my_alloc_region = _
+      } ->
+    Format.asprintf "During Simplify of %a" Code_id.print code_id
+
+let print_simplified_expr ppf (expr, dacc) =
+  match DE.closure_info (DA.denv dacc) with
+  | Not_in_a_closure ->
+    Format.fprintf ppf "%a@\n%a" LCS.print
+      (DA.get_lifted_constants dacc)
+      Simplified_expr.print expr
+  | In_a_set_of_closures_but_not_yet_in_a_specific_closure | Closure _ ->
+    Format.fprintf ppf "%a@\n%a" LCS.print
+      (DA.get_lifted_constants dacc)
+      Simplified_expr.print expr
+
 let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
   let { Simplified_expr.simplified_lets_and_let_conts;
         simplified_terminator;
@@ -83,24 +108,11 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
       (Flambda_arity.create [Singleton K.With_subkind.any_value])
   in
   let expr, dacc = simplify dacc ~down_to_up:(fun dacc expr -> expr, dacc) in
-  let header =
-    match DE.closure_info (DA.denv dacc) with
-    | Not_in_a_closure -> "During Simplify (toplevel)"
-    | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
-      "During Simplify (??)"
-    | Closure
-        { code_id;
-          return_continuation = _;
-          exn_continuation = _;
-          my_closure = _;
-          my_alloc_region = _
-        } ->
-      Format.asprintf "During Simplify of %a" Code_id.print code_id
-  in
-  Flambda_dump.if_enabled ~header
+  Flambda_dump.if_enabled
+    ~header:(simplified_expr_header dacc)
     (DE.ppf_dump (DA.denv dacc))
     (Flambda_features.dump_simplified ())
-    ~f:Simplified_expr.print expr;
+    ~f:print_simplified_expr (expr, dacc);
   let expr, uacc =
     let dacc =
       DA.map_flow_acc dacc ~f:(Flow.Acc.exit_continuation dummy_toplevel_cont)

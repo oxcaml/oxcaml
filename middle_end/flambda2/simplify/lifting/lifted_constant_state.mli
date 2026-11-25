@@ -24,15 +24,19 @@ val is_empty : t -> bool
 
 val print : Format.formatter -> t -> unit
 
-val singleton : LC.t -> t
-
 val add : t -> LC.t -> t
 
-val singleton_list_of_constants : LC.t list -> t
+val add_list : t -> LC.t list -> t
 
-val union : t -> t -> t
+val of_list : LC.t list -> t
 
 val fold : t -> init:'a -> f:('a -> LC.t -> 'a) -> 'a
+
+(** Difference between two states that are related (one should be the ancestor
+    of another).
+
+    CR gbury: that's actually more like [sub] than [diff] in practice *)
+val diff : t -> t -> t
 
 val all_defined_symbols : t -> Symbol.Set.t
 

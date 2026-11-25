@@ -169,24 +169,28 @@ let add_to_lifted_constant_accumulator ?also_add_to_env t constants =
   let also_add_to_env =
     match also_add_to_env with None -> false | Some () -> true
   in
-  let lifted_constants = LCS.union t.lifted_constants constants in
+  let lifted_constants = LCS.add_list t.lifted_constants constants in
   let denv =
     if also_add_to_env
-    then DE.add_lifted_constant_state t.denv constants
+    then DE.add_lifted_constant_state t.denv (LCS.of_list constants)
     else t.denv
   in
   { t with lifted_constants; denv }
 
+let fast_forward_lifted_constant_accumulator ?also_add_to_env t lcs =
+  let also_add_to_env =
+    match also_add_to_env with None -> false | Some () -> true
+  in
+  let denv =
+    if also_add_to_env
+    then DE.add_lifted_constant_state t.denv (LCS.diff t.lifted_constants lcs)
+    else t.denv
+  in
+  { t with lifted_constants = lcs; denv }
+
 let get_lifted_constants t = t.lifted_constants
 
-let clear_lifted_constants t = { t with lifted_constants = LCS.empty }
-
 let no_lifted_constants t = LCS.is_empty t.lifted_constants
-
-let get_and_clear_lifted_constants t =
-  let constants = t.lifted_constants in
-  let t = clear_lifted_constants t in
-  t, constants
 
 let find_shareable_constant t static_const =
   Static_const.Map.find_opt static_const t.shareable_constants
