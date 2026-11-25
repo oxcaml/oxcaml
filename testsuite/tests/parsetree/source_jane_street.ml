@@ -1974,3 +1974,28 @@ let f ({ contents = (x as deref_ a) as y }) = #(x, a, y)
 [%%expect{|
 val f : 'a ref -> #('a * 'a addr * 'a) = <fun>
 |}]
+
+(******************)
+(* Slice patterns *)
+
+let f = function
+  | [&| |] -> 0
+  | [&| x |] -> x
+  | [&| x; y; |] -> x + y
+  | _ -> 0
+let g = function [&: :] -> 0 | [&: x :] -> x | _ -> 0
+[%%expect{|
+Line 2, characters 4-10:
+2 |   | [&| |] -> 0
+        ^^^^^^
+Error: Slice patterns are not supported yet.
+|}]
+
+(* Rests are parsed, but not supported yet *)
+let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
+[%%expect{|
+Line 1, characters 37-58:
+1 | let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
+                                         ^^^^^^^^^^^^^^^^^^^^^
+Error: Slice patterns are not supported yet.
+|}]
