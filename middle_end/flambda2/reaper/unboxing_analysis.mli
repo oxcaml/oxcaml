@@ -114,6 +114,15 @@ val find_code_metadata :
 
 val pp_result : Format.formatter -> result -> unit
 
+(** Relations of the database resulting from [perform_analysis], used by
+    [Escape_analysis]: [cannot_change_calling_convention_relation code_id] means
+    that not all call sites of the function are known calls, and [to_unbox x]
+    that the allocation [x] is going to be unboxed. *)
+val cannot_change_calling_convention_relation :
+  Code_id_or_name.t Datalog.Term.t -> [> `Atom of Datalog.atom]
+
+val to_unbox : Code_id_or_name.t Datalog.Term.t -> [> `Atom of Datalog.atom]
+
 val perform_analysis :
   ?stats:Datalog.Schedule.stats ->
   Datalog.database ->

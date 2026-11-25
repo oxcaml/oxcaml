@@ -1,0 +1,9 @@
+14,15c14,16
+< (let try_region = %begin_try_region () in 
+< let try_ghost_region = %begin_try_ghost_region () in 
+---
+> let ghost_region = %begin_ghost_region () in 
+> (let try_region = %begin_try_region (`region`) in 
+> let try_ghost_region = %begin_try_ghost_region (ghost_region) in 
+33a35
+> let unit_1 = %end_ghost_region (ghost_region) in 

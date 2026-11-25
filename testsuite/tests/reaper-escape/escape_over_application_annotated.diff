@@ -1,0 +1,4 @@
+87c87
+< where k2 = let `fn[test.ml]` = closure `fn[test.ml]_8_1` @`fn[test.ml]` &my_alloc_region with { unboxed_field_t_field_1_1 = t_into_t_field_1; unboxed_field_u_field_1 = u_into_u_field_1; unboxed_field_u_field_0 = u_into_u_field_0 } in 
+---
+> where k2 = let `fn[test.ml]` = closure `fn[test.ml]_8_1` @`fn[test.ml]` &my_alloc_region with { unboxed_field_u_field_1 = u_into_u_field_1; unboxed_field_u_field_0 = u_into_u_field_0; unboxed_field_t_field_1_1 = t_into_t_field_1 } in 

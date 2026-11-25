@@ -1,0 +1,11 @@
+32c32
+< let code inline(never) loopify(never) size(27) newer_version_of(papp_exported_2) papp_exported_2_1 (f : val, m : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : val = let `region` = %begin_region () in 
+---
+> let code inline(never) loopify(never) size(28) newer_version_of(papp_exported_2) papp_exported_2_1 (f : val, m : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : val = let `region` = %begin_region () in 
+37,38c37,39
+< where k2 (k : val) = (apply direct(sum_pair_0_1 &my_alloc_region) ($camlTest__sum_pair_4 : _ -> imm tagged) (tmp) -> k3 * k1
+< where k3 (function_return : imm tagged) = cont k2
+---
+> where k2 (k : val) = (apply direct(sum_pair_0_1 &my_alloc_region) ($camlTest__sum_pair_4 : _ -> imm tagged) (tmp) -> k4 * k1
+> where k4 (function_return : imm tagged) = cont k3
+> where k3 = cont k2

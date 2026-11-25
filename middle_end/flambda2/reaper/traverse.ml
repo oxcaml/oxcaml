@@ -408,6 +408,7 @@ let traverse_apply denv acc apply : rev_expr =
       let (Normal params) = Env.find_cont denv cont in
       params
   in
+  Escape_traverse.record_apply denv acc apply ~return_args;
   let exn_arg =
     let exn = Apply.exn_continuation apply in
     let extra_args = Exn_continuation.extra_args exn in
@@ -468,6 +469,8 @@ let traverse_apply denv acc apply : rev_expr =
 
 let traverse_apply_cont denv acc apply_cont : rev_expr =
   let expr = Apply_cont apply_cont in
+  Escape_traverse.note_jump_to denv acc
+    (Apply_cont_expr.continuation apply_cont);
   apply_cont_deps denv acc apply_cont;
   { expr; holed_expr = Env.parent denv }
 
@@ -475,7 +478,11 @@ let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
-    (fun _ arm -> apply_cont_deps denv acc (Switch_arm.action arm))
+    (fun _ arm ->
+      let action = Switch_arm.action arm in
+      Escape_traverse.note_jump_to denv acc
+        (Apply_cont_expr.continuation action);
+      apply_cont_deps denv acc action)
     (Switch_expr.arms switch);
   { expr; holed_expr = Env.parent denv }
 
@@ -561,6 +568,7 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let let_acc =
     Let { bound_pattern; defining_expr = named; parent = Env.parent denv }
   in
+  let denv = Escape_traverse.enter_let denv acc ~bound_pattern defining_expr in
   let denv = Env.with_parent denv let_acc in
   traverse denv acc body
 
@@ -639,12 +647,21 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         Env.add_cont denv cont (Normal params))
       handlers denv
   in
+  let handlers_denv =
+    Escape_traverse.enter_recursive_handlers denv acc
+      ~conts:(Continuation.Lmap.keys handlers)
+      ~params:
+        (invariant_params_vars
+        @ List.concat_map
+            (fun (_, bp, _) -> Bound_parameters.vars bp)
+            (Continuation.Lmap.data handlers))
+  in
   let handlers =
     Continuation.Lmap.map
       (fun (cont_handler, bound_parameters, handler) ->
         let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
         let is_cold = Continuation_handler.is_cold cont_handler in
-        let expr = traverse (Env.with_parent denv Hole) acc handler in
+        let expr = traverse (Env.with_parent handlers_denv Hole) acc handler in
         let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
         handler)
       handlers
@@ -662,6 +679,10 @@ and traverse_cont_handler : type a.
   let is_cold = Continuation_handler.is_cold cont_handler in
   Continuation_handler.pattern_match cont_handler
     ~f:(fun bound_parameters ~handler ->
+      let denv =
+        Escape_traverse.enter_handler denv acc
+          ~params:(Bound_parameters.vars bound_parameters)
+      in
       let expr = traverse denv acc handler in
       let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
       k handler acc)
@@ -715,6 +736,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   let denv =
     Env.create ~parent:Hole ~conts ~current_code_id:(Some code_id)
       ~all_constants ~function_slots_to_keep ~value_slots_to_keep
+      ~escape:
+        (Escape_traverse.function_env acc ~code_id ~is_opaque ~my_alloc_mode
+           ~return ~exn ~return_continuation ~exn_continuation)
   in
   if not is_opaque
   then (
@@ -935,12 +959,15 @@ let run0 unit acc ~free_names ~all_constants () =
     traverse
       (Env.create ~parent:Hole ~conts ~current_code_id:None
          ~all_constants:(Name.symbol all_constants)
-         ~function_slots_to_keep ~value_slots_to_keep)
+         ~function_slots_to_keep ~value_slots_to_keep
+         ~escape:
+           (Escape_traverse.toplevel_env acc ~return_continuation
+              ~exn_continuation))
       acc (Flambda_unit.body unit) )
 
-let run (type f) (unit : Flambda_unit.t)
+let run (type f) ?escape (unit : Flambda_unit.t)
     ~(final_typing_env : (f, _) With_types.t) ~free_names =
-  let acc = Acc.create () in
+  let acc = Acc.create ?escape () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"

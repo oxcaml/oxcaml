@@ -1,0 +1,180 @@
+let code over_0 deleted in
+let code loop_1 deleted in
+let code step_2 deleted in
+let code h_4 deleted in
+let code run_3 deleted in
+let code growth_5 deleted in
+let $camlEscape_tail_over_application__immstring_0 = "stack growth " in
+let $camlEscape_tail_over_application__const_block_1 = Block 12 (10, 0) in
+let $camlEscape_tail_over_application__const_block_2 =
+  Block 4 (0, 0, 0, $camlEscape_tail_over_application__const_block_1)
+in
+let $camlEscape_tail_over_application__const_block_3 =
+  Block 12 (32, $camlEscape_tail_over_application__const_block_2)
+in
+let $camlEscape_tail_over_application__const_block_4 =
+  Block 4 (0, 0, 0, $camlEscape_tail_over_application__const_block_3)
+in
+let $camlEscape_tail_over_application__const_block_5 =
+  Block 11 ($camlEscape_tail_over_application__immstring_0,
+            $camlEscape_tail_over_application__const_block_4)
+in
+let $camlEscape_tail_over_application__immstring_6 = "stack growth %d %d\n"
+in
+let $camlEscape_tail_over_application__const_block_7 =
+  Block 0 ($camlEscape_tail_over_application__const_block_5,
+           $camlEscape_tail_over_application__immstring_6)
+in
+let `depth` = %block.mut.[`0`].`toplevel` (0) in
+let peak = %block.mut.[`0`].`toplevel` (0) in
+let code inline(never) loopify(never) size(6) newer_version_of(over_0)
+      over_0_1 (param : val, c : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region
+    param
+      (poison.val.reaper_unused_argument,
+       poison.val.reaper_unused_argument,
+       c)
+      -> k * k1
+in
+let $camlEscape_tail_over_application__over_8 =
+  closure over_0_1 @over &toplevel
+in
+let $camlEscape_tail_over_application__loop_9 =
+  closure loop_1_1 @loop &toplevel
+and $camlEscape_tail_over_application__step_10 =
+  closure step_2_1 @step &toplevel
+and code rec loopify(never) size(4) newer_version_of(step_2)
+      step_2_1 (f : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(loop_1_1 &my_alloc_region)
+    ($camlEscape_tail_over_application__loop_9 ~ depth my_depth -> succ my_depth
+     : _ -> imm tagged)
+      (f)
+      -> k * k1
+and code loopify(never) size(38) newer_version_of(loop_1)
+      loop_1_1 (f : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let depth_1 =
+    %project_value_slot.[loop].[unboxed_field_depth]
+      ($camlEscape_tail_over_application__loop_9)
+  in
+  let peak_1 =
+    %project_value_slot.[loop].[unboxed_field_peak]
+      ($camlEscape_tail_over_application__loop_9)
+  in
+  let Pfield = %block_load.mut.[`0`] (depth_1) in
+  let prim = %phys_eq (Pfield, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      (apply ccall
+         ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k3 * k1
+         where k3 (Pccall) =
+           let Psetfield = %block_set.`imm`.[`0`] (peak_1, Pccall) in
+           cont k (0))
+    where k2 =
+      let prim_1 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (depth_1)
+      in
+      let prim_2 = %int_barith.add (-1, prim_1) in
+      let Poffsetref =
+        %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (depth_1, prim_2)
+      in
+      apply direct(over_0_1 &my_alloc_region)
+        ($camlEscape_tail_over_application__over_8 : _ -> imm tagged)
+          (f, f)
+          -> k * k1
+  with { unboxed_field_depth = `depth`; unboxed_field_peak = peak }
+in
+let code loopify(never) size(1) newer_version_of(h_4)
+      h_4_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  cont k ($camlEscape_tail_over_application__step_10)
+in
+let $camlEscape_tail_over_application__run_11 =
+  closure run_3_1 @run &toplevel
+and code inline(never) loopify(never) size(18) newer_version_of(run_3)
+      run_3_1 (n : imm tagged, d : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let depth_1 =
+    %project_value_slot.[run].[`depth`]
+      ($camlEscape_tail_over_application__run_11)
+  in
+  let h = closure h_4_1 @h &my_alloc_region in
+  let Psetfield = %block_set.`imm`.[`0`] (depth_1, d) in
+  apply direct(loop_1_1 &my_alloc_region)
+    ($camlEscape_tail_over_application__loop_9 : _ -> imm tagged)
+      (h)
+      -> k * k1
+  with { `depth` = `depth` }
+in
+let $camlEscape_tail_over_application__Pmakeblock_12 =
+  Block 0 ($camlEscape_tail_over_application__run_11)
+in
+(let $camlEscape_tail_over_application__growth_13 =
+   closure growth_5_1 @growth &toplevel
+ and code loopify(never) size(21) newer_version_of(growth_5)
+       growth_5_1 (d : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let peak_1 =
+     %project_value_slot.[growth].[unboxed_field_peak_1]
+       ($camlEscape_tail_over_application__growth_13)
+   in
+   apply ccall
+     ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k3 * k2
+     where k3 (before) =
+       (apply direct(run_3_1 &my_alloc_region)
+          ($camlEscape_tail_over_application__run_11 : _ -> imm tagged)
+            (1, d)
+            -> k5 * k2
+          where k5 (function_return : imm tagged) =
+            cont k4
+          where k4 =
+            cont k3
+          where k3 =
+            let Pfield = %block_load.mut.[`0`] (peak_1) in
+            let int_sub = %int_barith.sub (Pfield, before) in
+            cont k1 (int_sub))
+   with { unboxed_field_peak_1 = peak }
+ in
+ apply direct(growth_5_1 &toplevel)
+   ($camlEscape_tail_over_application__growth_13 : _ -> imm tagged)
+     (5)
+     -> k1 * error
+   where k1 (g5 : imm tagged) =
+     (apply direct(growth_5_1 &toplevel)
+        ($camlEscape_tail_over_application__growth_13 : _ -> imm tagged)
+          (100)
+          -> k1 * error
+        where k1 (g100 : imm tagged) =
+          (apply direct(printf_13 &toplevel) inlined(never)
+             $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+               ($camlEscape_tail_over_application__const_block_7)
+               -> k1 * error
+             where k1 (full_apply) =
+               (apply &toplevel inlined(never)
+                  full_apply (g5, g100) -> k2 * error
+                  where k2 (function_return : imm tagged) =
+                    cont k1
+                  where k1 =
+                    cont k))))
+  where k =
+    let $camlEscape_tail_over_application =
+      Block 0 (`depth`,
+               peak,
+               $camlEscape_tail_over_application__Pmakeblock_12)
+    in
+    cont done ($camlEscape_tail_over_application)

@@ -1,0 +1,255 @@
+let code sum_pair_0 deleted in
+let code last_1 deleted in
+let code f3_2 deleted in
+let code f2_3 deleted in
+let code f1_4 deleted in
+let code handled_5 deleted in
+let $camlEscape_tail_call_never_returns__immstring_1 = "stack growth " in
+let $camlEscape_tail_call_never_returns__immstring_2 = "; handled " in
+let $camlEscape_tail_call_never_returns__const_block_3 = Block 12 (10, 0) in
+let $camlEscape_tail_call_never_returns__const_block_4 =
+  Block 4 (0, 0, 0, $camlEscape_tail_call_never_returns__const_block_3)
+in
+let $camlEscape_tail_call_never_returns__const_block_5 =
+  Block 11 ($camlEscape_tail_call_never_returns__immstring_2,
+            $camlEscape_tail_call_never_returns__const_block_4)
+in
+let $camlEscape_tail_call_never_returns__const_block_6 =
+  Block 4 (0, 0, 0, $camlEscape_tail_call_never_returns__const_block_5)
+in
+let $camlEscape_tail_call_never_returns__const_block_7 =
+  Block 11 ($camlEscape_tail_call_never_returns__immstring_1,
+            $camlEscape_tail_call_never_returns__const_block_6)
+in
+let $camlEscape_tail_call_never_returns__immstring_8 =
+  "stack growth %d; handled %d\n"
+in
+let $camlEscape_tail_call_never_returns__const_block_9 =
+  Block 0 ($camlEscape_tail_call_never_returns__const_block_7,
+           $camlEscape_tail_call_never_returns__immstring_8)
+in
+let $camlEscape_tail_call_never_returns__immstring_0 =
+  "Escape_tail_call_never_returns.Done"
+in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlEscape_tail_call_never_returns__Done_10 =
+      Block immutable_unique
+      248 ($camlEscape_tail_call_never_returns__immstring_0, Pccall)
+    in
+    let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+          sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let Pfield = %block_load.[`1`] (p) in
+      let Pfield_1 = %block_load.[`0`] (p) in
+      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      cont k (int_add)
+    in
+    let $camlEscape_tail_call_never_returns__sum_pair_11 =
+      closure sum_pair_0_1 @sum_pair &toplevel
+    in
+    let base = %block.mut.[`0`].`toplevel` (0) in
+    let $camlEscape_tail_call_never_returns__last_12 =
+      closure last_1_1 @last &toplevel
+    and code inline(never) loopify(never) size(26) newer_version_of(last_1)
+          last_1_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1 =
+      let base_1 =
+        %project_value_slot.[last].[base]
+          ($camlEscape_tail_call_never_returns__last_12)
+      in
+      let Pfield = %block_load.mut.[`0`] (base_1) in
+      apply ccall
+        ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k2 * k1
+        where k2 (Pccall_1) =
+          let int_sub = %int_barith.sub (Pccall_1, Pfield) in
+          let int_add = %int_barith.add (int_sub, n) in
+          let Pmakeblock =
+            %block.[`0`].my_alloc_region
+              ($camlEscape_tail_call_never_returns__Done_10, int_add)
+          in
+          cont k1 pop(reraise k1) (Pmakeblock)
+      with { base = base }
+    in
+    let code inline(never) loopify(never) size(23) newer_version_of(f3_2)
+          f3_2_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1 =
+      let `region` = %begin_region () in
+      let int_add = %int_barith.add (n, 1) in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_tail_call_never_returns__sum_pair_11 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          let int_add_1 = %int_barith.add (n, s) in
+          let int_sub = %int_barith.sub (int_add_1, s) in
+          let `unit` = %end_region (`region`) in
+          apply direct(last_1_1 &my_alloc_region)
+            $camlEscape_tail_call_never_returns__last_12
+              (int_sub)
+              -> never * k1
+    in
+    let $camlEscape_tail_call_never_returns__f3_13 =
+      closure f3_2_1 @f3 &toplevel
+    in
+    let code inline(never) loopify(never) size(23) newer_version_of(f2_3)
+          f2_3_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1 =
+      let `region` = %begin_region () in
+      let int_add = %int_barith.add (n, 1) in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_tail_call_never_returns__sum_pair_11 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          let int_add_1 = %int_barith.add (n, s) in
+          let int_sub = %int_barith.sub (int_add_1, s) in
+          let `unit` = %end_region (`region`) in
+          apply direct(f3_2_1 &my_alloc_region)
+            $camlEscape_tail_call_never_returns__f3_13
+              (int_sub)
+              -> never * k1
+    in
+    let $camlEscape_tail_call_never_returns__f2_14 =
+      closure f2_3_1 @f2 &toplevel
+    in
+    let code inline(never) loopify(never) size(23) newer_version_of(f1_4)
+          f1_4_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1 =
+      let `region` = %begin_region () in
+      let int_add = %int_barith.add (n, 1) in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_tail_call_never_returns__sum_pair_11 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          let int_add_1 = %int_barith.add (n, s) in
+          let int_sub = %int_barith.sub (int_add_1, s) in
+          let `unit` = %end_region (`region`) in
+          apply direct(f2_3_1 &my_alloc_region)
+            $camlEscape_tail_call_never_returns__f2_14
+              (int_sub)
+              -> never * k1
+    in
+    let $camlEscape_tail_call_never_returns__f1_15 =
+      closure f1_4_1 @f1 &toplevel
+    in
+    let code inline(never) loopify(never) size(51) newer_version_of(handled_5)
+          handled_5_1 (n : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let `region` = %begin_region () in
+      let int_add = %int_barith.add (n, 1) in
+      let t = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_tail_call_never_returns__sum_pair_11 : _ -> imm tagged)
+          (t)
+          -> k2 * k1
+        where k2 (s : imm tagged) =
+          let try_region = %begin_try_region () in
+          let try_ghost_region = %begin_try_ghost_region () in
+          (cont k3 push(k2)
+             where k3 =
+               let int_add_1 = %int_barith.add (n, s) in
+               let int_sub = %int_barith.sub (int_add_1, s) in
+               apply direct(last_1_1 &my_alloc_region)
+                 ($camlEscape_tail_call_never_returns__last_12
+                  : _ -> imm tagged)
+                   (int_sub)
+                   -> never * k2
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim =
+                 %phys_eq
+                   (Pfield, $camlEscape_tail_call_never_returns__Done_10)
+               in
+               (switch prim
+                  | 0 -> k1 pop(reraise k1) (`exn`)
+                  | 1 -> k2
+                  where k2 =
+                    (apply direct(sum_pair_0_1 &my_alloc_region)
+                       ($camlEscape_tail_call_never_returns__sum_pair_11
+                        : _ -> imm tagged)
+                         (t)
+                         -> k2 * k1
+                       where k2 (apply_result : imm tagged) =
+                         let Pfield_1 = %block_load.[`1`] (`exn`) in
+                         let int_add_1 =
+                           %int_barith.add (Pfield_1, apply_result)
+                         in
+                         let unit_2 = %end_region (`region`) in
+                         cont k (int_add_1))))
+    in
+    let $camlEscape_tail_call_never_returns__handled_16 =
+      closure handled_5_1 @handled &toplevel
+    in
+    (apply ccall
+       ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k1 * error
+       where k1 (Pccall_1) =
+         let Psetfield = %block_set.`imm`.[`0`] (base, Pccall_1) in
+         let try_region = %begin_try_region () in
+         let try_ghost_region = %begin_try_ghost_region () in
+         (cont k2 push(k1)
+            where k2 =
+              let Popaque = %opaque (0) in
+              apply direct(f1_4_1 &toplevel)
+                ($camlEscape_tail_call_never_returns__f1_15 : _ -> imm tagged
+                 )
+                  (Popaque)
+                  -> never * k1
+            where k1 exn (`exn` : val) =
+              let `unit` = %end_try_region (try_region) in
+              let unit_1 = %end_try_ghost_region (try_ghost_region) in
+              let Pfield = %block_load.[`0`] (`exn`) in
+              let prim =
+                %phys_eq
+                  (Pfield, $camlEscape_tail_call_never_returns__Done_10)
+              in
+              (switch prim
+                 | 0 -> error pop(reraise error) (`exn`)
+                 | 1 -> k1
+                 where k1 =
+                   let Pfield_1 = %block_load.[`1`] (`exn`) in
+                   ((let Popaque = %opaque (0) in
+                     apply direct(handled_5_1 &toplevel)
+                       ($camlEscape_tail_call_never_returns__handled_16
+                        : _ -> imm tagged)
+                         (Popaque)
+                         -> k1 * error)
+                      where k1 (h : imm tagged) =
+                        (apply direct(printf_13 &toplevel) inlined(never)
+                           $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+                             ($camlEscape_tail_call_never_returns__const_block_9)
+                             -> k1 * error
+                           where k1 (full_apply) =
+                             (apply &toplevel inlined(never)
+                                full_apply (Pfield_1, h) -> k2 * error
+                                where k2 (function_return : imm tagged) =
+                                  cont k1
+                                where k1 =
+                                  cont k)))))
+       where k =
+         let $camlEscape_tail_call_never_returns =
+           Block 0 ($camlEscape_tail_call_never_returns__Done_10,
+                    $camlEscape_tail_call_never_returns__sum_pair_11,
+                    base,
+                    $camlEscape_tail_call_never_returns__last_12,
+                    $camlEscape_tail_call_never_returns__f3_13,
+                    $camlEscape_tail_call_never_returns__f2_14,
+                    $camlEscape_tail_call_never_returns__f1_15,
+                    $camlEscape_tail_call_never_returns__handled_16)
+         in
+         cont done ($camlEscape_tail_call_never_returns))

@@ -1,0 +1,12 @@
+19,20c19,20
+< and code rec loopify(never) size(56) newer_version_of(pong_2) pong_2_1 (n : imm tagged, acc : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : [ 0 of imm tagged * imm tagged ] = let `region` = %begin_region () in 
+< let peak_1 = %project_value_slot.[pong].[unboxed_field_peak] ($camlTest__pong_9) in 
+---
+> and code rec loopify(never) size(56) newer_version_of(pong_2) pong_2_1 (n : imm tagged, acc : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : [ 0 of imm tagged * imm tagged ] = let peak_1 = %project_value_slot.[pong].[unboxed_field_peak] ($camlTest__pong_9) in 
+> let `region` = %begin_region () in 
+36,37c36,37
+< and code rec loopify(never) size(56) newer_version_of(ping_1) ping_1_1 (n : imm tagged, acc : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : [ 0 of imm tagged * imm tagged ] = let `region` = %begin_region () in 
+< let peak_1 = %project_value_slot.[ping].[unboxed_field_peak] ($camlTest__ping_8) in 
+---
+> and code rec loopify(never) size(56) newer_version_of(ping_1) ping_1_1 (n : imm tagged, acc : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : [ 0 of imm tagged * imm tagged ] = let peak_1 = %project_value_slot.[ping].[unboxed_field_peak] ($camlTest__ping_8) in 
+> let `region` = %begin_region () in 

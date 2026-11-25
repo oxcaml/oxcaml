@@ -1,0 +1,20 @@
+18c18
+< | 1 -> k2 (acc)
+---
+> | 1 -> k2
+25,26c25,26
+< where k2 (region_return : imm tagged) = let `unit` = %end_region (`region`) in 
+< cont k (region_return)
+---
+> where k2 = let `unit` = %end_region (`region`) in 
+> cont k (acc)
+31c31
+< | 1 -> k2 (acc)
+---
+> | 1 -> k2
+38,39c38,39
+< where k2 (region_return : imm tagged) = let `unit` = %end_region (`region`) in 
+< cont k (region_return) in 
+---
+> where k2 = let `unit` = %end_region (`region`) in 
+> cont k (acc) in 

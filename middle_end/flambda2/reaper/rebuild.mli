@@ -36,7 +36,10 @@ type 'f result = private
     final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
+(** If [escape] holds the results of the escape analysis (see [Analysis.solve]),
+    they are applied (see [Escape_rebuild]). *)
 val rebuild :
+  escape:Escape_graph.t ->
   machine_width:Target_system.Machine_width.t ->
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->

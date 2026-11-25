@@ -1,0 +1,261 @@
+let code sum7_0 deleted in
+let code static_1 deleted in
+let code papp_2 deleted in
+let code papp_local_3 deleted in
+let code h_5 deleted in
+let code use_4 deleted in
+let code h_7 deleted in
+let code use_local_6 deleted in
+let $camlEscape_partial_application_mixed__const_block_0 = Block 12 (10, 0)
+in
+let $camlEscape_partial_application_mixed__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_partial_application_mixed__const_block_0)
+in
+let $camlEscape_partial_application_mixed__const_block_2 =
+  Block 12 (32, $camlEscape_partial_application_mixed__const_block_1)
+in
+let $camlEscape_partial_application_mixed__const_block_3 =
+  Block 4 (0, 0, 0, $camlEscape_partial_application_mixed__const_block_2)
+in
+let $camlEscape_partial_application_mixed__const_block_4 =
+  Block 12 (32, $camlEscape_partial_application_mixed__const_block_3)
+in
+let $camlEscape_partial_application_mixed__const_block_5 =
+  Block 4 (0, 0, 0, $camlEscape_partial_application_mixed__const_block_4)
+in
+let $camlEscape_partial_application_mixed__immstring_6 = "%d %d %d\n" in
+let $camlEscape_partial_application_mixed__const_block_7 =
+  Block 0 ($camlEscape_partial_application_mixed__const_block_5,
+           $camlEscape_partial_application_mixed__immstring_6)
+in
+let code inline(never) loopify(never) size(20) newer_version_of(sum7_0)
+      sum7_0_1
+        (t :
+           [ 0 of imm tagged * imm tagged * imm tagged * imm tagged *
+               imm tagged * imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pmixedfield = %block_load.[`6`] (t) in
+  let Pmixedfield_1 = %block_load.[`5`] (t) in
+  let Pmixedfield_2 = %block_load.[`4`] (t) in
+  let Pmixedfield_3 = %block_load.[`3`] (t) in
+  let Pmixedfield_4 = %block_load.[`2`] (t) in
+  let Pmixedfield_5 = %block_load.[`1`] (t) in
+  let Pmixedfield_6 = %block_load.[`0`] (t) in
+  let int_add = %int_barith.add (Pmixedfield_6, Pmixedfield_5) in
+  let int_add_1 = %int_barith.add (int_add, Pmixedfield_4) in
+  let int_add_2 = %int_barith.add (int_add_1, Pmixedfield_3) in
+  let int_add_3 = %int_barith.add (int_add_2, Pmixedfield_2) in
+  let int_add_4 = %int_barith.add (int_add_3, Pmixedfield_1) in
+  let int_add_5 = %int_barith.add (int_add_4, Pmixedfield) in
+  cont k (int_add_5)
+in
+let $camlEscape_partial_application_mixed__sum7_8 =
+  closure sum7_0_1 @sum7 &toplevel
+in
+let code inline(never) loopify(never) size(9) newer_version_of(static_1)
+      static_1_1
+        (a : imm tagged, b : [ 0 of imm tagged * imm tagged ], c : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (b) in
+  let Pfield_1 = %block_load.[`0`] (b) in
+  let int_add = %int_barith.add (a, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  let int_add_2 = %int_barith.add (int_add_1, c) in
+  cont k (int_add_2)
+in
+let $camlEscape_partial_application_mixed__static_9 =
+  closure static_1_1 @static &toplevel
+in
+let code inline(never) loopify(never) size(6) newer_version_of(papp_2)
+      papp_2_1
+        (f : val, x : imm tagged, p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  apply &my_alloc_region f (x, p) -> k * k1
+in
+let $camlEscape_partial_application_mixed__papp_10 =
+  closure papp_2_1 @papp &toplevel
+in
+let code inline(never) loopify(never) size(6) newer_version_of(papp_local_3)
+      papp_local_3_1
+        (f : val, x : imm tagged, p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : val stack =
+  apply &my_alloc_region &my_region &my_ghost_region f (x, p) -> k * k1
+in
+let $camlEscape_partial_application_mixed__papp_local_11 =
+  closure papp_local_3_1 @papp_local &toplevel
+in
+let code loopify(never) size(12) newer_version_of(h_5)
+      h_5_1
+        (a : imm tagged, b : [ 0 of imm tagged * imm tagged ], c : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n = %project_value_slot.[h].[unboxed_field_n] (my_closure) in
+  let Pfield = %block_load.[`1`] (b) in
+  let Pfield_1 = %block_load.[`0`] (b) in
+  let int_add = %int_barith.add (a, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  let int_add_2 = %int_barith.add (int_add_1, c) in
+  let int_add_3 = %int_barith.add (int_add_2, n) in
+  cont k (int_add_3)
+in
+let code inline(never) loopify(never) size(84) newer_version_of(use_4)
+      use_4_1 (n : imm tagged, flag : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let int_add = %int_barith.add (n, 1) in
+  let p = %block.[`0`].my_alloc_region (n, int_add) in
+  let h = closure h_5_1 @h &my_alloc_region with { unboxed_field_n = n } in
+  (let untagged = %untag_imm (flag) in
+   switch untagged
+     | 0 -> k2 ($camlEscape_partial_application_mixed__static_9)
+     | 1 -> k2 (h))
+    where k2 (f : val) =
+      (apply direct(papp_2_1 &my_alloc_region)
+         ($camlEscape_partial_application_mixed__papp_10 : _ -> val)
+           (f, n, p)
+           -> k2 * k1
+         where k2 (k : val) =
+           let int_add_1 = %int_barith.add (n, 7) in
+           let int_add_2 = %int_barith.add (n, 6) in
+           let int_add_3 = %int_barith.add (n, 5) in
+           let int_add_4 = %int_barith.add (n, 4) in
+           let int_add_5 = %int_barith.add (n, 3) in
+           let int_add_6 = %int_barith.add (n, 2) in
+           let big =
+             %block.[`0`].my_alloc_region.local[`region`]
+               (int_add,
+                int_add_6,
+                int_add_5,
+                int_add_4,
+                int_add_3,
+                int_add_2,
+                int_add_1)
+           in
+           (apply direct(sum7_0_1 &my_alloc_region)
+              ($camlEscape_partial_application_mixed__sum7_8
+               : _ -> imm tagged)
+                (big)
+                -> k2 * k1
+              where k2 (s : imm tagged) =
+                (apply &my_alloc_region k (5) -> k2 * k1
+                   where k2 (apply_result : imm tagged) =
+                     let int_add_7 = %int_barith.add (apply_result, s) in
+                     let `unit` = %end_region (`region`) in
+                     cont k (int_add_7))))
+in
+let $camlEscape_partial_application_mixed__use_12 =
+  closure use_4_1 @use &toplevel
+in
+let code loopify(never) size(12) newer_version_of(h_7)
+      h_7_1
+        (a : imm tagged, b : [ 0 of imm tagged * imm tagged ], c : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let n = %project_value_slot.[h_1].[unboxed_field_n_1] (my_closure) in
+  let Pfield = %block_load.[`1`] (b) in
+  let Pfield_1 = %block_load.[`0`] (b) in
+  let int_add = %int_barith.add (a, Pfield_1) in
+  let int_add_1 = %int_barith.add (int_add, Pfield) in
+  let int_add_2 = %int_barith.add (int_add_1, c) in
+  let int_add_3 = %int_barith.add (int_add_2, n) in
+  cont k (int_add_3)
+in
+let code inline(never) loopify(never) size(73) newer_version_of(use_local_6)
+      use_local_6_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  let int_add = %int_barith.add (n, 1) in
+  let p = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+  let h = closure h_7_1 @h_1 &my_alloc_region &`region`
+  with { unboxed_field_n_1 = n }
+  in
+  apply direct(papp_local_3_1 &my_alloc_region &`region` &ghost_region)
+    ($camlEscape_partial_application_mixed__papp_local_11 : _ -> val)
+      (h, n, p)
+      -> k2 * k1
+    where k2 (k : val) =
+      let int_add_1 = %int_barith.add (n, 7) in
+      let int_add_2 = %int_barith.add (n, 6) in
+      let int_add_3 = %int_barith.add (n, 5) in
+      let int_add_4 = %int_barith.add (n, 4) in
+      let int_add_5 = %int_barith.add (n, 3) in
+      let int_add_6 = %int_barith.add (n, 2) in
+      let big =
+        %block.[`0`].my_alloc_region.local[`region`]
+          (int_add,
+           int_add_6,
+           int_add_5,
+           int_add_4,
+           int_add_3,
+           int_add_2,
+           int_add_1)
+      in
+      (apply direct(sum7_0_1 &my_alloc_region)
+         ($camlEscape_partial_application_mixed__sum7_8 : _ -> imm tagged)
+           (big)
+           -> k2 * k1
+         where k2 (s : imm tagged) =
+           (apply &my_alloc_region k (5) -> k2 * k1
+              where k2 (apply_result : imm tagged) =
+                let int_add_7 = %int_barith.add (apply_result, s) in
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
+                cont k (int_add_7)))
+in
+let $camlEscape_partial_application_mixed__use_local_13 =
+  closure use_local_6_1 @use_local &toplevel
+in
+let $camlEscape_partial_application_mixed__Pmakeblock_14 =
+  Block 0 ($camlEscape_partial_application_mixed__use_12,
+           $camlEscape_partial_application_mixed__use_local_13)
+in
+apply direct(use_local_6_1 &toplevel)
+  ($camlEscape_partial_application_mixed__use_local_13 : _ -> imm tagged)
+    (10)
+    -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(use_4_1 &toplevel)
+       ($camlEscape_partial_application_mixed__use_12 : _ -> imm tagged)
+         (10, 0)
+         -> k1 * error
+       where k1 (apply_result_1 : imm tagged) =
+         (apply direct(use_4_1 &toplevel)
+            ($camlEscape_partial_application_mixed__use_12 : _ -> imm tagged)
+              (10, 1)
+              -> k1 * error
+            where k1 (apply_result_2 : imm tagged) =
+              (apply direct(printf_13 &toplevel) inlined(never)
+                 $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+                   ($camlEscape_partial_application_mixed__const_block_7)
+                   -> k1 * error
+                 where k1 (full_apply) =
+                   (apply &toplevel inlined(never)
+                      full_apply
+                        (apply_result_2, apply_result_1, apply_result)
+                        -> k2 * error
+                      where k2 (function_return : imm tagged) =
+                        cont k1
+                      where k1 =
+                        cont k))))
+  where k =
+    let $camlEscape_partial_application_mixed =
+      Block 0 ($camlEscape_partial_application_mixed__sum7_8,
+               $camlEscape_partial_application_mixed__static_9,
+               $camlEscape_partial_application_mixed__Pmakeblock_14)
+    in
+    cont done ($camlEscape_partial_application_mixed)
