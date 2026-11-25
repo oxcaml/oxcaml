@@ -33,6 +33,10 @@
     counter of an inlined function). Because no instruction remains to measure
     it, the counter's execution count is unknown rather than zero.
 
+    The counters of code removed as unreachable (e.g. the edges of a test that
+    are never taken, or blocks that dead code elimination removes) are not
+    dropped: they would never count.
+
     Dropped counters are recorded with the reason they were dropped and
     registered per compilation unit for reporting. *)
 
@@ -58,10 +62,10 @@ module Reason : sig
         (** The counter of a self tail call that instruction selection turns
             into a jump. *)
     | Cfg_branch_to_jump
-        (** The counters of the edges of a branch that a jump replaces because
-            its outcome is known, e.g. when all its edges go to the same block.
-            When the jump is that of a predecessor, the branch keeps its
-            counters if other code still reaches it, but they miss the
+        (** The counters of the edges to its target of a branch that a jump
+            replaces because its outcome is known, e.g. when all its edges go to
+            the same block. When the jump is that of a predecessor, the branch
+            keeps its counters if other code still reaches it, but they miss the
             executions of that predecessor. *)
     | Cfg_blocks_merged
         (** The counters of a block that is merged into an identical one. *)
