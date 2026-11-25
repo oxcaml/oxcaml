@@ -538,8 +538,9 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
   let func =
     match op with
     | Direct
-        { sym = { sym_name; sym_global = _; sym_type = _ }; callsite_counter = _ }
-      ->
+        { sym = { sym_name; sym_global = _; sym_type = _ };
+          callsite_counter = _
+        } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
     | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
