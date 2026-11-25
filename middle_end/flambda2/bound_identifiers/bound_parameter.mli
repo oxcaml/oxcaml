@@ -40,9 +40,9 @@ val with_kind : t -> Flambda_kind.With_subkind.t -> t
 (** Whether the parameter may hold a value allocated in a region that is ended
     in the function body binding it. Only [To_cmm_local_values] sets this,
     immediately before translation to Cmm. *)
-val maybe_local : t -> bool
+val may_be_in_region_ended_in_body : t -> bool
 
-val mark_maybe_local : t -> t
+val mark_may_be_in_region_ended_in_body : t -> t
 
 val rename : t -> t
 

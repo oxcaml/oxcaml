@@ -285,7 +285,7 @@ and traverse_handler acc k ~invariant_params handler =
 
 let mark_bound_var ~is_marked bound_var =
   if is_marked (Bound_var.var bound_var)
-  then Bound_var.mark_maybe_local bound_var
+  then Bound_var.mark_may_be_in_region_ended_in_body bound_var
   else bound_var
 
 let mark_bound_pattern ~is_marked (bound_pattern : Bound_pattern.t) :
@@ -303,7 +303,7 @@ let mark_params ~is_marked params =
     (List.map
        (fun param ->
          if is_marked (Bound_parameter.var param)
-         then Bound_parameter.mark_maybe_local param
+         then Bound_parameter.mark_may_be_in_region_ended_in_body param
          else param)
        (Bound_parameters.to_list params))
 
@@ -514,7 +514,7 @@ let rewrite ~params ~my_region ~my_ghost_region body =
                 seeds params)
         seeds acc.local_returns
     in
-    let maybe_local = reachable acc.value_graph seeds in
+    let marked = reachable acc.value_graph seeds in
     (* The parameters of the body (and its regions) are bound outside the body;
        a local value cannot reach them. *)
     let bound_outside =
@@ -523,15 +523,15 @@ let rewrite ~params ~my_region ~my_ghost_region body =
         @ Option.to_list my_region
         @ Option.to_list my_ghost_region)
     in
-    let escaping = Variable.Set.inter maybe_local bound_outside in
+    let escaping = Variable.Set.inter marked bound_outside in
     if not (Variable.Set.is_empty escaping)
     then
       Misc.fatal_errorf
         "To_cmm_local_values: variables bound outside the body may hold local \
          values: %a"
         Variable.Set.print escaping;
-    if Variable.Set.is_empty maybe_local
+    if Variable.Set.is_empty marked
     then body
     else
-      let is_marked var = Variable.Set.mem var maybe_local in
+      let is_marked var = Variable.Set.mem var marked in
       fst (materialise ~is_marked skeleton)

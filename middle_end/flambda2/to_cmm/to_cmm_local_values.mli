@@ -35,15 +35,16 @@
     entered, which this analysis does not model, so this is a fatal error.
 
     [rewrite] returns an alpha-equivalent body in which the binder of every
-    variable found by the analysis is marked (see [Bound_var.maybe_local] and
-    [Bound_parameter.maybe_local]). A single traversal of the body records the
-    flows and keeps a skeleton of the term (its binders, with the leaves that
-    bind nothing); the skeleton is turned back into a term, with the marks, once
-    the analysis is complete. [To_cmm] records the marked variables in its
-    environment as it opens their binders. The parameters of the body are never
-    found by the analysis. The body is returned unchanged when it contains no
-    region primitive, when no variable is found, or when stack allocation is
-    disabled. *)
+    variable found by the analysis is marked (see
+    [Bound_var.may_be_in_region_ended_in_body] and
+    [Bound_parameter.may_be_in_region_ended_in_body]). A single traversal of the
+    body records the flows and keeps a skeleton of the term (its binders, with
+    the leaves that bind nothing); the skeleton is turned back into a term, with
+    the marks, once the analysis is complete. [To_cmm] records the marked
+    variables in its environment as it opens their binders. The parameters of
+    the body are never found by the analysis. The body is returned unchanged
+    when it contains no region primitive, when no variable is found, or when
+    stack allocation is disabled. *)
 val rewrite :
   params:Bound_parameters.t ->
   my_region:Variable.t option ->

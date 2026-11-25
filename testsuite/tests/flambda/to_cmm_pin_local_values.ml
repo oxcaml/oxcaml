@@ -1,5 +1,6 @@
 (* TEST
  flambda;
+ flags = "-extension let_mutable";
  ocamlopt_flags = "-flambda2-expert-cmm-safe-subst -flambda2-expert-cmm-pin-local-values";
  native;
 *)
@@ -84,12 +85,105 @@ let[@inline never] is_int n c k =
   in
   if c then exclave_ finish 1 else exclave_ finish 2
 
+(* A local boxed float, read by unboxing. *)
+
+let[@inline never] boxed_float (a : float) (b : float) c =
+  let q = Sys.opaque_identity (stack_ (a +. b)) in
+  let x = int_of_float q in
+  let finish y =
+    let p = Sys.opaque_identity (stack_ (float_of_int (y + 1000))) in
+    x + int_of_float p - 1000 - y
+  in
+  if c then exclave_ finish 1 else exclave_ finish 2
+
+(* A local value is carried round a loop by a mutable variable, that is, by the
+   parameters of a recursive continuation (its read in the loop body keeps it
+   live from one iteration to the next). *)
+
+let[@inline never] loop_carried (a : int) (b : int) n c =
+  let q1 = Sys.opaque_identity (stack_ (a, b)) in
+  let q2 = Sys.opaque_identity (stack_ (b, a)) in
+  let mutable m = q2 in
+  for _ = 1 to n do
+    m <- (if fst m = a then q2 else q1)
+  done;
+  let x = fst m in
+  let finish y =
+    let p = Sys.opaque_identity (stack_ (y + 1000, y + 2000)) in
+    let u, v = p in
+    x + u + v - 3000 - (2 * y)
+  in
+  if c then exclave_ finish 1 else exclave_ finish 2
+
+(* A local value held in a mutable variable at a call that may raise reaches the
+   handler through the extra arguments of the exception continuation. *)
+
+exception F
+
+let[@inline never] raise_if (b : int) = if b > 0 then raise F
+
+let[@inline never] exn_extra (a : int) (b : int) c d =
+  let q1 = Sys.opaque_identity (stack_ (a, b)) in
+  let q2 = Sys.opaque_identity (stack_ (b, a)) in
+  let mutable m = q2 in
+  (try
+     m <- (if c then q1 else q2);
+     raise_if b;
+     m <- q2
+   with F -> ());
+  let x = fst m in
+  let finish y =
+    let p = Sys.opaque_identity (stack_ (y + 1000, y + 2000)) in
+    let u, v = p in
+    x + u + v - 3000 - (2 * y)
+  in
+  if d then exclave_ finish 1 else exclave_ finish 2
+
+(* A local closure, called through an unknown path. *)
+
+let[@inline never] local_closure (a : int) (b : int) c =
+  let z = Sys.opaque_identity (a + b) in
+  let f = stack_ (fun y -> z + y) in
+  let g = Sys.opaque_identity f in
+  let x = g 0 in
+  let finish y =
+    let p = Sys.opaque_identity (stack_ (y + 1000, y + 2000)) in
+    let u, v = p in
+    x + u + v - 3000 - (2 * y)
+  in
+  if c then exclave_ finish 1 else exclave_ finish 2
+
+(* A region per iteration of a loop. *)
+
+let[@inline never] loop_regions n (b : int) =
+  let acc = ref 0 in
+  for i = 1 to n do
+    let q = Sys.opaque_identity (stack_ (i, b)) in
+    let x = fst q in
+    let finish y =
+      let p = Sys.opaque_identity (stack_ (y + 1000, y + 2000)) in
+      let u, v = p in
+      acc := !acc + x + u + v - 3000 - (2 * y)
+    in
+    if i mod 2 = 0 then finish 1 else finish 2
+  done;
+  !acc
+
 let () =
   Printf.printf "exclave_both_arms: %d\n"
     (exclave_both_arms 10 20 (Sys.opaque_identity true));
   Printf.printf "join: %d\n"
     (join 10 20 (Sys.opaque_identity true) (Sys.opaque_identity true));
   Printf.printf "try_region: %d\n" (try_region 10 20);
+  Printf.printf "boxed_float: %d\n"
+    (boxed_float 10. 20. (Sys.opaque_identity true));
+  Printf.printf "loop_carried: %d\n"
+    (loop_carried 10 20 3 (Sys.opaque_identity true));
+  Printf.printf "exn_extra: %d\n"
+    (exn_extra 10 20 (Sys.opaque_identity true) (Sys.opaque_identity true));
+  Printf.printf "local_closure: %d\n"
+    (local_closure 10 20 (Sys.opaque_identity true));
+  Printf.printf "loop_regions: %d\n" (loop_regions 10 20);
   let k = Int64.float_of_bits 0x300L in
   let corrupted = ref 0 in
   for i = 1 to 1_000_000 do
