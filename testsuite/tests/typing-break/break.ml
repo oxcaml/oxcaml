@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension runtime_metaprogramming -extension comprehensions";
  expect;
  expect.opt;
 *)
@@ -154,6 +155,56 @@ Line 5, characters 56-62:
 5 |     ignore (module struct module F () = struct let () = break_ end end : S)
                                                             ^^^^^^
 Error: break_ cannot be used inside a functor (at line 5, characters 35-66).
+|}]
+
+#syntax quotations on
+
+let f g =
+  for i = 0 to 10 do
+    g <[ break_ ]>
+  done
+[%%expect {|
+Line 3, characters 9-15:
+3 |     g <[ break_ ]>
+             ^^^^^^
+Error: break_ cannot be used inside a quoted expression (at line 3, characters 6-18).
+|}]
+
+#syntax quotations off
+
+let f g =
+  for i = 0 to 10 do
+    g (object val v : unit = break_ end)
+  done
+[%%expect {|
+Line 3, characters 29-35:
+3 |     g (object val v : unit = break_ end)
+                                 ^^^^^^
+Error: break_ cannot be used inside an object (at line 3, characters 6-40).
+|}]
+
+class d () = object end
+
+let f () =
+  for i = 0 to 10 do
+    let module M = struct class c = d break_ end in ()
+  done
+[%%expect {|
+class d : unit -> object  end
+>> Fatal error: Loop_label_map.find: missing label
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+
+let f () =
+  for i = 0 to 10 do
+    ignore [ break_ for _ in [1; 2; 3] ]
+  done
+[%%expect {|
+>> Fatal error: Loop_label_map.find: missing label
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* allowed usages of break_: *)
@@ -322,6 +373,19 @@ val x : int = 0
 |}]
 
 let x =
+  let n = ref 0 in
+  while true do
+    while break_ do
+      incr n (* not reached *)
+    done
+  done;
+  !n
+[%%expect{|
+val x : int = 0
+|}]
+
+
+let x =
   let r = ref [] in
   for i = 1 to 10 do
     let pair =
@@ -363,8 +427,8 @@ Lines 2-4, characters 2-6:
 2 | ..while true do
 3 |     ignore (break_)
 4 |   done.
-Error: This "while" expression has type "unit"
-       but an expression was expected of type "string"
+Error: This expression has type "unit" but an expression was expected of type
+         "string"
 |}]
 
 (* while true loops without a break are still typed as 'a *)
@@ -387,4 +451,67 @@ let x () : 'a =
 ;;
 [%%expect{|
 val x : unit -> 'a = <fun>
+|}]
+
+(* combining break and other sources of static try/catch *)
+
+let () =
+  let f a b =
+    for i = 0 to 3 do
+      Format.printf "%d@." i;
+      match a, b with
+      | true, true -> break_
+      | _ -> ()
+    done
+  in
+  f true true
+[%%expect{|
+0
+|}]
+
+let x =
+  let n = ref 0 in
+  (try
+     for i = 0 to 10 do
+       incr n;
+       (try if i = 2 then break_ with Not_found -> ())
+     done;
+     raise Exit
+   with Exit -> n := !n + 100);
+  !n
+[%%expect{|
+val x : int = 103
+|}]
+
+let x =
+  let n = ref 0 in
+  for i = 0 to 10 do
+    incr n;
+    match if i = 2 then raise Not_found else i with
+    | exception Not_found -> break_
+    | 1 -> break_
+    | _ -> ()
+  done;
+  !n
+[%%expect{|
+val x : int = 2
+|}]
+
+(* break at a non-value type *)
+
+external unbox : float -> float# = "%unbox_float"
+external box : float# -> float = "%box_float"
+
+let x =
+  let acc = ref 0. in
+  for i = 0 to 10 do
+    let u : float# = if i = 3 then break_ else unbox (Float.of_int i) in
+    acc := !acc +. box u
+  done;
+  !acc
+
+[%%expect{|
+external unbox : float -> float# = "%unbox_float"
+external box : float# -> float = "%box_float"
+val x : float = 3.
 |}]
