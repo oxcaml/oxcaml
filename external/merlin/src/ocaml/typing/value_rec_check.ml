@@ -363,10 +363,11 @@ let classify_expression : Typedtree.expression -> sd =
             classify_module_expression env mexp
         | Tcoerce_structure _ ->
             Static
-        (* CR jbachurski: Coercions yielding template functors should be
-           [Dynamic] once they are implemented. *)
-        | Tcoerce_functor (_, _, _) ->
+        | Tcoerce_functor (_, _, _, Dynamic) ->
             Static
+        | Tcoerce_functor (_, _, _, Static) ->
+            (* As above, only non-template functors can be pre-allocated *)
+            Dynamic
         | Tcoerce_primitive _ ->
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
