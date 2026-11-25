@@ -361,10 +361,12 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
       | Unary (End_region { ghost = _ }, region) -> (
         (* Uses of region variables in [End_region] don't count as uses, so that
            a region in which nothing is allocated can be deleted together with
-           its [End_region]. They are recorded apart: [Data_flow_graph] needs
-           them when the region is a parameter of a continuation. *)
+           its [End_region]. *)
         match Simple.must_be_var region with
-        | None -> t
+        | None ->
+          Misc.fatal_errorf
+            "[End_region] of something that is not a variable: %a" Simple.print
+            region
         | Some (region, _coercion) ->
           update_top_of_stack ~t ~f:(fun elt ->
               let ended_regions = Variable.Set.add region elt.ended_regions in
