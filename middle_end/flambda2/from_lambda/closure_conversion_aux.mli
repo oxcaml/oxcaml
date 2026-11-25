@@ -142,6 +142,8 @@ module Env : sig
       code. *)
   val declare_lcode : t -> Ident.t -> code_id:Code_id.t -> t
 
+  val find_lcode_code_id : t -> Ident.t -> Code_id.t option
+
   val lcode_code_id : t -> Ident.t -> Code_id.t
 
   val is_lcode : t -> Ident.t -> bool

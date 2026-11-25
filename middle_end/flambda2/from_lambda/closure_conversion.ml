@@ -1962,13 +1962,11 @@ let close_exact_or_unknown_apply acc env
       ~current_region ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let acc, (call_kind : Call_kind.t), can_erase_callee, replace_by_invalid =
+  let acc, call_kind, can_erase_callee, replace_by_invalid =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
-      | Some
-          ( Closure_approximation { code_id; code = code_or_meta; _ }
-          | Lcode_approximation { code_id; code = code_or_meta } ) ->
+      | Some (Closure_approximation { code_id; code = code_or_meta; _ }) ->
         let meta = Code_or_metadata.code_metadata code_or_meta in
         if Code_metadata.is_tupled meta
         then
@@ -2008,6 +2006,10 @@ let close_exact_or_unknown_apply acc env
               && not (Code_metadata.is_my_closure_used meta)
             in
             acc, Call_kind.direct_function_call code_id, can_erase_callee, false
+      | Some (Lcode_approximation { code_id; code = _ }) ->
+        (* Slambda never creates tupled code for instantiations, and
+           [close_apply_function] only gets here with exactly their arity. *)
+        acc, Call_kind.direct_function_call code_id, true, false
       | None ->
         acc, Call_kind.indirect_function_call_unknown_arity, false, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
@@ -2043,15 +2045,7 @@ let close_exact_or_unknown_apply acc env
       match func with
       | Ident func ->
         if can_erase_callee then None else Some (find_simple_from_id env func)
-      | Code _ ->
-        (match call_kind with
-        | Function { function_call = Direct _ } -> ()
-        | Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
-        | Method _ | C_call _ | Effect _ ->
-          Misc.fatal_errorf "Template instantiation %a must be called directly"
-            IR.print_callee func);
-        None
+      | Code _ -> None
     in
     let apply =
       Apply.create ~callee ~continuation:(Return continuation)
@@ -3613,10 +3607,10 @@ let close_lcode acc env ~lcode ~template decl =
         close_one_function acc ~code_id ~external_env:env
           ~by_function_slot:Function_slot.Map.empty ~function_code_ids:[] decl
           ~has_lifted_closure:false ~value_slots_from_idents:Ident.Map.empty
-          ~function_slots_from_idents:(Ident.Map.singleton lcode function_slot)
+          ~function_slots_from_idents:Ident.Map.empty
           ~approx_map:
             (Function_slot.Map.singleton function_slot
-               (Acc.lcode_approximation acc code_id))
+               (Value_approximation.Unknown K.value))
           ~template_key:(template_key template) function_declarations)
   in
   let acc = Acc.with_free_names free_names acc in

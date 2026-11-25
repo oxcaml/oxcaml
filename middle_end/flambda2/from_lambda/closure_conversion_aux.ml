@@ -240,8 +240,10 @@ module Env = struct
   let declare_lcode t id ~code_id =
     { t with lcodes = Ident.Map.add id code_id t.lcodes }
 
+  let find_lcode_code_id t id = Ident.Map.find_opt id t.lcodes
+
   let lcode_code_id t id =
-    match Ident.Map.find_opt id t.lcodes with
+    match find_lcode_code_id t id with
     | Some code_id -> code_id
     | None -> Misc.fatal_errorf "%a is not bound to [Lcode]" Ident.print id
 

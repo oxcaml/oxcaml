@@ -1285,10 +1285,14 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
     k_exn
 
 and cps_callee acc env ccenv (ap_func : L.lambda) k k_exn =
-  match[@warning "-fragile-match"] ap_func with
-  | Lvar id when CCenv.is_lcode ccenv id ->
-    k acc env ccenv (IR.Code (CCenv.lcode_code_id ccenv id))
-  | _ ->
+  let code_id =
+    match[@warning "-fragile-match"] ap_func with
+    | Lvar id -> CCenv.find_lcode_code_id ccenv id
+    | _ -> None
+  in
+  match code_id with
+  | Some code_id -> k acc env ccenv (IR.Code code_id)
+  | None ->
     cps_non_tail_var "func" acc env ccenv ap_func
       Flambda_kind.With_subkind.any_value
       (fun acc env ccenv func _func_arity -> k acc env ccenv (IR.Ident func))
