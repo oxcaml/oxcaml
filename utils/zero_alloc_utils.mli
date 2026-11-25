@@ -46,7 +46,7 @@ module Tag : sig
 
     val intersection : t -> t -> t option
 
-    val lessequal : t -> t -> bool
+    val subset : t -> t -> bool
 
     val union : t -> t -> t
 

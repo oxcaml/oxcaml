@@ -156,7 +156,7 @@ module Tag = struct
 
     let contains = Components.get
 
-    let lessequal = Components.lessequal (fun r1 r2 -> (not r1) || r2)
+    let subset = Components.lessequal (fun r1 r2 -> (not r1) || r2)
 
     let union (lhs : t) (rhs : t) : t =
       { nor = lhs.nor || rhs.nor;
@@ -200,7 +200,7 @@ module Relevant_components_by_argument_index = struct
       (fun argument_index c1 ->
         match Numbers.Int.Map.find_opt argument_index t2 with
         | None -> false
-        | Some c2 -> Tag.Nonempty_set.lessequal c1 c2)
+        | Some c2 -> Tag.Nonempty_set.subset c1 c2)
       t1
 
   let print_argument ppf (argument_index, (relevant : Tag.Nonempty_set.t)) =
