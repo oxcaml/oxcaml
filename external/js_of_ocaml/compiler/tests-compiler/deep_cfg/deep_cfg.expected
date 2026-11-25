@@ -1,3 +1,7 @@
+traverse and preorder_traverse on a deep chain of blocks:
+postorder visited 100001 blocks
+preorder visited 100001 blocks
+
 merge_blocks merges a chain and substitutes block parameters:
 blocks after merge: 1
 returns the variable bound in the first block: true

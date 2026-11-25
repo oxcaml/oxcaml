@@ -17,9 +17,9 @@
  *)
 
 (* Tests for [Code.traverse] and [Code.preorder_traverse], which are implemented
-   with an explicit stack: a deep chain of blocks (e.g. the initialization code
-   of a large program, with a block per call) must not overflow the stack, and
-   the visit order must match the former recursive implementation. *)
+   with an explicit stack: the visit order must match the former recursive
+   implementation. That a deep chain of blocks does not overflow the stack is
+   tested in deep_cfg/deep_cfg.ml, which runs with a small stack. *)
 
 open Js_of_ocaml_compiler.Code
 
@@ -144,31 +144,4 @@ let%expect_test "nested exception handlers" =
     {|
     fold_children: postorder [7 3 2 5 4 1 6 0], preorder [0 1 2 3 7 4 5 6]
     fold_children_skip_try_body: postorder [7 6 0], preorder [0 7 6]
-    |}]
-
-let%expect_test "deep chain of blocks does not overflow the stack" =
-  (* A chain long enough that a traversal with a stack frame per block would
-     overflow the default stack, with a join edge to the last block every few
-     blocks. *)
-  let depth = 1_000_000 in
-  let x = Var.fresh () in
-  let blocks = ref Addr.Map.empty in
-  for pc = 0 to depth do
-    let branch =
-      if pc = depth
-      then Return x
-      else if pc mod 3 = 0
-      then Cond (x, c (pc + 1), c depth)
-      else Branch (c (pc + 1))
-    in
-    blocks := Addr.Map.add pc { params = []; body = []; branch } !blocks
-  done;
-  let blocks = !blocks in
-  let count traverse = traverse { fold = fold_children } (fun _ n -> n + 1) 0 blocks 0 in
-  Printf.printf "postorder visited %d blocks\n" (count traverse);
-  Printf.printf "preorder visited %d blocks\n" (count preorder_traverse);
-  [%expect
-    {|
-    postorder visited 1000001 blocks
-    preorder visited 1000001 blocks
     |}]

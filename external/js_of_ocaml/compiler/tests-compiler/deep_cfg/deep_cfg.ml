@@ -16,9 +16,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-(* Stack-safety regressions for the passes that walk the control-flow graph
-   without using [Code.traverse]: [Deadcode.merge_blocks],
-   [Pure_fun.f] and the two DFS passes of [Strongly_connected_components].
+(* Stack-safety regressions for [Code.traverse] and [Code.preorder_traverse],
+   and for the passes that walk the control-flow graph without using them:
+   [Deadcode.merge_blocks], [Pure_fun.f] and the two DFS passes of
+   [Strongly_connected_components].
    A function can be a chain of hundreds of thousands of blocks (e.g. the
    initialization code of a whole program, with a block per call), so these
    passes must not use a stack frame per block.
@@ -55,6 +56,29 @@ let test name f =
   Printf.printf "%s:\n%!" name;
   f ();
   Printf.printf "\n%!"
+
+let () =
+  (* A join edge to the last block every few blocks, so that the traversals
+     also reach blocks that are already visited. *)
+  test "traverse and preorder_traverse on a deep chain of blocks" (fun () ->
+      let x = Var.fresh () in
+      let p =
+        program
+          0
+          ((deep, block [] [] (Return x))
+          :: List.init deep (fun pc ->
+              let next = pc + 1, [] in
+              ( pc
+              , block
+                  []
+                  []
+                  (if pc mod 3 = 0 then Cond (x, next, (deep, [])) else Branch next) )))
+      in
+      let count traverse =
+        traverse { fold = fold_children } (fun _ n -> n + 1) p.start p.blocks 0
+      in
+      Printf.printf "postorder visited %d blocks\n" (count traverse);
+      Printf.printf "preorder visited %d blocks\n" (count preorder_traverse))
 
 let () =
   test "merge_blocks merges a chain and substitutes block parameters" (fun () ->
