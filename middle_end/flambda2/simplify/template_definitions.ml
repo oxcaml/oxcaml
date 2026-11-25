@@ -108,3 +108,15 @@ let find_code denv code_id =
 
 let in_code denv code =
   in_code ~find_code:(find_code denv) ~seen:(ref Code_id.Set.empty) code
+
+let in_handlers denv (handlers : Original_handlers.t) =
+  let in_expr =
+    in_expr ~find_code:(find_code denv) ~seen:(ref Code_id.Set.empty)
+  in
+  match handlers with
+  | Non_recursive { handler; _ } -> in_expr handler
+  | Recursive { continuation_handlers; _ } ->
+    Continuation.Lmap.exists
+      (fun _cont one_rec_handler ->
+        in_expr one_rec_handler.One_recursive_handler.handler)
+      continuation_handlers

@@ -1086,12 +1086,7 @@ and specialize_continuation_if_needed ~simplify_expr dacc
       | uses ->
         if DA.templates_defined_since dacc data.dacc_after_body
         then
-          (* A definition of a template directly in the handler prevents
-             specialisation (see [Simplify_template_env]). One in a continuation
-             nested in the handler that can't be lifted, and so would be copied,
-             is assumed not to happen: such continuations are only created for
-             over-applications, whose bodies only contain simplified code, which
-             never defines templates. *)
+          (* See [Specialization_cost.Contains_template_definition]. *)
           Misc.fatal_errorf
             "Continuation %a is being specialised, but its handler defines a \
              template"
@@ -1767,7 +1762,12 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     DE.map_specialization_cost
       ~f:
         (Specialization_cost.add_continuations data.handlers
-           ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
+           ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers)
+           ~define_templates:
+             (lazy
+               ((not can_be_lifted)
+               && Template_definitions.in_handlers denv_before_body
+                    data.handlers)))
       (DE.add_lifting_cost lifting_cost
          (DE.define_continuations denv_for_body bound_continuations
             ~can_be_lifted))

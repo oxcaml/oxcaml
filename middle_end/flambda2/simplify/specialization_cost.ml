@@ -93,13 +93,17 @@ let add_prim bound_var prim t =
       let primitives = (bound_var, prim) :: primitives in
       { cost with primitives })
 
-let add_continuations ~can_be_lifted handlers t =
-  if can_be_lifted
-  then t
-  else
-    update_cost t ~f:(fun ({ non_lifted_continuations; _ } as cost) ->
-        let non_lifted_continuations = handlers :: non_lifted_continuations in
-        { cost with non_lifted_continuations })
+let add_continuations ~can_be_lifted ~define_templates handlers t =
+  match t with
+  | Cannot_specialize _ -> t
+  | Can_specialize _ when Lazy.force define_templates ->
+    add_template_definition t
+  | Can_specialize _ when can_be_lifted -> t
+  | Can_specialize cost ->
+    Can_specialize
+      { cost with
+        non_lifted_continuations = handlers :: cost.non_lifted_continuations
+      }
 
 (* Computing cost and benefits *)
 
