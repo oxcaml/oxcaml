@@ -505,6 +505,7 @@
 (@if $wasi
 (@then
    (func (export "unix_gettimeofday") (export "caml_unix_gettimeofday")
+      (export "caml_sys_gettimeofday")
       (param (ref eq)) (result (ref eq))
       (local $buffer i32) (local $res i32)
       (local.set $buffer (call $get_buffer))
@@ -519,6 +520,7 @@
 )
 (@else
    (func (export "unix_gettimeofday") (export "caml_unix_gettimeofday")
+      (export "caml_sys_gettimeofday")
       (param (ref eq)) (result (ref eq))
       (struct.new $float (call $gettimeofday)))
 ))
@@ -556,7 +558,9 @@
 
    (func (export "unix_times") (export "caml_unix_times")
       (param (ref eq)) (result (ref eq))
-      (return_call $times))
+      ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+      ;; tail call cross
+      (return (call $times)))
 ))
 
 (@if $wasi

@@ -15,12 +15,7 @@ let () = Sys.catch_break true
 
 module TLS = Domain.Safe.TLS
 
-let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
-  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
-let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
-  TLS.access k (fun r -> r := v) [@nontail]
-
-let k = TLS.new_key (fun () -> ref "init")
+let k = TLS.new_key (fun () -> "init")
 
 let[@inline never] allocate_bytes finished =
   let b = Bytes.create 42 in
@@ -31,15 +26,15 @@ let[@inline never] allocate_bytes finished =
   ref (Some b)
 
 let () =
-  set k "outer";
+  TLS.set k "outer";
   let finished = ref false in
   let r = allocate_bytes finished in
   (try
     Sys.with_async_exns (fun () ->
       r := None;
       Preemptible.match_with (fun () ->
-          set k "inner";
-          assert (get k = "inner");
+          TLS.set k "inner";
+          assert (TLS.get k = "inner");
           (* Allocate until the finaliser raises [Sys.Break] asynchronously,
              unwinding out of this owner fiber. *)
           while true do
@@ -54,5 +49,5 @@ let () =
   | Sys.Break -> assert !finished
   | _ -> assert false);
   (* The owner fiber is gone; the thread's state must be visible again. *)
-  Printf.printf "after async unwind: %s\n" (get k);
+  Printf.printf "after async unwind: %s\n" (TLS.get k);
   print_endline "OK"

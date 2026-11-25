@@ -139,6 +139,14 @@ module Variable : sig
   val import : importer -> t -> t
 
   val import_and_rename : importer -> t -> t
+
+  type stamp_state
+
+  val export_stamp_state : unit -> stamp_state
+
+  val restore_stamp_state : stamp_state -> unit
+
+  val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
 end
 
 module Symbol : sig
@@ -254,7 +262,16 @@ module Code_id : sig
 
   val initialise : unit -> unit
 
-  val create : name:string -> debug:Debuginfo.t -> Compilation_unit.t -> t
+  (** [name] is the source-level name of the function. [slot_stamp] is the stamp
+      of the [Function_slot] the code was created for, if any; it is recorded
+      separately from [name] so that it can be recognized (and omitted) when
+      demangling. *)
+  val create :
+    name:string ->
+    slot_stamp:int option ->
+    debug:Debuginfo.t ->
+    Compilation_unit.t ->
+    t
 
   val get_compilation_unit : t -> Compilation_unit.t
 
@@ -264,6 +281,8 @@ module Code_id : sig
 
   val linkage_name : t -> Linkage_name.t
 
+  (** The name given at creation, followed by [_<slot_stamp>] if a slot stamp
+      was given. *)
   val name : t -> string
 
   (* The [rename] function, in addition to changing the stamp of the code ID,
@@ -275,6 +294,14 @@ module Code_id : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  type stamp_state
+
+  val export_stamp_state : unit -> stamp_state
+
+  val restore_stamp_state : stamp_state -> unit
+
+  val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
 end
 
 module Code_id_or_symbol : sig

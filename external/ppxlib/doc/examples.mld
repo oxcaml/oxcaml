@@ -6,9 +6,9 @@ This section is here to allow viewing complete examples of PPXs written using [p
 
 In order to see a fully working complete example of a PPX written using [ppxlib], that you can compile, modify and test, go to the {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples}examples} folder of ppxlib sources.
 
-{1 [ppx_deriving_accesors]}
+{1 [ppx_deriving_accessors]}
 
-The fully complete, ready-to-compile [ppx_deriving_accesors] example is accessible in [ppxlib]'s {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples/simple-deriver}sources}.
+The fully complete, ready-to-compile [ppx_deriving_accessors] example is accessible in [ppxlib]'s {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples/simple-deriver}sources}.
 
 This deriver will generate accessors for record fields, from the record type
 definition.

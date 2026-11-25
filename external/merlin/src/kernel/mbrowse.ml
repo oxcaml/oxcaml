@@ -81,6 +81,8 @@ let node_loc node = approximate_loc Browse_raw.node_real_loc node
 (* Fuzzy locations, more likely to locate the appropriate node *)
 let node_merlin_loc node = approximate_loc Browse_raw.node_merlin_loc node
 
+let node_loc_stack = Browse_raw.node_loc_stack
+
 let leaf_node = List.hd
 
 let drop_leaf t =
@@ -273,6 +275,16 @@ let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
       | Some (env, _, node) -> aux ((env, node) :: path)
     in
     aux root
+
+let range_enclosing ~start ~stop roots =
+  List.filter
+    ~f:(fun (_, node) ->
+      let loc = node_loc node in
+      let nstart = loc.loc_start and nend = loc.loc_end in
+      let a = Lexing.compare_pos start nstart
+      and b = Lexing.compare_pos stop nend in
+      a >= 0 && b <= 0)
+    (enclosing start roots)
 
 (* Select open nodes *)
 

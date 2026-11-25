@@ -1,8 +1,9 @@
 open Import
 
-(** Converts [@@ocaml.doc " My doc comment "] to [@@ocaml.doc {| My doc comment |}] if the
-    origin of the attribute is a doc comment (i.e. (** *)). *)
 val prettify_odoc_attributes : Ast_traverse.map
+(** Converts [@@ocaml.doc " My doc comment "] to
+    [@@ocaml.doc {| My doc comment |}] if the origin of the attribute is a doc
+    comment (i.e. (** *)). *)
 
 (** Updates the locations of [structure_item]s and [signature_item]s to include the
     locations of doc comments (i.e. (** *)). *)
@@ -68,3 +69,7 @@ module System : sig
     output:string ->
     (unit, string * Ast_io.input_version) result
 end
+
+val print_as_compiler_source : Stdlib.Format.formatter -> Intf_or_impl.t -> unit
+(** Migrates the given AST to the compiler version and print it as source code
+    using Pprintast. *)

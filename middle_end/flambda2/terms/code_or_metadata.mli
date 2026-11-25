@@ -42,7 +42,7 @@ val create_metadata_only : Code_metadata.t -> t
 
 val from_raw : sections:File_sections.t -> raw -> t
 
-val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+val to_raw : sections:File_sections.Builder.t -> t -> raw
 
 val remember_only_metadata : t -> t
 
@@ -54,7 +54,14 @@ val code_metadata : t -> Code_metadata.t
 
 val code_present : t -> bool
 
-val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw
+type section_data
+
+(* CR-someday ncourant: ideally, the type would be [('a. 'a File_sections.Idx.t
+   -> 'a File_sections.Idx.t) -> raw -> raw]. *)
+val map_raw_index :
+  (section_data File_sections.Idx.t -> section_data File_sections.Idx.t) ->
+  raw ->
+  raw
 
 (** As for [Code_metadata], the free names of a value of type [t] do not include
     the code ID, which is only kept for convenience. *)

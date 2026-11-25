@@ -64,24 +64,34 @@ children. Some helpers for this are provided in {{!Ppxlib.Merlin_helpers}[Merlin
 
 {1:handling_errors Handling Errors}
 
-In order to give a nice user experience when reporting errors or failures in a
-PPX, it is necessary to include as much generated content as possible.
-Most IDE tools, such as Merlin, rely on the AST for their features, such as
-displaying type, jumping to definition, or showing the list of errors.
+In order to give a nice user experience when using a PPX, it is necessary that
+the resulting parsetree is as complete as possible.  Most IDE tools, such as
+Merlin, rely on the AST for their features, such as displaying type, jumping to
+definition, or showing the list of errors.
+
+In order to achieve this, errors that happen during rewriting should be handled
+in a way that do not prevent a meaningful AST to be passed to Merlin.
+
+There are mainly two ways to report errors when writing a PPX.
+
+- By embedding special extensions nodes, called "error nodes", inside the
+  generated code.
+- By raising a sepcific exception, letting the ppxlib driver {{!page-driver.exception_handling}handle the error}.
+
+Let us emphasize that, while exceptions can be practical to quickly fail with an
+error, the embedding mechanism has many advantages. For instance, embedding
+allows to report multiple errors, and to output the part of the code that could
+be generated successfully.
 
 {2 Embedding the Errors in the AST}
 
-A common way to report an error is to throw an exception. However, this method
-interrupts the execution flow of the [ppxlib] driver and leaves later PPXs
-unexpanded when handing the AST over to Merlin.
-
-Instead, it is better to always return a valid AST, as complete as possible, but
-with "error extension nodes" at every place where successful code generation was
-impossible. Error extension nodes are special extension nodes [[%ocaml.error
-error_message]] that can be embedded into a valid AST and are interpreted
-later as errors, e.g., by the compiler or Merlin. As all extension nodes,
-they can be put {{:https://ocaml.org/manual/extensionnodes.html}at many places
-in the AST} to replace structure items, expressions, or patterns, for example.
+It is better to always return a valid AST, as complete as possible, but with
+"error extension nodes" at every place where successful code generation was
+impossible. Error extension nodes are special extension nodes
+[[%ocaml.error "error_message"]] that can be embedded into a valid AST and are interpreted later
+as errors, e.g., by the compiler or Merlin. As all extension nodes, they can be
+put {{:https://ocaml.org/manual/extensionnodes.html}at many places in the AST}
+to replace structure items, expressions, or patterns, for example.
 
 So whenever you're in doubt whether to throw an exception or if to embed the error as
 an error extension node when writing a PPX rewriter,
@@ -188,75 +198,6 @@ the file. This impossible value consists of an error extension node.
                     ];
                 ])
             |> List.concat
-]}
-
-{2 In Case of Panic}
-
-In some rare cases, it might happen that a whole file rewriter is not able to
-output a meaningful AST. In this case, they might be tempted to raise a located
-error: an exception that includes the error's location. Moreover, this has
-historically been what was suggested to do by [ppxlib] examples, but it is now
-discouraged in most of the cases, as it prevents Merlin features to work well.
-
-If such an exception isn't caught, the PPX driver will return an error code,
-and the exception will be pretty-printed, including the location (that's the
-case when Dune calls the driver). When the driver is spawned with the
-[-embed-errors] or [-as-ppx] flags (that's the case when Merlin calls the driver), 
-the driver will look for located error. If it catches one, it will stop
-its rewriting chain at this point and output an AST consisting of the
-located error followed by the last valid AST: the one passed to the raising
-rewriter.
-
-Even more in context-free rewriters, raising should be avoided in favour of
-outputting a single error node when finer grained reporting is not needed or
-possible. As the whole context-free rewriting is done in one traverse of the
-AST, a single raise will cancel both the context-free pass and upcoming
-rewriters, and the AST prior to the context-free pass will be outputted together
-with the error.
-
-The function provided by the API to raise located errors is
-{{!Ppxlib.Location.raise_errorf}[raise_errorf]}.
-
-{2 Migrating From Raising to Embedding Errors}
-
-Lots of PPXs exclusively use {{!Ppxlib.Location.raise_errorf}[raise_errorf]}
-to report errors, instead of the more Merlin-friendly way of
-embedding errors in the AST, as described in this section.
-
-If you want to migrate such a codebase to the embedding approach, the rest of this section will present few
-recipes to do that. It might not be completely trivial, as raising can
-be done anywhere in the code, including in places where "embedding" would not
-make sense. The first thing you can do is to turn your internal raising functions to
-function returning a [result] type.
-
-The workflow for this change would look like this:
-
-{ol
-{- Search your code for all uses of {{!Ppxlib.Location.raise_errorf}[raise_errorf]}, using [grep], for instance.}
-{- For each of them, turn them into functions returning a [(_, extension) result] type, using {{!Ppxlib.Location.error_extensionf}[error_extensionf]} to generate the [Error].}
-{- Let the compiler or Merlin tell you where to propagate the [result] type (most certainly using [map]s and [bind]s).}
-{- When you have propagated until a point where you can embed an extension node, turn the [Error] case into an extension node and embed it.}
-}
-
-This is quite convenient, as it allows you to do a "type-driven" modification,
-using the full static analysis of OCaml to never omit a special case and to
-confidently find the place the most deeply in the AST to embed the error.
-However, it might induce quite a lot of code modification, and exceptions are
-sometimes convenient to use depending on your preference. In case you want to do only
-a very simple change and keep using exception, just catch them at the right place and turn them into extension
-points embedded in the AST, as in the following example:
-
-{[
-let rewrite_extension_point loc payload =
-  try generate_ast payload
-  with exn ->
-    let get_error exn =
-      match Location.Error.of_exn exn with
-      | None -> raise exn
-      | Some error -> error
-    in
-    let extension = exn |> get_error |> Location.Error.to_extension in
-    Ast_builder.Default.pstr_extension ~loc ext []
 ]}
 
 {1:quoting Quoting}

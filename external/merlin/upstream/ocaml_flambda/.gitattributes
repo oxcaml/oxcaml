@@ -26,6 +26,7 @@ parsing/parse.mli merlin-exclude
 
 typing/cmt2annot.ml* merlin-exclude
 
+utils/action_trace.ml* merlin-exclude
 utils/arg_helper.ml* merlin-exclude
 utils/arrayset.ml* merlin-exclude
 utils/binutils.ml* merlin-exclude
@@ -48,7 +49,6 @@ utils/strongly_connected_components.ml* merlin-exclude
 utils/structured_mangling.ml* merlin-exclude
 utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
-utils/targetint.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
 utils/id_counter.ml merlin-exclude
 utils/id_counter.mli merlin-exclude

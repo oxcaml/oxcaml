@@ -1039,6 +1039,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, l * allowed) morphvar ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
    fun ~allow_rigid ~log pp obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
+    (* Fast failure path *)
     let mlower = mlower obj mv in
     let mupper = mupper obj mv in
     let mupper_hint = mupper_hint mv in
@@ -1047,9 +1048,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else if not (C.le obj a mupper)
     then Error (mupper, mupper_hint)
     else
-      (* At this point we know [a <= f v], therefore [a] is in the downward
-         closure of [f]'s image. Therefore, asking [a <= f v] is equivalent to
-         asking [f' a <= v]. *)
+      (* Asking [a <= f v] is equivalent to asking [f' a <= v]. *)
       let f' = C.left_adjoint obj f in
       let src_pp, src, f'_hint =
         Comp_hint.Morph_hint.left_adjoint pp obj f_hint
@@ -1111,8 +1110,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ('a, right_only) Comp_hint.t ->
       (unit, 'a * ('a, left_only) Comp_hint.t) Result.t =
    fun ~allow_rigid ~log pp obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
-    (* See [submode_cmv] for why we need the following seemingly redundant
-       lines. *)
+    (* Fast failure path *)
     let mupper = mupper obj mv in
     let mlower = mlower obj mv in
     let mlower_hint = mlower_hint mv in
@@ -2334,7 +2332,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode (a, _a_hint_lower, _a_hint_upper) -> a
     | Amodevar mv -> mlower obj mv
     | Amodejoin (a, _a_hint, mvs) ->
-      VarMap.fold (fun _ mv acc -> C.join obj acc (mupper obj mv)) mvs a
+      VarMap.fold (fun _ mv acc -> C.join obj acc (mlower obj mv)) mvs a
     | Amodemeet (a, _a_hint, mvs) ->
       VarMap.fold (fun _ mv acc -> C.meet obj acc (mlower obj mv)) mvs a
 

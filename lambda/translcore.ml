@@ -199,9 +199,6 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout, yielding)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
-    | Lsplice _ ->
-      fatal_error "Translcore.remove_tail_markers_and_exclave: \
-        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in
@@ -270,7 +267,7 @@ let event_after ~scopes exp lam =
   Translprim.event_after (of_location ~scopes exp.exp_loc) exp lam
 
 let event_function ~scopes exp lam =
-  if !Clflags.debug && not (Clflags.target_is_native ()) then
+  if !Clflags.debug && Clflags.target_is_bytecode () then
     let repr = Some (ref 0) in
     let (info, body) = lam repr in
     (info,
@@ -391,8 +388,8 @@ let can_apply_primitive p pmode pos args =
   if List.exists (fun (_, arg) -> is_omitted arg) args then false
   else begin
     let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
+    if nargs = p.prim_type_arity then true
+    else if nargs < p.prim_type_arity then false
     else if pos <> Typedtree.Tail then true
     else begin
       let return_mode =
@@ -502,7 +499,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | ((_, arg_repr) :: prim_repr), ((_, Arg (x, _)) :: oargs) ->
           let arg_exps, extra_args = cut_args prim_repr oargs in
           let arg_sort =
-              Translprim.sort_of_native_repr arg_repr ~poly_sort:psort
+              Translprim.sort_of_native_repr_or_elided arg_repr ~poly_sort:psort
           in
           (x, arg_sort) :: arg_exps, extra_args
         | _, ((_, Omitted _) :: _) -> assert false
@@ -613,7 +610,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Lprim(Punbox_unit, [lambda_unit],
             of_location ~scopes e.exp_loc)
   | Texp_unboxed_bool b ->
-      Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
+      Lconst(Const_base(Const_untagged_int8(Numbers.Int8.of_bool b)))
   | Texp_tuple (el, locality_mode) ->
       let ll, sorts, layouts =
         transl_list_with_layout ~scopes
@@ -1324,7 +1321,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              modifs
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
-      let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
+      let mod_scopes = enter_anonymous_module ~scopes in
       let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~scopes layout body)
@@ -1344,7 +1341,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes layout body)
   | Texp_pack modl ->
-      let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
+      let mod_scopes = enter_anonymous_module ~scopes in
       !transl_module ~scopes:mod_scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
@@ -2393,7 +2390,7 @@ and transl_function
   let scopes =
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
-    else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
+    else enter_anonymous_function ~scopes ~assume_zero_alloc
   in
   let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
@@ -3276,6 +3273,14 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
   let func =
     (* XXX fixme: use result of is_function_type *)
     let return_mode = not_alloc_stack in
+    (* The continuation is an anonymous function in its own right. Its body is
+       written as part of the enclosing function, though, so like a probe
+       handler it inherits the enclosing zero_alloc assumption rather than
+       starting from none as a [fun] does. *)
+    let scopes =
+      enter_anonymous_function ~scopes
+        ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
+    in
     let (kind, params, return, _region, ret_mode), body =
       event_function ~scopes case.c_rhs
         (function repr ->

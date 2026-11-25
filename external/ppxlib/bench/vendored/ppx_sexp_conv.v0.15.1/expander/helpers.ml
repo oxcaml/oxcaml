@@ -139,7 +139,7 @@ let fresh_lambda ~loc apply =
 let rec is_value_expression expr =
   match expr.pexp_desc with
   (* Syntactic values. *)
-  | Pexp_ident _ | Pexp_constant _ | Pexp_function _ | Pexp_fun _ | Pexp_lazy _ -> true
+  | Pexp_ident _ | Pexp_constant _ | Pexp_function _ | Pexp_lazy _ -> true
   (* Type-only wrappers; we check their contents. *)
   | Pexp_constraint (expr, (_ : core_type))
   | Pexp_coerce (expr, (_ : core_type option), (_ : core_type))

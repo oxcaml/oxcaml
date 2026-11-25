@@ -164,3 +164,7 @@ val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
   graph ->
   unit
+
+val ids_for_export : graph -> Ids_for_export.t
+
+val apply_renaming : graph -> Renaming.t -> graph

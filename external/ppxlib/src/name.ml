@@ -122,6 +122,7 @@ module Allowlisted = struct
         "ocaml.toplevel_printer" (*Interpreted by the toplevel/utop*);
         "toplevel_printer" (*Interpreted by the toplevel/utop*);
         "ocaml.unsafe_allow_any_mode_crossing";
+        "ocaml.unsafe_unextended";
         "ocaml.or_null";
         "ocaml.or_null_reexport";
         "ocaml.atomic";
@@ -209,8 +210,8 @@ module Reserved_namespaces = struct
   let () = reserve "metaocaml"
   let () = reserve "ocamlformat"
   let () = reserve "ppxlib.migration"
-  let () = reserve "extension" (* deprecated namespace for OxCaml syntax *)
-  let () = reserve "jane" (* OxCaml syntax *)
+  let () = reserve "extension" (* deprecated namespace for jane street syntax *)
+  let () = reserve "jane" (* jane street syntax *)
 
   let check_not_reserved ~kind name =
     let kind, list =
@@ -342,14 +343,15 @@ module Registrar = struct
             Some
               (Format.asprintf
                  "@[Hint:@ `%s'@ is@ available@ for@ %a%t.@]@\n\
-                  Did you put it at the wrong level?" name pp_text c
-                 current_context)
+                  Did you put it at the wrong level?"
+                 name pp_text c current_context)
         | last :: rev_others ->
             let others = List.rev rev_others in
             Some
               (Format.asprintf
                  "@[Hint:@ `%s'@ is@ available@ for@ %a@ and@ %a%t.@]@\n\
-                  Did you put it at the wrong level?" name
+                  Did you put it at the wrong level?"
+                 name
                  (Format.pp_print_list pp_text ~pp_sep:(fun ppf () ->
                       Format.fprintf ppf ",@ "))
                  others pp_text last current_context))

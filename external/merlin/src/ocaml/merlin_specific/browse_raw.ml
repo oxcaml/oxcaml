@@ -248,25 +248,35 @@ let has_attr ~name node =
       str.Location.txt = name)
     attrs
 
+let node_loc_stack node =
+  let stack = node_attributes node in
+  List.fold_left stack
+    ~f:(fun acc { Parsetree.attr_name; _ } ->
+      if Location_aux.is_loc_stack_location attr_name then attr_name.loc :: acc
+      else acc)
+    ~init:[]
+
 let node_merlin_loc loc0 node =
   let attributes = node_attributes node in
-  let loc =
+  let relaxed_loc loc attributes =
     let open Parsetree in
     let pred { attr_name = loc; _ } = Location_aux.is_relaxed_location loc in
     match List.find attributes ~f:pred with
     | { attr_name; _ } -> attr_name.Location.loc
-    | exception Not_found -> node_real_loc loc0 node
+    | exception Not_found -> loc
+  in
+  let loc = relaxed_loc (node_real_loc loc0 node) attributes in
+  let extra_loc loc extra =
+    List.fold_left
+      ~f:(fun loc0 (_, loc, attributes) ->
+        let loc = relaxed_loc loc attributes in
+        Location_aux.union loc0 loc)
+      ~init:loc extra
   in
   let loc =
     match node with
-    | Expression { exp_extra; _ } ->
-      List.fold_left
-        ~f:(fun loc0 (_, loc, _) -> Location_aux.union loc0 loc)
-        ~init:loc exp_extra
-    | Pattern { pat_extra; _ } ->
-      List.fold_left
-        ~f:(fun loc0 (_, loc, _) -> Location_aux.union loc0 loc)
-        ~init:loc pat_extra
+    | Expression { exp_extra; _ } -> extra_loc loc exp_extra
+    | Pattern { pat_extra; _ } -> extra_loc loc pat_extra
     | _ -> loc
   in
   loc
@@ -391,6 +401,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
+  | Tpat_addr (_, _, p)
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)
@@ -782,7 +793,8 @@ let of_node node =
       let name = Ident.name id in
       let sort =
         match vd.Types.val_kind with
-        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg (Representable sort) | Types.Val_mut (_, sort) -> sort
+        | Types.Val_reg Unrepresentable
         | Types.Val_prim _
         | Types.Val_ivar _
         | Types.Val_self _

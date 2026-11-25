@@ -108,7 +108,8 @@ let meet_variants_don't_lose_aliases () =
               [T.alias_type_of K.value (Simple.var vy)] ) ) ]
     in
     T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
-      ~machine_width:Sixty_four
+      ~machine_width:Sixty_four ~is_int:None ~get_tag:None
+      ~extensions:No_extensions
   in
   let ty2 =
     let non_const_ctors =
@@ -121,7 +122,8 @@ let meet_variants_don't_lose_aliases () =
               [T.alias_type_of K.value (Simple.var vb)] ) ) ]
     in
     T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
-      ~machine_width:Sixty_four
+      ~machine_width:Sixty_four ~is_int:None ~get_tag:None
+      ~extensions:No_extensions
   in
   match T.meet env ty1 ty2 with
   | Bottom -> assert false
@@ -153,7 +155,8 @@ let meet_variants_don't_lose_aliases () =
                 [T.alias_type_of K.value (Simple.var vb)] ) ) ]
       in
       T.variant ~const_ctors ~non_const_ctors Alloc_mode.For_types.heap
-        ~machine_width:Sixty_four
+        ~machine_width:Sixty_four ~is_int:None ~get_tag:None
+        ~extensions:No_extensions
     in
     let meet_ty = TE.find env (Name.var v_variant) (Some K.value) in
     assert (T.Equal_types_for_debug.equal_type env meet_ty expected_ty);
@@ -183,7 +186,8 @@ let test_join_with_extensions () =
         (Tag.Scannable.Map.of_list
            [ tag_0, (K.Block_shape.Scannable Value_only, [ty]);
              tag_1, (K.Block_shape.Scannable Value_only, []) ])
-      Alloc_mode.For_types.heap ~machine_width:Sixty_four
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four ~is_int:None
+      ~get_tag:None ~extensions:No_extensions
   in
   let env = TE.add_equation env (Name.var y) (make (T.unknown K.value)) in
   let scope = TE.current_scope env in
@@ -247,7 +251,8 @@ let test_join_with_complex_extensions () =
         (Tag.Scannable.Map.of_list
            [ tag_0, (K.Block_shape.Scannable Value_only, tys);
              tag_1, (K.Block_shape.Scannable Value_only, []) ])
-      Alloc_mode.For_types.heap ~machine_width:Sixty_four
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four ~is_int:None
+      ~get_tag:None ~extensions:No_extensions
   in
   let env =
     TE.add_equation env (Name.var z)
@@ -384,7 +389,8 @@ let test_meet_recover_alias () =
       ~non_const_ctors:
         (Tag.Scannable.Map.of_list
            [Tag.Scannable.zero, (K.Block_shape.Scannable Value_only, [])])
-      ~machine_width:Sixty_four
+      ~machine_width:Sixty_four ~is_int:None ~get_tag:None
+      ~extensions:No_extensions
   in
   Format.eprintf "@[<hov 2>first type:@ %a@]@." T.print existing_ty;
   let env = TE.add_equation env (Name.var x) existing_ty in

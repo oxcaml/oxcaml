@@ -126,6 +126,52 @@ val t : uflt:float# * str:string * string =
   (~uflt:<abstr>, ~str:"str", "str2")
 |}];;
 
+(* Lists of non-values. (The elements are nonzero, since a zero in the tail's
+   position would look like [[]].) *)
+let l = [ #1.0; #2.0 ]
+
+[%%expect {|
+val l : float# list = [<abstr>; <abstr>]
+|}];;
+
+let l = [ #1L; #2L ]
+
+[%%expect {|
+val l : int64_u list = [<abstr>; <abstr>]
+|}];;
+
+let l = [ [ #1.0 ]; [ #2.0; #3.0 ] ]
+
+[%%expect {|
+val l : float# list list = [[<abstr>]; [<abstr>; <abstr>]]
+|}];;
+
+let l = [ #(); #() ]
+
+[%%expect {|
+val l : unit# list = [<void>; <void>]
+|}];;
+
+(* Cycles in lists of non-values should be detected just like cycles in lists
+   of values *)
+let rec l = 1 :: l
+
+[%%expect {|
+val l : int list = [1; <cycle>]
+|}];;
+
+let rec l = #1.0 :: l
+
+[%%expect {|
+val l : float# list = [<abstr>; <cycle>]
+|}];;
+
+let rec l = #() :: l
+
+[%%expect {|
+val l : unit# list = [<void>; <cycle>]
+|}];;
+
 (* Regression test: void field of a record with an [any] parameter *)
 type ('a : any) t = { x : int; y : 'a }
 
@@ -134,4 +180,31 @@ let t = { x = 42; y = #() }
 [%%expect {|
 type ('a : any) t = { x : int; y : 'a; }
 val t : unit# t = {x = 42; y = <void>}
+|}];;
+
+(* Lists of non-values should be truncated just like lists of values *)
+#print_length 5;;
+
+let l = [ 1; 2; 3; 4; 5; 6; 7; 8 ]
+
+[%%expect {|
+val l : int list = [1; 2; 3; 4; ...]
+|}];;
+
+let l = [ #1.0; #2.0; #3.0; #4.0; #5.0; #6.0; #7.0; #8.0 ]
+
+[%%expect {|
+val l : float# list = [<abstr>; <abstr>; <abstr>; <abstr>; ...]
+|}];;
+
+let l = [ #1L; #2L; #3L; #4L; #5L; #6L; #7L; #8L ]
+
+[%%expect {|
+val l : int64_u list = [<abstr>; <abstr>; <abstr>; <abstr>; ...]
+|}];;
+
+let l = [ #(); #(); #(); #(); #(); #(); #(); #() ]
+
+[%%expect {|
+val l : unit# list = [<void>; <void>; <void>; <void>; ...]
 |}];;

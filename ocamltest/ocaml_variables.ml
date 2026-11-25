@@ -47,10 +47,23 @@ let cppflags = make ("cppflags",
 let cc = make ("cc",
   "Command to use to invoke the C compiler")
 
+let outputobj = make ("outputobj",
+  "Exact string to prefix a call to cc -c to name the object")
+
 let cflags = make ("cflags",
   "Flags passed to the C compiler")
 
+let cxx = make ("cxx",
+  "Command to use to invoke the C++ compiler")
+
+let ccomp_type = make ("ccomp_type",
+  "The \"kind\" of the C compiler, assembler and linker used: one of \"cc\" \
+   (for Unix-style C compilers), or \"msvc\" (for Microsoft Visual C++ and \
+   MASM)")
+
 let caml_ld_library_path_name = "CAML_LD_LIBRARY_PATH"
+
+let startup_cwd = Sys.getcwd ()
 
 let export_caml_ld_library_path value =
   let current_value = Sys.safe_getenv caml_ld_library_path_name in
@@ -60,11 +73,21 @@ let export_caml_ld_library_path value =
     if local_value="" then current_value else
     if current_value="" then local_value else
     String.concat Filename.path_sep [local_value; current_value] in
-  (caml_ld_library_path_name, new_value)
+  let new_value =
+    (* Under dune, CAML_LD_LIBRARY_PATH may contain relative paths.
+       They are relative to the startup directory, but we may have
+       chdir'd since. *)
+    let paths = String.split_on_char Filename.path_sep.[0] new_value in
+    let paths = paths |> List.map (fun p ->
+      if Filename.is_relative p then Filename.concat startup_cwd p else p)
+    in
+    String.concat Filename.path_sep paths
+  in
+  new_value
 
 let caml_ld_library_path =
   make_with_exporter
-    export_caml_ld_library_path
+    (caml_ld_library_path_name, export_caml_ld_library_path)
     ("ld_library_path",
       "List of paths to lookup for loading dynamic libraries")
 
@@ -147,6 +170,15 @@ let ocamlopt_byte = make ("ocamlopt_byte",
 let ocamlrun = make ("ocamlrun",
   "Path of the ocamlrun executable")
 
+let ocamlrun_sys = make ("ocamlrun_sys",
+  "Path of the system ocamlrun executable")
+
+let stdlib = make ("stdlib",
+  "Path of the stdlib")
+
+let runtime = make ("runtime",
+  "Path of the runtime")
+
 let ocamlc_flags = make ("ocamlc_flags",
   "Flags passed to ocamlc.byte and ocamlc.opt")
 
@@ -188,12 +220,15 @@ let ocamlc_opt_exit_status = make ("ocamlc_opt_exit_status",
 let ocamlopt_opt_exit_status = make ("ocamlopt_opt_exit_status",
   "Expected exit status of ocamlopt.opt")
 
-let export_ocamlrunparam value =
-  ("OCAMLRUNPARAM", value)
+let ocamlopt_jsir_js_exit_status = make ("ocamlopt_jsir_js_exit_status",
+  "Expected exit status of ocamlopt.opt -target js_of_ocaml")
+
+let ocamlopt_jsir_wasm_exit_status = make ("ocamlopt_jsir_wasm_exit_status",
+  "Expected exit status of ocamlopt.opt -target wasm_of_ocaml")
 
 let ocamlrunparam =
   make_with_exporter
-    export_ocamlrunparam
+    ("OCAMLRUNPARAM", Fun.id)
     ("ocamlrunparam",
       "Equivalent of OCAMLRUNPARAM")
 
@@ -225,6 +260,10 @@ let ocamldoc_reference =
 let ocaml_script_as_argument =
   Variables.make ( "ocaml_script_as_argument",
     "Whether the ocaml script should be passed as argument or on stdin")
+
+let ocamlfilt =
+  Variables.make ( "ocamlfilt",
+    "Path to ocamlfilt")
 
 let plugins =
   Variables.make ( "plugins", "plugins for ocamldoc" )
@@ -260,6 +299,8 @@ let init () =
     cppflags;
     cc;
     cflags;
+    outputobj;
+    cxx;
     caml_ld_library_path;
     codegen_exit_status;
     compare_programs;
@@ -298,6 +339,8 @@ let init () =
     ocamlnat_exit_status;
     ocamlc_opt_exit_status;
     ocamlopt_opt_exit_status;
+    ocamlopt_jsir_js_exit_status;
+    ocamlopt_jsir_wasm_exit_status;
     ocamlrunparam;
     ocamllex_flags;
     ocamlyacc_flags;
@@ -308,6 +351,7 @@ let init () =
     ocamldoc_exit_status;
     ocamldebug_flags;
     ocaml_script_as_argument;
+    ocamlfilt;
     os_type;
     plugins;
     shared_library_cflags;

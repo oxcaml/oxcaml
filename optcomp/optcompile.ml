@@ -17,7 +17,6 @@
 
 open Misc
 open Compile_common
-module SL = Slambda
 
 module type S = sig
   include Optcomp_intf.File_extensions
@@ -86,38 +85,42 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     tlambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
-        program.code
-        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-        |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
-             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-        |> fun (static_data, lambda) ->
-        { program with Lambda.code = lambda }
-        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
-            Type_shape.print_debug_uid_tables ppf)
-        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
-        |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
-        |> fun program ->
-        let code =
-          Simplif.simplify_lambda program.Lambda.code
-            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
-            ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+        let tlambda =
+          print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+            program.code
         in
-        { program with Lambda.code }
-        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
-        |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
-        |> fun (program : Lambda.program) ->
-        if Clflags.(should_stop_after Compiler_pass.Lambda)
+        if Clflags.(should_stop_after Compiler_pass.Transl)
         then ()
-        else (
-          Backend.compile_implementation ~keep_symbol_tables
-            ~sourcefile:(Some (Unit_info.original_source_file i.target))
-            ~prefixname:(Unit_info.prefix i.target)
-            ~ppf_dump:i.ppf_dump program;
-          Compilenv.save_unit_info
-            (Unit_info.Artifact.filename
-               (Unit_info.artifact i.target ~extension:Backend.ext_flambda_obj))
-            ~main_module_block_format:program.main_module_block_format
-            ~static_data))
+        else
+          tlambda |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
+          |> fun (static_data, lambda) ->
+          { program with Lambda.code = lambda }
+          |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
+              Type_shape.print_debug_uid_tables ppf)
+          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+          |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+          |> fun program ->
+          let code =
+            Simplif.simplify_lambda program.Lambda.code
+              ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
+              ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+          in
+          { program with Lambda.code }
+          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
+          |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
+          |> fun (program : Lambda.program) ->
+          if Clflags.(should_stop_after Compiler_pass.Lambda)
+          then ()
+          else (
+            Backend.compile_implementation ~keep_symbol_tables
+              ~sourcefile:(Some (Unit_info.original_source_file i.target))
+              ~prefixname:(Unit_info.prefix i.target)
+              ~ppf_dump:i.ppf_dump program;
+            Compilenv.save_unit_info
+              (Unit_info.Artifact.filename
+                 (Unit_info.artifact i.target ~extension:Backend.ext_flambda_obj))
+              ~main_module_block_format:program.main_module_block_format
+              ~static_data))
 
   let compile_from_typed i typed ~keep_symbol_tables =
     let loc = Location.in_file (Unit_info.original_source_file i.target) in
@@ -229,7 +232,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     compile_from_tlambda info program ~keep_symbol_tables:false
 
   let functorize input_module_names target =
-    Functorizer.functorize input_module_names target ~with_info ~impl_ext:"cmx"
+    (* [impl_ext] is the extension without its leading dot. *)
+    let impl_ext =
+      let ext = ext_flambda_obj in
+      String.sub ext 1 (String.length ext - 1)
+    in
+    Functorizer.functorize input_module_names target ~with_info ~impl_ext
       ~read_format:(fun filename ->
         let unit_info, _crc = Compilenv.read_unit_info filename in
         unit_info.ui_format)
@@ -310,7 +318,7 @@ let native unix
       List.iter
         (fun lib ->
           Load_path.add_dir
-            (Visible { cmx_guaranteed = true })
+            { visibility = Visible; cmx_guaranteed = true }
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval
   end) : S)

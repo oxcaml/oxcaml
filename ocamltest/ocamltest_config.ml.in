@@ -31,6 +31,8 @@ let cc = {@QS@|@CC@|@QS@}
 
 let cflags = {@QS@|@common_cflags@|@QS@}
 
+let cxx = {@QS@|@ocamltest_CXX@|@QS@}
+
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 
 let target_os_type = {@QS@|@target_os_type@|@QS@}
@@ -91,6 +93,8 @@ let exe = {@QS@|@EXEEXT@|@QS@}
 
 let mkdll = {@QS@|@mkdll_exp@|@QS@}
 let mkexe = {@QS@|@mkexe_exp@|@QS@}
+
+let outputobj = {@QS@|@outputobj@|@QS@}
 
 let bytecc_libs = {@QS@|@zstd_libs@ @cclibs@|@QS@}
 

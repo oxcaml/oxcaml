@@ -1,6 +1,6 @@
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type shape_format = Old_merlin | Debugging_shapes
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -14,8 +14,8 @@ type visible_include =
 (** {1 Relevant settings}
     Parameters from OCaml compiler which affect Merlin behavior. *)
 val cmi_file             : string option ref
-val include_dirs         : visible_include list ref
-val hidden_include_dirs  : string list ref
+val include_dirs         : include_dir list ref
+val hidden_include_dirs  : include_dir list ref
 val include_paths_files : string list ref
 val hidden_include_paths_files : string list ref
 val print_variance       : bool ref
@@ -33,7 +33,7 @@ val strict_formats       : bool ref
 val syntax_quotations    : bool ref
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 val open_args            : open_arg list ref
 val parameters           : string list ref
@@ -65,7 +65,9 @@ val debug                : bool ref
 val unsafe               : bool ref
 val opaque               : bool ref
 val unboxed_types        : bool ref
+val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
+val profile_level : int ref
 val dwarf_pedantic : bool ref
 val gdwarf_config_shape_eval_depth : int option ref
 val type_to_shape_max_depth : int option ref

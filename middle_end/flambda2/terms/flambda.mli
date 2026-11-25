@@ -131,6 +131,8 @@ module Invalid : sig
     | Application_never_returns of Apply_expr.t
     | Over_application_never_returns of Apply_expr.t
     | Message of string
+
+  val to_string : t -> string
 end
 
 module Expr : sig
@@ -165,6 +167,8 @@ module Named : sig
   type t = named
 
   include Expr_std.S with type t := t
+
+  val ids_for_export : t -> Ids_for_export.t
 
   (** Convert a register-width value into the defining expression of a [Let]. *)
   val create_simple : Simple.t -> t

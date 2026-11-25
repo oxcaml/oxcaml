@@ -142,6 +142,7 @@ let () =
 
 (* TEST
  flags = "-g";
+ readonly_files = "sanitize-backtrace.sh";
  { bytecode; }
  {
    flat-float-array;

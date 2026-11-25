@@ -42,6 +42,9 @@
       (func $caml_copy_int32 (param i32) (result (ref eq))))
    (import "int32" "Int32_val"
       (func $Int32_val (param (ref eq)) (result i32)))
+   (import "array" "caml_make_vect"
+      (func $caml_make_vect
+         (param (ref eq)) (param (ref eq)) (result (ref eq))))
 
    (type $float (struct (field $f f64)))
 
@@ -93,6 +96,13 @@
 
    (func $unbox_float32 (param $f (ref eq)) (result f32)
       (struct.get $float32 1 (ref.cast (ref $float32) (local.get $f))))
+
+   ;; An array of unboxed float32s is a block of boxed float32s (see
+   ;; caml_make_unboxed_int32_vect_bytecode in array.wat).
+   (func (export "caml_make_unboxed_float32_vect_bytecode")
+      (param $n (ref eq)) (result (ref eq))
+      (return_call $caml_make_vect (local.get $n)
+         (call $box_float32 (f32.const 0))))
 
    (func $float32_cmp
       (param $v1 (ref eq)) (param $v2 (ref eq)) (param i32) (result i32)

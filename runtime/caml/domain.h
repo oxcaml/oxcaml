@@ -93,6 +93,9 @@ CAMLextern void caml_bt_exit_ocaml(void);
 CAMLextern void caml_acquire_domain_lock(void);
 CAMLextern void caml_release_domain_lock(void);
 
+/* Allocate a new thread id (a tagged integer) for [Caml_state->thread_id]. */
+CAMLextern value caml_fresh_thread_id(void);
+
 /* Start the tick thread unless it is disabled. Returns nonzero in the case of
    an error. */
 CAMLextern int caml_start_tick_thread(void);

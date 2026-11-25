@@ -46,13 +46,25 @@ let anon_fun arg =
       input_files_rev := arg :: !input_files_rev)
   | Some _ -> input_files_rev := arg :: !input_files_rev
 
+(* Reading input files from a file keeps command lines short when there are
+   many input files. *)
+let add_input_files_from file =
+  let files =
+    try Arg.read_arg file with Sys_error msg -> raise (Arg.Bad msg)
+  in
+  Array.iter
+    (fun file ->
+      if not (String.equal file "") then
+        input_files_rev := file :: !input_files_rev)
+    files
+
 let speclist =
   [ ("--verbose", Arg.Set verbose, "Output more information");
     ("--debug", Arg.Set debug, "Output debugging information");
     ( "-o",
       Arg.Set_string output_file,
-      "Set output file name. Note that sub-indexes paths remains relative to \
-       the current directory." );
+      "Set output file name. Pointers to sub-indexes are stored relative to \
+       the output file's directory." );
     ( "--root",
       Arg.Set_string root,
       "Set the root path for all relative locations" );
@@ -92,14 +104,29 @@ let speclist =
        cmx files for modules in <dir> are always available)" );
     ( "-H",
       Arg.String
-        (fun arg ->
+        (fun path ->
           build_path_rev :=
-            { !build_path_rev with hidden = arg :: !build_path_rev.hidden }),
+            { !build_path_rev with
+              hidden =
+                { path; cmx_guaranteed = false } :: !build_path_rev.hidden
+            }),
       "An extra hidden directory to add to the load path" );
+    ( "-Hx",
+      Arg.String
+        (fun path ->
+          build_path_rev :=
+            { !build_path_rev with
+              hidden = { path; cmx_guaranteed = true } :: !build_path_rev.hidden
+            }),
+      "An extra hidden directory to add to the load path (Like -H, but \
+       indicates that cmx files for modules in <dir> are always available)" );
     ( "--no-cmt-load-path",
       Arg.Set do_not_use_cmt_loadpath,
       "Do not initialize the load path with the paths found in the first input \
        cmt file" );
+    ( "--files-from",
+      Arg.String add_input_files_from,
+      "<file> Read input files from <file>, one per line. Can be repeated." );
     ( "--cache-size",
       Arg.Set_int cache_size_kb,
       "Set LRU cache size in kb. Will bound memory usage in read-heavy \
@@ -113,6 +140,10 @@ let set_log_level debug verbose =
 
 let () =
   Arg.parse speclist anon_fun usage_msg;
+  (* As with positional input files, default to [aggregate] when input files
+     are only given with [--files-from]. *)
+  if Option.is_none !command && not (List.is_empty !input_files_rev) then
+    command := Some Aggregate;
   set_log_level !debug !verbose;
   Granular_marshal.set_lru_size (!cache_size_kb * 1000);
   try

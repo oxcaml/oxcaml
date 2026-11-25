@@ -38,14 +38,29 @@ Import these functions to access or allocate integers:
    (func $Int32_val (param (ref eq)) (result i32)))
 (import "env" "caml_copy_int32"
    (func $caml_copy_int32 (param i32) (result (ref eq))))
-(import "env" "Nativeint_val"
-   (func $Nativeint_val (param (ref eq)) (result i32)))
-(import "env" "caml_copy_nativeint"
-   (func $caml_copy_nativeint (param i32) (result (ref eq))))
 (import "env" "Int64_val"
    (func $Int64_val (param (ref eq)) (result i64)))
 (import "env" "caml_copy_int64"
    (func $caml_copy_int64 (param i64) (result (ref eq))))
+v}
+
+The width of a native integer depends on the runtime flavor: [i32] by
+default, [i64] with portable integers ([$portable-int]). To read a
+native integer without depending on the flavor, use
+[boxed_nativeint_to_i64], which sign-extends to [i64] when needed:
+
+{v
+(import "env" "boxed_nativeint_to_i64"
+   (func $boxed_nativeint_to_i64 (param (ref eq)) (result i64)))
+v}
+
+[Nativeint_val] and [caml_copy_nativeint] use the flavor's width:
+
+{v
+(import "env" "Nativeint_val"
+   (func $Nativeint_val (param (ref eq)) (result i32))) ;; i64 with $portable-int
+(import "env" "caml_copy_nativeint"
+   (func $caml_copy_nativeint (param i32) (result (ref eq)))) ;; i64 with $portable-int
 v}
 
 {1:preprocessor Preprocessor}

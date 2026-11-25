@@ -7,6 +7,8 @@
    bytecode;
  } {
    native;
+ }{
+   jsir;
  } {
    flags = "-Oclassic";
    native;

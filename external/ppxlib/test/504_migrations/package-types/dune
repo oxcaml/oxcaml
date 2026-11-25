@@ -1,0 +1,13 @@
+(executable
+ (name id_driver)
+ (modules id_driver)
+ (libraries ppxlib))
+
+(cram
+ ; Somewhat confusingly we enable this test on 5.5 and above, even
+ ; though it is a test for 5.4 migrations. We need this Pprintast bug
+ ; fix (https://github.com/ocaml/ocaml/pull/14797) which did not make
+ ; it back to 5.4, to really test this.
+ (enabled_if
+  (>= %{ocaml_version} "5.5"))
+ (deps id_driver.exe))

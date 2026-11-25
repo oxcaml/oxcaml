@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 (* Repeated calls to [Gc.major_slice] must complete major cycles even in
    the absence of allocation: forced slices spend their budget on the

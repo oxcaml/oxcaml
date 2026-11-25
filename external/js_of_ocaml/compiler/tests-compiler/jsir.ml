@@ -61,14 +61,9 @@ let () =
     caml_get_symbol: compilation unit Bar has not been initialised yet (looking up x)
     |}]
 
-(* Synthetic [.cmj] and [.cmja] files, laid out as [ocamlj] and [ocamlj -a]
-   produce them. The programs are built directly in JSIR, as the [ocamlj]
-   pipeline is not available from these tests. *)
-
-let compilation_unit name =
-  Compilation_unit.create
-    Compilation_unit.Prefix.empty
-    (Compilation_unit.Name.of_string name)
+(* Synthetic JSIR files, laid out as [ocamlopt -target js_of_ocaml] produces
+   them. The programs are built directly in JSIR, as that pipeline is not
+   available from these tests. *)
 
 let string s = Code.Pc (Code.String s)
 
@@ -76,51 +71,36 @@ let native_string s = Code.Pc (Code.NativeString (Code.Native_string.of_string s
 
 let extern name args = Code.Prim (Code.Extern (name, None), args)
 
-let cmj_body ~name ~imports body : Code.cmj_body =
+let jsir_file ?(target = Code.Js) ?(whole_program = false) ~name ~imports body :
+    Code.jsir_file =
   let body = body ~fresh:Code.Var.fresh in
   let last_var = Code.Var.count () - 1 in
   let block = { Code.params = []; body; branch = Stop } in
-  { program =
+  { target
+  ; program =
       Code.Marshalable_program.of_program
         { start = 0; blocks = Code.Addr.Map.singleton 0 block; free_pc = 1 }
   ; last_var
+  ; var_names = []
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
+  ; force_link = false
+  ; whole_program
+  ; symbol_imports = []
+  ; symbol_exports = []
   }
 
-let write_cmj file (body : Code.cmj_body) =
+let write_jsir_file file (body : Code.jsir_file) =
   let oc = open_out_bin file in
-  output_string oc (Magic_number.to_string Magic_number.current_cmj);
+  output_string oc (Magic_number.to_string Magic_number.current_jsir);
   output_value oc body;
   close_out oc
 
-let write_cmja file bodies =
-  let oc = open_out_bin file in
-  output_string oc (Magic_number.to_string Magic_number.current_cmja);
-  let toc_pos_pos = pos_out oc in
-  output_binary_int oc 0;
-  let units =
-    List.map bodies ~f:(fun (body : Code.cmj_body) ->
-        let cu_pos = pos_out oc in
-        output_value oc body;
-        { Cmj_format.cu_name = compilation_unit body.exported_compilation_unit
-        ; cu_pos
-        ; cu_codesize = pos_out oc - cu_pos
-        })
-  in
-  let toc_pos = pos_out oc in
-  output_value oc { Cmj_format.lib_units = units };
-  seek_out oc toc_pos_pos;
-  output_binary_int oc toc_pos;
-  close_out oc
-
-let read_jsir_file file ~expected f =
+let read_jsir_file file =
   let ic = open_in_bin file in
-  let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
-  assert (Magic_number.equal magic (Magic_number.current expected));
-  let r = f ic in
-  close_in ic;
-  r
+  Fun.protect
+    ~finally:(fun () -> close_in ic)
+    (fun () -> Parse_bytecode.from_jsir_channel ~target:Code.Js ~filename:file ic)
 
 let print_unit (unit : Parse_bytecode.jsir_unit) =
   Printf.printf "unit %s\n" unit.name;
@@ -134,7 +114,7 @@ let print_unit (unit : Parse_bytecode.jsir_unit) =
   Format.pp_print_flush Format.std_formatter ()
 
 let unit_a =
-  cmj_body ~name:"A" ~imports:[] (fun ~fresh ->
+  jsir_file ~name:"A" ~imports:[] (fun ~fresh ->
       let greeting = fresh () in
       [ Let (greeting, extern "jsir_test_greet" [ string "A" ])
       ; Let
@@ -145,7 +125,7 @@ let unit_a =
       ])
 
 let unit_b =
-  cmj_body ~name:"B" ~imports:[ "A" ] (fun ~fresh ->
+  jsir_file ~name:"B" ~imports:[ "A" ] (fun ~fresh ->
       let greeting = fresh () in
       [ Let
           ( greeting
@@ -153,11 +133,11 @@ let unit_b =
       ; Let (fresh (), extern "jsir_test_print" [ Pv greeting ])
       ])
 
-let%expect_test "Parse_bytecode.from_cmj" =
+let%expect_test "Parse_bytecode.from_jsir_channel" =
   with_temp_dir ~f:(fun () ->
-      write_cmj "a.cmj" unit_a;
+      write_jsir_file "a.cm-jsir-js" unit_a;
       Code.Var.reset ();
-      let unit = read_jsir_file "a.cmj" ~expected:`Cmj Parse_bytecode.from_cmj in
+      let unit = read_jsir_file "a.cm-jsir-js" in
       print_unit unit;
       (* Fresh variables do not collide with the variables of the unit. *)
       Printf.printf "last_var: %d\n" unit_a.last_var;
@@ -175,12 +155,14 @@ let%expect_test "Parse_bytecode.from_cmj" =
     fresh: 3
     |}]
 
-let%expect_test "Parse_bytecode.from_cmja" =
+let%expect_test
+    "Parse_bytecode.from_jsir_channel keeps fresh variables disjoint across units" =
   with_temp_dir ~f:(fun () ->
-      write_cmja "lib.cmja" [ unit_a; unit_b ];
+      write_jsir_file "a.cm-jsir-js" unit_a;
+      write_jsir_file "b.cm-jsir-js" unit_b;
       Code.Var.reset ();
-      let units = read_jsir_file "lib.cmja" ~expected:`Cmja Parse_bytecode.from_cmja in
-      List.iter units ~f:print_unit;
+      List.iter [ "a.cm-jsir-js"; "b.cm-jsir-js" ] ~f:(fun file ->
+          print_unit (read_jsir_file file));
       (* Fresh variables do not collide with the variables of any unit. *)
       Printf.printf "last_var: %d, %d\n" unit_a.last_var unit_b.last_var;
       Printf.printf "fresh: %d\n" (Code.Var.idx (Code.Var.fresh ())));
@@ -226,28 +208,40 @@ function jsir_test_unused() {
 
 let setup () =
   Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
-  write_cmj "a.cmj" unit_a;
-  write_cmj "b.cmj" unit_b;
-  write_cmja "lib.cmja" [ unit_a; unit_b ];
+  write_jsir_file "a.cm-jsir-js" unit_a;
+  write_jsir_file "b.cm-jsir-js" unit_b;
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
-let link_and_run ?(filter = fun _ -> true) files =
-  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
-  run_javascript (Filetype.js_file_of_path "bin.js")
+let run ?(filter = fun _ -> true) file =
+  run_javascript (Filetype.js_file_of_path file)
   |> String.split_on_char ~sep:'\n'
   |> List.iter ~f:(fun line -> if filter line then print_endline line)
+
+let link_and_run ?filter files =
+  js_of_ocaml ([ "link"; "runtime.js" ] @ files @ [ "-o"; "bin.js" ]) |> print_string;
+  run ?filter "bin.js"
+
+(* The number of times a generated file mentions [name]. *)
+let occurrences file name =
+  let regexp = Str.regexp_string name in
+  let rec count line pos =
+    match Str.search_forward regexp line pos with
+    | pos -> 1 + count line (pos + 1)
+    | exception Not_found -> 0
+  in
+  List.fold_left (file_lines_text file) ~init:0 ~f:(fun n line -> n + count line 0)
 
 (* The unit info headers of a generated file. *)
 let print_unit_infos file =
   List.iter (file_lines_text file) ~f:(fun line ->
       if String.starts_with ~prefix:Unit_info.prefix line then print_endline line)
 
-let%expect_test "cmj without --include-runtime" =
+let%expect_test "JSIR file without --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "stubs.js"; "a.cmj"; "-o"; "a.js" ] |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       (* The stubs are not part of the output, so the program fails. Only the
@@ -262,12 +256,12 @@ let%expect_test "cmj without --include-runtime" =
     TypeError: b.jsir_test_greet is not a function
     |}]
 
-let%expect_test "cmj with --include-runtime" =
+let%expect_test "JSIR file with --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
-      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cmj"; "-o"; "a.js" ]
+      js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cm-jsir-js"; "-o"; "a.js" ]
       |> print_string;
-      js_of_ocaml [ "b.cmj"; "-o"; "b.js" ] |> print_string;
+      js_of_ocaml [ "b.cm-jsir-js"; "-o"; "b.js" ] |> print_string;
       print_unit_infos "a.js";
       print_unit_infos "b.js";
       link_and_run [ "a.js"; "b.js" ]);
@@ -282,48 +276,68 @@ let%expect_test "cmj with --include-runtime" =
     hello A
     |}]
 
-let%expect_test "cmja with --include-runtime" =
+(* A whole program, as [ocamlopt -link-jsir] makes from the JSIR of the units
+   of an executable. *)
+let whole_program =
+  jsir_file ~whole_program:true ~name:"prog" ~imports:[] (fun ~fresh ->
+      let greeting = fresh () in
+      [ Let (greeting, extern "jsir_test_greet" [ string "whole program" ])
+      ; Let (fresh (), extern "jsir_test_print" [ Pv greeting ])
+      ; (* The runtime raises a predefined exception, which the program has to
+           register itself. *)
+        Let (fresh (), extern "caml_sys_getenv" [ string "JSIR_TEST_UNSET_VARIABLE" ])
+      ])
+
+let%expect_test "JSIR whole program" =
   with_temp_dir ~f:(fun () ->
-      setup ();
-      js_of_ocaml [ "--include-runtime"; "stubs.js"; "lib.cmja"; "-o"; "lib.js" ]
+      Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
+      write_jsir_file "prog.cm-jsir-js" whole_program;
+      js_of_ocaml [ "--pretty"; "stubs.js"; "prog.cm-jsir-js"; "-o"; "prog.js" ]
       |> print_string;
-      print_unit_infos "lib.js";
-      link_and_run [ "lib.js" ]);
+      (* The output is an executable, with the primitives that the program
+         uses. *)
+      print_unit_infos "prog.js";
+      List.iter
+        [ "jsir_test_greet"; "jsir_test_unused"; "caml_set_link_info" ]
+        ~f:(fun name -> Printf.printf "%s: %b\n" name (occurrences "prog.js" name > 0));
+      run
+        ~filter:(fun line ->
+          String.starts_with ~prefix:"hello" line
+          || String.starts_with ~prefix:"Fatal error" line)
+        "prog.js");
   [%expect
     {|
-    //# unitInfo: Provides:
-    //# unitInfo: Primitives: jsir_test_greet, jsir_test_print, jsir_test_unused
-    //# unitInfo: Force_link: true
-    //# unitInfo: Provides: A
-    //# unitInfo: Provides: B
-    //# unitInfo: Requires: A
-    hello A
+    jsir_test_greet: true
+    jsir_test_unused: false
+    caml_set_link_info: false
+    Fatal error: exception Not_found
+    hello whole program
     |}]
 
-let%expect_test "cmja with --include-runtime and --keep-unit-names" =
+(* The error messages, without the path to the executable. *)
+let print_errors output =
+  let marker = "Error: " in
+  let len = String.length marker in
+  String.split_on_char ~sep:'\n' output
+  |> List.iter ~f:(fun line ->
+      let rec loop i =
+        if i + len <= String.length line
+        then
+          if String.equal (String.sub line ~pos:i ~len) marker
+          then print_endline (String.sub line ~pos:i ~len:(String.length line - i))
+          else loop (i + 1)
+      in
+      loop 0)
+
+let%expect_test "js_of_ocaml rejects units compiled for wasm_of_ocaml" =
   with_temp_dir ~f:(fun () ->
-      setup ();
-      Unix.mkdir "out" 0o755;
-      js_of_ocaml
-        [ "--include-runtime"; "--keep-unit-names"; "stubs.js"; "lib.cmja"; "-o"; "out/" ]
-      |> print_string;
-      List.iter
-        (List.sort ~cmp:String.compare (Array.to_list (Sys.readdir "out")))
-        ~f:(fun f ->
-          let file = Filename.concat "out" f in
-          Printf.printf "$ %s\n" file;
-          print_unit_infos file);
-      link_and_run [ "out/runtime.js"; "out/A.js"; "out/B.js" ]);
+      let unit = jsir_file ~target:Code.Wasm ~name:"W" ~imports:[] (fun ~fresh:_ -> []) in
+      write_jsir_file "w.cm-jsir-wasm" unit;
+      write_jsir_file "w.cm-jsir-js" unit;
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-wasm"; "-o"; "w.js" ]);
+      print_errors (js_of_ocaml ~fail:false [ "w.cm-jsir-js"; "-o"; "w.js" ]));
   [%expect
     {|
-    $ out/A.js
-    //# unitInfo: Provides: A
-    $ out/B.js
-    //# unitInfo: Provides: B
-    //# unitInfo: Requires: A
-    $ out/runtime.js
-    //# unitInfo: Provides:
-    //# unitInfo: Primitives: jsir_test_greet, jsir_test_print, jsir_test_unused
-    //# unitInfo: Force_link: true
-    hello A
+    Error: w.cm-jsir-wasm was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cm-jsir-js was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
     |}]

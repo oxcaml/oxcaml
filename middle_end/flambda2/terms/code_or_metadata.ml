@@ -17,7 +17,9 @@ type code_status =
   | Loaded of Code.t
   | Not_loaded of
       { sections : File_sections.t;
-        index : File_sections.Idx.t;
+        index :
+          (Flambda.function_params_and_body * Name_occurrences.t)
+          File_sections.Idx.t;
         metadata : Code_metadata.t;
         delayed_renaming : Renaming.t
       }
@@ -26,8 +28,10 @@ type t =
   | Code_present of { mutable code_status : code_status }
   | Metadata_only of Code_metadata.t
 
+type section_data = Flambda.function_params_and_body * Name_occurrences.t
+
 type code_present =
-  | Present of { index : File_sections.Idx.t }
+  | Present of { index : section_data File_sections.Idx.t }
   | Absent
 
 type raw =
@@ -59,7 +63,7 @@ let view t =
   | Code_present { code_status = Loaded code } -> View.Code_present code
   | Code_present ({ code_status = Not_loaded not_loaded } as c) ->
     let params_and_body, free_names_of_params_and_body =
-      Obj.obj (File_sections.get not_loaded.sections not_loaded.index)
+      File_sections.get not_loaded.sections not_loaded.index
     in
     let params_and_body =
       Flambda.Function_params_and_body.apply_renaming params_and_body
@@ -117,17 +121,16 @@ let from_raw ~sections raw =
             }
       }
 
-let to_raw ~add_section t : raw =
+let to_raw ~sections t : raw =
   match view t with
   | Code_present code ->
     { metadata = Code.code_metadata code;
       code_present =
         Present
           { index =
-              add_section
-                (Obj.repr
-                   ( Code.params_and_body code,
-                     Code.free_names_of_params_and_body code ))
+              File_sections.Builder.add sections
+                ( Code.params_and_body code,
+                  Code.free_names_of_params_and_body code )
           }
     }
   | Metadata_only metadata -> { metadata; code_present = Absent }

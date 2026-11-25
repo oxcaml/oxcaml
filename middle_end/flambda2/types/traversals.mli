@@ -147,10 +147,15 @@ module Make (X : sig
   val rewrite : t -> Typing_env.t -> Type_grammar.t -> t rewrite
 
   val block_slot :
-    ?tag:Tag.t -> t -> Target_ocaml_int.t -> Typing_env.t -> Type_grammar.t -> t
+    ?tag:Tag.t ->
+    t ->
+    Target_ocaml_int.t ->
+    Typing_env.t ->
+    Type_grammar.t ->
+    t Or_unknown.t
 
   val array_slot :
-    t -> Target_ocaml_int.t -> Typing_env.t -> Type_grammar.t -> t
+    t -> Target_ocaml_int.t -> Typing_env.t -> Type_grammar.t -> t Or_unknown.t
 
   type set_of_closures
 
@@ -167,13 +172,21 @@ module Make (X : sig
     Function_slot.t ->
     Code_id.t ->
     Type_grammar.t ->
-    t
+    t Or_unknown.t
 
   val value_slot :
-    set_of_closures -> Value_slot.t -> Typing_env.t -> Type_grammar.t -> t
+    set_of_closures ->
+    Value_slot.t ->
+    Typing_env.t ->
+    Type_grammar.t ->
+    t Or_unknown.t
 
   val function_slot :
-    set_of_closures -> Function_slot.t -> Typing_env.t -> Type_grammar.t -> t
+    set_of_closures ->
+    Function_slot.t ->
+    Typing_env.t ->
+    Type_grammar.t ->
+    t Or_unknown.t
 end) : sig
   val rewrite : Typing_env.t -> (Symbol.t -> X.t) -> Typing_env.t
 

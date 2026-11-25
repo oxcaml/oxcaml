@@ -61,7 +61,7 @@ module Datalog = struct
     create_table ?provenance ~name columns unit_repr
 
   module Schema = struct
-    module type S0 = sig
+    module type Schema_type = sig
       type keys
 
       type value
@@ -74,7 +74,7 @@ module Datalog = struct
     end
 
     module type S = sig
-      include S0
+      include Schema_type
 
       val create : name:string -> (t, keys, value) table
 
@@ -105,7 +105,7 @@ module Datalog = struct
       let result_repr = Table.unit_repr
     end
 
-    module Cons (C : C) (S : S0) = struct
+    module Cons (C : C) (S : Schema_type) = struct
       type keys = C.t -> S.keys
 
       type t = S.t C.Map.t

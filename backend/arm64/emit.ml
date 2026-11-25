@@ -747,7 +747,12 @@ let compute_live_offset env live =
         Misc.fatal_errorf "Unexpected Valx2 type of reg %a" Printreg.reg r
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128; _ } -> ()
+      | { typ =
+            ( Int | Static_block | Code_pointer | Out_of_heap_data_pointer
+            | Float | Float32 | Vec128 );
+          _
+        } ->
+        ()
       | { typ = Vec256 | Vec512 | Mask; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
@@ -887,7 +892,7 @@ let is_immediate_float bits =
   && Int64.equal (Int64.logand mant 0xF_0000_0000_0000L) mant
 
 let is_immediate_float32 bits =
-  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0x7F) - 63 in
+  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0xFF) - 127 in
   let mant = Int32.logand bits 0x7F_FFFFl in
   exp >= -3 && exp <= 4 && Int32.equal (Int32.logand mant 0x78_0000l) mant
 
@@ -971,6 +976,18 @@ let emit_stack_load_store env instr reg (r : Reg.t) =
 let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
+
+(* Moves of 8- and 16-bit stack arguments. The store writes exactly the
+   argument's width; instruction selection only creates these moves with a
+   stack-slot destination, so every other shape is unexpected. *)
+let emit_sized_move env ~str (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Reg _, Reg _ | Stack _, (Reg _ | Stack _) | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: unexpected move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
 
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
@@ -1329,7 +1346,8 @@ let emit_load_literal dst lbl =
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
-  | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
+  | Val | Int | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer ->
+    A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 | Mask ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
@@ -1343,7 +1361,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Reg _,
+      (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Reg _ ) ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_d src) dst
@@ -1351,7 +1372,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_str_simd_and_fp env (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_q src) dst
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
+  | ( (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Reg _,
+      (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Stack _ ) ->
     emit_stack_str env (H.reg_x src) dst
   | Float, Stack _, Float, Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_d dst) src
@@ -1359,7 +1383,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_ldr_simd_and_fp env (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_q dst) src
-  | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Stack _,
+      (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      Reg _ ) ->
     emit_stack_ldr env (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
@@ -1369,7 +1396,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( ( Float | Float32 | Vec128 | Int | Val | Addr | Static_block
+      | Code_pointer | Out_of_heap_data_pointer | Valx2 ),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1482,6 +1510,13 @@ let emit_condbranch arg tst lbl =
   | Ioddtest -> A.ins3 TBNZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
   | Ieventest -> A.ins3 TBZ (H.reg_x arg.(0)) (O.imm_six 0) lbl
 
+(* The guards of the coverage probes of the unit *)
+
+(* CR mshinwell: remove this global state. [begin_assembly] should return the
+   state of the emission of the unit, for [fundecl] and [end_assembly] to take
+   as an argument, which requires passing it through [Asmgen]. *)
+let sancov = ref (Emit_sancov.create ())
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr env i =
@@ -1510,6 +1545,8 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) -> emit_sized_move env ~str:STRB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) -> emit_sized_move env ~str:STRH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1574,7 +1611,33 @@ let emit_instr env i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself: no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            let rd = H.reg_x i.arg.(k) in
+            let offset = i.arg.(k + 1) in
+            (match offset.loc with
+            | Reg _ ->
+              A.ins4 ADD_shifted_register rd rd (H.reg_x offset) O.optional_none
+            | Stack _ ->
+              emit_stack_ldr env reg_x_tmp1 offset;
+              A.ins4 ADD_shifted_register rd rd reg_x_tmp1 O.optional_none
+            | Unknown ->
+              Misc.fatal_error
+                "Lextcall: fat-pointer offset has unknown location");
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1
+          | XDummy_int | XDummy_float -> k)
+        0 ty_args
+    in
     if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
@@ -1611,6 +1674,9 @@ let emit_instr env i =
     assert (
       Cmm.equal_memory_chunk memory_chunk Word_int
       || Cmm.equal_memory_chunk memory_chunk Word_val
+      || Cmm.equal_memory_chunk memory_chunk Word_static_block
+      || Cmm.equal_memory_chunk memory_chunk Word_code_pointer
+      || Cmm.equal_memory_chunk memory_chunk Word_out_of_heap_data_pointer
       || not is_atomic);
     let dst = i.res.(0) in
     let base =
@@ -1634,7 +1700,8 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
+    | Word_int | Word_static_block | Word_code_pointer
+    | Word_out_of_heap_data_pointer | Word_val ->
       if is_atomic
       then (
         assert (
@@ -1666,8 +1733,8 @@ let emit_instr env i =
     | Fivetwelve_aligned | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Store (size, addr, assignment)) -> (
-    (* NB: assignments other than Word_int and Word_val do not follow the
-       Multicore OCaml memory model and so do not emit a barrier *)
+    (* NB: assignments other than Word_(int/val/code_pointer/etc.) do not follow
+       the Multicore OCaml memory model and so do not emit a barrier *)
     let src = i.arg.(0) in
     let base =
       match addr with
@@ -1687,7 +1754,8 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_val ->
+    | Word_int | Word_static_block | Word_code_pointer
+    | Word_out_of_heap_data_pointer | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing
@@ -1782,6 +1850,7 @@ let emit_instr env i =
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
   | Lop (Intop Iclz) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
+  | Lop (Intop Inot) -> A.ins_mvn (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     A.ins4 AND_shifted_register rd rn rm O.optional_none
@@ -1827,7 +1896,8 @@ let emit_instr env i =
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
-      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
+      (Intop_imm
+         ((Imul | Idiv _ | Inot | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
@@ -1935,6 +2005,8 @@ let emit_instr env i =
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
+  | Lop Thread_self_id ->
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_thread_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -2051,6 +2123,9 @@ let emit_instr env i =
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
+  | Lop Trace_pc_guard_gate -> Emit_sancov.emit_gate ~res:i.res.(0)
+  | Lop (Trace_pc_guard index) ->
+    Emit_sancov.emit_call !sancov ~live:i.live ~move:(move env) ~index
 
 let emit_instr env i =
   try emit_instr env i
@@ -2211,6 +2286,7 @@ let rec emit_all env i =
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
+  Emit_sancov.start_function !sancov;
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2290,9 +2366,11 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
+  sancov := Emit_sancov.create ();
   A.set_emit_string ~emit_string:Emitaux.emit_string;
-  Asm_targets.Asm_label.initialize ~new_label:(fun () ->
-      Cmm.new_label () |> Label.to_int);
+  Asm_targets.Asm_label.initialize
+    ~new_label:(fun () -> Cmm.new_label () |> Label.to_int)
+    ~new_dwarf_label:(fun () -> Label.new_dwarf_label () |> Label.to_int);
   (* Set up binary emitter if JIT hook is registered or save_binary_sections is
      set *)
   let binary_emitter_callback = Binary_emitter_helpers.begin_emission () in
@@ -2335,6 +2413,7 @@ let register_expect_asm_callback (_ : string -> unit) = ()
 let expect_asm_whole_function = ref false
 
 let end_assembly () =
+  Emit_sancov.emit_data !sancov;
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
   emit_named_text_section code_end;

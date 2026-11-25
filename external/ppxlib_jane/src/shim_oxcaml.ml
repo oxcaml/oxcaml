@@ -38,14 +38,34 @@ module Modalities = struct
 end
 
 module Mode = struct
-  type t = mode = Mode of string [@@unboxed]
+  type t = mode =
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
+
+  and bounded = mode_bounded =
+    { pmode_upper : bound
+    ; pmode_lower : bound
+    }
+
+  and bound = bound_elem list
+
+  and bound_elem = mode_bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc list
+
+  and bound_var = mode_bound_var =
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
+    }
 end
 
 module Modes = struct
   type t = Mode.t loc list
 
   let none = []
-  let local ~loc = [ { txt = Mode "local"; loc } ]
+  let local ~loc = [ { txt = Pmode "local"; loc } ]
 end
 
 module Include_kind = struct
@@ -132,10 +152,11 @@ end
 module Value_binding = struct
   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
 
-  let create ~loc ~pat ~expr ~modes =
+  let create ~loc ~pat ~expr ~constraint_ ~modes =
     { pvb_is_poly = false
     ; pvb_pat = pat
     ; pvb_expr = expr
+    ; pvb_constraint = constraint_
     ; pvb_modes = modes
     ; pvb_attributes = []
     ; pvb_loc = loc
@@ -252,6 +273,7 @@ module Pattern_desc = struct
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -380,6 +402,7 @@ module Signature_item_desc = struct
     | Psig_attribute of attribute
     | Psig_extension of extension * attributes
     | Psig_jkind of jkind_declaration
+    | Psig_law of law_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x
@@ -404,6 +427,15 @@ type nonrec jkind_declaration = jkind_declaration =
   ; pjkind_manifest : jkind_annotation option
   ; pjkind_attributes : attributes
   ; pjkind_loc : Location.t
+  }
+
+type nonrec law_declaration = law_declaration =
+  { plaw_name : string loc
+  ; plaw_params : (string loc * core_type option) list
+  ; plaw_assumptions : expression list
+  ; plaw_conclusion : expression
+  ; plaw_attributes : attributes
+  ; plaw_loc : Location.t
   }
 
 module Type_declaration = struct
@@ -479,6 +511,7 @@ module Structure_item_desc = struct
     | Pstr_attribute of attribute
     | Pstr_extension of extension * attributes
     | Pstr_jkind of jkind_declaration
+    | Pstr_law of law_declaration
 
   let of_parsetree x = x
   let to_parsetree x = x
@@ -517,6 +550,7 @@ module Module_expr_desc = struct
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension

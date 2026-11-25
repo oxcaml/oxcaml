@@ -214,7 +214,7 @@ function caml_div(x, y) {
 //Alias: %int_mod
 function caml_mod(x, y) {
   if (y === 0) caml_raise_zero_divide();
-  return x % y;
+  return (x % y) | 0;
 }
 
 //Provides: caml_int_unsigned_div

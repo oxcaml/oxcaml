@@ -537,7 +537,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
   in
   let func =
     match op with
-    | Direct { sym_name; sym_global = _ } ->
+    | Direct { sym_name; sym_global = _; sym_type = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
     | Indirect _ -> load_reg_to_temp ~typ:T.ptr t i.arg.(0) |> V.get_ident_exn
@@ -801,7 +801,11 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
   | Tailcall_func op ->
     reject_addr_regs i.arg "tailcall func";
     call ~tail:true t i op
-  | Call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+  | Call_no_return op ->
+    reject_addr_regs i.arg "call no return";
+    call t i op;
+    emit_ins_no_res t I.unreachable
+  | External_call_no_return { func_symbol; alloc; stack_ofs; stack_align; _ } ->
     extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align;
     emit_ins_no_res t I.unreachable
   | Prim { op; label_after } -> (
@@ -896,6 +900,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
+    | Inot ->
+      reject_addr_regs i.res "int_op";
+      let arg1 = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
+      emit_ins t (I.binary Xor ~arg1 ~arg2:(V.of_int ~typ:T.i64 (-1)))
     | Ilsl -> do_binary Shl
     | Ilsr -> do_binary Lshr
     | Iasr -> do_binary Ashr
@@ -1093,6 +1101,8 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   in
   match memory_chunk with
   | Word_int -> basic T.i64
+  | Word_static_block | Word_code_pointer | Word_out_of_heap_data_pointer ->
+    basic T.ptr
   | Word_val -> basic T.val_ptr
   | Byte_unsigned -> extend Zext ~from:T.i8 ~to_:T.i64
   | Byte_signed -> extend Sext ~from:T.i8 ~to_:T.i64
@@ -1122,6 +1132,8 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   in
   match memory_chunk with
   | Word_int -> basic T.i64
+  | Word_static_block | Word_code_pointer | Word_out_of_heap_data_pointer ->
+    basic T.ptr
   | Word_val -> basic T.val_ptr
   | Byte_unsigned | Byte_signed -> trunc Trunc T.i8
   | Sixteen_unsigned | Sixteen_signed -> trunc Trunc T.i16
@@ -1231,7 +1243,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     in
     store_into_reg t i.res.(0) opaque_temp
   | Const_int n -> store_into_reg t i.res.(0) (V.of_nativeint n)
-  | Const_symbol { sym_name; sym_global = _ } ->
+  | Const_symbol { sym_name; sym_global = _; sym_type = _ } ->
     add_referenced_symbol t sym_name;
     store_into_reg t i.res.(0) (V.of_symbol sym_name)
   | Const_float32 bits -> store_into_reg t i.res.(0) (V.of_float32_bits bits)
@@ -1298,6 +1310,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
+  | Trace_pc_guard_gate | Trace_pc_guard _ ->
+    Misc.fatal_error
+      "Llvmize: -gated-trace-pc-guard is not supported with -llvm-backend"
   | Dls_get ->
     let dls_state_ptr = load_domainstate_addr t Domain_dls_state in
     let dls_state = emit_ins t (I.load ~ptr:dls_state_ptr ~typ:T.i64) in
@@ -1310,6 +1325,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let domain_id_ptr = load_domainstate_addr t Domain_id in
     let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) domain_id
+  | Thread_self_id ->
+    let thread_id_ptr = load_domainstate_addr t Domain_thread_id in
+    let thread_id = emit_ins t (I.load ~ptr:thread_id_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) thread_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
@@ -1677,7 +1696,8 @@ let llvm_value_of_data_item (d : Cmm.data_item) =
   | Cint8 n -> V.of_int ~typ:T.i8 n
   | Cint16 n -> V.of_int ~typ:T.i16 n
   | Cint32 n -> V.of_nativeint ~typ:T.i32 n
-  | Csymbol_address { sym_name; sym_global = _ } -> V.of_symbol sym_name
+  | Csymbol_address { sym_name; sym_global = _; sym_type = _ } ->
+    V.of_symbol sym_name
   | Cstring s -> V.of_string_constant s
   | Cskip size ->
     V.zeroinitializer (T.Array { num_of_elems = size; elem_type = T.i8 })
@@ -1703,7 +1723,7 @@ let define_symbol t ~private_ ~header ~symbol (contents : Cmm.data_item list) =
   List.iter
     (fun (d : Cmm.data_item) ->
       match[@warning "-fragile-match"] d with
-      | Csymbol_address { sym_name; sym_global = _ } ->
+      | Csymbol_address { sym_name; sym_global = _; sym_type = _ } ->
         add_referenced_symbol t sym_name
       | _ -> ())
     contents
@@ -1717,7 +1737,8 @@ let data (ds : Cmm.data_item list) =
   in
   let peek_int = function[@warning "-4"] Cmm.Cint n -> Some n | _ -> None in
   let peek_define_symbol = function[@warning "-4"]
-    | Cmm.Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
+    | Cmm.Cdefine_symbol { sym_name; sym_global = _; sym_type = _ } ->
+      Some sym_name
     | _ -> None
   in
   let eat_if peek = function

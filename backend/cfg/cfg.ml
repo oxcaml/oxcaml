@@ -173,7 +173,7 @@ let successor_labels_normal ti =
   | Tailcall_self { destination } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
-  | Call_no_return _ -> Label.Set.empty
+  | Call_no_return _ | External_call_no_return _ -> Label.Set.empty
   | Never -> Label.Set.empty
   | Always l -> Label.Set.singleton l
   | Parity_test { ifso; ifnot } | Truth_test { ifso; ifnot } ->
@@ -236,7 +236,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
         Tailcall_self { destination = f destination }
       | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
-      | Return | Raise _ | Call_no_return _
+      | Return | Raise _ | Call_no_return _ | External_call_no_return _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
       | Call { op; label_after } -> Call { op; label_after = f label_after }
@@ -356,7 +356,8 @@ let register_predecessors_for_all_blocks (t : t) =
 
 let can_raise_terminator (i : terminator) =
   match i with
-  | Call_no_return _ | Raise _ | Tailcall_func _ | Call _
+  | Call_no_return _ | External_call_no_return _ | Raise _ | Tailcall_func _
+  | Call _
   | Prim { op = Probe _; label_after = _ } ->
     true
   | Prim { op = External { alloc; effects; _ }; label_after = _ } -> (
@@ -379,8 +380,8 @@ let can_raise_terminator (i : terminator) =
    taking into account [effects] on extcalls *)
 let is_pure_terminator desc =
   match (desc : terminator) with
-  | Return | Raise _ | Call_no_return _ | Tailcall_func _ | Tailcall_self _
-  | Call _ | Prim _ | Invalid _ ->
+  | Return | Raise _ | Call_no_return _ | External_call_no_return _
+  | Tailcall_func _ | Tailcall_self _ | Call _ | Prim _ | Invalid _ ->
     false
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
@@ -392,7 +393,8 @@ let is_never_terminator desc =
   | Never -> true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+    ->
     false
 
 let is_return_terminator desc =
@@ -400,7 +402,7 @@ let is_return_terminator desc =
   | Return -> true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let is_pure_basic : basic -> bool = function
@@ -449,8 +451,8 @@ let is_noop_move instr =
       | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
       | Intop_atomic _ | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause
-        )
+      | End_region | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll
+      | Alloc _ | Pause | Trace_pc_guard_gate | Trace_pc_guard _ )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -527,10 +529,11 @@ let is_poll (instr : basic instruction) =
   | Op Poll -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Trace_pc_guard_gate
+      | Trace_pc_guard _ | Begin_region | End_region | Dls_get | Tls_get
+      | Domain_index | Thread_self_id | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -546,7 +549,8 @@ let is_alloc (instr : basic instruction) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Pause
+      | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
@@ -565,7 +569,8 @@ let is_heap_alloc (instr : basic instruction) =
   | Op
       ( Alloc { mode = Local; bytes = _; dbginfo = _ }
       | Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Pause
+      | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
@@ -583,9 +588,10 @@ let is_end_region (b : basic) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      | Tls_get | Domain_index | Thread_self_id | Pause | Trace_pc_guard_gate
+      | Trace_pc_guard _ | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -613,7 +619,7 @@ let basic_block_contains_calls block =
         true)
     | Tailcall_self _ -> false
     | Tailcall_func _ -> false
-    | Call_no_return _ -> true
+    | Call_no_return _ | External_call_no_return _ -> true
     | Call _ -> true
     | Prim { op = External _; _ } | Invalid _ -> true
     | Prim { op = Probe _; _ } -> true)
@@ -659,7 +665,8 @@ let remove_trap_instructions t removed_trap_handlers =
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Alloc _ | Pause )
+        | Domain_index | Thread_self_id | Poll | Alloc _ | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _ )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
@@ -671,7 +678,8 @@ let remove_trap_instructions t removed_trap_handlers =
     | Tailcall_self _ -> assert (Int.equal stack_offset 0)
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+      ->
       ());
     update_instruction terminator ~stack_offset
   and update_block label ~stack_offset =
@@ -882,9 +890,10 @@ let equal_terminator left right =
   | ( Tailcall_self { destination = left_dest },
       Tailcall_self { destination = right_dest } ) ->
     Label.equal left_dest right_dest
-  | Tailcall_func left_op, Tailcall_func right_op ->
-    equal_func_call_operation left_op right_op
+  | Tailcall_func left_op, Tailcall_func right_op
   | Call_no_return left_op, Call_no_return right_op ->
+    equal_func_call_operation left_op right_op
+  | External_call_no_return left_op, External_call_no_return right_op ->
     equal_external_call_operation left_op right_op
   | Call left_call, Call right_call ->
     equal_with_label_after equal_func_call_operation left_call right_call
@@ -908,6 +917,7 @@ let equal_terminator left right =
     && Option.equal Label.equal left_lbl right_lbl
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
       | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
+      | Tailcall_func _ | Call_no_return _ | External_call_no_return _ | Call _
+      | Prim _ | Invalid _ ),
       _ ) ->
     false

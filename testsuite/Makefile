@@ -127,6 +127,7 @@ else
 endif
 
 OCAMLTESTFLAGS = \
+  -exit-0-on-failure \
   -timeout $(TIMEOUT) \
   $(OCAMLTEST_PROMOTE_FLAG) \
   $(OCAMLTEST_KEEP_TEST_DIR_ON_SUCCESS_FLAG) \

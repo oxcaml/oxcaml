@@ -4,6 +4,8 @@
  flambda2;
  {
    native;
+ }{
+   jsir;
  } {
    flags = "-Oclassic";
    native;

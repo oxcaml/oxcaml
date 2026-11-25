@@ -106,9 +106,12 @@ type t =
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
-    is_cold : bool
+    is_cold : bool;
         (* This flag is used to mark cold contexts, i.e. the body of cold
            functions and continuations. *)
+    ppf_dump : Format.formatter
+        (* This is used to dump intermediate representation via the mechanism in
+           [Flambda_dump]. *)
   }
 
 let print ppf
@@ -141,7 +144,8 @@ let print ppf
       cost_of_lifting_continuations_out_of_current_one;
       has_seen_a_non_liftable_continuation;
       join_analysis;
-      is_cold
+      is_cold;
+      ppf_dump = _
     } =
   let open! Misc.Sexp in
   print ppf
@@ -237,7 +241,7 @@ let define_variable t var kind =
 let define_extra_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:true t var kind
 
-let create ~round ~machine_width ~(resolver : resolver)
+let create ~ppf_dump ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
     ~toplevel_my_alloc_region =
@@ -272,8 +276,11 @@ let create ~round ~machine_width ~(resolver : resolver)
     cost_of_lifting_continuations_out_of_current_one = 0;
     has_seen_a_non_liftable_continuation = false;
     join_analysis = None;
-    is_cold = false
+    is_cold = false;
+    ppf_dump
   }
+
+let ppf_dump t = t.ppf_dump
 
 let all_code t = t.all_code
 
@@ -367,7 +374,8 @@ let enter_set_of_closures
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
       join_analysis = _;
-      is_cold = _
+      is_cold = _;
+      ppf_dump
     } =
   { machine_width;
     round;
@@ -398,7 +406,8 @@ let enter_set_of_closures
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
     has_seen_a_non_liftable_continuation = false;
-    is_cold = false
+    is_cold = false;
+    ppf_dump
   }
 
 let define_symbol t sym kind =
@@ -941,5 +950,6 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     are_rebuilding_terms = denv.are_rebuilding_terms;
     closure_info = denv.closure_info;
     get_imported_code = denv.get_imported_code;
-    loopify_state = denv.loopify_state
+    loopify_state = denv.loopify_state;
+    ppf_dump = denv.ppf_dump
   }

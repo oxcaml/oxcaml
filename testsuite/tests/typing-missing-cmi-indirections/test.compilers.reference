@@ -1,10 +1,10 @@
-File "client.ml", line 2, characters 0-19:
-2 | and alias = missing
+File "client.ml", line 4, characters 0-19:
+4 | and alias = missing
     ^^^^^^^^^^^^^^^^^^^
 Error: 
        The layout of alias is any
          because the .cmi file for Missing.t is missing.
        But the layout of alias must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of value_list at file "client.ml", line 1, characters 0-28.
        No .cmi file found containing Missing.t.
        Hint: Adding "missing" to your dependencies might help.

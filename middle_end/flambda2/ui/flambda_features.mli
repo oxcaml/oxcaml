@@ -28,6 +28,8 @@ val classic_mode : unit -> bool
 
 val mode : unit -> any_mode
 
+val fdo_counters : unit -> bool
+
 val join_points : unit -> bool
 
 val unbox_along_intra_function_control_flow : unit -> bool
@@ -49,14 +51,6 @@ val join_algorithm : unit -> join_algorithm
 
 val enable_reaper : unit -> bool
 
-type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
-  | Never
-  | Always
-  | Zero_alloc
-  | Auto
-
-val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
-
 val reaper_local_fields : unit -> bool
 
 val reaper_unbox : unit -> bool
@@ -64,6 +58,8 @@ val reaper_unbox : unit -> bool
 val reaper_max_unbox_size : unit -> int
 
 val reaper_change_calling_conventions : unit -> bool
+
+val lto_support : unit -> bool
 
 val simplify_stubs : unit -> bool
 
@@ -111,6 +107,10 @@ val dump_fexpr_annot : unit -> bool
 
 val dump_fexpr_annot_after : unit -> string list
 
+val fexpr_print_branch_annotations : unit -> bool
+
+val fexpr_print_fdo_counters : unit -> bool
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string
@@ -120,6 +120,8 @@ val dump_fexpr : pass -> dump_target
 val dump_slot_offsets : unit -> bool
 
 val dump_flow : unit -> bool
+
+val dump_simplified : unit -> bool
 
 val dump_simplify : unit -> bool
 

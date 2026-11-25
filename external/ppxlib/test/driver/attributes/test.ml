@@ -59,6 +59,14 @@ Line _, characters 13-17:
 Error: Attribute `blah' was not used
 |}]
 
+(* Attributes interpreted by the compiler are accepted, with or without the
+   [ocaml.] prefix. *)
+
+external f : (int8#[@unsafe_unextended]) -> int8# = "f_byte" "f"
+[%%expect{|
+external f : (int8# [@unsafe_unextended]) -> int8# = "f_byte" "f"
+|}]
+
 (* Attribute drops *)
 
 let faulty_transformation = object
@@ -261,4 +269,29 @@ let () =
 let e = [%flag_ghost "bye" [@flag]]
 [%%expect{|
 val e : string * string = ("bye", "bye")
+|}]
+
+(* Test extensions aren't flagged as unused inside attributes. *)
+
+let () =
+  let attr =
+    Attribute.declare
+      "ignore_me"
+      Attribute.Context.core_type
+      Ast_pattern.(__)
+      ignore
+  in
+  let ext =
+    Extension.V3.declare
+      "ignore_me"
+      Core_type
+      Ast_pattern.(ptyp __)
+      (fun ~ctxt:_ e -> let (_ : unit option) = Attribute.get attr e in e)
+  in
+  Driver.register_transformation "ignore_me" ~rules:[ Context_free.Rule.extension ext ]
+;;
+
+type t = [%ignore_me: int[@ignore_me [%doesn't_exist]]]
+[%%expect{|
+type t = int
 |}]

@@ -224,6 +224,26 @@ let make_compiler_sections section_table compiler_sections symbol_table
         make_custom_section section_table name raw_section
           ~align:(Int64.of_int align) ~sh_type:7 (* SHT_NOTE *) sh_string_table
       else
+        (* CR mshinwell: the constructor that [-gated-trace-pc-guard] emits to
+           register the guards (see [Emit_sancov_common]) is not assembled
+           correctly here, so with this assembler the guards are never
+           registered, although linking succeeds. Three things are needed:
+
+           - the type of a section given as [init_array] must be
+           [SHT_INIT_ARRAY], not [SHT_PROGBITS], for the linker to gather the
+           entries of constructors;
+
+           - the [G] flag must put the section in a section group ([SHT_GROUP]
+           with [GRP_COMDAT]) having the given signature symbol; it is
+           currently ignored, so the constructor and its entry are not in a
+           COMDAT group;
+
+           - a symbol that is declared weak and hidden but not defined (the
+           bounds [__start___sancov_guards] and [__stop___sancov_guards]) must
+           be an undefined weak symbol, to be resolved by the linker; these
+           end up as weak symbols defined in the section of the constructor.
+
+           Until then this combination of flags should be rejected. *)
         make_custom_section section_table name raw_section
           ~align:(Int64.of_int align) ~sh_type:1 (* SHT_PROGBITS *)
           sh_string_table;

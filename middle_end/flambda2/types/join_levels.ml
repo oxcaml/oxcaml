@@ -50,7 +50,7 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
     ~extra_lifted_consts_in_use_envs;
   let ts = List.rev_map (fun (t, use_id, _) -> use_id, t) ts_and_use_ids in
   let env, analysis =
-    Join_env.cut_and_n_way_join_with_analysis
+    Join_env.cut_and_n_way_join_with_analysis ~params
       ~meet_expanded_head:Meet_and_n_way_join.meet_expanded_head
       ~n_way_join_type:Meet_and_n_way_join.n_way_join definition_typing_env
       ~cut_after ts

@@ -46,6 +46,7 @@ let compiler
   ~exit_status_variable:exit_status_variable
   ~reference_variable:reference_variable
   ~output_variable:output_variable
+  ~extra_dependencies:[Ocaml_directories.stdlib]
   )
 
   let host = host
@@ -107,3 +108,23 @@ let ocamlopt_opt = compiler
   ~output_variable: Ocaml_variables.compiler_output2
   ~host: Ocaml_backends.Native
   ~target: Ocaml_backends.Native
+
+let ocamlopt_jsir_js = compiler
+  ~name: Ocaml_files.ocamlopt_dot_opt
+  ~flags: ""
+  ~directory: "ocamlopt.jsir-js"
+  ~exit_status_variable: Ocaml_variables.ocamlopt_jsir_js_exit_status
+  ~reference_variable: Ocaml_variables.compiler_reference2
+  ~output_variable: Ocaml_variables.compiler_output2
+  ~host: Ocaml_backends.Native
+  ~target: Ocaml_backends.Jsir_js
+
+let ocamlopt_jsir_wasm = compiler
+  ~name: Ocaml_files.ocamlopt_dot_opt
+  ~flags: ""
+  ~directory: "ocamlopt.jsir-wasm"
+  ~exit_status_variable: Ocaml_variables.ocamlopt_jsir_wasm_exit_status
+  ~reference_variable: Ocaml_variables.compiler_reference2
+  ~output_variable: Ocaml_variables.compiler_output2
+  ~host: Ocaml_backends.Native
+  ~target: Ocaml_backends.Jsir_wasm
