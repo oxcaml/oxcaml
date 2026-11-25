@@ -1,6 +1,6 @@
 (* TEST
  include runtime_events;
- not target-windows;
+ not-target-windows;
  ocamlrunparam += ",e=8";
  exit_status = "-6";
  {
