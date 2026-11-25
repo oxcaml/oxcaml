@@ -55,8 +55,11 @@ module Instruction_requirements = struct
      [Cfg.basic_block_contains_calls], but as soon as shrink wrapping is
      implemented and enabled, we can remove [Cfg.basic_block_contains_calls]. *)
   let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
-    (* Incoming results are written by moves before the epilogue. The return
-       itself must still require the prologue to have been removed. *)
+    (* Terminators never access [Incoming] slots themselves: such slots are
+       written by moves preceding the terminator (results of a [Return], or
+       arguments of a [Tailcall_self] with stack-passed arguments), and those
+       moves carry the prologue requirement. [Return] must still be classified
+       below as requiring the prologue to have been removed. *)
     if instr_uses_stack_slots instr ~incoming_needs_prologue:false
     then Requires_prologue
     else
