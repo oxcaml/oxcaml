@@ -1117,6 +1117,25 @@ and switch env res switch =
     C.simple ~dbg env res scrutinee
   in
   let arms = Switch.arms switch in
+  let untagged_scrutinee_cmm, arms =
+    (* A switch on 0 and 1 whose scrutinee is the negation of a naked boolean
+       (see [C.mk_not_untagged]) is a switch on that boolean with the arms
+       exchanged. This is valid for any scrutinee of the form [c xor 1], since
+       the scrutinee of a switch is always one of its discriminants. See the CR
+       in [Simplify_switch_expr.simplify_switch]. *)
+    let machine_width = Target_system.Machine_width.Sixty_four in
+    match
+      ( C.is_xor_with_one untagged_scrutinee_cmm,
+        Target_ocaml_int.Map.bindings arms )
+    with
+    | Some c, [(d0, arm0); (d1, arm1)]
+      when Target_ocaml_int.equal d0 (Target_ocaml_int.zero machine_width)
+           && Target_ocaml_int.equal d1 (Target_ocaml_int.one machine_width) ->
+      ( c,
+        Target_ocaml_int.Map.add d0 arm1
+          (Target_ocaml_int.Map.singleton d1 arm0) )
+    | (Some _ | None), _ -> untagged_scrutinee_cmm, arms
+  in
   (* For binary switches, which can be translated to an if-then-else, it can be
      interesting for the scrutinee to be tagged (particularly for switches
      coming from a source level if-then-else on booleans) as that way the

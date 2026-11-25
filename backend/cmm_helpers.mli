@@ -198,6 +198,10 @@ val mk_not : Debuginfo.t -> expression -> expression
 (** Boolean negation of an untagged boolean (0 or 1) *)
 val mk_not_untagged : Debuginfo.t -> expression -> expression
 
+(** [Some c] if the expression is [c xor 1], as produced by [mk_not_untagged]
+    when it cannot do better. *)
+val is_xor_with_one : expression -> expression option
+
 (** Conditional selection: [ifso] when [cond] is non-zero, [ifnot] otherwise.
     Both arms are always evaluated. Simplifies away the conditional move when
     the result does not depend on the condition. *)

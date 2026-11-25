@@ -43,15 +43,13 @@ let $camlTOP3__Pmakeblock_4 =
 in
 (let Popaque = %opaque (1) in
  let untagged = %untag_imm (Popaque) in
- switch untagged
-   | 0 -> k1 (1i)
-   | 1 -> k1 (0i))
+ let not_scrutinee = %boolean_not.`imm` (untagged) in
+ cont k1 (not_scrutinee))
   where k1 (tag : imm) =
     ((let Popaque = %opaque (1) in
       let untagged = %untag_imm (Popaque) in
-      switch untagged
-        | 0 -> k1 (1i)
-        | 1 -> k1 (0i))
+      let not_scrutinee = %boolean_not.`imm` (untagged) in
+      cont k1 (not_scrutinee))
        where k1 (tag_1 : imm) =
          (switch tag
             | 0 -> k1
