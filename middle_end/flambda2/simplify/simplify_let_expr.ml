@@ -172,7 +172,8 @@ let rebuild_let
             let is_end_region =
               match defining_expr with
               | Prim (prim, _) -> P.is_end_region prim
-              | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
+              | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _
+              | Template_env _ ->
                 None
             in
             let is_end_region_for_unused_region, is_end_region_for_used_region =
@@ -202,7 +203,8 @@ let rebuild_let
               let is_depth =
                 match defining_expr with
                 | Rec_info _ -> true
-                | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
+                | Simple _ | Prim _ | Set_of_closures _ | Static_consts _
+                | Template_env _ ->
                   false
               in
               let has_uses =
@@ -313,8 +315,8 @@ let rebuild_let
           | ( Prim_rewrite _,
               ( None
               | Some
-                  (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
-                ) ) ->
+                  ( Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _
+                  | Template_env _ ) ) ) ->
             Misc.fatal_errorf "Prim_rewrite applied to a non-prim Named.t"))
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body

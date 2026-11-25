@@ -61,8 +61,7 @@ module IR : sig
         }
     | Template_env of
         { template : Template_id.t;
-          block : Ident.t;
-          loc : Lambda.scoped_location
+          block : Ident.t
         }
         (** The definition of [template], whose environment [block] has already
             been allocated (see [Lambda.Ptemplate_env]). *)

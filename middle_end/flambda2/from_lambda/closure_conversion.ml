@@ -1299,8 +1299,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
        (%d args)"
       Printlambda.primitive prim (List.length args)
 
-(* The key naming [template] in Flambda (see [Flambda_primitive.Template_env]),
-   if it belongs to a unit. *)
+(* The key naming [template] in Flambda (see [Template_env]), if it belongs to a
+   unit. *)
 let template_key template =
   match Template_id.owner template with
   | Some owner ->
@@ -1312,7 +1312,7 @@ let template_key template =
             (Printf.sprintf "template#%d" (Template_id.stamp template))))
   | None -> None
 
-let close_template_env acc env template ~block dbg
+let close_template_env acc env template ~block
     (k : Acc.t -> Named.t list -> Expr_with_acc.t) : Expr_with_acc.t =
   let acc = Acc.define_template acc template in
   match template_key template with
@@ -1325,9 +1325,8 @@ let close_template_env acc env template ~block dbg
   | Some template_key ->
     let instantiations = Env.lcode_code_ids_of_template env template in
     k acc
-      [ Named.create_prim
-          (Unary (Template_env { template_key; instantiations }, block))
-          dbg ]
+      [ Named.create_template_env
+          (Template_env.create ~template_key ~instantiations ~env:block) ]
 
 let close_primitive acc env ~let_bound_ids_with_kinds named
     (prim : Lambda.primitive) ~args loc
@@ -1550,11 +1549,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
       ~current_ghost_region:(get_region_ident ghost_region)
       ~current_alloc_region:(fst (Env.find_var env alloc_region))
       k
-  | Template_env { template; block; loc } ->
-    close_template_env acc env template
-      ~block:(find_simple_from_id env block)
-      (Debuginfo.from_location loc)
-      k
+  | Template_env { template; block } ->
+    close_template_env acc env template ~block:(find_simple_from_id env block) k
 
 type simplified_block_load =
   | Unknown
@@ -1667,7 +1663,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                but is bound to the result of %a which has kind %a@."
               Variable.print var Flambda_kind.print kind Flambda_primitive.print
               prim Flambda_kind.print result_kind
-        | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ -> ());
+        | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _
+        | Template_env _ ->
+          ());
         let bound_pattern =
           Bound_pattern.singleton (VB.create var uid Name_mode.normal)
         in

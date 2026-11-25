@@ -683,7 +683,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (prim_named (Pmakeblock (0, Immutable, Shape shape, mode)))
               ~body:(fun acc ccenv ->
                 CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
-                  (Template_env { template; block; loc })
+                  (Template_env { template; block })
                   ~body)
           | _ ->
             CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)

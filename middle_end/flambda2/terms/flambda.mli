@@ -81,6 +81,8 @@ and named = private
           constants (including sets of closures). *)
   | Rec_info of Rec_info_expr.t
       (** Definition of a state of recursive inlining. *)
+  | Template_env of Template_env.t
+      (** Definition of a layout-polymorphic or static template. *)
 
 and let_cont_expr = private
   | Non_recursive of
@@ -191,6 +193,10 @@ module Named : sig
   (** Convert one or more expressions for recursion state into the defining
       expression of a [Let]. *)
   val create_rec_info : Rec_info_expr.t -> t
+
+  (** Convert the definition of a template into the defining expression of a
+      [Let]. *)
+  val create_template_env : Template_env.t -> t
 
   (** Return a defining expression for a [Let] which is kind-correct, but not
       necessarily type-correct, at the given kind. *)

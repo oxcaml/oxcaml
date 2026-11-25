@@ -134,6 +134,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       To_jsir_static_const_group.translate ~env ~res ~translate_body:expr
         bound_static consts
     | Singleton _, Rec_info _ -> env, res
+    | _, Template_env _ ->
+      Misc.fatal_error "[Template_env] should have been removed by Simplify"
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
     | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->

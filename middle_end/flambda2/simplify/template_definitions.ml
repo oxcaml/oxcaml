@@ -61,8 +61,8 @@ and in_continuation_handler ~find_code ~seen handler =
       in_expr ~find_code ~seen handler)
 
 and in_named ~find_code ~seen (named : Named.t) =
-  match[@warning "-fragile-match"] named with
-  | Prim (Unary (Template_env _, _), _) -> true
+  match named with
+  | Template_env _ -> true
   | Prim _ | Simple _ | Rec_info _ -> false
   | Set_of_closures (set_of_closures, _alloc_mode) ->
     Function_slot.Map.exists

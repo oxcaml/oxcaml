@@ -28,9 +28,9 @@ module C = Simplify_set_of_closures_context
 
 (* The code of an instantiation of a template only ever receives environments
    created by the template's definition, so its environment parameter has their
-   type (see [Flambda_primitive.Template_env]), when that is known: the type of
-   the environments of one of this unit's templates is given by [context], since
-   the code is simplified at the template's definition. *)
+   type (see [Template_env]), when that is known: the type of the environments
+   of one of this unit's templates is given by [context], since the code is
+   simplified at the template's definition. *)
 let assume_template_env_type context code_metadata params denv =
   match Code_metadata.template_key code_metadata with
   | None -> denv

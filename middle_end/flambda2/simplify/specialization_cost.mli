@@ -76,8 +76,8 @@ val cannot_specialize : reason -> t
 val add_prim : Bound_var.t -> Flambda_primitive.t -> t -> t
 
 (** Specialising a continuation copies its handler, so the handler must not
-    contain the definition of a template (see [Flambda_primitive.Template_env]),
-    which must only be simplified once. *)
+    contain the definition of a template (see [Template_env]), which must only
+    be simplified once. *)
 val add_template_definition : t -> t
 
 val add_continuations : can_be_lifted:bool -> Original_handlers.t -> t -> t

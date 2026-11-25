@@ -92,10 +92,6 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
               simplified_defining_expr = defining_expr;
               original_defining_expr = Some named
             }))
-  | Prim (Unary (Template_env { template_key; instantiations }, arg), _dbg) ->
-    ok
-      (Simplify_template_env.simplify_template_env dacc bound_pattern named
-         ~template_key ~instantiations ~arg ~simplify_function_body)
   | Prim (prim, dbg) -> (
     if not (Name_mode.is_normal (Bound_pattern.name_mode bound_pattern))
     then
@@ -227,6 +223,10 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     (* We don't need to return any bindings; [Simplify_expr.simplify_let] will
        create the "let symbol" binding when it sees the lifted constant. *)
     ok (Simplify_named_result.create_empty dacc)
+  | Template_env template_env ->
+    ok
+      (Simplify_template_env.simplify_template_env dacc bound_pattern named
+         template_env ~simplify_function_body)
   | Rec_info rec_info_expr ->
     (* We could simplify away things like [let depth x = y in ...], but those
        don't actually happen (as of this writing). We could also do CSE,
@@ -316,7 +316,10 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
           (Simplify_named_result.bindings_to_place result)
       then zero
       else Removed_operations.prim original_prim
-    | Rec_info _ -> zero)
+    | Rec_info _ -> zero
+    | Template_env _ ->
+      (* The definition is replaced by its environment, which costs nothing. *)
+      zero)
 
 let simplify_named dacc bound_pattern named ~simplify_function_body :
     _ Simplified_named.or_rewritten =

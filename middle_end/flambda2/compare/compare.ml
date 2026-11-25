@@ -285,6 +285,13 @@ let subst_rec_info_expr _env ri =
      symbols and other global names *)
   ri
 
+let subst_template_env env template_env =
+  Template_env.create
+    ~template_key:(subst_symbol env (Template_env.template_key template_env))
+    ~instantiations:
+      (List.map (subst_code_id env) (Template_env.instantiations template_env))
+    ~env:(subst_simple env (Template_env.env template_env))
+
 let subst_field env field =
   Simple.With_debuginfo.create
     (subst_simple env (Simple.With_debuginfo.simple field))
@@ -323,6 +330,7 @@ and subst_named env (n : Named.t) =
     Named.create_set_of_closures ~alloc_mode (subst_set_of_closures env set)
   | Static_consts sc -> Named.create_static_consts (subst_static_consts env sc)
   | Rec_info ri -> Named.create_rec_info (subst_rec_info_expr env ri)
+  | Template_env te -> Named.create_template_env (subst_template_env env te)
 
 and subst_static_consts env (g : Static_const_group.t) =
   Static_const_group.map g ~f:(subst_static_const env)
@@ -905,7 +913,12 @@ let named_exprs env named1 named2 : Named.t Comparison.t =
        back when [Static_consts] was added. Remember, kids, don't use catch-all
        cases. *)
     assert false
-  | (Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _), _ ->
+  | Template_env _, Template_env _ ->
+    Misc.fatal_error
+      "[Template_env] is never compared, since Simplify always removes it"
+  | ( ( Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _
+      | Template_env _ ),
+      _ ) ->
     Different { approximant = subst_named env named1 }
 
 (* Compares the two patterns for compatibility *and* adds the

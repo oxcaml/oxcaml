@@ -220,7 +220,8 @@ let create_let are_rebuilding bound_vars defining_expr ~body
              different regions), and we miss out on an optimisation. This should
              be rare and mostly inconsequential, though. *)
           simple_expr (Hashtbl.hash (1, prim, args_hash))
-        | Set_of_closures _ | Static_consts _ | Rec_info _ -> None)
+        | Set_of_closures _ | Static_consts _ | Rec_info _ | Template_env _ ->
+          None)
     in
     Let.create bound_vars defining_expr ~body:(to_expr0 body)
       ~free_names_of_body:(Known free_names_of_body)
@@ -703,8 +704,9 @@ module Matching_for_unique_handler = struct
     | Simple simple1, Simple simple2 -> match_simple env simple1 simple2
     | Prim (prim1, _dbg1), Prim (prim2, _dbg2) ->
       match_primitive env prim1 prim2
-    | (Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _), _
-      ->
+    | ( ( Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _
+        | Template_env _ ),
+        _ ) ->
       fail ()
 
   let rec match_expr env t1 t2 =
