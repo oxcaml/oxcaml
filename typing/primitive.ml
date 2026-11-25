@@ -1051,6 +1051,42 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.word);
         is (Same_as_ocaml_repr C.bits64);
       ]
+    | "%unsafe_idx_array_advance" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_idx_array_advance_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits8);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_idx_array_advance_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits16);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_idx_array_advance_indexed_by_int32#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits32);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_idx_array_advance_indexed_by_int64#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_idx_array_advance_indexed_by_nativeint#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.word);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
     | "%atomic_load_idx" ->
       check [
         is (Same_as_ocaml_repr C.scannable);

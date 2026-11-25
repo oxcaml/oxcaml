@@ -516,6 +516,23 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       in
       Ccall (prefix ^ suffix)
     in
+    (* Compile [e], an integer of array index kind [ik], to a tagged int *)
+    let comp_array_index_to_int (ik : Lambda.array_index_kind) e =
+      match ik with
+      (* [int8#]/[int16#] are already tagged ints on bytecode *)
+      | Punboxed_or_untagged_integer_index
+          (Untagged_int8 | Untagged_int16 | Untagged_int)
+      | Ptagged_int_index ->
+        comp_expr e
+        (* CR mshinwell: this is probably ok for now, but it seems like
+           these conversions could silently overflow *)
+      | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+        Blambda.Prim (Ccall "caml_int64_to_int", [comp_expr e])
+      | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+        Blambda.Prim (Ccall "caml_int32_to_int", [comp_expr e])
+      | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+        Blambda.Prim (Ccall "caml_nativeint_to_int", [comp_expr e])
+    in
     (* [array_ref ~unsafe ref_kind index_kind] compiles a Parrayref{s,u} of the
        given [ref_kind] and [index_kind] to Blambda. For product ref kinds the
        result is deep-copied so it doesn't alias the array slot; for other
@@ -891,22 +908,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       match args with
       | [index] ->
-        let index =
-          match ik with
-          (* [int8#]/[int16#] are already tagged ints on bytecode *)
-          | Punboxed_or_untagged_integer_index
-              (Untagged_int8 | Untagged_int16 | Untagged_int)
-          | Ptagged_int_index ->
-            comp_expr index
-            (* CR mshinwell: this is probably ok for now, but it seems like
-               these conversions could silently overflow *)
-          | Punboxed_or_untagged_integer_index Unboxed_int64 ->
-            unary (Ccall "caml_int64_to_int")
-          | Punboxed_or_untagged_integer_index Unboxed_int32 ->
-            unary (Ccall "caml_int32_to_int")
-          | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
-            unary (Ccall "caml_nativeint_to_int")
-        in
+        let index = comp_array_index_to_int ik index in
         let path =
           List.map (fun pos -> Const (Const_base (Const_int pos))) path
         in
@@ -925,6 +927,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         Blambda.Prim
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pidx_array_advance (_, ik) -> (
+      (* In bytecode, an index is a block storing a series of positions;
+         advancing an array index increments the last position *)
+      match args with
+      | [idx; n] ->
+        Blambda.Prim
+          ( Ccall "caml_idx_array_advance_bytecode",
+            [comp_expr idx; comp_array_index_to_int ik n] )
+      | [] | [_] | _ :: _ :: _ :: _ -> wrong_arity ~expected:2)
     | Pfield_computed _sem -> binary Getvectitem
     | Psetfield (n, _ptr, _init) -> binary (Setfield n)
     | Psetfield_computed (_ptr, _init) -> ternary Setvectitem

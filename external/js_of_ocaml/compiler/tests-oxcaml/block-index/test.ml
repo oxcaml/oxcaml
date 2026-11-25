@@ -2,8 +2,9 @@
 
 (* Block indices: reads, writes and index deepening over the block shapes the
    runtime has to walk (plain blocks, nested unboxed records).  These go
-   through [caml_get_idx_bytecode], [caml_set_idx_bytecode] and
-   [caml_deepen_idx_bytecode] in the JavaScript and Wasm runtimes. *)
+   through [caml_get_idx_bytecode], [caml_set_idx_bytecode],
+   [caml_deepen_idx_bytecode] and [caml_idx_array_advance_bytecode] in the
+   JavaScript and Wasm runtimes. *)
 
 open Stdlib_upstream_compatible
 
@@ -37,6 +38,28 @@ external idx_imm_get
   : ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_imm -> 'b
   = "%get_idx_imm"
 [@@layout_poly] [@@if ocaml_version >= (5, 4, 0)]
+
+external unsafe_array_idx : ('a : any mod non_float). int -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx"
+[@@layout_poly]
+
+external idx_advance
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_mut -> int -> ('a, 'b) idx_mut
+  = "%unsafe_idx_array_advance"
+[@@layout_poly]
+
+external idx_advance_by_int32
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_mut -> int32_u -> ('a, 'b) idx_mut
+  = "%unsafe_idx_array_advance_indexed_by_int32#"
+[@@layout_poly]
+
+external idx_advance_by_int64
+  : ('a : value_or_null) ('b : any mod separable).
+  ('a, 'b) idx_mut -> int64_u -> ('a, 'b) idx_mut
+  = "%unsafe_idx_array_advance_indexed_by_int64#"
+[@@layout_poly]
 
 type boxed_record =
   { s : string
@@ -135,6 +158,24 @@ let test_singleton_product () =
   idx_set r (.idx_mut(sp).#y) 40;
   assert (r.sp.#x = 3 && r.sp.#y = 40)
 
+let test_advance () =
+  let arr = [| 0; 1; 2; 3; 4 |] in
+  let idx0 : (int array, int) idx_mut = unsafe_array_idx 0 in
+  let idx3 = idx_advance idx0 3 in
+  assert (idx_get arr idx3 = 3);
+  assert (idx_get arr (idx_advance idx3 (-2)) = 1);
+  assert (idx_get arr (idx_advance_by_int32 idx0 #4l) = 4);
+  assert (idx_get arr (idx_advance_by_int64 idx3 #1L) = 4);
+  idx_set arr (idx_advance idx0 2) 20;
+  assert (arr.(2) = 20 && arr.(1) = 1 && arr.(3) = 3);
+  let floats : float# array = [| #0.5; #1.5; #2.5 |] in
+  let fidx : (float# array, float#) idx_mut = unsafe_array_idx 0 in
+  assert (Float_u.to_float (idx_get floats (idx_advance fidx 2)) = 2.5);
+  let pairs : #(int * string) array = [| #(0, "a"); #(1, "b"); #(2, "c") |] in
+  let pidx : (#(int * string) array, #(int * string)) idx_mut = unsafe_array_idx 0 in
+  let #(i, s) = idx_get pairs (idx_advance pidx 2) in
+  assert (i = 2 && s = "c")
+
 let () =
   test_boxed_record ();
   test_mixed_record ();
@@ -142,4 +183,5 @@ let () =
   test_deepening ();
   test_deepening_twice ();
   test_singleton_product ();
+  test_advance ();
   print_endline "OK"

@@ -1044,7 +1044,7 @@ let rec choice ctx t =
     | Ppoll
     | Ppeek _ | Ppoke _
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
-    | Pmake_idx_array _
+    | Pmake_idx_array _ | Pidx_array_advance _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
     | Pget_ext_ptr _ | Pset_ext_ptr _
     | Punbox _ ->

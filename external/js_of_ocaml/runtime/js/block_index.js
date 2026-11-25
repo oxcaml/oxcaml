@@ -150,6 +150,23 @@ function caml_deepen_idx_bytecode(idx_prefix, idx_suffix) {
   return block;
 }
 
+//Provides: caml_idx_array_advance_bytecode const (const, const)
+//Version: >= 5.2
+//If: oxcaml
+function caml_idx_array_advance_bytecode(idx, n) {
+  var depth = idx.length - 1;
+  // An index without positions becomes an invalid index.
+  if (depth <= 0) {
+    var invalid = new Array(2);
+    invalid[0] = 1;
+    invalid[1] = 1;
+    return invalid;
+  }
+  var block = idx.slice();
+  block[depth] = idx[depth] + n;
+  return block;
+}
+
 ///////////// Atomic block indices
 // We do not support nested atomic indices, so a valid atomic index is a tag-0
 // block with exactly one position.

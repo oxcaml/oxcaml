@@ -2150,6 +2150,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           index_in_bytes,
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch offset_after_index)) )
     ]
+  | Pidx_array_advance (ak, ik), [[idx]; [n]] ->
+    needs_64_bit_target prim dbg;
+    [ Binary
+        ( Int_arith (Naked_int64, Add),
+          idx,
+          Prim
+            (Binary
+               ( Int_arith (Naked_int64, Mul),
+                 convert_index_to_naked_int64 ~index_kind:ik ~index:n,
+                 H.simple_i64 (Int64.of_int (L.array_element_size_in_bytes ak))
+               )) ) ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
     needs_64_bit_target prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
@@ -3699,7 +3710,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
       | Pphys_equal _
       | Pscalar (Binary _)
-      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
+      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _
+      | Pidx_array_advance _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _

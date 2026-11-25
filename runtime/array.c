@@ -1096,7 +1096,6 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLassert (Tag_val(idx) == 0);
   value res;
   mlsize_t depth = Wosize_val(idx);
-#ifdef FLAT_FLOAT_ARRAY
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
@@ -1105,7 +1104,6 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
     Store_double_val(res, d);
     CAMLreturn (res);
   }
-#endif
   res = base;
   for (mlsize_t i = 0; i < depth; i++) {
     intnat pos = Long_val(Field(idx, i));
@@ -1136,7 +1134,6 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLparam3 (base, idx, v);
   CAMLassert (Tag_val(idx) == 0);
   mlsize_t depth = Wosize_val(idx);
-#ifdef FLAT_FLOAT_ARRAY
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
@@ -1144,7 +1141,6 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     Store_double_flat_field(base, pos, d);
     CAMLreturn (Val_unit);
   }
-#endif
   // writing into an unboxed product that has been flattened into a singleton
   if (depth == 0) {
     CAMLassert (Wosize_val(base) == Wosize_val(v));
@@ -1267,6 +1263,26 @@ CAMLprim value caml_get_ext_ptr_bytecode(value idx)
 CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
 {
   return unimplemented_ext_ptr();
+}
+
+CAMLprim value caml_idx_array_advance_bytecode(value idx, value n)
+{
+  CAMLparam2 (idx, n);
+  CAMLlocal1 (res);
+  mlsize_t depth = Wosize_val(idx);
+  // return an invalid index if [idx] has no positions
+  if (depth == 0) {
+    res = caml_alloc_small(1, 1);
+    Field(res, 0) = Val_long(1);
+    CAMLreturn (res);
+  }
+  res = caml_alloc(depth, Tag_val(idx));
+  for (mlsize_t i = 0; i < depth - 1; i++) {
+    Store_field(res, i, Field(idx, i));
+  }
+  Store_field(res, depth - 1,
+              Val_long(Long_val(Field(idx, depth - 1)) + Long_val(n)));
+  CAMLreturn (res);
 }
 
 /* Concatenates idx_prefix and idx_suffix */

@@ -583,6 +583,8 @@ let primitive ppf = function
         (mixed_block_element (fun _ppf () -> ())) mbe
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
           path
+  | Pidx_array_advance (ak, ik) ->
+      fprintf ppf "idx_array_advance %s %a" (array_kind ak) array_index_kind ik
   | Pccall p -> fprintf ppf "%s" p.prim_name
   | Praise k -> fprintf ppf "%s" (Lambda.raise_kind k)
   | Psequand -> fprintf ppf "&&"
@@ -1054,6 +1056,7 @@ let name_of_primitive = function
   | Pmake_idx_mixed_field _ -> "Pmake_idx_mixed_field"
   | Pmake_idx_array _ -> "Pmake_idx_array"
   | Pidx_deepen _ -> "Pidx_deepen"
+  | Pidx_array_advance _ -> "Pidx_array_advance"
   | Parray_element_size_in_bytes _ -> "Parray_element_size_in_bytes"
   | Pccall _ -> "Pccall"
   | Praise _ -> "Praise"

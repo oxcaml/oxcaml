@@ -1,0 +1,16 @@
+int: 1 2 3 1
+string: b c d b
+float#: 1.5 4.5
+float32#: 1.5 4.5
+int8#: 1 4
+int16#: 1 4
+int32#: 1 4
+int64#: 1 4
+nativeint#: 1 4
+#(string * int): c 2
+#(int * int32# * float#): 3 3 3.5
+#(int * #(string * int)): 2 c 12
+index kinds: 1 2 3 4 5 6
+unknown amounts: 2 0 3
+write: 0 1 20 3
+iarray: 3 1

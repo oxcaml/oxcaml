@@ -549,4 +549,36 @@
          (local.get $suffix) (i32.const 1)
          (local.get $suffix_depth))
       (local.get $result))
+
+   ;; caml_idx_array_advance_bytecode : idx -> n -> idx
+   ;; Copies idx and advances its last position by n.
+   (func (export "caml_idx_array_advance_bytecode")
+      (param $idx (ref eq)) (param $n (ref eq)) (result (ref eq))
+      (local $idx_block (ref $block))
+      (local $depth i32)
+      (local $result (ref $block))
+      (local.set $idx_block (ref.cast (ref $block) (local.get $idx)))
+      (local.set $depth
+         (i32.sub (array.len (local.get $idx_block)) (i32.const 1)))
+      (if (i32.le_s (local.get $depth) (i32.const 0))
+         (then
+            ;; An index without positions becomes the invalid index [1; 1]
+            (return
+               (array.new $block (ref.i31 (i32.const 1)) (i32.const 2)))))
+      (local.set $result
+         (array.new $block (ref.i31 (i32.const 0))
+            (array.len (local.get $idx_block))))
+      (array.copy $block $block
+         (local.get $result) (i32.const 0)
+         (local.get $idx_block) (i32.const 0)
+         (array.len (local.get $idx_block)))
+      (array.set $block (local.get $result) (local.get $depth)
+         (ref.i31
+            (i32.add
+               (i31.get_s
+                  (ref.cast (ref i31)
+                     (array.get $block (local.get $idx_block)
+                        (local.get $depth))))
+               (i31.get_s (ref.cast (ref i31) (local.get $n))))))
+      (local.get $result))
 )
