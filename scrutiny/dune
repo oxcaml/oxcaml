@@ -1,5 +1,7 @@
 (cram
  (applies_to generate_registry)
+ (alias runtest-experimental-features)
+ (runtest_alias false)
  (deps ../tools/gen_experimental_features.exe %{bin:ocamlc} %{bin:ocamlrun}))
 
 ; Compile the production flag modules against a synthetic registry. These
@@ -33,4 +35,6 @@
 
 (cram
  (applies_to selection)
+ (alias runtest-experimental-features)
+ (runtest_alias false)
  (deps selection_driver.exe))

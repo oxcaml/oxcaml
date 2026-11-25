@@ -127,13 +127,31 @@ review levels remain the responsibility of `scrutiny/check.py`. The registry
 contains metadata only; `Oxcaml_flags.Experimental` owns the selection state,
 and `Oxcaml_args` derives option names and actions from the registry.
 
+The tests of the experimental-feature mechanism are opt-in, not part of CI
+or the default `runtest` aliases. The metadata-validation job and the
+`test-optimizations` CI job remain enabled.
+
 The cram tests in `scrutiny/generate_registry.t` and `scrutiny/selection.t`
-run under `make runtest`. Selection tests compile the production flag modules
-against a synthetic registry, without registering real compiler features.
-To run these tests with the bootstrap compiler:
+check generation and selection. Selection tests compile the production flag
+modules against a synthetic registry, without registering real compiler
+features. Run both with the bootstrap compiler:
 
 ```sh
-make boot-runtest runtest_targets=@scrutiny/runtest
+make boot-runtest runtest_targets=@scrutiny/runtest-experimental-features
+```
+
+Or run them with the self-hosted compiler:
+
+```sh
+make runtest runtest_targets=@scrutiny/runtest-experimental-features
+```
+
+Merlin's experimental-feature checks are also opt-in, separate from its
+ordinary flag-coverage test:
+
+```sh
+RUN_EXPERIMENTAL_FEATURE_TESTS=true \
+  make merlin-test ARGS=@tests/test-dirs/runtest-experimental-features
 ```
 
 ## Files
@@ -354,7 +372,7 @@ or review levels automatically, though it may suggest fixes in diagnostics.
 Failures produce diagnostics and a nonzero exit status.
 
 The unit tests are in `scrutiny/test_check.py` and use temporary Git
-repositories. Run them with:
+repositories. They are manual tests, not run by CI. Run them with:
 
 ```sh
 python3 -m unittest discover -s scrutiny -v

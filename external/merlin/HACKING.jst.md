@@ -181,12 +181,14 @@ Some files contain code Merlin cares about alongside code it doesn't, where the 
 
 ## Flag Handling / Config
 
-The build system forwards all the flags that it passes to the compiler onto Merlin, but Merlin only handles flags that are relevant to it; irrelevant flags are ignored. To avoid forgetting to add handling for new flags that we *do* care about, we maintain an explicit list of ignored flags. When a new flag (even backend flags\!) is added to the compiler, either Merlin must be taught to handle it or it must be added to the ignore list. A test (`external/merlin/tests/test-dirs/ocaml-flags.t`) ensures that Merlin knows about every flag that the compiler accepts. To ignore a flag, in `external/merlin/src/kernel/mconfig.ml`, add the flag to either `ocaml_ignored_flags` or `ocaml_ignored_parametrized_flags`, depending on whether the flag takes an argument. If Merlin should actually handle the flag, then update the `Mconfig` module appropriately.
+The build system forwards all the flags that it passes to the compiler onto Merlin, but Merlin only handles flags that are relevant to it; irrelevant flags are ignored. To avoid forgetting to add handling for new flags that we *do* care about, we maintain an explicit list of ignored flags. When a new flag (even backend flags\!) is added to the compiler, either Merlin must be taught to handle it or it must be added to the ignore list. A test (`external/merlin/tests/test-dirs/ocaml-flags.t`) checks ordinary compiler flags; experimental switches are checked separately (see below). To ignore a flag, in `external/merlin/src/kernel/mconfig.ml`, add the flag to either `ocaml_ignored_flags` or `ocaml_ignored_parametrized_flags`, depending on whether the flag takes an argument. If Merlin should actually handle the flag, then update the `Mconfig` module appropriately.
 
 Experimental feature switches (`-experimental-<flag>` and
 `-no-experimental-<flag>`) are derived from the compiler's generated registry.
 Adding a `SCRUTINY` registration therefore needs no manual ignore-list update.
 Unknown experimental feature names are still reported as unknown flags.
+The opt-in `external/merlin/tests/test-dirs/experimental-flags.t` covers
+these switches and universe selection; see `scrutiny/README.md` for how to run it.
 
 Since Merlin ignores a lot of compiler flags, `Clflags` is significantly diverged from the compiler. A large number of flags in that file are removed from Merlin altogether, and many of them are hardcoded to a default value without ever being configurable.
 

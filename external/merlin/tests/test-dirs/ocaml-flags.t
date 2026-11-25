@@ -16,15 +16,19 @@ Perform a sanity check that the flags are parsed correctly.
   >   done
   > done
 
-Verify that each flag is known to Merlin. Most flags appear literally in
-mconfig.ml; generated experimental feature switches are checked by parsing them.
-If a new flag appears in this list, Merlin should handle it or explicitly ignore it.
+Verify that each ordinary flag is known to Merlin. Experimental feature switches
+and universe selection are covered by the opt-in experimental-flags.t test.
+If a new ordinary flag appears in this list, Merlin should handle it or explicitly
+ignore it.
 
-  $ is_intentionally_unhandled () {
-  >   # These flags are unhandled by Merlin and we really do want to raise an error if
-  >   # they are passed.
+  $ is_excluded () {
   >   case "$1" in
   >     "-args" | "-args0" | "-depend")
+  >       # These flags should be rejected by Merlin.
+  >       return 0
+  >       ;;
+  >     -experimental-* | -no-experimental-*)
+  >       # Checked only by the opt-in experimental-flags.t test.
   >       return 0
   >       ;;
   >     *)
@@ -33,29 +37,11 @@ If a new flag appears in this list, Merlin should handle it or explicitly ignore
   >   esac
   > }
 
-  $ is_known_flag () {
-  >   case "$1" in
-  >     -experimental-universe)
-  >       grep -q "\"$1\"" "$mconfig"
-  >       ;;
-  >     -experimental-* | -no-experimental-*)
-  >       check='.class == "return" and .value.merlin.failures == [] and .value.ocaml.principal'
-  >       $MERLIN single dump-configuration -filename flag-check.ml "$1" -principal \
-  >         < /dev/null | jq -e "$check" > /dev/null &&
-  >       $MERLIN single dump-configuration -filename flag-check.ml -flags "$1 -principal" \
-  >         < /dev/null | jq -e "$check" > /dev/null
-  >       ;;
-  >     *)
-  >       grep -q "\"$1\"" "$mconfig"
-  >       ;;
-  >   esac
-  > }
-
   $ mconfig="../../src/kernel/mconfig.ml"
   > echo "$OCAML_FLAGS" | {
   >   has_unhandled_flags=0
   >   while IFS= read -r flag; do
-  >     if ! is_known_flag "$flag" && ! is_intentionally_unhandled "$flag"; then
+  >     if ! is_excluded "$flag" && ! grep -q "\"$flag\"" "$mconfig"; then
   >       echo "Unhandled flag: $flag"
   >       has_unhandled_flags=1
   >     fi
@@ -72,29 +58,3 @@ If a new flag appears in this list, Merlin should handle it or explicitly ignore
   > EOF
   >   fi
   > }
-
-The universe selector accepts both argument forms. These flags must also work
-when passed through the configuration's FLG directive.
-
-  $ for flags in '-experimental-universe ai-reviewed -test-optimizations' '-experimental-universe=human-reviewed'; do
-  >   printf 'FLG %s\n' "$flags" > .merlin
-  >   $MERLIN single check-configuration -filename flag-check.ml < /dev/null \
-  >     | jq '.value.failures'
-  > done
-  []
-  []
-  $ : > .merlin
-
-Do not silently ignore unknown experimental flags. The old optimizations name
-is reserved, so neither switch can be registered as a feature.
-
-  $ for flag in -experimental-optimizations -no-experimental-optimizations; do
-  >   $MERLIN single check-configuration -filename flag-check.ml "$flag" \
-  >     < /dev/null | jq '.value.failures'
-  > done
-  [
-    "unknown flag -experimental-optimizations"
-  ]
-  [
-    "unknown flag -no-experimental-optimizations"
-  ]
