@@ -41,7 +41,7 @@ identifiers distinguish hyphens from dots and support leading digits.
   >     all
   > EOF
   $ ocamlc -o use_registry.exe registry.mli registry.ml use_registry.ml
-  $ ./use_registry.exe
+  $ ocamlrun ./use_registry.exe
   0 ai-reviewed
   a-b ai-reviewed
   a.b human-reviewed

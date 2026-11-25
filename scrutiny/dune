@@ -1,6 +1,6 @@
 (cram
  (applies_to generate_registry)
- (deps ../tools/gen_experimental_features.exe))
+ (deps ../tools/gen_experimental_features.exe %{bin:ocamlc} %{bin:ocamlrun}))
 
 ; Compile the production flag modules against a synthetic registry. These
 ; inputs are not named SCRUTINY, so they do not register compiler features.
