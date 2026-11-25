@@ -353,8 +353,11 @@ let gen_variable ~debug_uid ~needed_by_phantom_let v =
      ([To_cmm_effects.classify_let_binding] and [add_alias]), which consult only
      the normal-mode occurrence count. A binder with a single normal occurrence
      may thus be inlined into its use and get no [Clet], hence no
-     [Name_for_debugger], exactly as for user-visible variables today. Consider
-     keeping such binders when compiling with -g. *)
+     [Name_for_debugger], exactly as for user-visible variables today. Likewise,
+     [create_binding] inlines and duplicates any binder whose defining
+     expression is a register-sized trivial one, such as an alias of a
+     parameter (as produced by parameter unboxing in loops), whatever its
+     occurrence count. Consider keeping such binders when compiling with -g. *)
   let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
