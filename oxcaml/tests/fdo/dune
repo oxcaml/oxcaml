@@ -449,7 +449,8 @@
   (diff to_cmm_reaper.output to_cmm_reaper.output.corrected)))
 
 ; The counter of the call of a probe handler, which To_cmm replaces by the
-; probe: it is dropped. Probes are only supported on Linux.
+; probe: it is dropped. Only x86-64 Linux has such probes: elsewhere a probe
+; is a conditional call of its handler.
 
 (rule
  (targets to_cmm_probe.output.corrected)
@@ -457,7 +458,8 @@
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{system} "linux")))
+   (= %{system} "linux")
+   (= %{architecture} "amd64")))
  (action
   (progn
    (setenv
@@ -484,7 +486,8 @@
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{system} "linux")))
+   (= %{system} "linux")
+   (= %{architecture} "amd64")))
  (deps to_cmm_probe.output to_cmm_probe.output.corrected)
  (action
   (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
