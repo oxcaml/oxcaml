@@ -31,4 +31,11 @@ val name_mode : t -> Name_mode.t
 
 val with_name_mode : t -> Name_mode.t -> t
 
+(** Whether the variable may hold a value allocated in a region that is ended in
+    the function body binding it. Only [To_cmm_local_values] sets this,
+    immediately before translation to Cmm. *)
+val may_be_in_region_ended_in_body : t -> bool
+
+val mark_may_be_in_region_ended_in_body : t -> t
+
 include Bindable.S with type t := t

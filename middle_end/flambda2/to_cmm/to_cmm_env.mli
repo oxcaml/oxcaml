@@ -163,6 +163,20 @@ val create_bound_parameters :
   (Variable.t * Flambda_debug_uid.t) list ->
   t * Backend_var.With_provenance.t list
 
+(** Record that the variables of the given binder that are marked as possibly
+    holding a value allocated in a region ended in the current function body
+    (see [To_cmm_local_values]) are in scope. *)
+val add_may_be_in_region_ended_in_body_from_bound_pattern :
+  t -> Bound_pattern.t -> t
+
+val add_may_be_in_region_ended_in_body_from_bound_parameters :
+  t -> Bound_parameters.t -> t
+
+(** Whether the variable may hold a value allocated in a region that is ended in
+    the current function body. Such variables are only marked when
+    [-flambda2-expert-cmm-pin-local-values] is set. *)
+val may_be_in_region_ended_in_body : t -> Variable.t -> bool
+
 (** {2 Delayed let-bindings}
 
     Let-bindings are delayed in a certain way to allow for potential reordering

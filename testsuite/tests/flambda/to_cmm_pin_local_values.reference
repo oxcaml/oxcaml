@@ -1,0 +1,10 @@
+exclave_both_arms: 10
+join: 10
+try_region: 10
+try_exclave: 10
+boxed_float: 30
+loop_carried: 10
+exn_extra: 10
+local_closure: 30
+loop_regions: 55
+is_int: ok
