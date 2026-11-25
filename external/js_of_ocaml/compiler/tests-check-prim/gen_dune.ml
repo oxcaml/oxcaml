@@ -63,8 +63,8 @@ let rule bc ocaml_version os_type ocaml_variant =
   in
   let ox =
     [ (match ocaml_variant with
-      | `Mainstream -> "(not %{oxcaml_supported})"
-      | `OxCaml -> "%{oxcaml_supported}")
+      | `Mainstream -> "(not %{ocaml-config:ox})"
+      | `OxCaml -> "%{ocaml-config:ox}")
     ]
   in
   let enabled_if = Printf.sprintf "(and %s)" (String.concat "" (vl @ vu @ os @ ox)) in

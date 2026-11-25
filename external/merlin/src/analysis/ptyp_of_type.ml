@@ -17,7 +17,7 @@ let rec module_type =
     Ast_helper.Mty.ident (Location.mknoloc (Untypeast.lident_of_path path))
   | Mty_alias path ->
     Ast_helper.Mty.alias (Location.mknoloc (Untypeast.lident_of_path path))
-  | Mty_functor (param, type_out, ret_mode) ->
+  | Mty_functor (param, type_out, ret_mode, _) ->
     let param =
       match param with
       | Unit -> Parsetree.Unit
@@ -184,7 +184,7 @@ and modes ~arg mode =
   let mode = Mode.With_locality.zap_to_legacy_force ~arg mode in
   Btype.backtrack snapshot;
   Out_type.tree_of_modes_const mode
-  |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
+  |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Pmode mode))
 
 and const_modalities ~mut modality =
   Out_type.tree_of_modalities mut modality

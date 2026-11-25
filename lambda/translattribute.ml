@@ -336,9 +336,8 @@ let add_inline_attribute expr loc attributes =
   match expr with
   | Lfunction({ attr = { stub = false } as attr } as funct) ->
     Lfunction(add_inline_attribute funct attr)
-  | Ltemplate
-      {tmpl_func = ({ attr = { stub = false } as attr } as funct); tmpl_env } ->
-    Ltemplate{ tmpl_func = add_inline_attribute funct attr; tmpl_env }
+  | Ltemplate({ attr = { stub = false } as attr } as funct) ->
+    Ltemplate(add_inline_attribute funct attr)
   | _ -> expr
 
 let add_specialise_attribute expr loc attributes =

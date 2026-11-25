@@ -168,16 +168,6 @@ let mk_cfg_stack_checks_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be optimized" )
 
-let mk_cfg_eliminate_dead_trap_handlers f =
-  ( "-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Eliminate dead trap handlers" )
-
-let mk_no_cfg_eliminate_dead_trap_handlers f =
-  ( "-no-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Do not eliminate dead trap handlers" )
-
 let mk_cfg_eliminate_dead_code_validate f =
   ( "-cfg-eliminate-dead-code-validate",
     Arg.Unit f,
@@ -402,6 +392,19 @@ let mk_function_layout f =
     Printf.sprintf " Order of functions in the generated assembly (default: %s)"
       default )
 
+let mk_float_op_fusion f =
+  ( "-float-op-fusion",
+    Arg.Unit f,
+    " Allow fusing floating-point operations into single operations that round \
+     only once, where available, e.g. a multiplication and an addition into a \
+     fused multiply-add (default)" )
+
+let mk_no_float_op_fusion f =
+  ( "-no-float-op-fusion",
+    Arg.Unit f,
+    " Do not fuse floating-point operations into single operations that round \
+     only once" )
+
 let mk_name_mangling_scheme f =
   ( "-name-mangling-scheme",
     Arg.Symbol ([ "flat"; "structured" ], f),
@@ -591,6 +594,12 @@ let mk_llvm_flags f =
     Arg.String f,
     " Extra flags to pass to LLVM (like -march or -mtune)" )
 
+let mk_fdo_counters f =
+  ( "-fdo-counters",
+    Arg.Unit f,
+    " Attach FDO counters to function entries, branches, and call sites (no \
+     counters are attached in classic mode)" )
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -729,19 +738,6 @@ let mk_no_flambda2_reaper f =
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
 
-let mk_reaper_preserve_direct_calls f =
-  ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
-    Printf.sprintf
-      " Choose the direct call preservation strategy of the reaper (Flambda2 \
-       only)\n\
-      \      Valid values are: \n\
-      \       \"never\": do not try to preserve direct calls to old functions;\n\
-      \       \"always\": always preserve existing direct calls;\n\
-      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked;\n\
-      \       \"auto\": preserve direct calls only when the reaper is unable \
-       to identify a set of possibly called functions." )
-
 let mk_reaper_local_fields f =
   ( "-reaper-local-fields",
     Arg.Unit f,
@@ -792,6 +788,22 @@ let mk_no_reaper_change_calling_conventions f =
       " Prevent the reaper from changing the calling conventions of \
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_lto_support f =
+  ( "-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Store data the Reaper's link time optimisation data in the .cmx file, \
+       for use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
+      (format_default Flambda2.Default.lto_support) )
+
+let mk_no_lto_support f =
+  ( "-no-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.lto_support) )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
@@ -1208,6 +1220,18 @@ let mk_dfexpr_to f =
     Arg.String f,
     "<file> Like -dfexpr but dumps to given file (Flambda 2 only)" )
 
+let mk_fexpr_print_branch_annotations f =
+  ( "-fexpr-print-branch-annotations",
+    Arg.Unit f,
+    " Print the branch annotations of switch arms in fexpr\n\
+    \     (Flambda 2 only)" )
+
+let mk_fexpr_print_fdo_counters f =
+  ( "-fexpr-print-fdo-counters",
+    Arg.Unit f,
+    " Print the FDO annotations of function entries and call sites in fexpr\n\
+    \     (Flambda 2 only)" )
+
 let mk_dslot_offsets f =
   ("-dslot-offsets", Arg.Unit f, " Dump closure offsets (Flambda 2 only)")
 
@@ -1220,6 +1244,11 @@ let mk_dflow f =
   ( "-dflow",
     Arg.Unit f,
     " Dump debug info for the flow computation (Flambda 2 only)" )
+
+let mk_dsimplified f =
+  ( "-dsimplified",
+    Arg.Unit f,
+    " Print the intermediate simplified term (Flambda 2 only)" )
 
 let mk_dsimplify f =
   ( "-dsimplify",
@@ -1334,6 +1363,90 @@ let mk_cached_generic_functions_path f =
     "<file>  Set the path of the cached generic functions (default to \
      cached-generic-functions.o)" )
 
+let mk_target f =
+  ( "-target",
+    (* We leave out [-target native] even though we could support it, as
+       we are hoping to use this flag for cross-compilation triplets, and
+       we don't want anyone to rely on this behaviour before that is in
+       place. *)
+    (let targets =
+       [
+         ("js_of_ocaml", Clflags.Target.Js_of_ocaml);
+         ("wasm_of_ocaml", Clflags.Target.Wasm_of_ocaml);
+       ]
+     in
+     Arg.Symbol (List.map fst targets, fun s -> f (List.assoc s targets))),
+    " Compile to JavaScript (js_of_ocaml) or WebAssembly (wasm_of_ocaml) \
+     instead of native code" )
+
+let mk_jsoo_opt f =
+  let doc (phase : Clflags.Jsoo_phase.t) =
+    match phase with
+    | All ->
+        "<opt>  Pass option <opt> to every js_of_ocaml or wasm_of_ocaml \
+         invocation"
+    | Compile ->
+        "<opt>  Pass option <opt> when compiling a unit, or the whole program \
+         with -link-jsir (js_of_ocaml or wasm_of_ocaml compile)"
+    | Archive ->
+        "<opt>  Pass option <opt> when creating an archive with -a \
+         (js_of_ocaml or wasm_of_ocaml link -a)"
+    | Runtime ->
+        "<opt>  Pass option <opt> when building the runtime of an executable \
+         (js_of_ocaml or wasm_of_ocaml build-runtime, not run with -link-jsir)"
+    | Link ->
+        "<opt>  Pass option <opt> when linking an executable (js_of_ocaml or \
+         wasm_of_ocaml link, not run with -link-jsir)"
+  in
+  List.map
+    (fun phase ->
+      ( Clflags.Jsoo_phase.flag phase,
+        Arg.String (f phase),
+        doc phase ^ " (with -target js_of_ocaml or wasm_of_ocaml)" ))
+    Clflags.Jsoo_phase.all
+
+let mk_jsoo_effects f =
+  let assoc_list =
+    List.map
+      (fun effects -> (Clflags.Jsoo_effects.to_string effects, effects))
+      Clflags.Jsoo_effects.all
+  in
+  let doc_for_target (target : Clflags.Jsir_target.t) =
+    let default = Clflags.Jsoo_effects.default target in
+    let values =
+      List.map
+        (fun effects ->
+          let name = Clflags.Jsoo_effects.to_string effects in
+          if effects = default then name ^ " (default)" else name)
+        (Clflags.Jsoo_effects.supported_by target)
+    in
+    Printf.sprintf "%s with -target %s"
+      (String.concat ", " values)
+      (Clflags.Jsir_target.program_name target)
+  in
+  ( "-jsoo-effects",
+    Arg.Symbol (List.map fst assoc_list, fun s -> f (List.assoc s assoc_list)),
+    Printf.sprintf " Effect handlers backend: %s; %s" (doc_for_target Js)
+      (doc_for_target Wasm) )
+
+let mk_link_jsir f =
+  ( "-link-jsir",
+    Arg.Unit f,
+    " Link the units of an executable as JSIR, into one program that \
+     js_of_ocaml or wasm_of_ocaml compiles as a whole. " )
+
+let mk_jsir_inlined_frames f =
+  ( "-jsir-inlined-frames",
+    Arg.Unit f,
+    " With -g, record the call sites that code was inlined through in the \
+     source file names of its locations, as FILE<-FILE:LINE:COL<-... (with \
+     -target js_of_ocaml or wasm_of_ocaml)" )
+
+let mk_djsir f =
+  ( "-djsir",
+    Arg.Unit f,
+    " Print the Js_of_ocaml IR (with -target js_of_ocaml or wasm_of_ocaml)" )
+
 let mk_x f = ("-X", Arg.String f, "(undocumented)")
 
 let set_long_frames_threshold n =
@@ -1391,8 +1504,6 @@ module type Oxcaml_options = sig
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
-  val cfg_eliminate_dead_trap_handlers : unit -> unit
-  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_eliminate_dead_code_validate : unit -> unit
   val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_dominators_validate : unit -> unit
@@ -1434,6 +1545,8 @@ module type Oxcaml_options = sig
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
   val function_layout : string -> unit
+  val float_op_fusion : unit -> unit
+  val no_float_op_fusion : unit -> unit
   val name_mangling_scheme : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
@@ -1471,6 +1584,7 @@ module type Oxcaml_options = sig
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
+  val fdo_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1490,7 +1604,6 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
-  val reaper_preserve_direct_calls : string -> unit
   val reaper_local_fields : unit -> unit
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
@@ -1498,6 +1611,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1552,13 +1667,22 @@ module type Oxcaml_options = sig
   val dfexpr_after : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
+  val fexpr_print_branch_annotations : unit -> unit
+  val fexpr_print_fdo_counters : unit -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
+  val dsimplified : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val target : Clflags.Target.t -> unit
+  val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val jsoo_effects : Clflags.Jsoo_effects.t -> unit
+  val link_jsir : unit -> unit
+  val jsir_inlined_frames : unit -> unit
+  val djsir : unit -> unit
   val x : string -> unit
 end
 
@@ -1603,9 +1727,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
-      mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
-      mk_no_cfg_eliminate_dead_trap_handlers
-        F.no_cfg_eliminate_dead_trap_handlers;
       mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
       mk_no_cfg_eliminate_dead_code_validate
         F.no_cfg_eliminate_dead_code_validate;
@@ -1649,6 +1770,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_zero_alloc_checker_details_extra;
       mk_zero_alloc_checker_join F.zero_alloc_checker_join;
       mk_function_layout F.function_layout;
+      mk_float_op_fusion F.float_op_fusion;
+      mk_no_float_op_fusion F.no_float_op_fusion;
       mk_name_mangling_scheme F.name_mangling_scheme;
       mk_disable_builtin_check F.disable_builtin_check;
       mk_disable_poll_insertion F.disable_poll_insertion;
@@ -1689,6 +1812,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
+      mk_fdo_counters F.fdo_counters;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -1713,7 +1837,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
-      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_reaper_local_fields F.reaper_local_fields;
       mk_no_reaper_local_fields F.no_reaper_local_fields;
       mk_reaper_unbox F.reaper_unbox;
@@ -1722,6 +1845,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_lto_support F.lto_support;
+      mk_no_lto_support F.no_lto_support;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -1798,15 +1923,24 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_after F.dfexpr_after;
       mk_dfexpr_annot F.dfexpr_annot;
       mk_dfexpr_annot_after F.dfexpr_annot_after;
+      mk_fexpr_print_branch_annotations F.fexpr_print_branch_annotations;
+      mk_fexpr_print_fdo_counters F.fexpr_print_fdo_counters;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
+      mk_dsimplified F.dsimplified;
       mk_dsimplify F.dsimplify;
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
+      mk_target F.target;
+      mk_jsoo_effects F.jsoo_effects;
+      mk_link_jsir F.link_jsir;
+      mk_jsir_inlined_frames F.jsir_inlined_frames;
+      mk_djsir F.djsir;
       mk_x F.x;
     ]
+    @ mk_jsoo_opt F.jsoo_opt
 end
 
 let set_dissector_partition_size f =
@@ -1977,12 +2111,6 @@ module Oxcaml_options_impl = struct
   let cfg_prologue_shrink_wrap_threshold n =
     Oxcaml_flags.cfg_prologue_shrink_wrap_threshold := n
 
-  let cfg_eliminate_dead_trap_handlers =
-    set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
-
-  let no_cfg_eliminate_dead_trap_handlers =
-    clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
-
   let cfg_eliminate_dead_code_validate =
     set' Oxcaml_flags.cfg_eliminate_dead_code_validate
 
@@ -2080,6 +2208,9 @@ module Oxcaml_options_impl = struct
     | None -> () (* this should not occur as we use Arg.Symbol *)
     | Some layout -> Oxcaml_flags.function_layout := layout
 
+  let float_op_fusion = set' Oxcaml_flags.float_op_fusion
+  let no_float_op_fusion = clear' Oxcaml_flags.float_op_fusion
+
   let name_mangling_scheme s =
     let scheme : Config.name_mangling_scheme option =
       match s with
@@ -2142,6 +2273,7 @@ module Oxcaml_options_impl = struct
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
+  let fdo_counters = set' Oxcaml_flags.fdo_counters
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2193,24 +2325,6 @@ module Oxcaml_options_impl = struct
   let no_flambda2_reaper = clear Flambda2.enable_reaper
   let flambda2_match_in_match = set Flambda2.match_in_match
   let no_flambda2_match_in_match = clear Flambda2.match_in_match
-
-  let reaper_preserve_direct_calls s =
-    match s with
-    | "never" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set
-            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
-    | "always" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Always
-    | "zero-alloc" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
-    | "auto" ->
-        Flambda2.reaper_preserve_direct_calls :=
-          Oxcaml_flags.Set Oxcaml_flags.Auto
-    | _ -> () (* This should not occur as we use Arg.Symbol *)
-
   let reaper_local_fields = set Flambda2.reaper_local_fields
   let no_reaper_local_fields = clear Flambda2.reaper_local_fields
   let reaper_unbox = set Flambda2.reaper_unbox
@@ -2225,6 +2339,8 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
+  let lto_support = set Flambda2.lto_support
+  let no_lto_support = clear Flambda2.lto_support
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
@@ -2383,9 +2499,14 @@ module Oxcaml_options_impl = struct
   let dfexpr_annot_after pass =
     Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
 
+  let fexpr_print_branch_annotations =
+    set' Flambda2.Dump.fexpr_print_branch_annotations
+
+  let fexpr_print_fdo_counters = set' Flambda2.Dump.fexpr_print_fdo_counters
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
+  let dsimplified = set' Flambda2.Dump.simplified
   let dsimplify = set' Flambda2.Dump.simplify
   let dreaper = set' Flambda2.Dump.reaper
 
@@ -2395,20 +2516,21 @@ module Oxcaml_options_impl = struct
   let cached_generic_functions_path file =
     Oxcaml_flags.cached_generic_functions_path := file
 
+  let target = Clflags.set_target
+  let jsoo_opt = Compenv.add_first_jsoo_opt
+  let jsoo_effects = Clflags.set_jsoo_effects
+  let link_jsir () = Clflags.link_jsir := true
+  let jsir_inlined_frames () = Clflags.jsir_inlined_frames := true
+  let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
     x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ();
     use_ssa ()
 end
@@ -2453,8 +2575,13 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
-  let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := true;
+    Debugging.no_dwarf_inlined_frames := false
+
+  let no_dwarf_inlined_frames () =
+    Debugging.dwarf_inlined_frames := false;
+    Debugging.no_dwarf_inlined_frames := true
 
   let gdwarf_version version =
     match version with
@@ -2508,7 +2635,7 @@ module Debugging_options_impl = struct
 end
 
 module Extra_params = struct
-  let read_param ppf _position name v =
+  let read_param ppf position name v =
     let set option =
       let b = Compenv.check_bool ppf name v in
       option := Oxcaml_flags.Set b;
@@ -2592,8 +2719,6 @@ module Extra_params = struct
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
     | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
-    | "cfg-eliminate-dead-trap-handlers" ->
-        set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-eliminate-dead-code-validate" ->
         set' Oxcaml_flags.cfg_eliminate_dead_code_validate
     | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
@@ -2671,6 +2796,7 @@ module Extra_params = struct
         | None ->
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
+    | "float-op-fusion" -> set' Oxcaml_flags.float_op_fusion
     | "name-mangling-scheme" -> (
         let scheme : Config.name_mangling_scheme option =
           match v with
@@ -2703,7 +2829,13 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
+    | "gdwarf-inlined-frames" ->
+        Compenv.setter ppf
+          (fun b -> not b)
+          name
+          [ Debugging.no_dwarf_inlined_frames ]
+          v;
+        set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
         set' Debugging.gdwarf_may_alter_codegen_experimental
@@ -2723,6 +2855,7 @@ module Extra_params = struct
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
+    | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=
@@ -2867,28 +3000,54 @@ module Extra_params = struct
     | "cached-generic-functions-path" ->
         Oxcaml_flags.cached_generic_functions_path := v;
         true
-    | "reaper" -> set Flambda2.enable_reaper
-    | "reaper-preserve-direct-calls" ->
-        (match String.lowercase_ascii v with
-        | "never" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
-        | "always" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
-        | "zero-alloc" ->
-            Flambda2.reaper_preserve_direct_calls :=
-              Oxcaml_flags.(Set Zero_alloc)
-        | "auto" ->
-            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
+    | "target" -> (
+        let set target =
+          (match position with
+          | Compenv.Before_args -> Clflags.set_target target
+          | Compenv.Before_compile _ | Compenv.Before_link ->
+              (* The backend has been chosen by then. *)
+              Compenv.fatal
+                "OCAMLPARAM: target must be given before the _ separator");
+          true
+        in
+        match v with
+        | "js_of_ocaml" -> set Js_of_ocaml
+        | "wasm_of_ocaml" -> set Wasm_of_ocaml
         | _ ->
-            Misc.fatal_error
-              "Syntax: reaper-preserve-direct-calls: \
-               always|never|zero-alloc|auto");
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml, \
+               wasm_of_ocaml)"
+              v)
+    | "link-jsir" ->
+        let link_jsir = Compenv.check_bool ppf name v in
+        (match position with
+        | Compenv.Before_args -> Clflags.link_jsir := link_jsir
+        | Compenv.Before_compile _ | Compenv.Before_link ->
+            (* The backend has been chosen by then, and with it the
+               extensions of the object files. *)
+            Compenv.fatal
+              "OCAMLPARAM: link-jsir must be given before the _ separator");
         true
+    | "jsir-inlined-frames" ->
+        Clflags.jsir_inlined_frames := Compenv.check_bool ppf name v;
+        true
+    | "jsoo-effects" -> (
+        match Clflags.Jsoo_effects.of_string v with
+        | Some effects ->
+            Clflags.set_jsoo_effects effects;
+            true
+        | None ->
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown jsoo-effects %S (possible values: %s)" v
+              (String.concat ", "
+                 (List.map Clflags.Jsoo_effects.to_string
+                    Clflags.Jsoo_effects.all)))
+    | "reaper" -> set Flambda2.enable_reaper
     | "reaper-local-fields" -> set Flambda2.reaper_local_fields
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "lto-support" -> set Flambda2.lto_support
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
@@ -2971,5 +3130,8 @@ module Default = struct
     include Main_args.Default.Opttopmain
     include Oxcaml_options_impl
     include Debugging_options_impl
+
+    let target (_ : Clflags.Target.t) =
+      Compenv.fatal "-target is not supported by ocamlnat"
   end
 end

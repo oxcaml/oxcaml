@@ -3,6 +3,8 @@
    bytecode;
  }{
    native;
+ }{
+   jsir;
  }
 *)
 type 'a t =

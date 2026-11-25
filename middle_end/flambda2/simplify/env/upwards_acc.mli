@@ -31,8 +31,6 @@ val creation_dacc : t -> Downwards_acc.t
 (** Extract the environment component of the given upwards accumulator. *)
 val uenv : t -> Upwards_env.t
 
-val cost_metrics : t -> Cost_metrics.t
-
 val code_age_relation : t -> Code_age_relation.t
 
 (** Return the lifted constants that still need to be placed (i.e. have
@@ -60,35 +58,11 @@ val all_code : t -> Exported_code.t
 
 val shareable_constants : t -> Symbol.t Static_const.Map.t
 
-val name_occurrences : t -> Name_occurrences.t
-
-val with_name_occurrences : t -> name_occurrences:Name_occurrences.t -> t
-
-val clear_name_occurrences : t -> t
-
-val add_free_names : t -> Name_occurrences.t -> t
-
 (** Note that this only includes uses of value slots in projections. *)
 val used_value_slots : t -> Name_occurrences.t
 
-val remove_all_occurrences_of_free_names : t -> Name_occurrences.t -> t
-
-val clear_cost_metrics : t -> t
-
-val with_cost_metrics : Cost_metrics.t -> t -> t
-
-val add_cost_metrics : Cost_metrics.t -> t -> t
-
 (* CR lmaurer: This is tragic. We can be rid of it once we have PDCE, if I
    understand correctly. *)
-
-(** This function exists as an optimisation to reduce allocation. *)
-val add_cost_metrics_and_with_name_occurrences :
-  t -> Cost_metrics.t -> Name_occurrences.t -> t
-
-val notify_added : code_size:Code_size.t -> t -> t
-
-val notify_removed : operation:Removed_operations.t -> t -> t
 
 val generate_phantom_lets : t -> bool
 

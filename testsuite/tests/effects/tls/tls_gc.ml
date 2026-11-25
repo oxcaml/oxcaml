@@ -19,13 +19,8 @@ type _ Effect.t += Suspend : unit Effect.t
 
 module TLS = Domain.Safe.TLS
 
-let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
-  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
-let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
-  TLS.access k (fun r -> r := v) [@nontail]
-
-let k = TLS.new_key (fun () -> ref "init")
-let far_keys = Array.init 64 (fun _ -> TLS.new_key (fun () -> ref (-1)))
+let k = TLS.new_key (fun () -> "init")
+let far_keys = Array.init 64 (fun _ -> TLS.new_key (fun () -> -1))
 
 (* A fresh, young, heap-allocated value with checkable contents. *)
 let payload tag = String.concat "" [ "<"; tag; ">"; String.make 64 '.' ]
@@ -65,9 +60,9 @@ let preemptible ~on_suspend f =
 (* The suspended fiber's stack holds the only reference to its state. *)
 let suspended_owner () =
   preemptible ~on_suspend:full_gc (fun () ->
-      set k (payload "suspended");
+      TLS.set k (payload "suspended");
       perform Suspend;
-      assert (get k = payload "suspended"))
+      assert (TLS.get k = payload "suspended"))
 
 (* Same, but the continuation outlives the handler and is resumed later from
    the thread, after the parent has done more work and GCs. *)
@@ -75,9 +70,9 @@ let stashed_owner () =
   let stash : (unit, string) continuation option ref = ref None in
   let r =
     Preemptible.match_with (fun () ->
-        set k (payload "stashed");
+        TLS.set k (payload "stashed");
         perform Suspend;
-        get k)
+        TLS.get k)
       ()
       { retc = Fun.id; exnc = raise;
         effc = (fun (type a) (e : a Effect.t) ->
@@ -89,32 +84,32 @@ let stashed_owner () =
         tickc = This (fun () -> Continue) }
   in
   assert (r = "suspended");
-  set k (payload "thread");
+  TLS.set k (payload "thread");
   full_gc ();
   match !stash with
   | None -> assert false
   | Some k' ->
     assert (continue k' () = payload "stashed");
-    assert (get k = payload "thread")
+    assert (TLS.get k = payload "thread")
 
 (* GC while a non-owner fiber runs inside an owner: the cache and the
    owner's [tls_state] must be moved together. The writes after the GC go
-   through the cache (the first [set] of each far key initialises its slot,
+   through the cache (the first [TLS.set] of each far key initialises its slot,
    growing the array); the suspension recomputes the cache from the owner. *)
 let nested_non_owner () =
   preemptible ~on_suspend:full_gc (fun () ->
-      set k (payload "owner");
+      TLS.set k (payload "owner");
       non_preemptible (fun () ->
-          set k (payload "non-owner");
+          TLS.set k (payload "non-owner");
           full_gc ();
-          assert (get k = payload "non-owner");
-          set k (payload "after-gc");
+          assert (TLS.get k = payload "non-owner");
+          TLS.set k (payload "after-gc");
           (* Grow the array after the GC too. *)
-          Array.iteri (fun i k -> set k i) far_keys;
+          Array.iteri (fun i k -> TLS.set k i) far_keys;
           full_gc ());
       perform Suspend;
-      assert (get k = payload "after-gc");
-      Array.iteri (fun i k -> assert (get k = i)) far_keys)
+      assert (TLS.get k = payload "after-gc");
+      Array.iteri (fun i k -> assert (i = TLS.get k)) far_keys)
 
 (* Many suspended owners at once, resumed in reverse order. *)
 let many_suspended () =
@@ -123,9 +118,9 @@ let many_suspended () =
   for i = 1 to n do
     let r =
       Preemptible.match_with (fun () ->
-          set k (payload (string_of_int i));
+          TLS.set k (payload (string_of_int i));
           perform Suspend;
-          assert (get k = payload (string_of_int i));
+          assert (TLS.get k = payload (string_of_int i));
           "done")
         ()
         { retc = Fun.id; exnc = raise;
@@ -145,15 +140,15 @@ let many_suspended () =
 (* The thread's own state: GC with it cached, then switch to a fiber and
    back (which recomputes the cache from the main stack). *)
 let thread_owner () =
-  set k (payload "thread-1");
+  TLS.set k (payload "thread-1");
   full_gc ();
-  set k (payload "thread-2");
+  TLS.set k (payload "thread-2");
   preemptible ~on_suspend:ignore (fun () ->
-      assert (get k = "init");
+      assert (TLS.get k = "init");
       full_gc ());
-  assert (get k = payload "thread-2");
+  assert (TLS.get k = payload "thread-2");
   non_preemptible full_gc;
-  assert (get k = payload "thread-2")
+  assert (TLS.get k = payload "thread-2")
 
 let () =
   suspended_owner ();

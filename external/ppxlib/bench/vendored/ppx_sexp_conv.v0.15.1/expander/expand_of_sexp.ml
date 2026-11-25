@@ -186,6 +186,7 @@ module Str_generate_of_sexp = struct
     | { ptyp_desc = Ptyp_class (_, _); _ }
     | { ptyp_desc = Ptyp_alias (_, _); _ }
     | { ptyp_desc = Ptyp_package _; _ }
+    | { ptyp_desc = Ptyp_open _; _ }
     | { ptyp_desc = Ptyp_extension _; _ } ->
       Location.raise_errorf ~loc "Type unsupported for ppx [of_sexp] conversion"
 
@@ -841,7 +842,7 @@ module Str_generate_of_sexp = struct
       [%expr
         let rec [%p Fresh_name.pattern fresh_iter] =
           [%e
-            pexp_function
+            pexp_function_cases
               ~loc
               [ [%pat?
                        Sexplib0.Sexp.List

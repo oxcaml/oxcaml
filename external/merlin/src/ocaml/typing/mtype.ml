@@ -46,15 +46,17 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
     Mty_signature sg ->
       Some (Mty_signature(strengthen_lazy_sig ~aliasable sg p))
 
-  | Mty_functor(Named (Some param, arg, marg), res, mres)
+  | Mty_functor(Named (Some param, arg, marg), res, mres, st)
     when !Clflags.applicative_functors ->
       Some (Mty_functor(Named (Some param, arg, marg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
-  | Mty_functor(Named (None, arg, marg), res, mres)
+        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)),
+        mres, st))
+  | Mty_functor(Named (None, arg, marg), res, mres, st)
     when !Clflags.applicative_functors ->
       let param = Ident.create_scoped ~scope:(Path.scope p) "Arg" in
       Some (Mty_functor(Named (Some param, arg, marg),
-        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
+        strengthen_lazy ~aliasable:false res (Papply(p, Pident param)),
+        mres, st))
 
   | Mty_strengthen (mty,q,Not_aliasable) when aliasable ->
       (* Normally, we have S/M/N = S/M. However, if the inner strengthening is
@@ -259,7 +261,7 @@ let rec expand_paths_lazy paths env =
   function
     Mty_signature sg ->
       Mty_signature (expand_paths_lazy_sig paths env sg)
-  | Mty_functor (param,res,mres) ->
+  | Mty_functor (param,res,mres,st) ->
       let param, env = match param with
         Unit -> Unit, env
       | Named (name,mty,mm) ->
@@ -278,7 +280,7 @@ let rec expand_paths_lazy paths env =
           Named (name, mty, mm), env
       in
       let res = expand_paths_lazy paths env res in
-      Mty_functor (param,res,mres)
+      Mty_functor (param,res,mres,st)
   | Mty_strengthen (_,p,_) as mty when Path.Set.mem p paths ->
       (* If the path we're strengthening with is in paths then we need to
           unfold the node. *)
@@ -419,9 +421,9 @@ let rec make_aliases_absent ~aliased pres mty =
           item
       in
       pres, Mty_signature(List.map make_item sg)
-  | Mty_functor(arg, res, mres) ->
+  | Mty_functor(arg, res, mres, st) ->
       let _, res = make_aliases_absent ~aliased:false Mp_present res in
-      pres, Mty_functor(arg, res, mres)
+      pres, Mty_functor(arg, res, mres, st)
   | Mty_ident _ | Mty_for_hole ->
       pres, mty
   | Mty_strengthen (mty,p,a) ->
@@ -507,9 +509,9 @@ let rec nondep_mty_with_presence env va ids pres mty =
   | Mty_signature sg ->
       let mty = Mty_signature(nondep_sig env va ids sg) in
       pres, mty
-  | Mty_functor(Unit, res, mres) ->
-      pres, Mty_functor(Unit, nondep_mty env va ids res, mres)
-  | Mty_functor(Named (param, arg, marg), res, mres) ->
+  | Mty_functor(Unit, res, mres, st) ->
+      pres, Mty_functor(Unit, nondep_mty env va ids res, mres, st)
+  | Mty_functor(Named (param, arg, marg), res, mres, st) ->
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
       let mode =
@@ -524,7 +526,7 @@ let rec nondep_mty_with_presence env va ids pres mty =
       in
       let mty =
         Mty_functor(Named (param, nondep_mty env var_inv ids arg, marg),
-                    nondep_mty res_env va ids res, mres)
+                    nondep_mty res_env va ids res, mres, st)
       in
       pres, mty
   | Mty_for_hole as mty_for_hole -> pres, mty_for_hole
@@ -740,7 +742,7 @@ module Contains_type_or_jkind = struct
       Mty_ident _ -> raise (Contains Type) (* PR#6427 *)
     | Mty_signature sg ->
         contains_type_or_jkind_sig env sg
-    | Mty_functor (_, body, _) ->
+    | Mty_functor (_, body, _, _) ->
         contains_type_or_jkind env body
     | Mty_alias _
     | Mty_for_hole ->
@@ -930,6 +932,9 @@ let scrape_for_type_of ~remove_aliases env mty =
 
 (* Lower non-generalizable type variables *)
 
+type escape = { var : type_expr; kind : Path.t }
+exception Escape of escape
+
 let lower_nongen nglev mty =
   let open Btype in
   with_type_mark begin fun mark ->
@@ -939,7 +944,14 @@ let lower_nongen nglev mty =
         Tvar { jkind } ->
           let level = get_level ty in
           if level < generic_level && level > nglev then (
-            set_level ty nglev; Jkind.update_level nglev jkind)
+            set_level ty nglev;
+            match Jkind.update_level Env.empty nglev jkind with
+            | Ok None -> ()
+            | Ok (Some jkind) -> set_var_jkind ty jkind
+            | Error Rigid ->
+              Misc.fatal_error "Ctype.lower_nongen: rigid sort variable"
+            | Error (Escape kind) ->
+              raise (Escape { var = ty; kind }))
       | _ ->
           super.it_do_type_expr it ty
     in
@@ -948,5 +960,6 @@ let lower_nongen nglev mty =
       Mode.With_locality.update_level nglev m
   in
   let it = {super with it_do_type_expr; it_mode_expr} in
-  it.it_module_type it mty
+  try it.it_module_type it mty; Ok ()
+  with Escape { var; kind } -> Error { var; kind }
   end

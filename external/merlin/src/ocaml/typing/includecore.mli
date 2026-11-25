@@ -30,6 +30,7 @@ type primitive_mismatch =
   | Native_name
   | Result_repr
   | Argument_repr of int
+  | Elided_args
   | Layout_poly_attr
 
 type value_mismatch =
@@ -183,7 +184,7 @@ val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
 val value_descriptions:
   loc:Location.t -> Env.t -> string ->
   mmodes:mmodes -> self_check:bool ->
-  value_description -> value_description -> module_coercion
+  value_description -> Subst.t -> value_description -> module_coercion
 
 val type_declarations:
   ?equality:bool ->

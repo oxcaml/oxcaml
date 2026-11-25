@@ -1,4 +1,6 @@
 (* TEST
+ file = "${ocamlsrcdir}/tools/dumpobj";
+ file-exists;
  flags = "-g";
  setup-ocamlc.byte-build-env;
  ocamlc.byte;

@@ -24,6 +24,20 @@ val lambda_to_cmm :
   Lambda.program ->
   Cmm.phrase list
 
+(** Translate Lambda code to the js_of_ocaml IR using Flambda 2. This function
+    is not currently re-entrant. *)
+val lambda_to_jsir :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  keep_symbol_tables:bool ->
+  Lambda.program ->
+  Optcomp_intf.jsir_program
+
+val link_jsir :
+  register_globals:bool ->
+  Jsoo_imports.Code.jsir_file list ->
+  Jsoo_imports.Code.program
+
 type flambda_result =
   { flambda : Flambda_unit.t;
     all_code : Exported_code.t;

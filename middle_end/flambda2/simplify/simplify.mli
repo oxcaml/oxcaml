@@ -29,6 +29,7 @@ type simplify_result = private
   }
 
 val run :
+  ppf_dump:Format.formatter ->
   cmx_loader:Flambda_cmx.loader ->
   machine_width:Target_system.Machine_width.t ->
   round:int ->

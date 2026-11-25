@@ -2716,6 +2716,20 @@ end = struct
           ~desc:("direct tailcall to " ^ func)
           dbg
 
+      let transform_func_call t ~next ~exn (op : Cfg.func_call_operation) dbg =
+        match op with
+        | Indirect None ->
+          let w = create_witnesses t (Indirect_call { callee = None }) dbg in
+          transform_top t ~next ~exn w "indirect call" dbg
+        | Indirect (Some callees) ->
+          transform_call_indirect t ~next ~exn callees
+            (fun callee -> Witness.Indirect_call { callee = Some callee })
+            ~desc:"indirect call" dbg
+        | Direct { sym_name = func; _ } ->
+          let k = Witness.Direct_call { callee = func } in
+          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
+            dbg
+
       let operation t ~next (op : Operation.t) dbg =
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
@@ -2723,11 +2737,12 @@ end = struct
         | Const_mask _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
-              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz
+              | Icomp _ ),
               _ )
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
@@ -2747,7 +2762,8 @@ end = struct
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
+        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _ ->
           next
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,
@@ -2768,7 +2784,7 @@ end = struct
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
-        | Dls_get | Tls_get | Domain_index -> next
+        | Dls_get | Tls_get | Domain_index | Thread_self_id -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =
@@ -2816,11 +2832,11 @@ end = struct
           in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call_no_return { alloc = false; _ } ->
+        | External_call_no_return { alloc = false; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call_no_return { alloc = true; func_symbol = func; _ } ->
+        | External_call_no_return { alloc = true; func_symbol = func; _ } ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func }) dbg in
@@ -2841,17 +2857,9 @@ end = struct
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect None; _ } ->
-          let w = create_witnesses t (Indirect_call { callee = None }) dbg in
-          transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some callees); _ } ->
-          transform_call_indirect t ~next ~exn callees
-            (fun callee -> Witness.Indirect_call { callee = Some callee })
-            ~desc:"indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
-          let k = Witness.Direct_call { callee = func } in
-          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
-            dbg
+        | Call { op; _ } -> transform_func_call t ~next ~exn op dbg
+        | Call_no_return op ->
+          transform_func_call t ~next:Value.normal_return ~exn op dbg
         | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
@@ -2934,7 +2942,8 @@ let drop_invalid_successors cfg_with_layout =
         | Invalid { label_after = None; _ }
         | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
         | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_self _ | Tailcall_func _ | Call_no_return _
+        | External_call_no_return _ | Call _ ->
           ());
     if not !modified
     then cfg_with_layout

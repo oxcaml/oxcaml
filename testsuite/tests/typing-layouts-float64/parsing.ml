@@ -26,50 +26,22 @@ val f : float# -> unit = <fun>
 *)
 type t = float# list;;
 [%%expect {|
-Line 1, characters 9-15:
-1 | type t = float# list;;
-             ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = float# list
 |}];;
 
 let f (_ : float# list) = ();;
 [%%expect {|
-Line 1, characters 11-17:
-1 | let f (_ : float# list) = ();;
-               ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : float# list -> unit = <fun>
 |}];;
 
 type t = C of float# list;;
 [%%expect {|
-Line 1, characters 14-20:
-1 | type t = C of float# list;;
-                  ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of float# list
 |}];;
 
 type t = C : float# list -> t;;
 [%%expect {|
-Line 1, characters 13-19:
-1 | type t = C : float# list -> t;;
-                 ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : float# list -> t
 |}];;
 
 (* Syntax: float#c

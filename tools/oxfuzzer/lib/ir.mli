@@ -1,10 +1,12 @@
-(* CR-someday hwasilewski: Turn on strong warnings (unused value etc.). *)
+(* CR-someday xclerc: Turn on strong warnings (unused value etc.). *)
 module Name : sig
   type t
 
   val of_string : string -> t
 
   val to_string : t -> string
+
+  val equal : t -> t -> bool
 end
 
 module NumberTy : sig
@@ -71,10 +73,14 @@ end
 module Ty : sig
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
+    | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
+    | Or_null of t
     | Bool
+    | String
+    | Arrow of t * t
 
   and record =
     { id : int;
@@ -100,18 +106,37 @@ module Ty : sig
 
   val equal : t -> t -> bool
 
+  (** [curry [a; b] c] is [a -> b -> c]. *)
+  val curry : t list -> t -> t
+
+  (** [uncurry (a -> b -> c)] is [([a; b], c)], and [uncurry ty] is [([], ty)]
+      if [ty] is not a function type. *)
+  val uncurry : t -> t list * t
+
   val variant_name : variant -> string
 
   val constructor_name : variant -> constructor -> string
-
-  val constructor_pattern :
-    variant -> constructor -> Name.t list -> Parsetree.pattern
 
   val record_name : record -> string
 
   val field_name : record -> field -> string
 
   val to_code : t -> Parsetree.core_type
+end
+
+module Sum : sig
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  val ty : t -> Ty.t
+
+  val constructors : t -> Ty.constructor list
+
+  val constructor_name : t -> Ty.constructor -> string
+
+  val constructor_pattern :
+    t -> Ty.constructor -> Name.t list -> Parsetree.pattern
 end
 
 module Binding : sig
@@ -122,18 +147,75 @@ module Binding : sig
     }
 end
 
+module Exn : sig
+  type t =
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option  (** Must be a value type (boxed). *)
+        }
+
+  val equal : t -> t -> bool
+
+  val name : t -> string
+
+  val payload : t -> Ty.t option
+
+  (** Built-in exceptions need no declaration. *)
+  val to_code : t -> Parsetree.structure_item option
+end
+
+module Handler : sig
+  type pattern =
+    | Exn of
+        { exn : Exn.t;
+          payload : Binding.t option
+        }
+    | Catch_all
+
+  type 'body t =
+    { pattern : pattern;
+      body : 'body
+    }
+end
+
+module Un_op : sig
+  type t =
+    | Neg
+    | Abs
+    | Succ
+    | Pred
+    | Sqrt
+    | Round
+    | Trunc
+    | Ceil
+    | Floor
+    | Bit_not
+    | Not
+
+  val ops_for_ty : Ty.t -> t list
+
+  val to_code : Ty.t -> t -> arg:Parsetree.expression -> Parsetree.expression
+end
+
 module Bin_op : sig
   type t =
     | Add
     | Sub
     | Mul
+    | Div
+    | Rem
+    | Min
+    | Max
+    | Min_num
+    | Max_num
     | Bit_and
     | Bit_or
     | Bit_xor
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq (* CR-someday hwasilewski: Also add non-equality. *)
+    | Eq (* CR-someday xclerc: Also add non-equality. *)
     | Lt
     | Le
     | Gt
@@ -151,9 +233,37 @@ module Bin_op : sig
     Parsetree.expression
 end
 
+module Inline : sig
+  type t =
+    | Never
+    | Always
+    | Default
+end
+
 module Expr : sig
   type t =
     | Const of Number.t
+    | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
+    | Assert_false
+        (** Non-returning expression, valid at any result type or layout. *)
+    | Let of
+        { name : Name.t;
+          expr : t;
+          body : t
+        }  (** Immutable binding. *)
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of
@@ -161,6 +271,7 @@ module Expr : sig
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of (Name.t * t) list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -170,16 +281,21 @@ module Expr : sig
           expr : t
         }
     | Construct of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           constructor : Ty.constructor;
           args : (Name.t * t) list
         }
     | Match of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           scrutinee : t;
           cases : case list
         }
     | Opaque of t
+    | Un_op of
+        { ty : Ty.t;
+          op : Un_op.t;
+          arg : t
+        }
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;
@@ -195,6 +311,33 @@ module Expr : sig
         { fun_name : Name.t;
           args : t list
         }
+    | Raise of raise
+    | Try of
+        { ty : Ty.t;
+          body : t;
+          handlers : t Handler.t list
+        }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }  (** An anonymous function, which may capture variables. *)
+    | Apply of
+        { func : t;
+          args : t list
+        }  (** Application of a function value. *)
+    | Let_rec of
+        { functions : (Name.t * t) list;
+              (** Each function must be a [Lambda]. *)
+          body : t
+        }  (** Local mutually recursive functions. *)
+
+  and raise =
+    { exn : Exn.t;
+      payload : t option;
+      notrace : bool
+    }
 
   and case =
     { constructor : Ty.constructor;
@@ -206,6 +349,12 @@ module Expr : sig
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val convert_num :
     Parsetree.expression ->
@@ -214,6 +363,8 @@ module Expr : sig
     Parsetree.expression
 
   val to_code : t -> Parsetree.expression
+
+  val raise_to_code : raise -> Parsetree.expression
 
   val place_to_code : place -> Parsetree.expression
 
@@ -225,6 +376,12 @@ module Place : sig
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val to_code : t -> Parsetree.expression
 end
@@ -242,6 +399,11 @@ module Statement : sig
           stride : int;
           body : t
         }
+    | Raise of Expr.raise
+    | Try of
+        { body : t;
+          handlers : t Handler.t list
+        }
 
   val let_binding :
     Binding.t ->
@@ -254,13 +416,6 @@ module Statement : sig
   val to_code : t -> Parsetree.expression
 end
 
-module Inline : sig
-  type t =
-    | Never
-    | Always
-    | Default
-end
-
 module Function : sig
   type t =
     { name : Name.t;
@@ -268,7 +423,9 @@ module Function : sig
       inline : Inline.t;
       body : Statement.t;
       return_ty : Ty.t;
-      result : Expr.t
+      result : Expr.t;
+      raises : Exn.t list
+          (** Exceptions that may escape a call. Callers must catch them. *)
     }
 
   val to_code : t -> Parsetree.structure_item

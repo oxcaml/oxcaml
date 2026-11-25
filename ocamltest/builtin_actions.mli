@@ -53,3 +53,9 @@ val file_exists : Actions.t
 val copy : Actions.t
 
 val init : unit -> unit
+
+(* Action evaluators *)
+val do_chdir : string -> Result.t
+val do_check_file_exists : filename:string -> reason:string -> Result.t
+val do_check_file_absent : filename:string -> Result.t
+val do_copy_file : out_channel -> src:string -> dst:string -> Result.t

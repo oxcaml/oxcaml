@@ -3,6 +3,7 @@ include unix;
 hasunix;
 { bytecode; }
 { native; }
+{ jsir; }
 *)
 
 let filename = "test.out"

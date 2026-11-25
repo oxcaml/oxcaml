@@ -100,4 +100,5 @@ module Contains_type_or_jkind : sig
   val check : Env.t -> module_type -> t option
 end
 
-val lower_nongen: int -> module_type -> unit
+type escape = { var : type_expr; kind : Path.t }
+val lower_nongen: int -> module_type -> (unit, escape) result

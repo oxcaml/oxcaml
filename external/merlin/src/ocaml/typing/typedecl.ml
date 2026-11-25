@@ -25,7 +25,8 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
+type native_repr_kind =
+  Unboxed | Untagged | Unpacked | Unsafe_unextended | Fat_ptr
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -88,7 +89,7 @@ type error =
   | Duplicate_constructor of string
   | Too_many_constructors
   | Duplicate_label of string
-  | Unboxed_mutable_label
+  | Unboxed_atomic_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -117,7 +118,10 @@ type error =
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
   | Multiple_native_repr_attributes
-  | Cannot_unbox_or_untag_type of native_repr_kind
+  | Elide_void_on_non_void
+  | Elide_void_in_return_position
+  | All_external_arguments_elided
+  | Bad_native_repr_attr of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
   | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
@@ -129,7 +133,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -507,7 +510,7 @@ let update_type temp_env env id loc =
 *)
 let is_float env ty =
   match Ctype.get_unboxed_type_approximation env ty with
-  | { ty; or_null = None; modality = _ } -> begin
+  | { ty; or_null = None; wrapping = _ } -> begin
     match get_desc ty with
     | Tconstr(p, _, _) -> Path.same p Predef.path_float
     | _ -> false end
@@ -598,18 +601,17 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       (fun () ->
          let is_atomic = Builtin_attributes.has_atomic attrs in
          let mut : mutability =
+          let mode = Mode.With_regionality.Comonadic.legacy in
           match mut, is_atomic with
           | Immutable, false -> Immutable
           | Immutable, true ->
               Error.log_and_raise loc (Atomic_field_must_be_mutable name.txt)
-          | Mutable, is_atomic ->
-              match record_form with
-              | Legacy -> Mutable {
-                mode = Mode.With_regionality.Comonadic.legacy;
-                atomic = if is_atomic then Atomic else Nonatomic
-              }
-              | Unboxed_product ->
-                  Error.log_and_raise loc Unboxed_mutable_label
+          | Mutable, false -> Mutable { mode; atomic = Nonatomic }
+          | Mutable, true ->
+              begin match record_form with
+              | Legacy -> Mutable { mode; atomic = Atomic }
+              | Unboxed_product -> Error.log_and_raise loc Unboxed_atomic_label
+              end
          in
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
@@ -966,7 +968,7 @@ let check_imprecise_type_param_annotation env (cty, _) annotated_jkind =
   match cty.ctyp_desc, get_desc cty.ctyp_type, annotated_jkind with
   | Ttyp_var (name_opt, Some _), Tvar { jkind; _ }, Some annotated_jkind
     when not (Jkind.History.has_warned jkind) ->
-    if not (Jkind.equate env jkind annotated_jkind) then begin
+    if Result.is_error (Jkind.equate env jkind annotated_jkind) then begin
       let format_jkind jkind =
         Format_doc.asprintf "%a" !Oprint.out_jkind
           (Out_type.out_jkind_of_jkind env jkind)
@@ -1474,11 +1476,11 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       List.map
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
-            ld_mutable = Immutable;
+            ld_mutable = ld.ld_mutable;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
-                  are affected by the mutability of the boxed label, even
-                  though the unboxed version is always immutable. *)
+                 are affected by the mutability of the boxed label, even
+                 though the unboxed version cannot (currently) be mutated. *)
             ld_sort = None;
             ld_type = ld.ld_type;
             ld_loc = ld.ld_loc;
@@ -2415,8 +2417,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   match form, lbls, rep with
   | Legacy, [lbl], Record_unboxed ->
     let jkind =
-      Ctype.type_jkind env lbl.ld_type |>
-      Jkind.apply_modality_l lbl.ld_modalities
+      Jkind.for_at_at_unboxed_record
+        ~get_ty_base:(Ctype.type_jkind_base env)
+        ~lbl
+        ~ld_type:lbl.ld_type
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =
@@ -2583,7 +2587,7 @@ let rec update_decl_jkind env dpath decl =
   let decl = { decl with type_unboxed_version } in
 
   (* returns updated constructors, updated rep, and updated jkind *)
-  let update_variant_kind loc cstrs rep =
+  let update_variant_kind loc (cstrs : Types.constructor_declaration list) rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
@@ -2675,33 +2679,31 @@ let rec update_decl_jkind env dpath decl =
         end
       | None -> bad_or_null_payload_count loc
       end
-    | [{Types.cd_args} as cstr], Variant_unboxed -> begin
-        match cd_args with
-        | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
-            let jkind = Ctype.type_jkind env ty in
-            let sort = Jkind.sort_option_of_jkind env jkind in
-            let ca_sort =
-              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
-            in
-            if Option.is_none sort then assert_any_args_support loc;
-            [{ cstr with Types.cd_args =
-                           Cstr_tuple [{ arg with ca_sort }] }],
-            Variant_unboxed, jkind
-          end
-        | Cstr_record [{ld_type} as lbl] -> begin
-            let jkind = Ctype.type_jkind env ld_type in
-            let sort = Jkind.sort_option_of_jkind env jkind in
-            let ld_sort =
-              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
-            in
-            if Option.is_none sort then assert_any_args_support loc;
-            [{ cstr with Types.cd_args =
-                           Cstr_record [{ lbl with ld_sort }] }],
-            Variant_unboxed, jkind
-          end
+    | [ cstr ], Variant_unboxed ->
+      let jkind =
+        Jkind.for_unboxed_variant
+        ~decl_params:decl.type_params
+        ~type_apply:(Ctype.apply env)
+        ~get_free_vars:(Ctype.free_variable_set_of_list env)
+        ~get_ty_base:(Ctype.type_jkind_base env)
+        cstr
+      in
+      let sort =
+        Jkind.sort_option_of_jkind env jkind
+        |> fun s ->
+            Option.bind s Jkind.Sort.get_concrete_defaulting_to_scannable
+      in
+      if Option.is_none sort then assert_any_args_support loc;
+      let cstr =
+        match cstr.cd_args with
+        | Cstr_tuple [ arg ] ->
+          { cstr with cd_args = Cstr_tuple [ { arg with ca_sort = sort } ] }
+        | Cstr_record [ lbl] ->
+          { cstr with cd_args = Cstr_record [ { lbl with ld_sort = sort } ] }
         | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
           assert false
-      end
+      in
+      [ cstr ], Variant_unboxed, jkind
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
@@ -3130,7 +3132,7 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     let rec_ok =
       match get_desc ty with
       | Tconstr(p,_,_) ->
-          !Clflags.recursive_types && Ctype.is_contractive env p
+          !Clflags.recursive_types && Ctype.is_contractive_with_rectypes env p
       | Tobject _ | Tvariant _ -> true
       | _ -> !Clflags.recursive_types
     in
@@ -3139,12 +3141,24 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
     match get_desc ty with
     | Tconstr(p, tyl, _) ->
         let to_check = to_check p in
-        if to_check then List.iter (check_subtype parents trace ty env) tyl;
+        let check_parameters () =
+          if tyl <> [] then begin
+            let variance =
+              try (Env.find_type p env).type_variance
+              with Not_found -> List.map (fun _ -> Variance.unknown) tyl
+            in
+            List.iter2
+              (fun v t ->
+                 if Variance.(mem May_noncontractive v) then
+                   check_subtype parents trace ty env t)
+              variance tyl
+          end
+        in
+        if to_check then check_parameters ();
         begin match Ctype.try_expand_once_opt env ty with
         | ty' -> check parents (Expands_to (ty, ty') :: trace) env ty'
         | exception Ctype.Cannot_expand ->
-            if not to_check then
-              List.iter (check_subtype parents trace ty env) tyl
+            if not to_check then check_parameters ()
         end
     | _ ->
         Ctype.iter_type_expr_with_stages
@@ -4173,19 +4187,24 @@ let transl_type_extension extend env loc styext =
         Error.log_and_raise loc (Not_extensible_type type_path)
   end;
   let type_variance =
-    List.map (fun v ->
-                let (co, cn) = Variance.get_upper v in
-                  (not cn, not co, false))
-             type_decl.type_variance
+    List.map
+      (fun v ->
+         let (co, cn) = Variance.get_upper v in
+         { Typedecl_variance.
+           plus = not cn; minus = not co;
+           bang = false; rec_ = false })
+      type_decl.type_variance
   in
   let err =
     if type_decl.type_arity <> List.length styext.ptyext_params then
       Some Includecore.Arity
     else
       if List.for_all2
-           (fun (c1, n1, _) (c2, n2, _) -> (not c2 || c1) && (not n2 || n1))
+           (fun (v1 : Typedecl_variance.surface_variance)
+                (v2 : Typedecl_variance.surface_variance) ->
+             (not v2.plus || v1.plus) && (not v2.minus || v1.minus))
            type_variance
-           (Typedecl_variance.variance_of_params styext.ptyext_params)
+           (Typedecl_variance.variance_of_pparams styext.ptyext_params)
       then None else Some Includecore.Variance
   in
   begin match err with
@@ -4323,18 +4342,22 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "untagged" attrs,
     Attr_helper.get_no_payload_attribute "unpacked" attrs,
     Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
+    Attr_helper.get_no_payload_attribute "fat_ptr" attrs,
     global_repr
   with
-  | None, None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None, None -> Native_repr_attr_present Unpacked
-  | None, None, None, Some _, None -> Native_repr_attr_present Unsafe_unextended
-  | Some { Location.loc }, _, _, _, _
-  | _, Some { Location.loc }, _, _, _
-  | _, _, Some { Location.loc }, _, _
-  | _, _, _, Some { Location.loc }, _ ->
+  | None, None, None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None, None, None -> Native_repr_attr_present Unpacked
+  | None, None, None, Some _, None, None ->
+    Native_repr_attr_present Unsafe_unextended
+  | None, None, None, None, Some _, None -> Native_repr_attr_present Fat_ptr
+  | Some { Location.loc }, _, _, _, _, _
+  | _, Some { Location.loc }, _, _, _, _
+  | _, _, Some { Location.loc }, _, _, _
+  | _, _, _, Some { Location.loc }, _, _
+  | _, _, _, _, Some { Location.loc }, _ ->
     Error.log_and_raise loc Multiple_native_repr_attributes
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -4466,6 +4489,23 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
     in
     Error.log_and_raise loc (Jkind_sort {env; kloc; typ; err})
 
+let rec strip_addressable_sort (s : Jkind_types.Sort.Const.t) =
+  match s with
+  | Addressable s -> strip_addressable_sort s
+  | (Base _ | Product _ | Univar _ | Genvar _) as s -> s
+
+(* A fat pointer: an unboxed pair of a [value] base and a [bits64] byte
+   offset. *)
+let sort_is_fat_pointer (sort : Jkind_types.Sort.Const.t) =
+  match strip_addressable_sort sort with
+  | Product [a; b] ->
+    (match strip_addressable_sort a, strip_addressable_sort b with
+     | Base Scannable, Base Bits64 -> true
+     | _, _ -> false)
+  | Base _ | Product _ | Univar _ | Genvar _
+  (* [strip_addressable_sort] never returns [Addressable _] *)
+  | Addressable _ -> false
+
 let make_native_repr
       env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
   error_if_has_deep_native_repr_attributes core_type;
@@ -4533,7 +4573,7 @@ let make_native_repr
     with
     | None ->
         Error.log_and_raise core_type.ptyp_loc
-          (Cannot_unbox_or_untag_type kind)
+          (Bad_native_repr_attr kind)
     | Some repr -> repr
     end
   | Native_repr_attr_present Unboxed, Sort (Univar _) ->
@@ -4543,7 +4583,7 @@ let make_native_repr
   | Native_repr_attr_present Unboxed,
     (Sort (Product _ | Base Void | Addressable _)) ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unboxed)
+      (Bad_native_repr_attr Unboxed)
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
        upstream-compatibility, we want the code to still work when all the
@@ -4584,7 +4624,7 @@ let make_native_repr
   | Native_repr_attr_present Unpacked, (Sort (Base _ | Addressable _) | Poly)
     ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unpacked)
+      (Bad_native_repr_attr Unpacked)
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
   | Native_repr_attr_present Unsafe_unextended,
@@ -4598,9 +4638,16 @@ let make_native_repr
       Bits64 | Word | Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 |
       Vec512 | Mask))) ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unsafe_unextended)
+      (Bad_native_repr_attr Unsafe_unextended)
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Fat_ptr, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Fat_ptr, Sort sort
+    when sort_is_fat_pointer sort ->
+    Raw_pointer
+  | Native_repr_attr_present Fat_ptr, (Sort _ | Poly) ->
+    Error.log_and_raise core_type.ptyp_loc (Bad_native_repr_attr Fat_ptr)
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -4610,18 +4657,47 @@ let prim_const_mode m =
 
 let rec parse_native_repr_attributes env core_type ty rmode
         ~global_repr ~is_layout_poly =
+  begin match
+    Attr_helper.get_no_payload_attribute
+      "elide_void" core_type.ptyp_attributes
+  with
+  | None -> ()
+  | Some {loc; _} ->
+    Error.log_and_raise loc Elide_void_in_return_position
+  end;
   match core_type.ptyp_desc, get_desc ty,
     get_native_repr_attribute core_type.ptyp_attributes ~global_repr:None
   with
   | Ptyp_arrow _, Tarrow _, Native_repr_attr_present kind  ->
-      Error.log_and_raise core_type.ptyp_loc (Cannot_unbox_or_untag_type kind)
+      Error.log_and_raise core_type.ptyp_loc (Bad_native_repr_attr kind)
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
     let t1, _ = Btype.tpoly_get_poly t1 in
+    let elide_void =
+      Attr_helper.get_no_payload_attribute "elide_void" ct1.ptyp_attributes
+    in
     let repr_arg =
+      (* Global representation attributes apply only to retained arguments. *)
+      let global_repr =
+        match elide_void with
+        | None -> global_repr
+        | Some _ -> None
+      in
       make_native_repr
         env ct1 t1 ~global_repr
         ~is_layout_poly ~why:External_argument ~is_return:false
+    in
+    let repr_arg =
+      match elide_void with
+      | None -> Native_repr repr_arg
+      | Some {loc; _} ->
+        match repr_arg with
+        | Same_as_ocaml_repr (Base Void) -> Elided_void
+        | Same_as_ocaml_repr _ | Repr_poly | Unboxed_float _
+        | Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _
+        | Unpacked_product _ | Unextended_bits8 | Unextended_bits16
+        | Raw_pointer ->
+          Error.log_and_raise loc Elide_void_on_non_void
     in
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
@@ -4675,14 +4751,33 @@ let check_unboxable env loc ty =
     all_unboxable_types
     ()
 
-let has_ty_var_with_layout_any env ty =
-  Ctype.exists_free_variable (fun _ jkind -> Jkind.has_layout_any env jkind) ty
+(* Unlike other similar functions, we care about [any] specifically, not just
+   unrepresentable layouts. Abstract kinds should pass this check; if they did
+   not, we would report an error with an inaccurate suggestion. *)
+let has_ty_var_containing_layout_any env ty =
+  (* Look through products but not [box], since we know how to represent
+     [any box]. Basically checks representability, just not abstract kinds. *)
+  let rec needs_to_represent_any : _ Jkind.Layout.t -> bool = function
+    | Any _ -> true
+    | Addressable l -> needs_to_represent_any l
+    | Product ls -> List.exists needs_to_represent_any ls
+    | Sort _ | Box _ -> false
+  in
+  Ctype.exists_free_variable
+    (fun _ jkind ->
+       match Jkind.extract_layout env jkind with
+       | Ok l -> needs_to_represent_any l
+       | Error _ -> false)
+    ty
 
 let unexpected_layout_any_check env prim cty ty =
   if Primitive.prim_can_contain_layout_any prim ||
      prim.prim_is_layout_poly then ()
   else
-  if has_ty_var_with_layout_any env ty then
+  (* Slightly conservative: doesn't check where these types containing [any]
+     occur, meaning we might reject an ['a : any] that only appears in
+     acceptable positions. But that seems fine. *)
+  if has_ty_var_containing_layout_any env ty then
     Error.log_and_raise cty.ctyp_loc
       (Unexpected_layout_any_in_primitive(prim.prim_name))
 
@@ -4715,7 +4810,7 @@ let unexpected_layout_any_check env prim cty ty =
       See comment in [prim_has_valid_reprs] about what it could miss.
 
    3. Built-in primitives that inspect the jkind of type parameters cannot have
-      type variables with jkind [any] anywhere within their types.
+      type variables containing jkind [any] anywhere within their types.
 
       This check is here to prevent someone from writing:
 
@@ -4726,15 +4821,14 @@ let unexpected_layout_any_check env prim cty ty =
 
       [let f x = len x]
 
-      [x] here will have type ['a array] where the jkind of ['a] is [any]. The
-      array kind function in [typeopt] will look at ['a] expecting it to be
-      representable and fail. This produces a bad error message that doesn't
-      point to the source of the mistake which is, in fact, the external
-      declaration.
+      [x] here will have type ['a array] where the jkind of ['a] is [any].
+      Specialization of the length primitive requires this be representable, and
+      will generate code based on the default, [value]. This disagrees with the
+      type of [f], which will still contain [any].
 
-      For this reason, we have [unexpected_layout_any_check].  It's here to
-      point out this type of mistake early and suggest the use of
-      [@layout_poly].
+      [unexpected_layout_any_check] rules this out by rejecting the external
+      declaration and suggesting [@layout_poly], which instead picks a sort
+      for ['a] at each use during type checking (not just during transl).
 
       An exception is raised if any of these checks fails. *)
 (* CR layouts v7.1: additionally, we do not allow externals to have unboxed
@@ -4789,12 +4883,12 @@ let transl_value_decl env loc ~modal ~why valdecl =
     match modal with
     | Str_primitive ->
         assert (not valdecl.pval_poly);
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+        let modality_to_mode {txt = Modality m; loc} = {txt = Pmode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
         let modes = Typemode.transl_mode_annots modes in
         let mode =
           modes.mode_modes
-          |> Typemode.apply_mode_implications
+          |> Mode.Const.apply_implications
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Const.with_locality_as_regionality
@@ -4827,10 +4921,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
   in
   let sort =
     match Ctype.type_sort ~why ~allow_mutation:true env cty.ctyp_type with
-    | Ok sort -> sort
-    | Error err ->
-        Error.log_and_raise cty.ctyp_loc
-          (Non_representable_in_module (env, err, cty.ctyp_type))
+    | Ok sort -> Representable sort
+    | Error _ -> Unrepresentable
   in
   let ty = cty.ctyp_type in
   let v =
@@ -4906,7 +4998,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Builtin_attributes.has_layout_poly valdecl.pval_attributes
       in
       if is_layout_poly &&
-         not (has_ty_var_with_layout_any env ty) then
+         not (has_ty_var_containing_layout_any env ty) then
         Error.log_and_raise valdecl.pval_type.ptyp_loc Useless_layout_poly;
       let native_repr_args, native_repr_res =
         parse_native_repr_attributes
@@ -4924,12 +5016,17 @@ let transl_value_decl env loc ~modal ~why valdecl =
          Language_extension.assert_enabled ~loc Layouts Language_extension.Alpha
        | _ -> ());
       (*
-      if prim.prim_arity = 0 &&
-         (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
-         Error.log_and_raise valdecl.pval_type.ptyp_loc  Null_arity_external;
+      if prim.prim_apply_arity = 0
+         && (prim.prim_name = "" || prim.prim_name.[0] <> '%')
+      then
+        Error.log_and_raise
+          valdecl.pval_type.ptyp_loc
+          (if prim.prim_type_arity = 0
+           then Null_arity_external
+           else All_external_arguments_elided);
       *)
       if Clflags.target_is_native ()
-      && prim.prim_arity > 5
+      && prim.prim_apply_arity > 5
       && prim.prim_native_name = ""
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then
@@ -5151,7 +5248,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   end;
   let new_sig_decl = name_recursion sdecl id new_sig_decl in
   let new_type_variance =
-    let required = Typedecl_variance.variance_of_params sdecl.ptype_params in
+    let required = Typedecl_variance.variance_of_pparams sdecl.ptype_params in
     try
       Typedecl_variance.compute_decl env ~check:(Some (id, false)) new_sig_decl
         required
@@ -5189,7 +5286,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
         Option.map (fun d ->
           let type_variance =
             let required =
-              Typedecl_variance.variance_of_params sdecl.ptype_params in
+              Typedecl_variance.variance_of_pparams sdecl.ptype_params in
             try
               Typedecl_variance.compute_decl env ~check:(Some (id, true))
                 d required
@@ -5421,8 +5518,7 @@ let explain_unbound_gen ppf tv tl typ kwd pr =
     let ti = List.find (fun ti -> Ctype.deep_occur tv (typ ti)) tl in
     let ty0 = (* Hack to force aliasing when needed *)
       Btype.newgenty (Tobject(tv, ref None)) in
-    Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-      [typ ti; ty0];
+    Out_type.prepare_for_printing [typ ti; ty0];
     fprintf ppf
       ".@ @[<hov2>In %s@ %a@;<1 -2>the variable %a is unbound@]"
       kwd (Style.as_inline_code pr) ti
@@ -5587,13 +5683,37 @@ let explain_unbounded ty decl ppf =
       explain_unbound_single ppf ty ty'
   | _ -> ()
 
-let variance (p,n,i) =
-  let inj = if i then "injective " else "" in
-  match p, n with
-    true,  true  -> inj ^ "invariant"
-  | true,  false -> inj ^ "covariant"
-  | false, true  -> inj ^ "contravariant"
-  | false, false -> if inj = "" then "unrestricted" else inj
+(* Describe a variance, mentioning only the properties that differ between
+   the expected variance [v2] and the actual variance [v1]. *)
+let variance ~v1 ~v2 =
+  let open Typedecl_variance in
+  let variance_relevant =
+    (v1.plus && not v2.plus) || (v1.minus && not v2.minus)
+  in
+  let injectivity_relevant = v2.bang && not v1.bang in
+  let contractiveness_relevant = v2.rec_ && not v1.rec_ in
+  fun {plus; minus; bang; rec_} ->
+    let v =
+      if not variance_relevant then []
+      else begin
+        match plus, minus with
+        | true,  true  -> ["invariant"]
+        | true,  false -> ["covariant"]
+        | false, true  -> ["contravariant"]
+        | false, false -> ["unrestricted"]
+      end
+    in
+    let v =
+      if not injectivity_relevant then v
+      else if bang then "injective" :: v
+      else "noninjective" :: v
+    in
+    let v =
+      if not contractiveness_relevant then v
+      else if rec_ then "recursive" :: v
+      else "nonrecursive" :: v
+    in
+    String.concat " " v
 
 let variance_context =
   let open Typedecl_variance in
@@ -5627,6 +5747,7 @@ let variance_context =
 
 let variance_variable_error ~v1 ~v2 variable error ppf =
   let open Typedecl_variance in
+  let variance = variance ~v1 ~v2 in
   match error with
   | Variance_not_reflected ->
       fprintf ppf
@@ -5650,6 +5771,7 @@ let variance_variable_error ~v1 ~v2 variable error ppf =
 
 let variance_error ~loc ~v1 ~v2 =
   let open Typedecl_variance in
+  let variance = variance ~v1 ~v2 in
   function
   | Variance_variable_error { error; variable; context } ->
       (* CR dkalinichenko: OxCaml changes the [Ident_names] map from
@@ -5658,8 +5780,7 @@ let variance_error ~loc ~v1 ~v2 =
          lacks the [env]. Therefore, we clear [Ident_names] manually.
          It'd be good to come up with a better solution. *)
       Out_type.Ident_names.reset ();
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        [ variable ];
+      Out_type.prepare_for_printing [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
         (variance_variable_error ~v1 ~v2 variable error)
@@ -5683,8 +5804,8 @@ let report_error ~loc = function
       (Config.max_tag + 1)
   | Duplicate_label s ->
       Location.errorf "Two labels are named %a" Style.inline_code s
-  | Unboxed_mutable_label ->
-      Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Unboxed_atomic_label ->
+      Location.errorf ~loc "Unboxed record labels cannot be atomic"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -5731,7 +5852,7 @@ let report_error ~loc = function
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
       | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
       | Function_label_mismatch _ | Tuple_label_mismatch _
-      | First_class_module _ -> None
+      | First_class_module _ | Weaken_sort _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->
@@ -5754,7 +5875,7 @@ let report_error ~loc = function
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
       let base = Mode.With_locality.Const.legacy in
-      Out_type.prepare_for_printing ~base [used_as; defined_as];
+      Out_type.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Out_type.Ident_names.reset ();
       Location.errorf ~loc
@@ -5866,12 +5987,24 @@ let report_error ~loc = function
   | Val_in_structure ->
       Location.errorf ~loc "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      Location.errorf ~loc "Too many %a/%a/%a/%a attributes"
+      Location.errorf ~loc "Too many %a/%a/%a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
         Style.inline_code "[@@unsafe_unextended]"
-  | Cannot_unbox_or_untag_type Unboxed ->
+        Style.inline_code "[@@fat_ptr]"
+  | Elide_void_on_non_void ->
+      Location.errorf ~loc
+        "Only external arguments of layout void can be marked %a."
+        Style.inline_code "[@elide_void]"
+  | Elide_void_in_return_position ->
+      Location.errorf ~loc
+        "%a is not allowed in return position."
+        Style.inline_code "[@elide_void]"
+  | All_external_arguments_elided ->
+      Location.errorf ~loc
+        "An external must have at least one non-elided argument."
+  | Bad_native_repr_attr Unboxed ->
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \
          Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
@@ -5882,20 +6015,26 @@ let report_error ~loc = function
         Style.inline_code "int32"
         Style.inline_code "int64"
         Style.inline_code "nativeint"
-  | Cannot_unbox_or_untag_type Untagged ->
+  | Bad_native_repr_attr Untagged ->
       Location.errorf ~loc
         "Don't know how to untag this type. Only %a, \
          and@ other immediate types can be untagged."
         Style.inline_code "int"
-  | Cannot_unbox_or_untag_type Unpacked ->
+  | Bad_native_repr_attr Unpacked ->
       Location.errorf ~loc
         "Don't know how to unpack this type.@ \
          Only types with product layouts can be marked %a."
         Style.inline_code "unpacked"
-  | Cannot_unbox_or_untag_type Unsafe_unextended ->
+  | Bad_native_repr_attr Unsafe_unextended ->
       Location.errorf ~loc
         "@[Only types with layout bits8 or bits16 can be marked %a.@]"
         Style.inline_code "unsafe_unextended"
+  | Bad_native_repr_attr Fat_ptr ->
+      Location.errorf ~loc
+        "The %a attribute may only be used on external arguments@ \
+         whose layout is %a (a fat pointer)."
+        Style.inline_code "[@fat_ptr]"
+        Style.inline_code "value_or_null & bits64"
   | Deep_unbox_or_untag_attribute kind ->
       Location.errorf ~loc
         "The attribute %a should be attached to@ \
@@ -5906,7 +6045,8 @@ let report_error ~loc = function
          | Unboxed -> "@unboxed"
          | Untagged -> "@untagged"
          | Unpacked -> "@unpacked"
-         | Unsafe_unextended -> "@unsafe_unextended")
+         | Unsafe_unextended -> "@unsafe_unextended"
+         | Fat_ptr -> "@fat_ptr")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
@@ -5963,13 +6103,6 @@ let report_error ~loc = function
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
          env) err
-  | Non_representable_in_module (env, err, ty) ->
-    let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    Location.errorf ~loc "The type of a module-level value must have a@ \
-                          representable layout.@ %a"
-      (Jkind.Violation.report_with_offender ~offender
-         env)
-      err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =
       match lloc with

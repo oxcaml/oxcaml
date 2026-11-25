@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
   Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -83,7 +83,34 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      match Clflags.jsir_target () with
+      | Some target ->
+        let unsupported what =
+          Compenv.fatal
+            (Printf.sprintf "%s is not supported when targeting %s" what
+               (Clflags.Jsir_target.program_name target))
+        in
+        if !output_c_object then unsupported "-output-obj";
+        if !make_package then unsupported "-pack";
+        let supported_effects = Clflags.Jsoo_effects.supported_by target in
+        (match Clflags.jsoo_effects () with
+         | Some effects when not (List.mem effects supported_effects) ->
+           let supported_effects =
+             List.map Clflags.Jsoo_effects.to_string supported_effects
+             |> String.concat ", "
+           in
+           Compenv.fatal
+             (Printf.sprintf
+                "-jsoo-effects %s is not supported when targeting %s \
+                 (supported values: %s)"
+                (Clflags.Jsoo_effects.to_string effects)
+                (Clflags.Jsir_target.program_name target)
+                supported_effects)
+         | Some _ | None -> ());
+        Jscomp.make target ~link_jsir:!Clflags.link_jsir
+          ~lambda_to_jsir:Flambda2.lambda_to_jsir
+          ~jsir_linker:Flambda2.link_jsir
+      | None -> Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -112,7 +139,8 @@ let main unix argv ppf ~flambda2 =
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
                          -output-obj, -instantiate, -functorize";
-      | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
+      | Some ((P.Parsing | P.Typing | P.Transl | P.Lambda | P.Middle_end
+              | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
         assert (P.is_compilation_pass p);
@@ -187,7 +215,9 @@ let main unix argv ppf ~flambda2 =
                  Config.ext_obj Config.ext_dll
               )
         else
-          Compenv.default_output !output_name
+          match !output_name with
+          | Some name -> name
+          | None -> Compiler.default_executable_name
       in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->

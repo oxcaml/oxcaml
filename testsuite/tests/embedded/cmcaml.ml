@@ -1,5 +1,10 @@
 (* TEST
  modules = "cmstub.c cmmain.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* OCaml part of the code *)

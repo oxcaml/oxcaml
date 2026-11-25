@@ -217,7 +217,7 @@ grant each would need, as a checklist against accidental future widening:
   `ACTIONS_RUNTIME_TOKEN`, outside the permissions system), so this one is a
   *known residual risk* rather than an absent grant: a hostile session could in
   principle drive the cache API directly, and `merlin.yml` restores-and-runs a
-  cached compiler build (`cache-flambda-backend-*-<sha>`), making a poisoned
+  cached compiler build (`cache-oxcaml-compiler-*-<sha>`), making a poisoned
   entry consequential. This was already reachable when the allowlists were
   scoped (`Bash(make:*)` + file edits = arbitrary execution) and is unchanged
   by the broad-Bash grant. Mitigations: triggering requires a write-access

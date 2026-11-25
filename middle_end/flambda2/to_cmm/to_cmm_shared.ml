@@ -156,7 +156,8 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
   match memory_chunk_of_kind kind with
   | Word_val -> Word_int
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+    | Word_code_pointer | Word_out_of_heap_data_pointer | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned
     | Word_mask ) as mem ->
@@ -577,3 +578,12 @@ let alloc_mode_for_allocations_to_cmm t =
   | Alloc_mode.For_allocations.Local _ ->
     assert (Flambda_features.stack_allocation_enabled ());
     Cmm.Alloc_mode.Local
+
+let fail_if_apply_with_probe apply =
+  match Flambda.Apply.probe apply with
+  | None -> ()
+  | Some _ ->
+    Misc.fatal_errorf
+      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
+       always be direct applications of an OCaml function:@ %a"
+      Flambda.Apply.print apply

@@ -1,5 +1,9 @@
 (* TEST
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 type alloc_count = { mutable total: float }
 let allocs = Sys.opaque_identity { total = 0. }

@@ -95,6 +95,12 @@ module String = struct
           | _ as c -> f quote (w ^ (string_of_char c)) ws j
       end in
     if l=0 then [] else f None "" [] 0
+
+  let remove_prefix ~prefix s =
+    if starts_with ~prefix s then
+      let plen = String.length prefix in
+      Some (String.sub s plen (String.length s - plen))
+    else None
 end
 
 module Sys = struct

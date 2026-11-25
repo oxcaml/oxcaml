@@ -1,3 +1,7 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+
 # This CI check builds and tests Merlin. Running the Merlin tests requires
 # having a corresponding compiler, so the CI check builds the compiler at the
 # same revision as the Merlin being tested.
@@ -30,7 +34,6 @@ concurrency:
 
 jobs:
   build:
-    # The type of runner that the job will run on
     name: merlin
     runs-on: ${{ matrix.os }}
     permissions:
@@ -78,6 +81,7 @@ jobs:
         persist-credentials: false
 
     - name: Assert Merlin is in sync with the compiler
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml
       run: external/merlin/scripts/assert-in-sync.sh
 
@@ -88,7 +92,7 @@ jobs:
 
     - name: Set up Opam
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
-      uses: ocaml/setup-ocaml@e89b2ded52a6e13f50162220cf5fe47290162032 # v3.8.0
+      uses: ocaml/setup-ocaml@93303b622b2522e4411e295f9e77411a24912ac7 # v3.9.0
       with:
         ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
         opam-repositories: |
@@ -108,19 +112,19 @@ jobs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       id: cache
       with:
-        path: ${{ github.workspace }}/flambda-backend/_install
-        key: cache-flambda-backend-${{ matrix.name }}-${{ github.sha }}
+        path: ${{ github.workspace }}/oxcaml-compiler/_install
+        key: cache-oxcaml-compiler-${{ matrix.name }}-${{ github.sha }}
 
     - name: Check out the OxCaml repo for the compiler build
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       with:
-        path: 'flambda-backend'
+        path: 'oxcaml-compiler'
         persist-credentials: false
 
     - name: Install dependencies for OxCaml
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
-      working-directory: flambda-backend
+      working-directory: oxcaml-compiler
       run: |
         # We don't need the dev tool parts
         sed -i -e '/ocamlformat\|merlin\|ocaml-lsp-server/d' oxcaml-dev.opam
@@ -128,12 +132,12 @@ jobs:
 
     - name: Configure, build, and install OxCaml
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
-      working-directory: flambda-backend
+      working-directory: oxcaml-compiler
       run: |
         eval $(opam env)
         autoconf
         ./configure \
-          --prefix=$GITHUB_WORKSPACE/flambda-backend/_install \
+          --prefix=$GITHUB_WORKSPACE/oxcaml-compiler/_install \
           --with-dune=$(which dune)
         make install
         opam pin remove oxcaml-dev
@@ -142,8 +146,8 @@ jobs:
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ github.workspace }}/flambda-backend/_install
-        key: cache-flambda-backend-${{ matrix.name }}-${{ github.sha }}
+        path: ${{ github.workspace }}/oxcaml-compiler/_install
+        key: cache-oxcaml-compiler-${{ matrix.name }}-${{ github.sha }}
 
     - name: Install dependencies
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
@@ -164,7 +168,7 @@ jobs:
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml/external/merlin
       run: |
-        export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
+        export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/oxcaml-compiler/_install
         make build
         make test
         if ! git diff --quiet ; then

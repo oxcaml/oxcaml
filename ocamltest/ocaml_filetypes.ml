@@ -70,6 +70,12 @@ let extension_of_filetype = function
       | (Ocaml_backends.Bytecode, Object) -> "cmo"
       | (Ocaml_backends.Bytecode, Library) -> "cma"
       | (Ocaml_backends.Bytecode, Program) -> "byte"
+      | (Ocaml_backends.Jsir_js, Object) -> "cmx-js"
+      | (Ocaml_backends.Jsir_js, Library) -> "cmxa-js"
+      | (Ocaml_backends.Jsir_js, Program) -> "js"
+      | (Ocaml_backends.Jsir_wasm, Object) -> "cmx-wasm"
+      | (Ocaml_backends.Jsir_wasm, Library) -> "cmxa-wasm"
+      | (Ocaml_backends.Jsir_wasm, Program) -> "js"
     end
   | Text -> "txt"
   | Other s -> s
@@ -91,6 +97,13 @@ let filetype_of_extension = function
   | "cmo" -> Backend_specific (Ocaml_backends.Bytecode, Object)
   | "cma" -> Backend_specific (Ocaml_backends.Bytecode, Library)
   | "byte" -> Backend_specific (Ocaml_backends.Bytecode, Program)
+  | "cmx-js" -> Backend_specific (Ocaml_backends.Jsir_js, Object)
+  | "cmxa-js" -> Backend_specific (Ocaml_backends.Jsir_js, Library)
+  (* wasm_of_ocaml programs are run through a JavaScript wrapper, which loads
+     the WebAssembly code from a directory next to it. *)
+  | "js" -> Backend_specific (Ocaml_backends.Jsir_js, Program)
+  | "cmx-wasm" -> Backend_specific (Ocaml_backends.Jsir_wasm, Object)
+  | "cmxa-wasm" -> Backend_specific (Ocaml_backends.Jsir_wasm, Library)
   | "txt" -> Text
   | e -> Other e
 

@@ -214,7 +214,7 @@ let rebuild_apply
     *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
     * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
       (Flambda_arity.unarize_t result_arity)
       apply
@@ -681,13 +681,20 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             @ Bound_parameters.simples remaining_params
           in
           let inlined = Inlined_attribute.forward_inlined () in
+          (* The full application also receives the remaining parameters, which
+             may be yielding even if the partial application itself cannot
+             yield. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg ~inlined
+              dbg
+              (* This is the call to the callee made by the source partial
+                 application, so it carries that application's counter. *)
+              ~callsite_counter:(Apply.callsite_counter apply)
+              ~inlined
               ~inlining_state:(Apply.inlining_state apply)
-              ~position:Normal ~probe:None
+              ~position:Normal ~probe:None ~yielding:May_yield
               ~relative_history:Inlining_history.Relative.empty
           in
           let cost_metrics =
@@ -753,7 +760,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name ~debug:dbg (Current_unit.get_cu_exn ())
+          (* [name] is derived from the callee's function slot rather than the
+             wrapper's own, so no slot stamp is recorded here. *)
+          Code_id.create ~name ~slot_stamp:None ~debug:dbg
+            (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.
@@ -774,7 +784,11 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~cold:false ~is_a_functor:false ~is_opaque:false ~recursive
               ~cost_metrics:cost_metrics_of_body
               ~inlining_arguments:(DE.inlining_arguments (DA.denv dacc))
-              ~dbg ~is_tupled:false
+              ~dbg
+              ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+                (* The eta-expanded function doesn't exist in the source, so
+                   shouldn't have counters. *)
+              ~is_tupled:false
               ~is_my_closure_used:
                 (Function_params_and_body.is_my_closure_used params_and_body)
               ~inlining_decision:Stub ~absolute_history ~relative_history
@@ -798,7 +812,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             applied_values
           |> Value_slot.Map.of_list
         in
-        ( Set_of_closures.create ~value_slots function_decls,
+        ( Set_of_closures.create ~value_slots ~dbg function_decls,
           new_closure_alloc_mode,
           dacc,
           code_id,
@@ -1326,8 +1340,9 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
+        ~callsite_counter:(Apply.callsite_counter apply)
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
-        ~position:(Apply.position apply)
+        ~position:(Apply.position apply) ~yielding:(Apply.yielding apply)
         ~relative_history:
           (Inlining_history.Relative.concat
              ~earlier:(DE.relative_history (DA.denv dacc))
@@ -1525,8 +1540,12 @@ let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
       in
       simplify_method_call dacc apply ~callee_ty ~kind ~obj ~down_to_up
     | C_call
-        { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ }
-      ->
+        { needs_caml_c_call = _;
+          is_c_builtin = _;
+          effects = _;
+          coeffects = _;
+          fat_ptr_arg_starts = _
+        } ->
       let callee_ty =
         match callee_ty with
         | Some callee_ty -> callee_ty

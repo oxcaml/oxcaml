@@ -31,6 +31,7 @@ let () =
 (* TEST
  flags = "-g";
  ocamlrunparam += ",b=1";
+ readonly_files = "filter-locations.sh";
  {
    bytecode;
  }{

@@ -267,7 +267,8 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
 type spills_reloads_moves =
   { spills : int;
     reloads : int;
-    moves : int
+    moves : int;
+    loads : int
   }
 
 let count_spills_reloads_moves (block : Cfg.basic_block) =
@@ -276,15 +277,18 @@ let count_spills_reloads_moves (block : Cfg.basic_block) =
     | Op Spill -> { acc with spills = acc.spills + 1 }
     | Op Reload -> { acc with reloads = acc.reloads + 1 }
     | Op Move -> { acc with moves = acc.moves + 1 }
+    | Op (Load _) -> { acc with loads = acc.loads + 1 }
     | _ -> acc
   in
-  DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
+  DLL.fold_left ~f
+    ~init:{ spills = 0; reloads = 0; moves = 0; loads = 0 }
+    block.body
 
 (** Returns all CFG counters that work on a single block and are summative over
     the blocks. *)
 let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
-  let { spills; reloads; moves } = count_spills_reloads_moves block in
+  let { spills; reloads; moves; loads } = count_spills_reloads_moves block in
   let instructions = DLL.length block.body + 1 in
   Profile.Counters.create ()
   |> Profile.Counters.set "block_duplicate_spill" dup_spills
@@ -294,6 +298,7 @@ let cfg_block_counters (block : Cfg.basic_block) =
   |> Profile.Counters.set "instruction" instructions
   |> Profile.Counters.set "block" 1
   |> Profile.Counters.set "move" moves
+  |> Profile.Counters.set "load" loads
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (cfg : Cfg.t) =
@@ -367,8 +372,8 @@ let register_allocator_irc cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_irc"
     (fun cfg_with_infos ->
       match Regalloc_irc.run cfg_with_infos with
-      | Some res -> res
-      | None -> Regalloc_ls.run cfg_with_infos)
+      | Ok result -> result
+      | Error prepared -> Regalloc_ls.run_after_prelude prepared)
     cfg_with_infos
 
 let register_allocator_ls cfg_with_infos =
@@ -451,6 +456,19 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
   ++ Cfg_with_infos.make
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+  ++ (fun cfg_with_infos ->
+  match !Clflags.gated_trace_pc_guard with
+  | false -> cfg_with_infos
+  | true ->
+    cfg_with_infos
+    ++ cfg_with_infos_profile ~accumulate:true "cfg_trace_pc_guard"
+         Cfg_trace_pc_guard.run
+    ++ fun cfg_with_infos ->
+    let (_ : Cfg_with_layout.t) =
+      pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_trace_pc_guard"
+        (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+    in
+    cfg_with_infos)
   ++ save_cfg_before_regalloc
   (* CR-soon xclerc for xclerc: copy propagation should be "moved inside"
      register allocation, so that it would be covered by the validator; it
@@ -612,14 +630,16 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   Reg.clear_relocatable_regs ();
   fd_cmm
-  ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~level:2 "cmm_invariants"
+       (cmm_invariants ppf_dump)
   ++ (if !Oxcaml_flags.use_ssa
       then compile_via_ssa ~ppf_dump ~funcnames
       else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
        (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
-  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
+  ++ Profile.record ~accumulate:true ~level:2 "cfg_invariants"
+       (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true ~level:2 "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend
       then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
       else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
@@ -685,6 +705,9 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Clflags.llvm_backend && !Clflags.gated_trace_pc_guard
+  then
+    Misc.fatal_error "-gated-trace-pc-guard is not supported with -llvm-backend";
   if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm
@@ -787,7 +810,10 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
           (fun prim ->
             if not (Primitive.native_name_is_external prim)
             then None
-            else Some (Cmm.global_symbol (Primitive.native_name prim)))
+            else
+              Some
+                (Cmm.global_symbol ~ty:Cmm.typ_code_pointer
+                   (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
   emit_end_assembly ~sourcefile ()
 

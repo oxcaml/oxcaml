@@ -33,6 +33,9 @@ type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
   modes : mapper -> modes -> modes;
+  mode : mapper -> mode Location.loc -> mode Location.loc;
+  mode_bound : mapper -> mode_bound -> mode_bound;
+  mode_bound_var : mapper -> mode_bound_var -> mode_bound_var;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
@@ -60,6 +63,7 @@ type mapper = {
   jkind_annotation: mapper -> jkind_annotation -> jkind_annotation;
   jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> label_declaration -> label_declaration;
+  law_declaration: mapper -> law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;
   module_declaration: mapper -> module_declaration -> module_declaration;
@@ -435,6 +439,7 @@ module MT = struct
         extension ~loc ~attrs (sub.extension sub x)
     | Psig_attribute x -> attribute ~loc (sub.attribute sub x)
     | Psig_jkind x -> jkind ~loc (sub.jkind_declaration sub x)
+    | Psig_law x -> law ~loc (sub.law_declaration sub x)
 end
 
 
@@ -490,6 +495,7 @@ module M = struct
         extension ~loc ~attrs (sub.extension sub x)
     | Pstr_attribute x -> attribute ~loc (sub.attribute sub x)
     | Pstr_jkind x -> jkind ~loc (sub.jkind_declaration sub x)
+    | Pstr_law x -> law ~loc (sub.law_declaration sub x)
 end
 
 module E = struct
@@ -723,6 +729,7 @@ module P = struct
     | Ppat_constraint (p, t, m) ->
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
+    | Ppat_addr (mut, p) -> addr ~loc ~attrs mut (sub.pat sub p)
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
     | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
     | Ppat_open (lid,p) ->
@@ -1039,8 +1046,50 @@ let default_mapper =
          let pjkind_loc = this.location this pjkind_loc in
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
 
+    law_declaration =
+      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+                  plaw_attributes; plaw_loc } ->
+         let plaw_name = map_loc this plaw_name in
+         let plaw_params =
+           List.map
+             (fun (name, ty) ->
+                (map_loc this name, Option.map (this.typ this) ty))
+             plaw_params
+         in
+         let plaw_assumptions = List.map (this.expr this) plaw_assumptions in
+         let plaw_conclusion = this.expr this plaw_conclusion in
+         let plaw_attributes = this.attributes this plaw_attributes in
+         let plaw_loc = this.location this plaw_loc in
+         { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+           plaw_attributes; plaw_loc });
+
     modes = (fun this m ->
-      List.map (map_loc this) m);
+      List.map (this.mode this) m);
+
+    mode = (fun this { txt; loc } ->
+      let txt =
+        match txt with
+        | (Pmode _ | Pmode_var _) as mode -> mode
+        | Pmode_bounded { pmode_upper; pmode_lower } ->
+          Pmode_bounded
+            { pmode_upper = this.mode_bound this pmode_upper;
+              pmode_lower = this.mode_bound this pmode_lower
+            }
+      in
+      { txt; loc = this.location this loc });
+
+    mode_bound = (fun this elems ->
+      List.map
+        (function
+          | Pbound_var v -> Pbound_var (this.mode_bound_var this v)
+          | Pbound_const cs -> Pbound_const (List.map (map_loc this) cs))
+        elems);
+
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      { pbound_morph = Option.map (map_loc this) pbound_morph;
+        pbound_var = map_loc this pbound_var;
+        pbound_mod = List.map (map_loc this) pbound_mod
+      });
 
     modalities = (fun this m ->
       List.map (map_loc this) m);
@@ -1131,7 +1180,10 @@ module PpxContext = struct
   let make_open_arg (arg : Clflags.open_arg) =
     match arg with
     | Open s -> Exp.construct (lid "Open") (Some (make_string s))
-    | Open_cmi s -> Exp.construct (lid "Open_cmi") (Some (make_string s))
+    | Open_cmi { path; cmx_guaranteed = false } ->
+        Exp.construct (lid "Open_cmi") (Some (make_string path))
+    | Open_cmi { path; cmx_guaranteed = true } ->
+        Exp.construct (lid "Open_cmi_x") (Some (make_string path))
 
   let get_cookies () =
     lid "cookies",
@@ -1148,9 +1200,9 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
-    let visible_load_dir_pairs dirs =
+    let load_dir_pairs dirs =
       List.map
-        (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
+        (fun (e : Clflags.include_dir) -> (e.path, e.cmx_guaranteed))
         dirs
     in
     let fields =
@@ -1159,14 +1211,16 @@ module PpxContext = struct
         lid "include_dirs",
           make_list
             (make_pair make_string make_bool)
-            (visible_load_dir_pairs !Clflags.include_dirs);
+            (load_dir_pairs !Clflags.include_dirs);
         lid "hidden_include_dirs",
-          make_list make_string (!Clflags.hidden_include_dirs);
+          make_list
+            (make_pair make_string make_bool)
+            (load_dir_pairs !Clflags.hidden_include_dirs);
         lid "load_path",
           make_pair
             (make_list (make_pair make_string make_bool))
-            (make_list make_string)
-            (visible_load_dir_pairs visible, hidden);
+            (make_list (make_pair make_string make_bool))
+            (load_dir_pairs visible, load_dir_pairs hidden);
         lid "open_args",
           make_list make_open_arg !Clflags.open_args;
         lid "for_package",  make_option make_string !Clflags.for_package;
@@ -1241,20 +1295,27 @@ module PpxContext = struct
         | { pexp_desc =
               Pexp_construct
                 ({ txt = Longident.Lident "Open_cmi" }, Some exp) } ->
-            Clflags.Open_cmi (get_string exp)
+            Clflags.Open_cmi { path = get_string exp; cmx_guaranteed = false }
+        | { pexp_desc =
+              Pexp_construct
+                ({ txt = Longident.Lident "Open_cmi_x" }, Some exp) } ->
+            Clflags.Open_cmi { path = get_string exp; cmx_guaranteed = true }
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] open_arg syntax" name
+      in
+      let get_load_dirs payload =
+        List.map
+          (fun (path, cmx_guaranteed) : Clflags.include_dir ->
+             { path; cmx_guaranteed })
+          (get_list (get_pair get_string get_bool) payload)
       in
       match name with
       | "tool_name" ->
           tool_name_ref := get_string payload
       | "include_dirs" ->
-          Clflags.include_dirs :=
-            List.map
-              (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed })
-              (get_list (get_pair get_string get_bool) payload)
+          Clflags.include_dirs := get_load_dirs payload
       | "hidden_include_dirs" ->
-          Clflags.hidden_include_dirs := get_list get_string payload
+          Clflags.hidden_include_dirs := get_load_dirs payload
       | "load_path" ->
           (* Duplicates Compmisc.auto_include, since we can't reference Compmisc
              from this module. *)
@@ -1265,18 +1326,7 @@ module PpxContext = struct
               let alert = Location.auto_include_alert in
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in *)
-          let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
-                 { path; cmx_guaranteed })
-              visible
-          in
+          let visible, hidden = get_pair get_load_dirs get_load_dirs payload in
           Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
       | "open_args" ->
           Clflags.open_args := get_list get_open_arg payload

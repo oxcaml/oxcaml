@@ -33,11 +33,21 @@ module type S = sig
 
   val name : t -> string
 
+  val stamp : t -> int
+
   val canonical_name : t -> string
 
   val payload : t -> payload
 
   val rename : t -> t
+
+  type stamp_state
+
+  val export_stamp_state : unit -> stamp_state
+
+  val restore_stamp_state : stamp_state -> unit
+
+  val merge_stamp_state : stamp_state -> stamp_state -> stamp_state
 end
 
 module Make (P : sig
@@ -109,6 +119,20 @@ end) : S with type payload := P.payload = struct
     incr next_stamp;
     stamp
 
+  type stamp_state = int
+
+  let export_stamp_state () = !next_stamp
+
+  let restore_stamp_state state =
+    if !next_stamp = 0
+    then next_stamp := state
+    else
+      Misc.fatal_errorf
+        "Restoring slot stamp state would overwrite modified value %d"
+        !next_stamp
+
+  let merge_stamp_state stamp1 stamp2 = Int.max stamp1 stamp2
+
   let create compilation_unit ~name payload =
     { compilation_unit; name; name_stamp = get_next_stamp (); payload }
 
@@ -122,6 +146,8 @@ end) : S with type payload := P.payload = struct
   let to_string t = t.name ^ "_" ^ string_of_int t.name_stamp
 
   let name t = t.name
+
+  let stamp t = t.name_stamp
 
   let canonical_name t = if !Clflags.canonical_ids then name t else to_string t
 

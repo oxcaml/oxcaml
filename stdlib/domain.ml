@@ -380,22 +380,36 @@ module TLS0 = struct
   let[@poll error] store idx obj =
     Array.unsafe_set (get_tls_state ()) idx obj
 
-  let[@cold] grow_and_set idx x =
+  (* [@poll error] so that interrupts cannot run between check and update. *)
+  let[@poll error] compare_and_set_tls_state old_st new_st =
+    if get_tls_state () == old_st
+    then (set_tls_state new_st; true)
+    else false
+
+  let[@cold] rec grow_and_set idx x =
     let old_st = get_tls_state () in
     let new_st = Obj_slot.grow_array old_st idx (Array.length old_st) in
-    set_tls_state new_st;
-    store idx (Obj_slot.some x)
-
-  (* Unlike with DLS we do not prevent inlining to prevent additional poll
-     points as we assume each thread will have its own TLS and we consider TLS
-     use in signal handlers as unsupported. *)
-  let[@inline] set (type a) ((idx, _) : a key) (x : a) =
-    if idx < Array.length (get_tls_state ())
+    (* Like in [DLS], growing the array may be interrupted and another
+       access may grow the state. We must retry in this case. *)
+    if compare_and_set_tls_state old_st new_st
     then store idx (Obj_slot.some x)
     else grow_and_set idx x
 
   let[@inline never] already_accessing () =
     failwith "Domain.Safe.TLS: key is already being accessed"
+
+  (* Unlike with DLS we do not prevent inlining to prevent additional poll
+     points as we assume each thread will have its own TLS and we consider TLS
+     use in signal handlers as unsupported. *)
+  let[@inline] set (type a) ((idx, _) : a key) (x : a) =
+    let st = get_tls_state () in
+    if idx < Array.length st
+    then begin
+      if Obj_slot.is_borrowed (Array.unsafe_get st idx)
+      then already_accessing ()
+      else store idx (Obj_slot.some x)
+    end
+    else grow_and_set idx x
 
   let[@cold] init (type a) ((idx, { portable = init }) as key : a key) : a =
     let st = get_tls_state () in
@@ -416,7 +430,7 @@ module TLS0 = struct
     else init key
 
   (* While [f] runs, the slot holds [Obj_slot.borrowed] instead of the value, so
-     [get] (hence [access] and splitting) raises on that key. *)
+     [get] and [set] (hence [access] and splitting) raise on that key. *)
   let access ((idx, _) as k) f = exclave_
     let v = get k in
     store idx (Obj_slot.borrowed ());

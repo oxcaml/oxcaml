@@ -697,9 +697,9 @@ module Make (X : sig
      all types of accesses (i.e. array lenghts, boxed number contents, ...) to
      better reflect the actual traversal. *)
 
-  val block_slot : ?tag:Tag.t -> t -> TI.t -> TE.t -> TG.t -> t
+  val block_slot : ?tag:Tag.t -> t -> TI.t -> TE.t -> TG.t -> t Or_unknown.t
 
-  val array_slot : t -> TI.t -> TE.t -> TG.t -> t
+  val array_slot : t -> TI.t -> TE.t -> TG.t -> t Or_unknown.t
 
   type set_of_closures
 
@@ -707,11 +707,18 @@ module Make (X : sig
     t -> Function_slot.t -> TE.t -> TG.closures_entry -> set_of_closures
 
   val rec_info :
-    TE.t -> set_of_closures -> Function_slot.t -> Code_id.t -> TG.t -> t
+    TE.t ->
+    set_of_closures ->
+    Function_slot.t ->
+    Code_id.t ->
+    TG.t ->
+    t Or_unknown.t
 
-  val value_slot : set_of_closures -> Value_slot.t -> TE.t -> TG.t -> t
+  val value_slot :
+    set_of_closures -> Value_slot.t -> TE.t -> TG.t -> t Or_unknown.t
 
-  val function_slot : set_of_closures -> Function_slot.t -> TE.t -> TG.t -> t
+  val function_slot :
+    set_of_closures -> Function_slot.t -> TE.t -> TG.t -> t Or_unknown.t
 end) =
 struct
   open Or_unknown.Let_syntax
@@ -911,6 +918,11 @@ struct
         Format.eprintf "@[<v>Context is rewriting type:@;<1 2>@[%a@]@]@."
           TG.print ty;
         Printexc.raise_with_backtrace e bt)
+
+  and rewrite_arbitrary_type_or_unknown env acc (abs : _ Or_unknown.t) ty =
+    match abs with
+    | Or_unknown.Unknown -> More_type_creators.unknown_like ty, acc
+    | Or_unknown.Known abs -> rewrite_arbitrary_type env acc abs ty
 
   and rewrite_arbitrary_type env acc abs ty =
     match TG.get_alias_opt ty with
@@ -1242,7 +1254,7 @@ struct
             X.function_slot metadata function_slot env function_slot_ty
           in
           let function_slot_ty', acc =
-            rewrite_arbitrary_type env acc function_slot_metadata
+            rewrite_arbitrary_type_or_unknown env acc function_slot_metadata
               function_slot_ty
           in
           ( Function_slot.Map.add function_slot function_slot_ty'
@@ -1263,7 +1275,8 @@ struct
             X.value_slot metadata value_slot env value_slot_ty
           in
           let value_slot_ty', acc =
-            rewrite_arbitrary_type env acc value_slot_metadata value_slot_ty
+            rewrite_arbitrary_type_or_unknown env acc value_slot_metadata
+              value_slot_ty
           in
           ( Value_slot.Map.add value_slot value_slot_ty'
               value_slot_components_by_index,
@@ -1279,7 +1292,7 @@ struct
         (fun (acc, index) field_ty ->
           let field_metadata = slot metadata index env field_ty in
           let field_ty', acc =
-            rewrite_arbitrary_type env acc field_metadata field_ty
+            rewrite_arbitrary_type_or_unknown env acc field_metadata field_ty
           in
           (acc, TI.(add index (one (TE.machine_width env)))), field_ty')
         (acc, TI.of_int (TE.machine_width env) 0)
@@ -1293,7 +1306,7 @@ struct
       X.rec_info env metadata function_slot code_id rec_info
     in
     let rec_info, acc =
-      rewrite_arbitrary_type env acc rec_info_metadata rec_info
+      rewrite_arbitrary_type_or_unknown env acc rec_info_metadata rec_info
     in
     TG.Function_type.create code_id ~rec_info, acc
 

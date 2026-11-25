@@ -21,6 +21,9 @@ type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
   | Int
+  | Static_block
+  | Code_pointer
+  | Out_of_heap_data_pointer
   | Float
   | Vec128
   | Vec256
@@ -32,11 +35,15 @@ type machtype_component = Cmx_format.machtype_component =
 (*=- [Val] denotes a valid OCaml value: either a pointer to the beginning
      of a heap block, an infix pointer if it is preceded by the correct
      infix header, or a 2n+1 encoded integer.
-   - [Int] is for integers (not necessarily 2n+1 encoded) and for
-     pointers outside the heap.
+   - [Int] is for integers (not necessarily 2n+1 encoded).
+   - [Static_block] is for pointers to well-formed OCaml values that, if
+     registered in the GC roots table, may be scanned by the GC.
    - [Addr] denotes pointers that are neither [Val] nor [Int], i.e.
      pointers into the heap that point in the middle of a heap block.
      Such derived pointers are produced by e.g. array indexing.
+   - [Code_pointer] is for off-heap pointers to code.
+   - [Out_of_heap_data_pointer] is for pointers to data that cannot necessarily
+     be scanned by the GC (and will not be in the GC roots table).
    - [Float] is for unboxed floating-point numbers.
 
 The purpose of these types is twofold.  First, they guide register
@@ -46,7 +53,8 @@ tracked by the GC:
    - Variables of type [Val] are GC roots.  If they are pointers, the
      GC will not deallocate the addressed heap block, and will update
      the local variable if the heap block moves.
-   - Variables of type [Int] and [Float] are ignored by the GC.
+   - Variables of type [Int], [Static_block], [Code_pointer],
+     [Out_of_heap_data_pointer], and [Float] are ignored by the GC.
      The GC does not change their values.
    - Variables of type [Addr] must never be live across an allocation
      point or function call.  They cannot be given as roots to the GC
@@ -66,6 +74,12 @@ val typ_val : machtype
 val typ_addr : machtype
 
 val typ_int : machtype
+
+val typ_static_block : machtype
+
+val typ_code_pointer : machtype
+
+val typ_out_of_heap_data_pointer : machtype
 
 val typ_float : machtype
 
@@ -102,6 +116,15 @@ type exttype =
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
+  | XDummy_int  (**r uses up an int register, passes nothing *)
+  | XDummy_float  (**r uses up a float register, passes nothing *)
+  | XFat_pointer
+      (**r A fat pointer, passed to C as a single raw pointer. Occupies one
+         argument slot of the C calling convention but corresponds to two Cmm
+         arguments: a [Val] base and an [Int] byte offset. The addition
+         [base + offset] is performed when the call itself is emitted. *)
+
+val is_dummy_exttype : exttype -> bool
 
 val machtype_of_exttype : exttype -> machtype
 
@@ -212,9 +235,10 @@ val equal_is_global : is_global -> is_global -> bool
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)
-type symbol =
+type symbol = private
   { sym_name : string;
-    sym_global : is_global
+    sym_global : is_global;
+    sym_type : machtype
   }
 
 val equal_symbol : symbol -> symbol -> bool
@@ -332,7 +356,10 @@ type memory_chunk =
   | Sixteen_signed
   | Thirtytwo_unsigned
   | Thirtytwo_signed
-  | Word_int (* integer or pointer outside heap *)
+  | Word_static_block (* pointer to a statically-allocated OCaml block *)
+  | Word_code_pointer (* code pointer outside heap *)
+  | Word_out_of_heap_data_pointer (* data pointer outside heap *)
+  | Word_int (* integer *)
   | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
@@ -442,9 +469,10 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : callee list option
+        callees : callee list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
+        returns : bool (* [true] is the conservative default. *)
       }
   | Cextcall of
       { func : string;
@@ -479,6 +507,7 @@ type operation =
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr
@@ -518,7 +547,7 @@ type operation =
       { name : string;
         enabled_at_init : bool option
       }
-  | Copaque (* Sys.opaque_identity *)
+  | Copaque of machtype (* Sys.opaque_identity *)
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -526,6 +555,7 @@ type operation =
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
 
@@ -554,7 +584,9 @@ type vec512_bits =
     word7 : int64
   }
 
-val global_symbol : string -> symbol
+val global_symbol : ty:machtype -> string -> symbol
+
+val local_symbol : ty:machtype -> string -> symbol
 
 type ccatch_flag =
   | Normal

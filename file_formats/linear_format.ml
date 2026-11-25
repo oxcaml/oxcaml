@@ -45,6 +45,9 @@ let save filename linear_unit_info =
     output_value ch linear_unit_info;
     (* Saved because Linearize and Emit depend on Cmm.label. *)
     output_value ch (Cmm.cur_label ());
+    (* Saved because the IR may already contain labels inserted for DWARF by a
+       previous emission, which new ones must not clash with. *)
+    output_value ch (Label.cur_dwarf_label ());
     (* Compute digest of the contents and append it to the file. *)
     flush ch;
     let crc = Digest.file filename in
@@ -68,6 +71,8 @@ let restore filename =
            let last_label = (input_value ic : Cmm.label) in
            Cmm.reset ();
            Cmm.set_label last_label;
+           let last_dwarf_label = (input_value ic : Label.t) in
+           Label.set_dwarf_label last_dwarf_label;
            let crc = Digest.input ic in
            linear_unit_info, crc
          with End_of_file | Failure _ -> raise (Error (Corrupted filename))
