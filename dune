@@ -788,6 +788,15 @@
   dwarf_high
   binary_emitter_intf))
 
+(rule
+ (targets experimental_feature_registry.ml experimental_feature_registry.mli)
+ (deps
+  (:registrations (glob_files_rec SCRUTINY)))
+ (action
+  (run %{exe:tools/gen_experimental_features.exe}
+   experimental_feature_registry.ml experimental_feature_registry.mli
+   %{registrations})))
+
 (library
  (name oxcaml_common)
  (wrapped false)
@@ -813,7 +822,7 @@
   asm_targets
   arm64_ast
   arm64_binary_emitter)
- (modules oxcaml_args oxcaml_flags))
+ (modules oxcaml_args oxcaml_flags experimental_feature_registry))
 
 (executable
  (name oxcaml_main)

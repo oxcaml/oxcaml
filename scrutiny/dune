@@ -1,0 +1,3 @@
+(cram
+ (applies_to generate_registry)
+ (deps ../tools/gen_experimental_features.exe))
