@@ -39,7 +39,7 @@ let code inline(never) loopify(never) size(65) newer_version_of(f_0)
                where k3 =
                  let stdout =
                    %project_value_slot.[print_string].[stdout]
-                     ($Stdlib.camlStdlib__print_string_43_94)
+                     ($Stdlib.camlStdlib__print_string_43_93)
                  in
                  (apply ccall inlining_state(depth(20))
                     ($`*extern*`.caml_ml_output
@@ -72,7 +72,7 @@ let code inline(never) loopify(never) size(65) newer_version_of(f_0)
                    where k2 =
                      let stdout =
                        %project_value_slot.[print_string].[stdout]
-                         ($Stdlib.camlStdlib__print_string_43_94)
+                         ($Stdlib.camlStdlib__print_string_43_93)
                      in
                      apply ccall inlining_state(depth(20))
                        ($`*extern*`.caml_ml_output
@@ -90,7 +90,7 @@ apply direct(f_0_1 &toplevel)
   where k1 =
     let stdout =
       %project_value_slot.[print_string].[stdout]
-        ($Stdlib.camlStdlib__print_string_43_94)
+        ($Stdlib.camlStdlib__print_string_43_93)
     in
     (apply ccall inlining_state(depth(20))
        ($`*extern*`.caml_ml_output : val * val * val * val -> val)

@@ -76,12 +76,12 @@ let $camlVariant_unboxing__is_empty_4 =
   closure is_empty_2_2 @is_empty &toplevel
   with { Tree = $camlVariant_unboxing__Pmakeblock_2 }
 in
-let $camlVariant_unboxing__Pmakeblock_6 =
+let $camlVariant_unboxing__Pmakeblock_5 =
   Block 0 ($camlVariant_unboxing__is_empty_4)
 in
 let $camlVariant_unboxing =
   Block 0 ($camlVariant_unboxing__Pmakeblock_2,
            $camlVariant_unboxing__Tree_operations_3,
-           $camlVariant_unboxing__Pmakeblock_6)
+           $camlVariant_unboxing__Pmakeblock_5)
 in
 cont done ($camlVariant_unboxing)
