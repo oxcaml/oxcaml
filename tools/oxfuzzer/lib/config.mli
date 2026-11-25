@@ -68,6 +68,8 @@ val max_handle_count : int
 
 val max_conditional_expression_count : int
 
+val max_stack_function_count : int
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -169,7 +171,8 @@ module Swarm : sig
       recursive_functions : bool;
       wide_functions : bool;
       reraises : bool;
-      effects : bool
+      effects : bool;
+      stack_functions : bool
     }
 
   val create : Random.State.t -> t

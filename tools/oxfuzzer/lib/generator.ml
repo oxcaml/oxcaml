@@ -35,7 +35,8 @@ module State = struct
       mutable recursive_calls_remaining : int;
       mutable recursive_callees : Name.t list;
       mutable handles_remaining : int;
-      mutable conditional_expressions_remaining : int
+      mutable conditional_expressions_remaining : int;
+      mutable stack_functions_remaining : int
     }
 
   let create random_state =
@@ -58,7 +59,8 @@ module State = struct
       recursive_callees = [];
       handles_remaining = Config.max_handle_count;
       conditional_expressions_remaining =
-        Config.max_conditional_expression_count
+        Config.max_conditional_expression_count;
+      stack_functions_remaining = Config.max_stack_function_count
     }
 
   let fresh t = Fresh.next t.names
@@ -113,7 +115,9 @@ module Env = struct
       loop_variables : Loop_variable.t list;
       catchable_exceptions : Exn.t list;
       recursion : Recursion.t option;
-      handled_effects : Eff.t list
+      handled_effects : Eff.t list;
+      stack_functions : Local_function.t list
+          (** Local, so they can only be applied. *)
     }
 
   let empty =
@@ -121,7 +125,8 @@ module Env = struct
       loop_variables = [];
       catchable_exceptions = [];
       recursion = None;
-      handled_effects = []
+      handled_effects = [];
+      stack_functions = []
     }
 
   let can_raise t exn = List.exists (Exn.equal exn) t.catchable_exceptions
@@ -145,7 +150,8 @@ module Env = struct
   (* Closures cannot capture mutable variables, which include loop variables.
      They can be called after the handlers around them have been left, so they
      must not raise, nor call the recursive functions around them, which could
-     then be called without a bound, nor perform effects. *)
+     then be called without a bound, nor perform effects. Heap closures cannot
+     capture local values either. *)
   let for_closure t =
     let is_loop_variable (binding : Binding.t) =
       List.exists
@@ -983,6 +989,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_recursive_call st env (Ty.Number nty);
          1, gen_let_rec st env (Ty.Number nty);
          1, gen_perform st env (Ty.Number nty);
+         1, gen_let_stack_function st env (Ty.Number nty);
          1, gen_handle st env (Ty.Number nty);
          1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
@@ -1242,6 +1249,18 @@ and gen_closure_call (st : State.t) (env : Env.t) result_ty =
           | _ -> None)
         st.top_level_functions
   in
+  let stack_functions =
+    List.filter_map
+      (fun ({ name; params; result } : Local_function.t) ->
+        if can_convert st result result_ty
+        then
+          Some
+            ( params,
+              result,
+              fun args -> Expr.Apply_stack_function { name; args } )
+        else None)
+      env.stack_functions
+  in
   let functions =
     List.map
       (fun (params, result, make) ->
@@ -1249,7 +1268,7 @@ and gen_closure_call (st : State.t) (env : Env.t) result_ty =
           result,
           fun args -> Expr.Apply { func = Expr.Read (make ()); args } ))
       functions
-    @ over_applications
+    @ over_applications @ stack_functions
   in
   Gen.when_
     (st.closure_calls_remaining > 0 && not (List.is_empty functions))
@@ -1329,13 +1348,13 @@ and gen_partial_application (st : State.t) (env : Env.t) params result =
   Gen.only_if st.swarm.partial_applications
     (Gen.weighted st.random_state [2, existing; 1, new_function])
 
-and gen_lambda (st : State.t) (env : Env.t) params result_ty =
+and gen_lambda ?(curried = true) (st : State.t) (env : Env.t) params result_ty =
   (* A curried function takes the first parameters and returns a function taking
      the rest. *)
   let params, result_ty =
     let count = List.length params in
     if
-      st.swarm.partial_applications && count > 1
+      curried && st.swarm.partial_applications && count > 1
       && with_probability st ~probability:Config.curried_lambda_probability
     then
       let count = random_int_in_range st ~min:1 ~max:(count - 1) in
@@ -1507,6 +1526,31 @@ and gen_let_rec_call (st : State.t) (env : Env.t) ty (first : Local_function.t)
           Expr.Apply
             { func = Expr.Opaque (Expr.Apply { func; args = [fuel] }); args }
         else Expr.Apply { func; args = fuel :: args })
+
+(* An anonymous function allocated on the stack, then an expression that applies
+   it, which is all it can do with a local value. *)
+and gen_let_stack_function (st : State.t) (env : Env.t) ty =
+  Gen.when_
+    (st.swarm.stack_functions && st.stack_functions_remaining > 0)
+    (fun () ->
+      st.stack_functions_remaining <- st.stack_functions_remaining - 1;
+      let name = State.fresh st in
+      let params, result = Ty.uncurry (gen_arrow_type st) in
+      (* The result of a partial application of a local function is local too,
+         so it cannot be applied to more arguments at once. *)
+      let lambda = gen_lambda ~curried:false st env params result in
+      let env =
+        { env with
+          stack_functions =
+            { Local_function.name; params; result } :: env.stack_functions
+        }
+      in
+      let body =
+        match gen_closure_call st env ty with
+        | Some generate when Random.State.bool st.random_state -> generate ()
+        | Some _ | None -> gen_value st env ty
+      in
+      Expr.Let_stack_function { name; lambda; body })
 
 and gen_perform (st : State.t) (env : Env.t) ty =
   let effects =
