@@ -76,8 +76,6 @@ let scoped_indirect_call_result = NN.create ~name:"scoped_indirect_call_result"
 let unscoped_indirect_call_result =
   N.create ~name:"unscoped_indirect_call_result"
 
-let flag = Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape"
-
 let make ~enabled =
   { enabled;
     allocated_in = NN.empty;
@@ -97,7 +95,11 @@ let make ~enabled =
   }
 
 let create () =
-  make ~enabled:(flag () && Flambda_features.stack_allocation_enabled ())
+  make
+    ~enabled:
+      (Oxcaml_flags.Experimental.is_enabled
+         Experimental_feature_registry.Feature_reaper_escape
+      && Flambda_features.stack_allocation_enabled ())
 
 (* Nothing is ever recorded in a disabled graph (see the [add_*] functions and
    [set_solved]), so this value is never mutated. *)

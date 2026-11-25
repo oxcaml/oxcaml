@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=escape-stats-verbose";
+   flags += "-flambda2-reaper -experimental-reaper-escape -reaper-debug-flags=escape-stats-verbose";
    setup-ocamlopt.opt-build-env;
    ocamlopt.opt;
    check-ocamlopt.opt-output;

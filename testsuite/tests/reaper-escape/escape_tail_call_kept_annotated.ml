@@ -1,7 +1,8 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
+   unset OCAMLPARAM;
+   flags += "-flambda2-reaper -no-experimental-reaper-escape -reaper-debug-flags=nostamps";
    script = "sh ${test_source_directory}/compare-with-annotated.sh escape_tail_call_kept";
    setup-ocamlopt.byte-build-env;
    ocamlopt.byte with dump-reaper;

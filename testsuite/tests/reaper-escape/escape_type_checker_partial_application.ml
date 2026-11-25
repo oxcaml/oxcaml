@@ -1,14 +1,16 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
+   unset OCAMLPARAM;
+   flags += "-flambda2-reaper -no-experimental-reaper-escape -reaper-debug-flags=nostamps";
    { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Control: the same as [escape_partial_application_two_args] but with user
    annotations and without the escape analysis, to see what the type checker
    produces: [papp] returns at mode local and its application of [f] has a
-   local return mode. *)
+   local return mode. OCAMLPARAM is cleared so CI's testing preset cannot
+   re-enable the analysis after the command-line flags. *)
 let[@inline never] sum7 (t : int * int * int * int * int * int * int) =
   let a, b, c, d, e, f, g = t in
   a + b + c + d + e + f + g

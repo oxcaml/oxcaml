@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=escape-db,nostamps";
+   flags += "-flambda2-reaper -experimental-reaper-escape -reaper-debug-flags=escape-db,nostamps";
    setup-ocamlopt.opt-build-env;
    ocamlopt.opt;
    script = "sh ${test_source_directory}/check-escaping-flow.sh ${compiler_output2}";

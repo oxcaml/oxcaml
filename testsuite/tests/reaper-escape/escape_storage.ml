@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -X reaper-escape=1 -extension immutable_arrays";
+   flags += "-flambda2-reaper -experimental-reaper-escape -extension immutable_arrays";
    native;
  *)
 

@@ -6,7 +6,9 @@ set -eu
 #
 # TEST_annotated.ml is TEST.ml with the [local_] and [exclave_] annotations
 # that the escape analysis is expected to infer, compiled without the escape
-# analysis. Its reaper dump must be the reference dump of TEST, which is
+# analysis. The annotated tests clear OCAMLPARAM so CI's testing preset
+# cannot override their -no-experimental-reaper-escape flag.
+# Its reaper dump must be the reference dump of TEST, which is
 # compiled with the analysis, up to the name of the compilation unit; or, when
 # the two cannot be reconciled, be the result of applying the patch
 # TEST_annotated.diff (made by diff(1) from the dump of TEST to the one of

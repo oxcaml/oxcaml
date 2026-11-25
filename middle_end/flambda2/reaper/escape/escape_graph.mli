@@ -46,8 +46,8 @@
 type t
 
 (** A graph for one run of the reaper on a compilation unit. The analysis is
-    enabled for it if [-X reaper-escape=1] was given and stack allocation is
-    available. *)
+    enabled if the [reaper-escape] experiment is selected through
+    [Oxcaml_flags.Experimental] and stack allocation is available. *)
 val create : unit -> t
 
 (** A graph for which the analysis is disabled. *)

@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    stack-allocation;
-   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   flags += "-flambda2-reaper -experimental-reaper-escape -reaper-debug-flags=nostamps";
    { native with dump-reaper; check-fexpr-dump; }
  *)
 

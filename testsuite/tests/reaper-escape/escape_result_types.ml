@@ -3,7 +3,7 @@
  stack-allocation;
  readonly_files = "escape_result_types_lib.ml";
  setup-ocamlopt.byte-build-env;
- flags = "-O3 -flambda2-reaper -X reaper-escape=1 \
+ flags = "-O3 -flambda2-reaper -experimental-reaper-escape \
           -flambda2-result-types-all-functions";
  module = "escape_result_types_lib.ml";
  ocamlopt.byte;
