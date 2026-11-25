@@ -554,6 +554,9 @@ module Directive : sig
   (** Replace the [Asm_label.t] inside a [New_label (Label _, _)] directive
       using the given function. Other directives are returned unchanged. *)
   val map_new_label : (Asm_label.t -> Asm_label.t) -> t -> t
+
+  (** The label defined by a [New_label (Label _, _)] directive. *)
+  val defined_label : t -> Asm_label.t option
 end
 
 (** To be called by the emitter at the very start of code generation.

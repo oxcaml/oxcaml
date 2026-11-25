@@ -738,6 +738,18 @@ module Directive = struct
   let map_new_label f = function[@warning "-4"]
     | New_label (Label l, c) -> New_label (Label (f l), c)
     | d -> d
+
+  let defined_label = function
+    | New_label (Label label, _) -> Some label
+    | New_label (Symbol _, _)
+    | Align _ | Bytes _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _
+    | Cfi_endproc | Cfi_offset _ | Cfi_rel_offset _ | Cfi_startproc
+    | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
+    | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
+    | Indirect_symbol _ | Loc _ | New_line | Private_extern _ | Section _
+    | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _
+    | Weak _ | External _ | Reloc _ | Delta_uleb128 _ ->
+      None
 end
 
 (* A higher-level version of [Constant.t] which contains some more abstractions

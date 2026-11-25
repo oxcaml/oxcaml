@@ -245,6 +245,13 @@ module Symbol : sig
   val print_target : Format.formatter -> target -> unit
 
   val print : Format.formatter -> _ t -> unit
+
+  (** Like [print], but names the target [target_name] and uses the relocation
+      syntax of the GNU assembler whatever the target system. *)
+  val print_gas_syntax : target_name:string -> Format.formatter -> _ t -> unit
+
+  (** A way of printing symbol references, for [Instruction.print_with]. *)
+  type printer = { print : 'w. Format.formatter -> 'w t -> unit }
 end
 
 module Float_cond : sig
@@ -1602,6 +1609,9 @@ module Instruction : sig
 
   val print : Format.formatter -> t -> unit
 
+  (** Like [print], but prints symbol references with [symbol]. *)
+  val print_with : symbol:Symbol.printer -> Format.formatter -> t -> unit
+
   (** If this instruction is a conditional branch (B.cond, CBZ, CBNZ, TBZ,
       TBNZ), returns [Some n] where [n] is the maximum displacement in
       instruction-sized units. Returns [None] for all other instructions
@@ -1859,6 +1869,10 @@ module DSL : sig
 
     (** Clear the binary emission callback. *)
     val clear_emit_instruction : unit -> unit
+
+    (** Set a callback that receives every emitted instruction, independently of
+        [set_emit_instruction]. *)
+    val set_observe_instruction : (Instruction.t -> unit) option -> unit
 
     (** Passes the instruction to the function provided to [set_emit_string].
         Also passes to [set_emit_instruction] callback if set. (Can't directly
