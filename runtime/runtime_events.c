@@ -27,6 +27,11 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdatomic.h>
+
+/* Upstream defines this in caml/config.h (ocaml/ocaml#13656). */
+#ifndef CAML_PRIuNAT
+#define CAML_PRIuNAT ARCH_INTNAT_PRINTF_FORMAT "u"
+#endif
 #include <string.h>
 #include <sys/stat.h>
 
