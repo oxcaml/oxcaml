@@ -1211,11 +1211,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
-  | Lcode _ ->
-    (* [Lcode] is only allowed at the top of the unit: see
-       [lambda_to_flambda]. *)
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
+  | Lcode _ ->
+    Misc.fatal_error "Lambda_to_flambda.cps: [Lcode] below the top of the unit"
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1771,9 +1770,10 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _
+        | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+          Lambda.fatal_error_invalid_constructor action
         | Lcode _ ->
-          Lambda.fatal_error_invalid_constructor action)
+          Misc.fatal_error "Lambda_to_flambda.cps_switch: [Lcode] in a switch")
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee
