@@ -66,6 +66,8 @@ val max_effect_count : int
 
 val max_handle_count : int
 
+val max_conditional_expression_count : int
+
 val max_probability : int
 
 (* Probabilities out of [max_probability]. *)
@@ -126,6 +128,8 @@ val tail_call_probability : int
 val existing_value_for_wide_argument_probability : int
 
 val reraise_probability : int
+
+val conditional_expression_probability : int
 
 type assertion_mode =
   | Disabled
