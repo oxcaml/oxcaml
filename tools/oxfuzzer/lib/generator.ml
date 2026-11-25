@@ -1001,11 +1001,7 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
     || not (State.can_create_function st ~max:Config.max_function_count)
   then Gen.unavailable
   else
-    let gen_arguments params =
-      List.map
-        (fun (binding : Binding.t) -> gen_value st caller_env binding.ty)
-        params
-    in
+    let gen_arguments params = gen_arguments st caller_env params in
     let functions =
       List.filter
         (fun (function_ : Function.t) ->
@@ -1025,10 +1021,18 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
     in
     let new_function =
       Gen.create (fun () ->
+          (* Wide functions take more arguments than fit in registers. *)
+          let min, max =
+            if
+              st.swarm.wide_functions
+              && with_probability st
+                   ~probability:Config.wide_function_probability
+            then
+              Config.wide_fun_min_param_count, Config.wide_fun_max_param_count
+            else Config.fun_min_param_count, Config.fun_max_param_count
+          in
           let params =
-            List.init
-              (random_int_in_range st ~min:Config.fun_min_param_count
-                 ~max:Config.fun_max_param_count) (fun _ ->
+            List.init (random_int_in_range st ~min ~max) (fun _ ->
                 gen_param st (gen_type st))
           in
           let raises =
@@ -1075,6 +1079,37 @@ and gen_string (st : State.t) env =
          1, gen_try_expr st env Ty.String;
          1, gen_match st env Ty.String ])
 
+(* Arguments of wide functions are mostly variables, to keep programs small. *)
+and gen_arguments (st : State.t) env params =
+  let wide = List.compare_length_with params Config.fun_max_param_count > 0 in
+  List.map
+    (fun (binding : Binding.t) ->
+      match gen_existing st env binding.ty with
+      | Some generate
+        when wide
+             && with_probability st
+                  ~probability:
+                    Config.existing_value_for_wide_argument_probability ->
+        generate ()
+      | Some _ | None -> gen_value st env binding.ty)
+    params
+
+and gen_tail_call (st : State.t) (env : Env.t) return_ty =
+  let functions =
+    List.filter
+      (fun (function_ : Function.t) ->
+        Ty.equal function_.return_ty return_ty
+        && List.for_all (Env.can_raise env) function_.raises)
+      st.top_level_functions
+  in
+  Gen.when_
+    (st.swarm.function_calls && not (List.is_empty functions))
+    (fun () ->
+      let function_ = random_element st functions in
+      let args = gen_arguments st env function_.params in
+      bind_operands st args ~f:(fun args ->
+          Expr.Call_toplevel { fun_name = function_.name; args }))
+
 and gen_param (st : State.t) ty =
   { Binding.name = State.fresh st;
     ty;
@@ -1097,9 +1132,15 @@ and gen_function (st : State.t) ~params ~return_ty ~raises =
      variables as possible. Otherwise, most of the function might become dead
      code, which is a waste of CPU time for fuzzing. *)
   let result =
-    match gen_existing st callee_env return_ty with
-    | Some generate -> maybe_assert st ~f:generate
-    | None -> gen_value st callee_env return_ty
+    match
+      ( gen_tail_call st callee_env return_ty,
+        gen_existing st callee_env return_ty )
+    with
+    | Some generate, _
+      when with_probability st ~probability:Config.tail_call_probability ->
+      generate ()
+    | _, Some generate -> maybe_assert st ~f:generate
+    | _, None -> gen_value st callee_env return_ty
   in
   let function_ =
     { Function.name; params; inline; body; return_ty; result; raises }
