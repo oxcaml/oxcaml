@@ -37,7 +37,44 @@ one_or_two_element_list:
   movq  %rdi, 8(%rax)
   addq  $8, %rsp
   ret
-|}, Arm64{||}]
+|}, Arm64{|
+one_or_two_element_list:
+  sub   sp, sp, #16
+  str   lr, [sp, #8]
+.L0:
+  ldr   x16, [x28, #0]
+  sub   x27, x27, #24
+  subs  xzr, x27, x16
+  b.cc  <hidden GC jump pad>
+.L1:
+  add   x2, x27, #8
+  orr   x3, xzr, #2048
+  str   x3, [x2, #-8]
+  str   x1, [x2, #0]
+  orr   x3, xzr, #1
+  str   x3, [x2, #8]
+  subs  xzr, x0, #1
+  b.ne  .L2
+  orr   x0, xzr, x2
+  ldr   lr, [sp, #8]
+  add   sp, sp, #16
+  ret
+.L2:
+  ldr   x16, [x28, #0]
+  sub   x27, x27, #24
+  subs  xzr, x27, x16
+  b.cc  <hidden GC jump pad>
+.L3:
+  add   x0, x27, #8
+  orr   x3, xzr, #2048
+  str   x3, [x0, #-8]
+  str   x1, [x0, #0]
+  str   x2, [x0, #8]
+  ldr   lr, [sp, #8]
+  add   sp, sp, #16
+  ret
+.L4:
+|}]
 
 
 (* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/1783 *)
@@ -87,4 +124,48 @@ spill_slot_lifetime:
 spill_slot_lifetime.get_one:
   vmovsd <hidden PC-relative offset>(%rip), %xmm0
   ret
-|}, Arm64{||}]
+|}, Arm64{|
+spill_slot_lifetime:
+  sub   sp, sp, #32
+  str   lr, [sp, #24]
+.L0:
+  orr   x0, xzr, #1
+  bl    camlTOP3__get_one_2_5_code
+.L1:
+  str   d0, [sp, #0]
+  orr   x0, xzr, #1
+  bl    camlTOP3__get_one_2_5_code
+.L2:
+  str   d0, [sp, #8]
+  orr   x0, xzr, #1
+  bl    camlTOP3__get_one_2_5_code
+.L3:
+  str   d0, [sp, #16]
+  orr   x0, xzr, #1
+  bl    camlTOP3__get_one_2_5_code
+.L4:
+  ldr   x16, [x28, #0]
+  sub   x27, x27, #40
+  subs  xzr, x27, x16
+  b.cc  <hidden GC jump pad>
+.L5:
+  add   x0, x27, #8
+  movz  x1, #4096, lsl #0
+  movk  x1, #256, lsl #48
+  str   x1, [x0, #-8]
+  ldr   d1, [sp, #0]
+  str   d1, [x0, #0]
+  ldr   d1, [sp, #8]
+  str   d1, [x0, #8]
+  ldr   d1, [sp, #16]
+  str   d1, [x0, #16]
+  str   d0, [x0, #24]
+  ldr   lr, [sp, #24]
+  add   sp, sp, #32
+  ret
+.L6:
+
+spill_slot_lifetime.get_one:
+  fmov  d0, #1.0000000
+  ret
+|}]
