@@ -193,6 +193,10 @@ let llvm_flags = ref "" (* -llvm-flags *)
 
 let fdo_counters = ref false (* -fdo-counters *)
 
+let fdo_metadata = ref false (* -fdo-metadata *)
+
+let fdo_counters_enabled () = !fdo_counters || !fdo_metadata
+
 let fdo_names = ref false (* -fdo-names *)
 
 let fdo_dropped_counters = ref false (* -fdo-dropped-counters *)

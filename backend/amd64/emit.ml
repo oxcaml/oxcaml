@@ -2112,8 +2112,10 @@ let prologue_stack_offset () =
   frame_size () - 8 - if fp then 8 else 0
 
 (* Instrumented instructions of the current function, recorded with their output
-   position during emission. After peephole optimization, surviving instructions
-   get assembler labels and are recorded in [Fdo_metadata_encode]. *)
+   position during emission. After peephole optimization, the counters of the
+   surviving instructions are recorded as emitted and, with -fdo-metadata, the
+   instructions get assembler labels and are recorded in
+   [Fdo_metadata_encode]. *)
 module Fdo_instruction = struct
   type t =
     | Call of Fdo_counter.t
@@ -2136,12 +2138,14 @@ let fdo_instructions : (X86_proc.output_pos * Fdo_instruction.t) list ref =
 
 let fdo_handler_labels : L.t list ref = ref []
 
-let fdo_metadata_enabled () = !Oxcaml_flags.fdo_counters
+let fdo_counters_enabled () = Oxcaml_flags.fdo_counters_enabled ()
+
+let fdo_metadata_enabled () = !Oxcaml_flags.fdo_metadata
 
 let fdo_metadata = ref (Fdo_metadata_encode.create ~record_names:false)
 
 let record_fdo_instruction pos instruction =
-  if fdo_metadata_enabled ()
+  if fdo_counters_enabled ()
   then fdo_instructions := (pos, instruction) :: !fdo_instructions
 
 let record_fdo_here instruction =
@@ -2200,13 +2204,15 @@ let record_fdo_jump_table (jumptbl : Linear.successor array) =
   if not (Label.Map.is_empty targets)
   then record_fdo_here (Jump_table (Label.Map.bindings targets))
 
+(* Returns the function's metadata, with -fdo-metadata. *)
 let begin_fdo_function (fundecl : Linear.fundecl) ~start =
+  let entry = fundecl.fun_fdo_entry_annotation in
+  let entry_annotation = Fdo_annotation.With_body_hash.annotation entry in
+  if fdo_counters_enabled ()
+  then Fdo_dropped_counters.record_emitted entry_annotation;
   if not (fdo_metadata_enabled ())
   then None
   else
-    let entry = fundecl.fun_fdo_entry_annotation in
-    let entry_annotation = Fdo_annotation.With_body_hash.annotation entry in
-    Fdo_dropped_counters.record_emitted entry_annotation;
     (* The body hash belongs to the compiled function itself, identified by the
        entry counter with an empty inlining stack. *)
     let function_ =
@@ -2231,47 +2237,59 @@ let begin_fdo_function (fundecl : Linear.fundecl) ~start =
    of the code: taking the numbers of the code's labels would renumber those of
    the following functions, which can change their code (e.g. which block
    [Cfg_merge_blocks] keeps). *)
-let record_fdo_event fdo_function (pos, (instruction : Fdo_instruction.t)) =
-  if X86_proc.deleted pos
-  then
-    Fdo_dropped_counters.register ~reason:Peephole_deleted
-      (Fdo_instruction.counters instruction)
-  else
-    let () =
-      Fdo_dropped_counters.record_emitted (Fdo_instruction.counters instruction)
+let record_fdo_metadata_event fdo_function pos (instruction : Fdo_instruction.t)
+    =
+  let label = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
+  X86_proc.insert_label_before pos label;
+  let record = Fdo_metadata_encode.record_event fdo_function label in
+  match instruction with
+  | Call counter ->
+    let return_address =
+      L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
     in
-    let label = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
-    X86_proc.insert_label_before pos label;
-    let record = Fdo_metadata_encode.record_event fdo_function label in
-    match instruction with
-    | Call counter ->
-      let return_address =
-        L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
-      in
-      X86_proc.insert_label_after pos return_address;
-      record (Call { return_address; counter })
-    | Tail_call counter -> record (Tail_call counter)
-    | Conditional_branch { taken; fallthrough } ->
-      record (Conditional_branch { taken; fallthrough })
-    | Jump_table targets ->
-      List.iter
-        (fun (target, taken) ->
-          record
-            (Indirect_jump
-               { target = label_to_asm_label ~section:Text target; taken }))
-        targets
+    X86_proc.insert_label_after pos return_address;
+    record (Call { return_address; counter })
+  | Tail_call counter -> record (Tail_call counter)
+  | Conditional_branch { taken; fallthrough } ->
+    record (Conditional_branch { taken; fallthrough })
+  | Jump_table targets ->
+    List.iter
+      (fun (target, taken) ->
+        record
+          (Indirect_jump
+             { target = label_to_asm_label ~section:Text target; taken }))
+      targets
+
+let record_fdo_event fdo_function (pos, (instruction : Fdo_instruction.t)) =
+  let counters = Fdo_instruction.counters instruction in
+  if X86_proc.deleted pos
+  then Fdo_dropped_counters.register ~reason:Peephole_deleted counters
+  else (
+    Fdo_dropped_counters.record_emitted counters;
+    Option.iter
+      (fun fdo_function ->
+        record_fdo_metadata_event fdo_function pos instruction)
+      fdo_function)
 
 (* Must be called after peephole optimization on the function's code. *)
 let end_fdo_function fdo_function =
-  List.sort_uniq
-    (fun a b -> String.compare (L.encode a) (L.encode b))
-    !fdo_handler_labels
-  |> List.iter (fun label ->
-      Fdo_metadata_encode.record_event fdo_function label Exception_handler);
+  Option.iter
+    (fun fdo_function ->
+      List.sort_uniq
+        (fun a b -> String.compare (L.encode a) (L.encode b))
+        !fdo_handler_labels
+      |> List.iter (fun label ->
+          Fdo_metadata_encode.record_event fdo_function label Exception_handler))
+    fdo_function;
   List.iter (record_fdo_event fdo_function) (List.rev !fdo_instructions);
-  let finish = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
-  D.define_label finish;
-  Fdo_metadata_encode.end_function fdo_function ~finish;
+  Option.iter
+    (fun fdo_function ->
+      let finish =
+        L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
+      in
+      D.define_label finish;
+      Fdo_metadata_encode.end_function fdo_function ~finish)
+    fdo_function;
   fdo_instructions := [];
   fdo_handler_labels := []
 
@@ -3156,7 +3174,7 @@ let fundecl fundecl =
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
-  Option.iter end_fdo_function fdo_function;
+  end_fdo_function fdo_function;
   (* [record_for_expect_asm] runs after the trailing out-of-line code so the
      [%%expect_asm_full] variant can include it (e.g. the stack-realloc
      handler). For the plain variant the body still stops at [fun_body_end] and
@@ -3624,7 +3642,7 @@ let end_assembly () =
   D.size frametable_sym;
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
-  if !Oxcaml_flags.fdo_dropped_counters
+  if fdo_metadata_enabled () && !Oxcaml_flags.fdo_dropped_counters
   then
     Fdo_metadata_encode.set_dropped !fdo_metadata
       (Fdo_dropped_counters.registered ());
