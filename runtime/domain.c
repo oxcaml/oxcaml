@@ -621,6 +621,16 @@ static inline void domain_root_register(value *root, value t);
 static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
+/* Returns the largest odd number not greater than the full range of
+   `value`s divided by the maximum number of domains.  An odd number
+   is used with the intention of making the lowest bits different for
+   each domain. */
+static uintnat get_unique_id_counter_per_domain_shard(void) {
+  uintnat full_range = (uintnat)Max_long - (uintnat)Min_long + 1;
+  uintnat full_shard = full_range / caml_params->max_domains;
+  return full_shard - ((full_shard & 1) ^ 1);
+}
+
 /* must be run on the domain's thread */
 static void domain_create(uintnat initial_minor_heap_wsize,
                           caml_domain_state *parent)
@@ -699,6 +709,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
     d->state = domain_state;
     domain_state->id = d->id;
+    domain_state->sharded_unique_id_counter =
+      Val_long(get_unique_id_counter_per_domain_shard() * d->id - 1);
   } else {
     domain_state = d->state;
     CAMLassert(domain_state->id == d->id);
@@ -831,7 +843,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->local_limit = 0;
 
   domain_state->compare_unordered = 0;
-  domain_state->oo_next_id_local = 0;
 
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;

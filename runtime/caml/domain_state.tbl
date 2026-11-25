@@ -157,7 +157,7 @@ DOMAIN_STATE(value, backtrace_last_exn)
 
 DOMAIN_STATE(intnat, compare_unordered)
 
-DOMAIN_STATE(uintnat, oo_next_id_local)
+DOMAIN_STATE(value, sharded_unique_id_counter)
 
 DOMAIN_STATE(uintnat, requested_major_slice)
 DOMAIN_STATE(uintnat, requested_global_major_slice)
