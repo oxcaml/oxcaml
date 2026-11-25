@@ -65,7 +65,9 @@ val debug                : bool ref
 val unsafe               : bool ref
 val opaque               : bool ref
 val unboxed_types        : bool ref
+val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
+val profile_level : int ref
 val dwarf_pedantic : bool ref
 val gdwarf_config_shape_eval_depth : int option ref
 val type_to_shape_max_depth : int option ref
