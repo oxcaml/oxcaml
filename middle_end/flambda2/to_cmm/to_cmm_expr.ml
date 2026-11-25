@@ -219,8 +219,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg ~returns ~callsite_counter return_ty pos callee
-          ~callees args_ty args,
+      ( C.indirect_full_call ~dbg ~returns ~callsite_counter return_ty pos
+          callee ~callees args_ty args,
         free_vars,
         env,
         res,

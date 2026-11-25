@@ -3835,7 +3835,8 @@ let rec might_split_call_caml_apply ?old_region ~callsite_counter result arity
     let body old_region =
       bind "result"
         (call_caml_apply ~callsite_counter [| Val |] arity mut clos args
-           Rc_normal Cmx_format.Maybe_alloc_stack ~returns:true dbg) (fun clos ->
+           Rc_normal Cmx_format.Maybe_alloc_stack ~returns:true dbg)
+        (fun clos ->
           (* Only the first of the calls has the counter, as for an
              over-application in Flambda. *)
           might_split_call_caml_apply ?old_region ~callsite_counter:None result
