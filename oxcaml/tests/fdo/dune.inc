@@ -350,7 +350,11 @@
 (rule
  (targets to_cmm_probe.output.corrected)
  (deps to_cmm_probe.ml)
- (enabled_if (and (= %{context_name} "main") (= %{system} "linux")))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")
+   (= %{architecture} "amd64")))
  (action
   (progn
    (setenv
@@ -368,7 +372,11 @@
 
 (rule
  (alias runtest)
- (enabled_if (and (= %{context_name} "main") (= %{system} "linux")))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")
+   (= %{architecture} "amd64")))
  (deps to_cmm_probe.output to_cmm_probe.output.corrected)
  (action (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
 
