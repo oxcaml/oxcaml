@@ -48,6 +48,7 @@ module Extension = struct
       | AVX512_BITALG
       | AVX512_VPOPCNTDQ
       | AVX512_IFMA
+      | GFNI
 
     let rank = function
       | POPCNT -> 0
@@ -79,6 +80,7 @@ module Extension = struct
       | AVX512_BITALG -> 26
       | AVX512_VPOPCNTDQ -> 27
       | AVX512_IFMA -> 28
+      | GFNI -> 29
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -116,6 +118,7 @@ module Extension = struct
     | AVX512_BITALG -> "AVX512BITALG"
     | AVX512_VPOPCNTDQ -> "AVX512VPOPCNTDQ"
     | AVX512_IFMA -> "AVX512IFMA"
+    | GFNI -> "GFNI"
 
   let generation = function
     | POPCNT -> "Nehalem+"
@@ -146,6 +149,7 @@ module Extension = struct
     | AVX512_BITALG -> "Icelake+"
     | AVX512_VPOPCNTDQ -> "Icelake+"
     | AVX512_IFMA -> "Cannonlake+"
+    | GFNI -> "Icelake+"
 
   let enabled_by_default = function
     (* Extension defaults follow configure-time CPU detection.
@@ -177,6 +181,7 @@ module Extension = struct
     | AVX512_BITALG -> Config.has_avx512bitalg
     | AVX512_VPOPCNTDQ -> Config.has_avx512vpopcntdq
     | AVX512_IFMA -> Config.has_avx512ifma
+    | GFNI -> Config.has_gfni
     | PREFETCHW | PREFETCHWT1 -> false
 
   let all =
@@ -184,7 +189,8 @@ module Extension = struct
       [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
         CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F; AVX512DQ; AVX512CD;
         AVX512BW; AVX512VL; AES; AVX512_BF16; VPCLMULQDQ; AVX512_VBMI;
-        AVX512_VBMI2; VAES; AVX512_BITALG; AVX512_VPOPCNTDQ; AVX512_IFMA ]
+        AVX512_VBMI2; VAES; AVX512_BITALG; AVX512_VPOPCNTDQ; AVX512_IFMA;
+        GFNI ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -218,7 +224,7 @@ module Extension = struct
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
        AVX512DQ | AVX512CD | AVX512BW | AVX512VL | AES | AVX512_BF16 |
        VPCLMULQDQ | AVX512_VBMI | AVX512_VBMI2 | VAES | AVX512_BITALG |
-       AVX512_VPOPCNTDQ | AVX512_IFMA), _
+       AVX512_VPOPCNTDQ | AVX512_IFMA | GFNI), _
        -> false
 
   let rec fix set less =
@@ -300,6 +306,7 @@ module Extension = struct
       | AVX512_BITALG -> enabled AVX512_BITALG
       | AVX512_VPOPCNTDQ -> enabled AVX512_VPOPCNTDQ
       | AVX512_IFMA -> enabled AVX512_IFMA
+      | GFNI -> enabled GFNI
     in
     Array.for_all enabled instr.ext
 end

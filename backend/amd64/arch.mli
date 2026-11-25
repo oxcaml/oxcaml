@@ -50,6 +50,7 @@ module Extension : sig
     | AVX512_BITALG
     | AVX512_VPOPCNTDQ
     | AVX512_IFMA
+    | GFNI
 
   val name : t -> string
 

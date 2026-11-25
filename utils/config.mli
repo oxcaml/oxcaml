@@ -455,6 +455,9 @@ val has_avx512vpopcntdq : bool
 val has_avx512ifma : bool
 (* Whether the compiler was configured on a machine with AVX512_IFMA *)
 
+val has_gfni : bool
+(* Whether the compiler was configured on a machine with GFNI *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
 

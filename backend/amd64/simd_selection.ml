@@ -161,6 +161,22 @@ let select_operation_clmul ~dbg:_ op args =
       sse_or_avx pclmulqdq vpclmulqdq_X_X_Xm128 ~i args
     | _ -> None
 
+(* These take precedence over the generated table, which only has the VEX
+   forms. *)
+let select_operation_gfni ~dbg:_ op args =
+  if not (Arch.Extension.enabled GFNI)
+  then None
+  else
+    match op with
+    | "caml_mm_gf2p8affine_epi64_epi8" ->
+      let i, args = extract_constant args ~max:255 op in
+      sse_or_avx gf2p8affineqb vgf2p8affineqb_X_X_Xm128 ~i args
+    | "caml_mm_gf2p8affineinv_epi64_epi8" ->
+      let i, args = extract_constant args ~max:255 op in
+      sse_or_avx gf2p8affineinvqb vgf2p8affineinvqb_X_X_Xm128 ~i args
+    | "caml_mm_gf2p8mul_epi8" -> sse_or_avx gf2p8mulb vgf2p8mulb_X_X_Xm128 args
+    | _ -> None
+
 let select_operation_popcnt ~dbg:_ op args =
   if not (Arch.Extension.enabled POPCNT)
   then None
@@ -1287,6 +1303,7 @@ let select_operation_cfg ~dbg op args =
   None
   |> or_else select_operation_aes
   |> or_else select_operation_clmul
+  |> or_else select_operation_gfni
   |> or_else select_operation_popcnt
   |> or_else select_operation_lzcnt
   |> or_else select_operation_bmi
