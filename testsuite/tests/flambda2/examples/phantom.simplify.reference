@@ -116,7 +116,7 @@ in
 let $camlPhantom__is_true_6 = closure is_true_1_1 @is_true &toplevel in
 let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       Make_0_1 (F : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
-  apply ccall noalloc
+  apply ccall noalloc &my_alloc_region
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
@@ -150,7 +150,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  apply ccall noalloc inlining_state(depth(1))
+  apply ccall noalloc &my_alloc_region inlining_state(depth(1))
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
