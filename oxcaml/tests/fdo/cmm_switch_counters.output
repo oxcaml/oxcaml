@@ -50,14 +50,17 @@ shared case on both sides:
   lost:
 
 lookup:
-(load_mut val (+a L:"camlCmm_switch_counters__1" (<< x/8 3)))
+(load_mut val
+  (+a L:"camlCmm_switch_counters__1":out_of_heap_data_pointer (<< x/8 3)))
   on edges:
   dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
     "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
   lost:
 
 lookup of arguments:
-(exit 7 (load_mut val (+a L:"camlCmm_switch_counters__2" (<< x/9 3))))
+(exit 7
+  (load_mut val
+    (+a L:"camlCmm_switch_counters__2":out_of_heap_data_pointer (<< x/9 3))))
   on edges:
   dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
     "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
@@ -72,7 +75,8 @@ lookup cluster:
                  "Test.f":0:00000001:0:branch(1)
                  "Test.f":0:00000001:0:branch(2)
                  "Test.f":0:00000001:0:branch(3))
-  (load_mut val (+a L:"camlCmm_switch_counters__3" (<< x/10 3))))
+  (load_mut val
+    (+a L:"camlCmm_switch_counters__3":out_of_heap_data_pointer (<< x/10 3))))
   on edges: "Test.f":0:00000001:0:branch(5) "Test.f":0:00000001:0:branch(4)
     "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
     "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
