@@ -31,10 +31,10 @@ let of_descr (descr : Descr.t) =
   | Naked_vec256 v -> naked_vec256 v
   | Naked_vec512 v -> naked_vec512 v
   | Naked_mask v -> naked_mask v
-  | Null -> const_null
+  | Null -> const_null ()
   | Poison (kind, name) -> const_poison kind name
 
-let is_null t = equal t const_null
+let is_null t = equal t (const_null ())
 
 let is_naked_immediate t =
   match descr t with

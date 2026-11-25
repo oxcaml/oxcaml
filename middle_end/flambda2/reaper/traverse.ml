@@ -168,9 +168,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
             Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
       fields;
     default_bp (fun base ->
-        Acc.add_constructor_dep acc ~base Field.is_int
+        Acc.add_constructor_dep acc ~base (Field.is_int ())
           ~from:(Code_id_or_name.name (Env.all_constants denv));
-        Acc.add_constructor_dep acc ~base Field.get_tag
+        Acc.add_constructor_dep acc ~base (Field.get_tag ())
           ~from:(Code_id_or_name.name (Env.all_constants denv)))
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
@@ -198,11 +198,11 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
-        Acc.add_accessor_dep acc ~to_ Field.is_int ~base:name)
+        Acc.add_accessor_dep acc ~to_ (Field.is_int ()) ~base:name)
   | Unary (Get_tag, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
-        Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
+        Acc.add_accessor_dep acc ~to_ (Field.get_tag ()) ~base:name)
   | Unary (Box_number (bn, _alloc_mode), contents) ->
     (* Boxed numbers are treated like blocks with a single field. Unlike blocks,
        no [Is_int] or [Get_tag] fields are needed: those primitives arise from
@@ -301,9 +301,9 @@ let traverse_block_like_static_const denv acc symbol
         in
         Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
       fields;
-    Acc.add_constructor_dep acc ~base:name Field.is_int
+    Acc.add_constructor_dep acc ~base:name (Field.is_int ())
       ~from:(Code_id_or_name.name (Env.all_constants denv));
-    Acc.add_constructor_dep acc ~base:name Field.get_tag
+    Acc.add_constructor_dep acc ~base:name (Field.get_tag ())
       ~from:(Code_id_or_name.name (Env.all_constants denv))
   | Set_of_closures _ ->
     Misc.fatal_errorf
@@ -363,7 +363,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | None -> None, call_widget
       | Some callee ->
         let callee = Acc.simple_to_node acc ~denv callee in
-        Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+        Acc.add_accessor_dep acc ~to_:call_widget
+          (Field.known_arity_call_witness ())
           ~base:callee;
         let callee_if_any_source =
           Code_id_or_name.var (Variable.create "callee_if_any_source" K.value)
@@ -387,7 +388,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-    Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+    Acc.add_accessor_dep acc ~to_:call_widget
+      (Field.known_arity_call_witness ())
       ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
@@ -395,7 +397,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-    Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
+    Acc.add_accessor_dep acc ~to_:call_widget
+      (Field.unknown_arity_call_witness ())
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
 

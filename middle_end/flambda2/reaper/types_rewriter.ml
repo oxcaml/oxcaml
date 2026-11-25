@@ -567,15 +567,17 @@ module Rewriter = struct
         match is_int with
         | None -> acc, pats
         | Some use ->
-          let vars, pat = for_one_use Field.is_int use in
-          Field.Map.add Field.is_int vars acc, Pattern.is_int pat :: pats
+          let field = Field.is_int () in
+          let vars, pat = for_one_use field use in
+          Field.Map.add field vars acc, Pattern.is_int pat :: pats
       in
       let acc, pats =
         match get_tag with
         | None -> acc, pats
         | Some use ->
-          let vars, pat = for_one_use Field.get_tag use in
-          Field.Map.add Field.get_tag vars acc, Pattern.get_tag pat :: pats
+          let field = Field.get_tag () in
+          let vars, pat = for_one_use field use in
+          Field.Map.add field vars acc, Pattern.get_tag pat :: pats
       in
       let acc = ref acc in
       let pats = ref pats in
@@ -652,13 +654,13 @@ module Rewriter = struct
         let constructors = Code_id_or_name.Map.singleton closure () in
         match
           PTA.get_one_field_usage_of_constructors db constructors
-            Field.unknown_arity_call_witness
+            (Field.unknown_arity_call_witness ())
         with
         | Unknown | Ok _ -> Any_call
         | Bottom -> (
           match
             PTA.get_one_field_usage_of_constructors db constructors
-              Field.known_arity_call_witness
+              (Field.known_arity_call_witness ())
           with
           | Unknown | Ok _ -> Only_called_with_known_arity
           | Bottom -> Never_called))
@@ -988,9 +990,9 @@ module Rewriter = struct
                             let code_id_must_be_erased =
                               not
                                 (PTA.field_used context.db source
-                                   Field.known_arity_call_witness
+                                   (Field.known_arity_call_witness ())
                                 || PTA.field_used context.db source
-                                     Field.unknown_arity_call_witness)
+                                     (Field.unknown_arity_call_witness ()))
                             in
                             Single_source source, code_id_must_be_erased)
                         function_slot_types

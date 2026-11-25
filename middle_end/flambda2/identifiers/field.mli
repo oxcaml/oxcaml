@@ -71,9 +71,9 @@ val value_slot : Value_slot.t -> t
 
 val function_slot : Function_slot.t -> t
 
-val is_int : t
+val is_int : unit -> t
 
-val get_tag : t
+val get_tag : unit -> t
 
 val boxed_number : Flambda_kind.Boxable_number.t -> t
 
@@ -82,17 +82,17 @@ val boxed_number : Flambda_kind.Boxable_number.t -> t
     These fields cannot be accessed through primitives and are used internally
     by the reaper to model function calls. *)
 
-val known_arity_call_witness : t
+val known_arity_call_witness : unit -> t
 
-val unknown_arity_call_witness : t
+val unknown_arity_call_witness : unit -> t
 
 val call_witness : closure_entry_point -> t
 
 val normal_return_of_call : int -> t
 
-val exn_return_of_call : t
+val exn_return_of_call : unit -> t
 
-val code_id_of_call_witness : t
+val code_id_of_call_witness : unit -> t
 
 (** {1 Inspecting fields} *)
 

@@ -1845,8 +1845,8 @@ let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
   let field_kind = P.Block_access_field_kind.from_kind full_kind in
   H.Prim offset, field_kind
 
-let null_base : H.simple_or_prim =
-  H.Simple (Simple.const Reg_width_const.const_null)
+let null_base () : H.simple_or_prim =
+  H.Simple (Simple.const (Reg_width_const.const_null ()))
 
 let convert_pget_indirect ~machine_width ~dbg primitive layout
     (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
@@ -3602,11 +3602,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr:null_base
-      ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut
+      ~ptr:(null_base ()) ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
-      mode ~ptr:null_base ~idx ~new_values
+      mode ~ptr:(null_base ()) ~idx ~new_values
   | Pbox (layout, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region

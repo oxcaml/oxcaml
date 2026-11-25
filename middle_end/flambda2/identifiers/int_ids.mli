@@ -45,7 +45,7 @@ module Const : sig
 
   val const_int : Target_ocaml_int.t -> t
 
-  val const_null : t
+  val const_null : unit -> t
 
   val const_poison : Flambda_kind.t -> string -> t
 

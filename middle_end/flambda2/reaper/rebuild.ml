@@ -351,10 +351,10 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let code_is_used bound_name =
     Analysis.field_used env.solution
       (Code_id_or_name.name bound_name)
-      Field.known_arity_call_witness
+      (Field.known_arity_call_witness ())
     || Analysis.field_used env.solution
          (Code_id_or_name.name bound_name)
-         Field.unknown_arity_call_witness
+         (Field.unknown_arity_call_witness ())
   in
   let new_repr =
     match bound with
@@ -684,9 +684,9 @@ let rebuild_named_default_case env (named : Named.t) =
     rewrite_field_access arg (Field.value_slot value_slot)
   | Prim (Unary (Is_int { variant_only = true }, arg), _dbg)
     when simple_is_unboxable env arg ->
-    rewrite_field_access arg Field.is_int
+    rewrite_field_access arg (Field.is_int ())
   | Prim (Unary (Get_tag, arg), _dbg) when simple_is_unboxable env arg ->
-    rewrite_field_access arg Field.get_tag
+    rewrite_field_access arg (Field.get_tag ())
   | Prim (Unary (Unbox_number bn, arg), _dbg) when simple_is_unboxable env arg
     ->
     rewrite_field_access arg (Field.boxed_number bn)
@@ -700,9 +700,9 @@ let rebuild_named_default_case env (named : Named.t) =
     rewrite_field_access_chg_repr arg (Field.value_slot value_slot) dbg
   | Prim (Unary (Is_int { variant_only = true }, arg), dbg)
     when simple_changed_repr env arg ->
-    rewrite_field_access_chg_repr arg Field.is_int dbg
+    rewrite_field_access_chg_repr arg (Field.is_int ()) dbg
   | Prim (Unary (Get_tag, arg), dbg) when simple_changed_repr env arg ->
-    rewrite_field_access_chg_repr arg Field.get_tag dbg
+    rewrite_field_access_chg_repr arg (Field.get_tag ()) dbg
   | Prim (prim, dbg) ->
     let prim = P.map_args (rewrite_simple env) prim in
     ( Named.create_prim prim dbg,
