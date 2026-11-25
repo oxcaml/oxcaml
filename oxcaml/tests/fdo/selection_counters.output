@@ -100,7 +100,10 @@ case 3: fdo_annotation("Test.f":0:00000001:0:branch(2)) 7)
   added:
 
 calls:
-(let v/10 (app callsite_counter("Test.f":0:00000001:0:call) G:"h" x/8 int)
+(let
+  v/10
+    (app callsite_counter("Test.f":0:00000001:0:call) G:"h":code_pointer x/8
+      int)
   (app callsite_counter("Test.f":0:00000001:1:call) g/9 v/10 int))
   cfg:
     entry: ("Test.f":0 body_hash:00000001)
@@ -113,7 +116,8 @@ calls:
 
 tail calls:
 (if (<s x/11 0) fdo_annotation("Test.f":0:00000001:0:branch(1))
-  (app callsite_counter("Test.f":0:00000001:0:call) G:"h" x/11 int)
+  (app callsite_counter("Test.f":0:00000001:0:call) G:"h":code_pointer x/11
+    int)
   fdo_annotation("Test.f":0:00000001:0:branch(2))
   (app callsite_counter("Test.f":0:00000001:1:call) g/12 x/11 int))
   cfg:
@@ -127,7 +131,8 @@ tail calls:
 
 self tail call:
 (if (<s x/13 0) fdo_annotation("Test.f":0:00000001:0:branch(1))
-  (app callsite_counter("Test.f":0:00000001:0:call) G:"f" (+ x/13 2) int)
+  (app callsite_counter("Test.f":0:00000001:0:call) G:"f":code_pointer
+    (+ x/13 2) int)
   fdo_annotation("Test.f":0:00000001:0:branch(2)) x/13)
   cfg:
     entry: ("Test.f":0 body_hash:00000001)

@@ -149,7 +149,7 @@ let () =
     Call
       { op =
           Direct
-            { sym = { sym_name = "g"; sym_global = Global };
+            { sym = Cmm.global_symbol ~ty:Cmm.typ_code_pointer "g";
               callsite_counter = Some (call_counter index)
             };
         label_after = c
