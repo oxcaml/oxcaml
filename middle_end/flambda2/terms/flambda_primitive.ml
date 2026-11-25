@@ -1035,12 +1035,13 @@ type nullary_primitive =
   | Dls_get
   | Tls_get
   | Domain_index
+  | Thread_self_id
   | Poll
   | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
@@ -1053,8 +1054,9 @@ let compare_nullary_primitive p1 p2 =
     | Dls_get -> 4
     | Tls_get -> 5
     | Domain_index -> 6
-    | Poll -> 7
-    | Cpu_relax -> 8
+    | Thread_self_id -> 7
+    | Poll -> 8
+    | Cpu_relax -> 9
   in
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
@@ -1075,10 +1077,11 @@ let compare_nullary_primitive p1 p2 =
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
   | Domain_index, Domain_index -> 0
+  | Thread_self_id, Thread_self_id -> 0
   | Poll, Poll -> 0
   | Cpu_relax, Cpu_relax -> 0
   | ( ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ),
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ),
       _ ) ->
     Int.compare
       (nullary_primitive_numbering p1)
@@ -1105,6 +1108,7 @@ let print_nullary_primitive ppf p =
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Domain_index -> Format.pp_print_string ppf "Domain_index"
+  | Thread_self_id -> Format.pp_print_string ppf "Thread_self_id"
   | Poll -> Format.pp_print_string ppf "Poll"
   | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
@@ -1114,7 +1118,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Optimised_out k -> Singleton k
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
-  | Dls_get | Tls_get -> Singleton K.value
+  | Dls_get | Tls_get | Thread_self_id -> Singleton K.value
   | Domain_index -> Singleton K.naked_immediate
   | Poll | Cpu_relax -> Unit
 
@@ -1136,7 +1140,7 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Dls_get | Tls_get | Domain_index ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id ->
     No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Poll | Cpu_relax ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
@@ -1144,13 +1148,13 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     Neither
 
 let free_names_nullary_primitive p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax ->
     Name_occurrences.empty
 
 module Reinterpret_64_bit_word = struct
@@ -1173,6 +1177,10 @@ module Reinterpret_64_bit_word = struct
     | Unboxed_float64_as_unboxed_int64 ->
       Format.pp_print_string ppf "Unboxed_float64_as_unboxed_int64"
 end
+
+type boolean_representation =
+  | Tagged_bool
+  | Naked_bool
 
 type unary_primitive =
   | Block_load of
@@ -1207,7 +1215,7 @@ type unary_primitive =
       { src : Flambda_kind.Standard_int_or_float.t;
         dst : Flambda_kind.Standard_int_or_float.t
       }
-  | Boolean_not
+  | Boolean_not of boolean_representation
   | Reinterpret_64_bit_word of Reinterpret_64_bit_word.t
   | Reinterpret_boxed_vector
   | Unbox_number of Flambda_kind.Boxable_number.t
@@ -1251,7 +1259,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Float_arith _ ->
     (* See comment in effects_and_coeffects *)
     Flambda_features.float_const_prop ()
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     true
   | Unbox_number _ | Untag_immediate -> false
@@ -1284,7 +1292,7 @@ let compare_unary_primitive p1 p2 =
     | Int_arith _ -> 10
     | Float_arith _ -> 11
     | Num_conv _ -> 12
-    | Boolean_not -> 13
+    | Boolean_not _ -> 13
     | Reinterpret_64_bit_word _ -> 14
     | Unbox_number _ -> 15
     | Box_number _ -> 16
@@ -1396,13 +1404,14 @@ let compare_unary_primitive p1 p2 =
     Variable.compare alloc_region1 alloc_region2
   | Peek kind1, Peek kind2 ->
     Flambda_kind.Standard_int_or_float.compare kind1 kind2
+  | Boolean_not repr1, Boolean_not repr2 -> Stdlib.compare repr1 repr2
   | ( Make_lazy { lazy_tag = lazy_tag1; alloc_region = alloc_region1 },
       Make_lazy { lazy_tag = lazy_tag2; alloc_region = alloc_region2 } ) ->
     let c = Lazy_block_tag.compare lazy_tag1 lazy_tag2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
       | Is_null | Get_tag | String_length _ | Int_as_pointer _
-      | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+      | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
       | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
       | Array_length _ | Bigarray_length _ | Unbox_number _ | Box_number _
       | Untag_immediate | Tag_immediate | Project_function_slot _
@@ -1444,7 +1453,8 @@ let print_unary_primitive ppf p =
     fprintf ppf "Num_conv_%a_to_%a"
       Flambda_kind.Standard_int_or_float.print_lowercase src
       Flambda_kind.Standard_int_or_float.print_lowercase dst
-  | Boolean_not -> fprintf ppf "Boolean_not"
+  | Boolean_not Tagged_bool -> fprintf ppf "Boolean_not"
+  | Boolean_not Naked_bool -> fprintf ppf "(Boolean_not naked)"
   | Reinterpret_64_bit_word reinterpret ->
     fprintf ppf "@[<hov 1>(Reinterpret_64_bit_word@ %a)@]"
       Reinterpret_64_bit_word.print reinterpret
@@ -1495,7 +1505,8 @@ let arg_kind_of_unary_primitive p =
   | Opaque_identity { middle_end_only = _; kind } -> kind
   | Int_arith (kind, _) -> K.Standard_int.to_kind kind
   | Num_conv { src; dst = _ } -> K.Standard_int_or_float.to_kind src
-  | Boolean_not -> K.value
+  | Boolean_not Tagged_bool -> K.value
+  | Boolean_not Naked_bool -> K.naked_immediate
   | Reinterpret_boxed_vector -> K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
@@ -1533,7 +1544,8 @@ let result_kind_of_unary_primitive p : result_kind =
   | Opaque_identity { middle_end_only = _; kind } -> Singleton kind
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
   | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
-  | Boolean_not -> Singleton K.value
+  | Boolean_not Tagged_bool -> Singleton K.value
+  | Boolean_not Naked_bool -> Singleton K.naked_immediate
   | Reinterpret_boxed_vector -> Singleton K.value
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
@@ -1608,7 +1620,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, (Swap_byte_endianness | Not))
-  | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
+  | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Abs | Neg)) ->
@@ -1687,7 +1699,7 @@ let unary_classify_for_printing p =
   | Duplicate_array _ | Duplicate_block _ | Obj_dup _ -> Constructive
   | String_length _ | Get_tag -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
-  | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
+  | Boolean_not _ | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
   | Float_arith _ ->
     Neither
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate ->
@@ -1720,7 +1732,7 @@ let free_names_unary_primitive p =
   | Make_lazy { alloc_region; _ } ->
     Name_occurrences.singleton_variable alloc_region Name_mode.normal
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
@@ -1768,7 +1780,7 @@ let apply_renaming_unary_primitive p renaming =
     then p
     else Make_lazy { alloc_region = alloc_region'; lazy_tag }
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
@@ -1787,7 +1799,7 @@ let ids_for_export_unary_primitive p =
   | Make_lazy { alloc_region; _ } ->
     Ids_for_export.singleton_variable alloc_region
   | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
-  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not _
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
@@ -2851,7 +2863,8 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
+    ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2890,7 +2903,8 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Domain_index | Thread_self_id | Poll | Cpu_relax )
+    ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union

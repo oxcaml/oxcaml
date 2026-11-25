@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 let [@inline never] foo () =
   let s = "Hello" ^ " world!" in

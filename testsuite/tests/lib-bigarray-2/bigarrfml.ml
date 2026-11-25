@@ -2,7 +2,7 @@
  readonly_files = "bigarrf.f bigarrfstub.c";
  last_flags = "-cclib -lgfortran";
  script = "sh ${test_source_directory}/has-gfortran.sh";
- script;
+ config_script;
  {
    setup-ocamlc.byte-build-env;
    script = "sh ${test_source_directory}/call-gfortran.sh ${cc} -c bigarrf.f";

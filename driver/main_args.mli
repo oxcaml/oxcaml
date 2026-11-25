@@ -28,8 +28,11 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
+  val _H_file : string -> unit
+  val _Hx_file : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -48,6 +51,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _open_cmi : string -> unit
+  val _open_cmi_x : string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit
@@ -97,7 +101,6 @@ module type Core_options = sig
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
   val _dtlambda : unit -> unit
-  val _dslambda : unit -> unit
   val _dmatchcomp : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
@@ -172,11 +175,14 @@ module type Compiler_options = sig
   val _dtimings_precision : int -> unit
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
+  val _dprofile_level : int -> unit
   val _dgranularity : string -> unit
   val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
+  val _enable_action_trace : unit -> unit
+  val _debug_action_trace : unit -> unit
 
   val _args: string -> string array
   val _args0: string -> string array
@@ -285,6 +291,8 @@ module type Optcomp_options = sig
   val _shared : unit -> unit
   val _afl_instrument : unit -> unit
   val _afl_inst_ratio : int -> unit
+  val _gated_trace_pc_guard : unit -> unit
+  val _gated_trace_pc_guard_define_gate : unit -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
@@ -309,40 +317,6 @@ module type Opttop_options = sig
   val _S : unit -> unit
 end
 
-module type Jscomp_options = sig
-  include Core_options
-  include Compiler_options
-
-  val _inline : string -> unit
-  val _inline_toplevel : string -> unit
-  val _inlining_report : unit -> unit
-  val _dump_pass : string -> unit
-  val _inline_max_depth : string -> unit
-  val _rounds : int -> unit
-  val _inline_max_unroll : string -> unit
-  val _inline_call_cost : string -> unit
-  val _inline_alloc_cost : string -> unit
-  val _inline_prim_cost : string -> unit
-  val _inline_branch_cost : string -> unit
-  val _inline_indirect_cost : string -> unit
-  val _inline_lifting_benefit : string -> unit
-  val _inline_branch_factor : string -> unit
-
-  val _dflambda : unit -> unit
-  val _dflambda_heavy_invariants : unit -> unit
-  val _dflambda_invariants : unit -> unit
-  val _dflambda_let : int -> unit
-  val _dflambda_no_invariants : unit -> unit
-  val _dflambda_verbose : unit -> unit
-  val _djsir : unit -> unit
-  val _drawflambda : unit -> unit
-
-  val _classic_inlining : unit -> unit
-  val _o2 : unit -> unit
-  val _o3 : unit -> unit
-  val _o4 : unit -> unit
-end
-
 module type Ocamldoc_options = sig
   include Common_options
   val _impl : string -> unit
@@ -363,7 +337,6 @@ module Make_bytecomp_options : Bytecomp_options -> Arg_list
 module Make_bytetop_options : Bytetop_options -> Arg_list
 module Make_optcomp_options : Optcomp_options -> Arg_list
 module Make_opttop_options : Opttop_options -> Arg_list
-module Make_jscomp_options : Jscomp_options -> Arg_list
 module Make_ocamldoc_options : Ocamldoc_options -> Arg_list
 
 (** [options_with_command_line_syntax options r] returns [options2] that behaves
@@ -381,6 +354,5 @@ module Default: sig
   module Opttopmain: Opttop_options
   module Main: Bytecomp_options
   module Optmain: Optcomp_options
-  module Jsmain : Jscomp_options
   module Odoc_args: Ocamldoc_options
 end

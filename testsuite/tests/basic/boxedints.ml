@@ -87,8 +87,8 @@ struct
        | _ -> assert false);
     test 4 (unsigned_to_int max_int)
       (match Sys.word_size with
-       | 32 -> None
-       | 64 -> Some (to_int max_int)
+       | 32 when Sys.int_size < 32 -> None
+       | 32 | 64 -> Some (to_int max_int)
        | _ -> assert false);
     test 5 (unsigned_to_int min_int)
       (match Sys.word_size with

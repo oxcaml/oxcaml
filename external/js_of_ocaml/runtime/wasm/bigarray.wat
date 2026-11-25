@@ -724,61 +724,85 @@
                   (br $loop)))))
    ))
 
-
+   ;; Round the double to float16 once, with integer operations
    (func $double_to_float16 (export "caml_float16_of_double")
       (param $f f64) (result i32)
-      (local $x i32) (local $sign i32) (local $o i32)
-      (local.set $x (i32.reinterpret_f32 (f32.demote_f64 (local.get $f))))
-      (local.set $sign (i32.and (local.get $x) (i32.const 0x80000000)))
-      (local.set $x (i32.xor (local.get $x) (local.get $sign)))
-      (if (i32.ge_u (local.get $x) (i32.const 0x47800000))
+      (local $x i64) (local $o i32)
+      (local.set $x
+         (i64.and (i64.reinterpret_f64 (local.get $f))
+            (i64.const 0x7fffffffffffffff)))
+      (if (i64.ge_u (local.get $x) (i64.const 0x40f0000000000000)) ;; 2^16
          (then
             (local.set $o
                (select
                   (i32.const 0x7E00) ;; NaN
                   (i32.const 0x7C00) ;; infinity
-                  (i32.gt_u (local.get $x) (i32.const 0x7f800000)))))
+                  (i64.gt_u (local.get $x) (i64.const 0x7ff0000000000000)))))
          (else
-            (if (i32.lt_u (local.get $x) (i32.const 0x38800000))
+            (if (i64.lt_u (local.get $x) (i64.const 0x3f10000000000000)) ;; 2^-14
                (then
+                  ;; subnormal: the ulp of 2^28 is 2^-24, the smallest
+                  ;; float16 subnormal, so the addition rounds once
                   (local.set $o
-                     (i32.sub
-                        (i32.reinterpret_f32
-                            (f32.add (f32.reinterpret_i32 (local.get $x))
-                               (f32.const 0.5)))
-                        (i32.const 0x3f000000))))
+                     (i32.wrap_i64
+                        (i64.sub
+                           (i64.reinterpret_f64
+                              (f64.add (f64.reinterpret_i64 (local.get $x))
+                                 (f64.const 0x1p28)))
+                           (i64.const 0x41b0000000000000)))))
                (else
+                  ;; normal: rebias the exponent (1023 -> 15) and round to
+                  ;; nearest even over the 42 dropped bits; a carry into the
+                  ;; exponent gives the next binade, or infinity
                   (local.set $o
-                     (i32.shr_u
-                        (i32.add (i32.add (local.get $x) (i32.const 0xC8000FFF))
-                           (i32.and (i32.shr_u (local.get $x) (i32.const 13))
-                              (i32.const 1)))
-                        (i32.const 13)))))))
-      (i32.or (local.get $o) (i32.shr_u (local.get $sign) (i32.const 16))))
+                     (i32.wrap_i64
+                        (i64.shr_u
+                           (i64.add
+                              (i64.add (local.get $x)
+                                 (i64.const 0xc10001ffffffffff))
+                              (i64.and (i64.shr_u (local.get $x) (i64.const 42))
+                                 (i64.const 1)))
+                           (i64.const 42))))))))
+      (i32.or (local.get $o)
+         (i32.and
+            (i32.wrap_i64
+               (i64.shr_u (i64.reinterpret_f64 (local.get $f)) (i64.const 48)))
+            (i32.const 0x8000))))
 
+   ;; Without arithmetic on subnormal values, which is slow
    (func $double_of_float16 (export "caml_double_of_float16")
       (param $d i32) (result f64)
-      (local $f f32)
-      (local.set $f
-         (f32.mul
-            (f32.reinterpret_i32
-               ;; exponent and mantissa
-               (i32.shl (i32.and (local.get $d) (i32.const 0x7FFF))
-                  (i32.const 13)))
-            (f32.const 0x1p+112)))
-      (if (f32.ge (local.get $f) (f32.const 65536))
+      (local $e i32) (local $x i64)
+      (local.set $e (i32.and (local.get $d) (i32.const 0x7c00)))
+      ;; exponent and mantissa, exponent rebiased from 15 to 1023
+      (local.set $x
+         (i64.add
+            (i64.shl (i64.extend_i32_u (i32.and (local.get $d) (i32.const 0x7fff)))
+               (i64.const 42))
+            (i64.const 0x3f00000000000000)))
+      (if (i32.eqz (local.get $e))
          (then
-            ;; NaN / infinity
-            (local.set $f
-               (f32.reinterpret_i32
-                  (i32.or (i32.reinterpret_f32 (local.get $f))
-                     (i32.const 0x7f800000))))))
-      (f64.promote_f32
-         (f32.reinterpret_i32
-            (i32.or (i32.reinterpret_f32 (local.get $f))
-               ;; sign bit
-               (i32.shl (i32.and (local.get $d) (i32.const 0x8000))
-                  (i32.const 16))))))
+            ;; subnormal: 2^-14 * (1 + m / 1024) - 2^-14 = m * 2^-24, exactly
+            (local.set $x
+               (i64.reinterpret_f64
+                  (f64.sub
+                     (f64.reinterpret_i64
+                        (i64.add (local.get $x) (i64.const 0x0010000000000000)))
+                     (f64.const 0x1p-14))))))
+      (if (i32.eq (local.get $e) (i32.const 0x7c00))
+         (then
+            ;; infinity / NaN: exponent 31 + 1008 + 1008 = 2047; NaNs are
+            ;; made quiet, as a conversion through float32 does
+            (local.set $x
+               (i64.or
+                  (i64.add (local.get $x) (i64.const 0x3f00000000000000))
+                  (select (i64.const 0x0008000000000000) (i64.const 0)
+                     (i32.and (local.get $d) (i32.const 0x3ff)))))))
+      (f64.reinterpret_i64
+         (i64.or (local.get $x)
+            ;; sign bit
+            (i64.shl (i64.extend_i32_u (i32.and (local.get $d) (i32.const 0x8000)))
+               (i64.const 48)))))
 
    (func $caml_ba_num_elts (export "caml_ba_num_elts")
       (param $b (ref eq)) (result i32)
@@ -1408,7 +1432,10 @@
               (call $caml_ba_size_per_element (local.get $kind)))))
      (if (i64.ne (local.get $l) (i64.extend_i32_s (i32.wrap_i64 (local.get $l))))
         (then (call $caml_raise_out_of_memory)))
-     (return_call $ta_create (local.get $kind) (i32.wrap_i64 (local.get $l))))
+     ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+     ;; tail call cross
+     (return
+        (call $ta_create (local.get $kind) (i32.wrap_i64 (local.get $l)))))
 
    (global $CAML_BA_MAX_NUM_DIMS i32 (i32.const 16))
 
@@ -2447,6 +2474,30 @@
          (local.get $v))
       (ref.i31 (i32.const 0)))
 
+   ;; Accesses at a flat element offset, which the OxCaml JSIR backend has
+   ;; already computed (and bounds-checked if needed). The compiler inlines
+   ;; them when it knows the kind of the bigarray, but needs these as
+   ;; fallbacks.
+
+   (func (export "caml_ba_get_raw_unsafe")
+      (param $vba (ref eq)) (param $vi (ref eq)) (result (ref eq))
+      (return_call $caml_ba_get_at_offset
+         (ref.cast (ref $bigarray) (local.get $vba))
+         (@if $portable-int
+         (@then (call $caml_ba_index_val (local.get $vi)))
+         (@else (i31.get_u (ref.cast (ref i31) (local.get $vi)))))))
+
+   (func (export "caml_ba_set_raw_unsafe")
+      (param $vba (ref eq)) (param $vi (ref eq)) (param $v (ref eq))
+      (result (ref eq))
+      (call $caml_ba_set_at_offset
+         (ref.cast (ref $bigarray) (local.get $vba))
+         (@if $portable-int
+         (@then (call $caml_ba_index_val (local.get $vi)))
+         (@else (i31.get_u (ref.cast (ref i31) (local.get $vi)))))
+         (local.get $v))
+      (ref.i31 (i32.const 0)))
+
    (@string $too_many_indices "Bigarray.slice: too many indices")
 
    (func (export "caml_ba_slice")
@@ -3210,8 +3261,9 @@
       (local $view (ref extern))
       (local.set $ba (ref.cast (ref $bigarray) (local.get $vba)))
       (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
-      (return_call $dv_get_ui16_unaligned
-         (local.get $view) (local.get $i) (i32.const 1)))
+      (return
+         (call $dv_get_ui16_unaligned
+            (local.get $view) (local.get $i) (i32.const 1))))
 
    (func (export "caml_ba_uint8_get32")
       (param $vba (ref eq)) (param $i i32) (result i32)
@@ -3235,8 +3287,9 @@
       (local $view (ref extern))
       (local.set $ba (ref.cast (ref $bigarray) (local.get $vba)))
       (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
-      (return_call $dv_get_i32_unaligned
-         (local.get $view) (local.get $i) (i32.const 1)))
+      (return
+         (call $dv_get_i32_unaligned
+            (local.get $view) (local.get $i) (i32.const 1))))
 
    (func (export "caml_ba_uint8_get64")
       (param $vba (ref eq)) (param $i i32) (result i64)

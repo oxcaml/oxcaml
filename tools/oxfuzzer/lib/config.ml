@@ -1,10 +1,14 @@
-(* CR-someday hwasilewski: Make sure all constants, including probabilities, are
+(* CR-someday xclerc: Make sure all constants, including probabilities, are
    inside Config. *)
 let max_function_count = 10
 
 let fun_min_param_count = 0
 
 let fun_max_param_count = 5
+
+let wide_fun_min_param_count = 16
+
+let wide_fun_max_param_count = 64
 
 let max_block_depth = 4
 
@@ -20,9 +24,17 @@ let max_array_axis_size = 10
 
 let max_array_elements = 256
 
+let max_string_length = 64
+
 let max_record_types = 3
 
 let max_record_fields = 4
+
+let max_exception_count = 3
+
+let max_handler_count = 2
+
+let max_try_count = 8
 
 let max_variant_types = 3
 
@@ -32,30 +44,92 @@ let max_constructor_args = 3
 
 let max_match_count = 8
 
-(* Percentages. *)
-let record_probability = 25
+let max_unboxed_tuple_arity = 4
 
-let variant_probability = 25
+let max_unboxed_tuple_depth = 2
 
-let match_in_match_probability = 50
+let max_closure_param_count = 3
 
-let nested_record_probability = 15
+let max_closure_call_count = 8
 
-let mutable_binding_probability = 75
+let max_let_rec_count = 4
 
-let mutable_field_probability = 50
+let max_recursive_functions = 3
 
-let array_probability = 25
+let max_recursive_param_count = 2
 
-let array_literal_probability = 50
+let max_recursive_calls = 2
 
-let bounded_index_probability = 75
+let max_recursion_fuel = 3
 
-let opaque_initializer_probability = 50
+(* Off by default to avoid generating tests that tend to trigger a known
+   compiler bug (https://github.com/oxcaml/oxcaml/issues/8139) *)
+let unused_recursive_functions = false
 
-let opaque_leaf_probability = 5
+let max_probability = 10_000
 
-let opaque_loop_bound_probability = 50
+(* Probabilities out of [max_probability], conditional on reaching each
+   choice. *)
+let record_probability = 2_500
+
+let variant_probability = 2_500
+
+let or_null_probability = 2_500
+
+let unboxed_tuple_probability = 2_500
+
+let match_in_match_probability = 5_000
+
+let assert_false_probability = 1
+
+let nested_record_probability = 1_500
+
+let mutable_binding_probability = 7_500
+
+let mutable_field_probability = 5_000
+
+let array_probability = 2_500
+
+let bool_probability = 2_000
+
+let string_probability = 2_000
+
+let array_literal_probability = 5_000
+
+let bounded_index_probability = 7_500
+
+let opaque_initializer_probability = 5_000
+
+let opaque_leaf_probability = 500
+
+let opaque_loop_bound_probability = 5_000
+
+let exception_payload_probability = 5_000
+
+let payload_binding_probability = 7_500
+
+let catch_all_probability = 2_500
+
+let raise_notrace_probability = 5_000
+
+let callee_raises_probability = 5_000
+
+let closure_probability = 1_500
+
+let curried_lambda_probability = 2_500
+
+let opaque_recursive_call_probability = 2_500
+
+let wide_function_probability = 500
+
+let tail_call_probability = 2_500
+
+let existing_value_for_wide_argument_probability = 7_500
+
+type assertion_mode =
+  | Disabled
+  | Unreachable_only
+  | May_raise
 
 module Swarm = struct
   type t =
@@ -65,8 +139,11 @@ module Swarm = struct
       multidimensional_arrays : bool;
       boxed_records : bool;
       unboxed_records : bool;
+      unboxed_tuples : bool;
       variants : bool;
+      or_null : bool;
       matches : bool;
+      assertions : assertion_mode;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
@@ -80,7 +157,12 @@ module Swarm = struct
       bitwise_operations : bool;
       opaque_initializers : bool;
       opaque_leaves : bool;
-      opaque_loop_bounds : bool
+      opaque_loop_bounds : bool;
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool;
+      wide_functions : bool
     }
 
   let create random_state =
@@ -90,8 +172,15 @@ module Swarm = struct
       multidimensional_arrays = Random.State.bool random_state;
       boxed_records = Random.State.bool random_state;
       unboxed_records = Random.State.bool random_state;
+      unboxed_tuples = Random.State.bool random_state;
       variants = Random.State.bool random_state;
+      or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
+      assertions =
+        (match Random.State.int random_state 3 with
+        | 0 -> Disabled
+        | 1 -> Unreachable_only
+        | _ -> May_raise);
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -105,7 +194,12 @@ module Swarm = struct
       bitwise_operations = Random.State.bool random_state;
       opaque_initializers = Random.State.bool random_state;
       opaque_leaves = Random.State.bool random_state;
-      opaque_loop_bounds = Random.State.bool random_state
+      opaque_loop_bounds = Random.State.bool random_state;
+      exceptions = Random.State.bool random_state;
+      closures = Random.State.bool random_state;
+      partial_applications = Random.State.bool random_state;
+      recursive_functions = Random.State.bool random_state;
+      wide_functions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -115,7 +209,9 @@ module Swarm = struct
       "multidimensional_arrays", t.multidimensional_arrays;
       "boxed_records", t.boxed_records;
       "unboxed_records", t.unboxed_records;
+      "unboxed_tuples", t.unboxed_tuples;
       "variants", t.variants;
+      "or_null", t.or_null;
       "matches", t.matches;
       "record_updates", t.record_updates;
       "record_representation_conversions", t.record_representation_conversions;
@@ -130,8 +226,19 @@ module Swarm = struct
       "bitwise_operations", t.bitwise_operations;
       "opaque_initializers", t.opaque_initializers;
       "opaque_leaves", t.opaque_leaves;
-      "opaque_loop_bounds", t.opaque_loop_bounds ]
+      "opaque_loop_bounds", t.opaque_loop_bounds;
+      "exceptions", t.exceptions;
+      "closures", t.closures;
+      "partial_applications", t.partial_applications;
+      "recursive_functions", t.recursive_functions;
+      "wide_functions", t.wide_functions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
+    |> List.cons
+         (Format.sprintf "  assertions = %s"
+            (match t.assertions with
+            | Disabled -> "disabled"
+            | Unreachable_only -> "unreachable_only"
+            | May_raise -> "may_raise"))
     |> String.concat "\n"
 
   let number_types t =

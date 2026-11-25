@@ -328,8 +328,12 @@ module Vars = Misc.Stdlib.String.Map
 
 (* Value descriptions *)
 
+type sort_or_unrepresentable =
+  | Representable of Jkind_types.Sort.t
+  | Unrepresentable
+
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg of sort_or_unrepresentable  (* Regular value *)
   | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -359,12 +363,13 @@ and method_privacy =
      0 <= may_pos <= pos
      0 <= may_weak <= may_neg <= neg
      0 <= inj
+     0 <= may_noncontractive
    may_pos/may_neg mean possible positive/negative occurrences;
      thus, may_pos + may_neg = invariant
    Additionally, the following implications are valid
      pos => inj
      neg => inj
-   Examples:
+   Examples (all of which are also may_noncontractive):
      type 'a t        : may_pos + may_neg
      type +'a t       : may_pos
      type -'a t       : may_neg
@@ -383,32 +388,46 @@ and method_privacy =
 
 module Variance = struct
   type t = int
-  type f = May_pos | May_neg | May_weak | Inj | Pos | Neg | Inv
+  type f =
+    | May_pos | May_neg | May_weak | May_noncontractive
+    | Inj | Pos | Neg | Inv
   let single = function
     | May_pos -> 1
     | May_neg -> 2 + 4
     | May_weak -> 4
-    | Inj -> 8
-    | Pos -> 16 + 8 + 1
-    | Neg -> 32 + 8 + 4 + 2
-    | Inv -> 63
+    | May_noncontractive -> 8
+    | Inj -> 16
+    | Pos -> 32 + 16 + 1
+    | Neg -> 64 + 16 + 4 + 2
+    | Inv -> 127
   let union v1 v2 = v1 lor v2
   let inter v1 v2 = v1 land v2
+  let subtract v1 v2 = v1 land (lnot v2)
   let subset v1 v2 = (v1 land v2 = v1)
   let eq (v1 : t) v2 = (v1 = v2)
   let set x v = union v (single x)
+  let unset x v = subtract v (single x)
   let set_if b x v = if b then set x v else v
   let mem x = subset (single x)
   let null = 0
-  let unknown = 7
+  let unknown = 15
   let full = single Inv
-  let covariant = single Pos
-  let contravariant = single Neg
+  let covariant = union (single Pos) (single May_noncontractive)
+  let contravariant = union (single Neg) (single May_noncontractive)
   let swap f1 f2 v v' =
     set_if (mem f2 v) f1 (set_if (mem f1 v) f2 v')
   let conjugate v =
-    let v' = inter v (union (single Inj) (single May_weak)) in
+    let v' =
+      inter v
+        (union (single Inj)
+           (union (single May_weak) (single May_noncontractive)))
+    in
     swap Pos Neg v (swap May_pos May_neg v v')
+  let contractive v = unset May_noncontractive v
+
+  let contractive_if_rectypes_enabled vari =
+    if !Clflags.recursive_types then contractive vari else vari
+
   let compose v1 v2 =
     if mem Inv v1 && mem Inj v2 then full else
     let mp =
@@ -416,15 +435,18 @@ module Variance = struct
     and mn =
       mem May_pos v1 && mem May_neg v2 || mem May_neg v1 && mem May_pos v2
     and mw = mem May_weak v1 && v2 <> null || v1 <> null && mem May_weak v2
+    and mnc = mem May_noncontractive v1 && mem May_noncontractive v2
     and inj = mem Inj v1 && mem Inj v2
     and pos = mem Pos v1 && mem Pos v2 || mem Neg v1 && mem Neg v2
     and neg = mem Pos v1 && mem Neg v2 || mem Neg v1 && mem Pos v2 in
     List.fold_left (fun v (b,f) -> set_if b f v) null
-      [mp, May_pos; mn, May_neg; mw, May_weak; inj, Inj; pos, Pos; neg, Neg]
+      [mp, May_pos; mn, May_neg; mw, May_weak; mnc, May_noncontractive;
+       inj, Inj; pos, Pos; neg, Neg]
   let strengthen v =
-    if mem May_neg v then v else v land (full - single May_weak)
+    if mem May_neg v then v else v land (unset May_weak full)
   let get_upper v = (mem May_pos v, mem May_neg v)
   let get_lower v = (mem Pos v, mem Neg v, mem Inj v)
+  let is_null v = (v = null)
   let unknown_signature ~injective ~arity =
     let v = if injective then set Inj unknown else unknown in
     Misc.replicate_list v arity
@@ -725,6 +747,8 @@ module type Wrapped = sig
     Mty_ident of Path.t
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
+                   * Mode.Staticity.Const.t
+      (* [Mode.Staticity.Const.t] is [Static] for template functors. *)
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
@@ -766,8 +790,15 @@ module type Wrapped = sig
     mtd_uid: Uid.t;
   }
 
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option
+  type signature_item_sort =
+    | Fixed of Jkind_types.Sort.t
+    | Unknown of Ident.t * value_description
+    | Absent_at_runtime
+
+  val sort_of_signature_item : signature_item -> signature_item_sort
+
+  val expect_fixed_representation :
+    signature_item list -> Jkind_types.Sort.t array
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
@@ -776,28 +807,41 @@ module Make_wrapped(Wrap : Wrap) = struct
   include M
 
   let sort_of_signature_item = function
-    | Sig_value(_, decl, _) ->
+    | Sig_value(id, decl, _) ->
       begin match decl.val_kind with
-      | Val_reg sort -> Some sort
+      | Val_reg Unrepresentable -> Unknown (id, decl)
+      | Val_reg (Representable sort) -> Fixed sort
       | Val_ivar _ ->
-        Some Jkind_types.Sort.(of_const Const.for_instance_var)
+        Fixed Jkind_types.Sort.(of_const Const.for_instance_var)
       | Val_self _ | Val_anc _ ->
-        Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ -> None (* Primitives are not stored in modules *)
+        Fixed Jkind_types.Sort.(of_const Const.for_object)
+      | Val_prim _ ->
+        Absent_at_runtime (* Primitives are not stored in modules *)
       | Val_mut _ ->
         Misc.fatal_error "Mutable variable found at the structure level"
       end
     | Sig_typext _ ->
-      Some Jkind_types.Sort.(of_const Const.for_type_extension)
+      Fixed Jkind_types.Sort.(of_const Const.for_type_extension)
     | Sig_module(_, pres, _, _, _) ->
       begin match pres with
       | Mp_present ->
-        Some Jkind_types.Sort.(of_const Const.for_module)
-      | Mp_absent -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_module)
+      | Mp_absent -> Absent_at_runtime
       end
     | Sig_class _ ->
-        Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+        Fixed Jkind_types.Sort.(of_const Const.for_class)
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ ->
+      Absent_at_runtime
+
+  let expect_fixed_representation items =
+    List.filter_map
+      (fun item ->
+         match sort_of_signature_item item with
+         | Fixed sort -> Some sort
+         | Absent_at_runtime -> None
+         | Unknown _ -> Misc.fatal_error "unrepresentable signature item")
+      items
+    |> Array.of_list
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -815,8 +859,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
   let rec module_type m = function
     | Mty_ident p -> To.Mty_ident p
     | Mty_alias p -> To.Mty_alias p
-    | Mty_functor (parm,mty,mm) ->
-        To.Mty_functor (functor_parameter m parm, module_type m mty, mm)
+    | Mty_functor (parm,mty,mm,st) ->
+        To.Mty_functor (functor_parameter m parm, module_type m mty, mm, st)
     | Mty_signature sg -> To.Mty_signature (signature m sg)
     | Mty_for_hole -> To.Mty_for_hole
     | Mty_strengthen (mty,p,aliasable) ->
@@ -824,7 +868,7 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
 
   and functor_parameter m = function
       | Unit -> To.Unit
-      | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
+      | Named (id, mty, mm) -> To.Named (id, module_type m mty, mm)
 
   let value_description m vd = m.map_value_description m vd
 
@@ -1087,17 +1131,25 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record
-      ([{ld_type = arg; ld_modalities = ms; _}],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}],
        Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }],
+      ([{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _ }],
        (Record_unboxed_product | Record_unboxed_product_undetermined), _)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
-  | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms)
+  | Type_variant
+      ([{cd_args =
+           Cstr_record
+             [{ld_type = arg; ld_modalities = ms; ld_mutable = mut; _}];
+         _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, mut)
+  | Type_variant
+      ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}],
+       Variant_unboxed, _) ->
+    Some (arg, ms, Immutable)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined
@@ -1140,14 +1192,6 @@ let signature_item_id = function
   | Sig_class_type (id, _, _, _)
   | Sig_jkind (id, _, _)
     -> id
-
-let signature_item_representation sg =
-  match sort_of_signature_item sg with
-  | None -> None
-  | Some sort -> Some (signature_item_id sg, sort)
-
-let bound_value_identifiers_and_sorts sigs =
-  List.filter_map signature_item_representation sigs
 
 type arg_signature = {
   arg_param : Global_module.Parameter_name.t;
@@ -1344,6 +1388,8 @@ let not_marked_node mark t =
   | Mark {mark} -> (repr t).scope land mark = 0
   | Hash {visited} -> not (TransientTypeHash.mem visited (repr t))
 
+let marked_node mark t = not (not_marked_node mark t)
+
 (* transient type_expr *)
 
 module Transient_expr = struct
@@ -1359,7 +1405,16 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
-    | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+    | _ -> Misc.fatal_error "set_var_jkind called on non-Tvar"
+  let set_jkind ty jkind' =
+    match ty.desc with
+    | Tvar { name; _ } ->
+      set_desc ty (Tvar { name; jkind = jkind' })
+    | Tunivar { name; _ } ->
+      set_desc ty (Tunivar { name; jkind = jkind' })
+    | Tof_kind _ ->
+      set_desc ty (Tof_kind jkind')
+    | _ -> Misc.fatal_error "set_jkind called on non-Tvar/Tunivar/Tof_kind"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1381,6 +1436,7 @@ end
 
 (* setting marks *)
 let try_mark_node mark t = Transient_expr.try_mark_node mark (repr t)
+let mark_node mark t = ignore (try_mark_node mark t)
 
 (* Comparison for [type_expr]; cannot be used for functors *)
 
@@ -1772,6 +1828,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_jkind ty jkind =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_jkind ty jkind
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

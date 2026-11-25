@@ -298,7 +298,8 @@ type t =
       { needs_caml_c_call : bool;
         is_c_builtin : bool;
         effects : Effects.t;
-        coeffects : Coeffects.t
+        coeffects : Coeffects.t;
+        fat_ptr_arg_starts : int list
       }
   | Effect of Effect.t
 
@@ -316,17 +317,22 @@ let [@ocamlformat "disable"] print ppf t =
         )@]"
       Simple.print obj
       Method_kind.print kind
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects;
+             fat_ptr_arg_starts } ->
     fprintf ppf "@[<hov 1>(C@ \
         @[<hov 1>(needs_caml_c_call@ %b)@]@ \
         @[<hov 1>(is_c_builtin@ %b)@]@ \
         @[<hov 1>(effects@ %a)@]@ \
-        @[<hov 1>(coeffects@ %a)@]\
+        @[<hov 1>(coeffects@ %a)@]@ \
+        @[<hov 1>(fat_ptr_arg_starts@ (%a))@]\
         )@]"
       needs_caml_c_call
       is_c_builtin
       Effects.print effects
       Coeffects.print coeffects
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space
+         Format.pp_print_int)
+      fat_ptr_arg_starts
   | Effect effect_op -> Effect.print ppf effect_op
 
 let direct_function_call code_id = Function { function_call = Direct code_id }
@@ -339,8 +345,10 @@ let indirect_function_call_known_arity ~code_ids =
 
 let method_call kind ~obj = Method { kind; obj }
 
-let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects =
-  C_call { needs_caml_c_call; is_c_builtin; effects; coeffects }
+let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects
+    ~fat_ptr_arg_starts =
+  C_call
+    { needs_caml_c_call; is_c_builtin; effects; coeffects; fat_ptr_arg_starts }
 
 let effect_ eff = Effect eff
 
@@ -349,15 +357,17 @@ let free_names t =
   | Function { function_call = Direct code_id } ->
     Name_occurrences.add_code_id Name_occurrences.empty code_id Name_mode.normal
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    Code_id.Set.fold
-      (fun code_id free_names ->
-        Name_occurrences.add_code_id free_names code_id Name_mode.normal)
-      code_ids Name_occurrences.empty
+    Name_occurrences.free_names_code_id_set code_ids Name_mode.normal
   | Function { function_call = Indirect_unknown_arity }
   | Function { function_call = Indirect_known_arity Unknown } ->
     Name_occurrences.empty
   | C_call
-      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+      { needs_caml_c_call = _;
+        is_c_builtin = _;
+        effects = _;
+        coeffects = _;
+        fat_ptr_arg_starts = _
+      } ->
     Name_occurrences.empty
   | Method { kind = _; obj } -> Simple.free_names obj
   | Effect op -> Effect.free_names op
@@ -370,10 +380,8 @@ let apply_renaming t renaming =
     then t
     else Function { function_call = Direct code_id' }
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    let code_ids' =
-      Code_id.Set.map (Renaming.apply_code_id renaming) code_ids
-    in
-    if Code_id.Set.equal code_ids code_ids'
+    let code_ids' = Renaming.apply_code_id_set renaming code_ids in
+    if code_ids == code_ids'
     then t
     else Function { function_call = Indirect_known_arity (Known code_ids') }
   | Function
@@ -381,7 +389,12 @@ let apply_renaming t renaming =
     ->
     t
   | C_call
-      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+      { needs_caml_c_call = _;
+        is_c_builtin = _;
+        effects = _;
+        coeffects = _;
+        fat_ptr_arg_starts = _
+      } ->
     t
   | Method { kind; obj } ->
     let obj' = Simple.apply_renaming obj renaming in
@@ -395,15 +408,17 @@ let ids_for_export t =
   | Function { function_call = Direct code_id } ->
     Ids_for_export.add_code_id Ids_for_export.empty code_id
   | Function { function_call = Indirect_known_arity (Known code_ids) } ->
-    Code_id.Set.fold
-      (fun code_id ids_for_export ->
-        Ids_for_export.add_code_id ids_for_export code_id)
-      code_ids Ids_for_export.empty
+    Ids_for_export.ids_for_export_code_id_set code_ids
   | Function { function_call = Indirect_unknown_arity }
   | Function { function_call = Indirect_known_arity Unknown } ->
     Ids_for_export.empty
   | C_call
-      { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ } ->
+      { needs_caml_c_call = _;
+        is_c_builtin = _;
+        effects = _;
+        coeffects = _;
+        fat_ptr_arg_starts = _
+      } ->
     Ids_for_export.empty
   | Method { kind = _; obj } -> Ids_for_export.from_simple obj
   | Effect op -> Effect.ids_for_export op

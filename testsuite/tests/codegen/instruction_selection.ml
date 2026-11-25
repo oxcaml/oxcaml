@@ -86,6 +86,64 @@ logand_branch:
   ret
 |}]
 
+let lognot_branch x y f = if Int64_u.equal (Int64_u.lognot x) #0L then f ()
+[%%expect_asm X86_64{|
+lognot_branch:
+  movq  %rdi, %rbx
+  cmpq  $-1, %rax
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_neq_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <> 0L then f ()
+[%%expect_asm X86_64{|
+lognot_neq_branch:
+  cmpq  $-1, %rax
+  je    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_lt_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) < 7L then f ()
+[%%expect_asm X86_64{|
+lognot_lt_branch:
+  cmpq  $-8, %rax
+  jle   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_lognot_lte_branch x y f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <= Int64_u.to_int64 (Int64_u.lognot y)
+  then f ()
+[%%expect_asm X86_64{|
+lognot_lognot_lte_branch:
+  movq  %rbx, %rsi
+  movq  %rdi, %rbx
+  cmpq  %rsi, %rax
+  jl    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`
@@ -180,21 +238,14 @@ int_compare:
   ret
 |}]
 
-(* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
   let cmp = o <> 0 in
   if cmp = true then o else 7
 ;;
 [%%expect_asm X86_64{|
 branch_and_return:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  cmpq  $1, %rbx
-  setne %al
-  leaq  1(%rax,%rax), %rax
-  cmpq  $3, %rax
-  jne   .L0
-  movq  %rbx, %rax
+  cmpq  $1, %rax
+  je    .L0
   ret
 .L0:
   movl  $15, %eax
@@ -266,7 +317,6 @@ int32_box_unbox_after_call:
   movq  %rax, %rdi
   movq  %rbx, %rsi
   call  memcmp@PLT
-  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret

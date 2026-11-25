@@ -2,7 +2,7 @@
  script = "sh ${test_source_directory}/test-runtime-cleanup.sh";
  include systhreads;
  hassysthreads;
- script;
+ config_script;
  {
    output = "${test_build_directory}/program-output";
    stdout = "${output}";

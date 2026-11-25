@@ -29,6 +29,8 @@
 (** Annotations for a given branch (i.e. switch arm). *)
 type t
 
+val create : likelihood:Likelihood.t -> fdo_annotation:Fdo_annotation.t -> t
+
 val from_likelihood : Likelihood.t -> t
 
 val default : t
@@ -45,13 +47,24 @@ val likelihood : t -> Likelihood.t
 
 val with_likelihood : t -> Likelihood.t -> t
 
-(** Combine multiple branch annotations into annotations for a shared branch.
+(** The FDO counters of the edge this branch takes. See [Fdo_annotation]. *)
+val fdo_annotation : t -> Fdo_annotation.t
 
-    The returned branch information must be valid for an intermediate jump
-    target that captures all the provided branches (this may be followed by a
-    branching point to dispatch to the provided branches, but not necessarily if
-    the branches have been found to be identical and shared). *)
-val sum_list : t list -> t
+val with_fdo_annotation : t -> Fdo_annotation.t -> t
 
-(** [add t1 t2] is [sum_list [t1; t2]]. *)
-val add : t -> t -> t
+(** Annotations for a single branch that replaces the given branches, when they
+    have been found to be identical and shared. *)
+val join_point : t list -> t
+
+(** Annotations for the edge into an intermediate branching point that
+    dispatches to the given branches, e.g. a node of the decision tree compiled
+    from a switch. *)
+val fork_point : t list -> t
+
+(** The scale at which the likelihood annotations of the arms of a switch are
+    printed. *)
+val likelihood_printing_scale : t list -> Likelihood.printing_scale
+
+(** The annotations of an arm of a switch, at the scale of its arms. Each part
+    is preceded by a space. *)
+val print : Likelihood.printing_scale -> Format.formatter -> t -> unit

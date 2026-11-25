@@ -387,7 +387,7 @@ include Container_types.Make (struct
         or_var2
     | Boxed_mask or_var1, Boxed_mask or_var2 ->
       Or_variable.compare Vector_types.Mask.Bit_pattern.compare or_var1 or_var2
-    | Immutable_float_block fields1, Immutable_float_array fields2 ->
+    | Immutable_float_block fields1, Immutable_float_block fields2 ->
       Misc.Stdlib.List.compare
         (Or_variable.compare Numeric_types.Float_by_bit_pattern.compare)
         fields1 fields2

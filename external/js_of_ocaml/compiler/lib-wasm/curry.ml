@@ -235,7 +235,8 @@ module Make (Target : Target_sig.S) = struct
   let cps_curry ~arity ~name = cps_curry ~arity arity ~name
 
   let apply ~context ~arity ~name =
-    assert (arity > 1);
+    (* The arity 0 case can happen in OxCaml, which drops void arguments. *)
+    assert (arity <> 1);
     let l =
       List.rev
         (List.init ~len:arity ~f:(fun i -> Code.Var.fresh_n (Printf.sprintf "x%d" i)))

@@ -581,6 +581,7 @@ module Analyser =
         let take_item psig_desc = { sig_item with Parsetree.psig_desc } :: acc in
         match sig_item.Parsetree.psig_desc with
         | Parsetree.Psig_jkind _ -> Misc.fatal_error "Psig_kind"
+        | Parsetree.Psig_law _
         | Parsetree.Psig_attribute _
         | Parsetree.Psig_extension _
         | Parsetree.Psig_value _
@@ -1610,7 +1611,8 @@ module Analyser =
             in
             (maybe_more, new_env, eles)
         | Parsetree.Psig_attribute _
-        | Parsetree.Psig_extension _ ->
+        | Parsetree.Psig_extension _
+        | Parsetree.Psig_law _ ->
             (0, env, [])
 
     and analyse_signature_item env _signat table current_module_name
@@ -1666,7 +1668,7 @@ module Analyser =
            let loc_end = Loc.end_ loc in
            let mp_type_code = get_string_of_file loc_start loc_end in
            match sig_module_type with
-             Types.Mty_functor (param, body_module_type, _) ->
+             Types.Mty_functor (param, body_module_type, _, _) ->
                let mp_name, mp_kind =
                  match param2, param with
                    Parsetree.Named (_, pmty, _),
@@ -1760,7 +1762,7 @@ module Analyser =
       | Parsetree.Pmty_functor (param2,module_type2, _) (* of string * module_type * module_type *) ->
           (
            match sig_module_type with
-             Types.Mty_functor (param, body_module_type, _) ->
+             Types.Mty_functor (param, body_module_type, _, _) ->
                let loc = match param2 with Parsetree.Unit -> Location.none
                      | Parsetree.Named (_, pmty, _) -> pmty.Parsetree.pmty_loc in
                let loc_start = Loc.start loc in

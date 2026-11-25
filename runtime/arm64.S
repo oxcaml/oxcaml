@@ -18,8 +18,11 @@
 /* Asm part of the runtime system, ARM processor, 64-bit mode */
 /* Must be preprocessed by cpp */
 
+#define CAML_INTERNALS
+
 #include "caml/m.h"
 #include "caml/asm.h"
+#include "caml/asm_offsets.h"
 
 /* Special registers */
 
@@ -50,6 +53,12 @@
 #define DW_REG_x21                21
 #define DW_REG_x29                29
 #define DW_REG_sp                 31
+
+/* The operand of DW_OP_breg is a signed LEB128, so a single byte can only
+   encode -64..63: larger non-negative offsets silently decode as negative.
+   SLEB128_2 always uses two bytes, which is valid for 0..8191; each use must
+   be guarded by an assembly-time range check. */
+#define SLEB128_2(x) (((x) & 0x7f) | 0x80), (((x) >> 7) & 0x7f)
 
 
         .set    domain_curr_field, 0
@@ -178,37 +187,26 @@ G(name):
 
 /* Stack switching operations */
 
-/* struct stack_info */
-#define Stack_sp(reg)           [reg]
-#define Stack_sp_offset         0
-#define Stack_exception(reg)    [reg, #8]
-#define Stack_handler(reg)      [reg, #16]
-#define Stack_handler_from_cont(reg) [reg, #15]
-#define Stack_local_sp(reg)     [reg, #64]
-#define Stack_local_top(reg)    [reg, #72]
-#define Stack_local_limit(reg)  [reg, #80]
-#define Stack_tls_state(reg)    [reg, #88]
-
-/* struct c_stack_link */
-#define Cstack_stack(reg)       [reg]
-#define Cstack_sp(reg)          [reg, #8]
-#define Cstack_sp_offset        8
-#define Cstack_prev(reg)        [reg, #16]
-#define Cstack_async_exn_handler(reg) [reg, #24]
-
-/* struct dynamic_cache_s */
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
-#define Dynamic_binding_size     (2*8) /* dyn, val */
-#define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
-
-/* struct stack_handler */
-#define Handler_value(reg)      [reg]
-#define Handler_exception(reg)  [reg, #8]
-#define Handler_effect(reg)     [reg, #16]
-#define Handler_parent(reg)     [reg, #32]
-#define Handler_parent_offset   32
+#define Stack_sp(reg)           [reg, #Stack_sp_offset]
+#define Stack_exception(reg)    [reg, #Stack_exception_offset]
+#define Stack_handler(reg)      [reg, #Stack_handler_offset]
+#define Stack_handler_from_cont(reg) \
+                                [reg, #Stack_handler_from_cont_offset]
+#define Stack_local_sp(reg)     [reg, #Stack_local_sp_offset]
+#define Stack_local_top(reg)    [reg, #Stack_local_top_offset]
+#define Stack_local_limit(reg)  [reg, #Stack_local_limit_offset]
+#define Stack_tls_state(reg)    [reg, #Stack_tls_state_offset]
+#define Stack_idled_from_high(reg) \
+                                [reg, #Stack_idled_from_high_offset]
+#define Handler_value(reg)      [reg, #Handler_value_offset]
+#define Handler_exception(reg)  [reg, #Handler_exception_offset]
+#define Handler_effect(reg)     [reg, #Handler_effect_offset]
+#define Handler_parent(reg)     [reg, #Handler_parent_offset]
+#define Cstack_stack(reg)       [reg, #Cstack_stack_offset]
+#define Cstack_sp(reg)          [reg, #Cstack_sp_offset]
+#define Cstack_prev(reg)        [reg, #Cstack_prev_offset]
+#define Cstack_async_exn_handler(reg) \
+                                [reg, #Cstack_async_exn_handler_offset]
 
 /* Continuation values
  *
@@ -772,14 +770,18 @@ FUNCTION(caml_c_call)
         SWITCH_C_TO_OCAML
 #if defined(WITH_THREAD_SANITIZER)
     /* Save return value registers. Since the called function could be
-       anything, it may have returned its result (if any) either in x0
-       or q0:q1. */
+       anything, it may have returned its result (if any) in x0:x1 and/or
+       q0:q3 (q2:q3 for homogeneous aggregate returns). */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
         stp     q0, q1, [sp, -32]!
         CFI_ADJUST(32)
+        stp     q2, q3, [sp, -32]!
+        CFI_ADJUST(32)
         TSAN_EXIT_FUNCTION
     /* Restore return value registers */
+        ldp     q2, q3, [sp], 32
+        CFI_ADJUST(-32)
         ldp     q0, q1, [sp], 32
         CFI_ADJUST(-32)
         ldp     x0, x1, [sp], 16
@@ -1357,7 +1359,9 @@ L(preemption_unhandled):
        redoing the interrupted allocation, restoring registers, and
        returning to user code. */
         b       L(resume_preemption)
-2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+2:
+L(raise_resume_failure):
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
@@ -1367,6 +1371,38 @@ FUNCTION(caml_reperform)
     /*  x0: effect to reperform
         x1: continuation
         x2: last_fiber */
+
+     /* An already-consumed continuation (NULL stack) is left for the
+        unhandled path to report. */
+        ldr     TMP, Cont_fiber(x1)
+        sub     TMP, TMP, 1                   /* TMP := Ptr_val(fiber) */
+        cbz     TMP, 1f
+
+     /* If a minor collection idled the continuation's stacks during this
+        perform (moving them), x2 is stale: wake the stacks in place
+        and reload the last fiber from the continuation. */
+        ldr     TMP2, Stack_idled_from_high(TMP)
+        cbz     TMP2, 1f
+
+        mov     x19, x0                       /* save the effect */
+        mov     x20, x1                       /* save the continuation */
+        mov     x21, x30                      /* [bl] below clobbers the
+                                                 perform-site return
+                                                 address, which do_perform
+                                                 saves at the switch */
+        mov     C_ARG_1, x1
+        SWITCH_OCAML_TO_C
+        bl      G(caml_cont_wake_stacks)
+    /* TMP2 := zero if the stacks could not be woken, in which case the
+       last fiber is still stale and must not be used. */
+        mov     TMP2, x0
+        SWITCH_C_TO_OCAML
+        mov     x30, x21
+        mov     x0, x19
+        mov     x1, x20
+        cbz     TMP2, L(raise_resume_failure) /* could not wake: raise */
+        ldr     x2, Cont_last_fiber(x1)       /* the woken last fiber */
+1:
         ldr     TMP, Stack_handler_from_cont(x2)
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
         str     x2, Handler_parent(TMP) /* Append to last_fiber */
@@ -1390,7 +1426,7 @@ END_FUNCTION(caml_reperform)
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
-        ldr     x23, Cont_last_fiber(x0)      /* x23 := last_fiber */
+        mov     x24, x0                       /* x24 := the continuation */
     /* Check if this is a preemption continuation (wosize == 3) */
         WOSIZE_BLOCK_VAL TMP, x0
         cmp     TMP, #3
@@ -1404,6 +1440,9 @@ END_FUNCTION(caml_reperform)
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
     /* Check if stack null, then already used */
         cbz     x0, L(continuation_already_resumed)
+    /* Waking may have moved the stacks and updated the last-fiber
+       field: it can only be read now. */
+        ldr     x23, Cont_last_fiber(x24)     /* x23 := last_fiber */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
         stp     x0, x1, [sp, -16]!
@@ -1478,7 +1517,12 @@ L(resume_preemption): /* x25 -> gc_regs */
        registers and `ret` to resume */
         b       L(resume_from_preempt)
 L(continuation_already_resumed):
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+    /* Pop the frame pushed by DO_RESUME_SWITCH, which the normal path pops
+       before switching stacks.  This restores x30 as well as sp, which
+       caml_c_call records as the return address for use during scanning. */
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_continue)
@@ -1587,14 +1631,21 @@ FUNCTION(caml_runstack)
 6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
-        .cfi_escape DW_CFA_def_cfa_expression, 3+3+2,       \
+    /* Offset from sp to the parent field of this fiber's handler */
+#define RUNSTACK_PARENT_OFFSET                  \
+  (16 /* exn */ +                               \
+   8 /* gc_regs slot (unused) */ +              \
+   8 /* C_STACK_SP for DWARF (unused) */ +      \
+   Handler_parent_offset)
+        .ifge RUNSTACK_PARENT_OFFSET - 8192
+        .error "RUNSTACK_PARENT_OFFSET out of range for 2-byte SLEB128"
+        .endif
+        .cfi_escape DW_CFA_def_cfa_expression, 4+3+2,       \
           DW_OP_breg + DW_REG_sp,                           \
-            16 /* exn */ +                                  \
-            8 /* gc_regs slot (unused) */ +                 \
-            8 /* C_STACK_SP for DWARF (unused) */           \
-            + Handler_parent_offset, DW_OP_deref,           \
+            SLEB128_2(RUNSTACK_PARENT_OFFSET), DW_OP_deref, \
           DW_OP_plus_uconst, Stack_sp_offset, DW_OP_deref,  \
           DW_OP_plus_uconst, 16 /* fp + ret addr */
+#undef RUNSTACK_PARENT_OFFSET
 #endif
     /* Call the function on the new stack */
         mov     x0, x2

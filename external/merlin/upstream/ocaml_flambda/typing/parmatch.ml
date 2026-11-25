@@ -23,9 +23,22 @@ open Typedtree
 
 type error = Float32_match
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
 
-let raise_matched_float32 () = raise (Error Float32_match)
+  val log_and_raise : error -> 'a
+end = struct
+  type exn += In_context of error
+
+  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
+
+let raise_matched_float32 () = Error.log_and_raise Float32_match
 
 type 'pattern parmatch_case =
   { pattern : 'pattern;
@@ -210,9 +223,10 @@ let all_coherent column =
     | Record_unboxed_product ([], _), Record_unboxed_product ([], _)
     | Variant _, Variant _
     | Lazy, Lazy -> true
+    | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
     | ( Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
       | Unboxed_tuple _ | Record _ | Record_unboxed_product _ | Array _
-      | Variant _ | Lazy ), _ -> false
+      | Variant _ | Addr _ | Lazy ), _ -> false
   in
   match
     List.find
@@ -380,6 +394,8 @@ module Compat
   | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs
   | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
       tuple_compat labeled_ps labeled_qs
+  | Tpat_addr (mut1, _, p), Tpat_addr (mut2, _, q) ->
+      mut1 = mut2 && compat p q
   | Tpat_lazy p, Tpat_lazy q -> compat p q
   | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
@@ -403,6 +419,7 @@ module Compat
   | Tpat_record (_, _, _), _
   | Tpat_record_unboxed_product (_, _, _), _
   | Tpat_array (_, _, _), _
+  | Tpat_addr (_, _, _), _
   | Tpat_lazy _, _ ->
       false
 
@@ -467,6 +484,7 @@ let simple_match d h =
   | Variant { tag = t1; _ }, Variant { tag = t2 } ->
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
+  | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
   | Lazy, Lazy -> true
   | Record _, Record _ -> true
   | Record_unboxed_product _, Record_unboxed_product _ -> true
@@ -478,9 +496,9 @@ let simple_match d h =
       lbls1 lbls2
   | Array (am1, _, len1), Array (am2, _, len2) -> am1 = am2 && len1 = len2
   | _, Any -> true
-  | ( Construct _ | Variant _ | Constant _ | Lazy | Record _
-    | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _ | Tuple _
-    | Unboxed_tuple _ | Array _ | Any), _ -> false
+  | ( Construct _ | Variant _ | Constant _ | Addr _ | Lazy
+    | Record _ | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _
+    | Tuple _ | Unboxed_tuple _ | Array _ | Any), _ -> false
 
 
 
@@ -521,6 +539,7 @@ let simple_match_args discr head args =
   | Tuple _
   | Unboxed_tuple _
   | Array _
+  | Addr _
   | Lazy -> args
   | Record (lbls, _) ->
     extract_fields (record_arg discr) (List.combine lbls args)
@@ -530,6 +549,7 @@ let simple_match_args discr head args =
       begin match discr.pat_desc with
       | Construct (cstr, _, _) -> Patterns.omegas cstr.cstr_arity
       | Variant { has_arg = true }
+      | Addr _
       | Lazy -> [Patterns.omega]
       | Record (lbls, _) -> omega_list lbls
       | Record_unboxed_product (lbls, _) -> omega_list lbls
@@ -553,7 +573,7 @@ let simple_match_args discr head args =
    We build a normalized /discriminating/ pattern from a pattern [q] by folding
    over the first column of the matrix, "refining" [q] as we go:
 
-   - when we encounter a row starting with [Tuple] or [Lazy] then we
+   - when we encounter a row starting with [Tuple], [Addr] or [Lazy] then we
    can stop and return that head, as we cannot refine any further. Indeed,
    these constructors are alone in their signature, so they will subsume
    whatever other head we might find, as well as the head we're threading
@@ -585,7 +605,7 @@ let discr_pat q pss =
       in
       match head.pat_desc with
       | Any -> refine_pat acc rows
-      | Tuple _ | Unboxed_tuple _ | Lazy -> head
+      | Tuple _ | Unboxed_tuple _ | Addr _ | Lazy -> head
       | Record (lbls, repr) ->
         (* N.B. we could make this case "simpler" by refining the record case
            using [all_record_args].
@@ -672,6 +692,12 @@ let set_args q r = match q with
     make_pat
       (Tpat_variant (l, arg, row)) q.pat_type q.pat_env::
     rest
+| {pat_desc = Tpat_addr (mut, arg_sort, _omega)} ->
+    begin match r with
+      arg::rest ->
+        make_pat (Tpat_addr (mut, arg_sort, arg)) q.pat_type q.pat_env::rest
+    | _ -> fatal_error "Parmatch.do_set_args (addr)"
+    end
 | {pat_desc = Tpat_lazy _omega} ->
     begin match r with
       arg::rest ->
@@ -824,7 +850,7 @@ let build_specialized_submatrices ~extend_row discr rows =
       let open Patterns.Head in
       match discr.pat_desc with
       | Record _ | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _
-      | Lazy ->
+      | Addr _ | Lazy ->
         (* [discr] comes from [discr_pat], and in this case subsumes any of the
            patterns we could find on the first column of [rows]. So it is better
            to use it for our initial environment than any of the normalized
@@ -946,6 +972,7 @@ let full_match closing env =  match env with
   | Unboxed_tuple _
   | Record _
   | Record_unboxed_product _
+  | Addr _
   | Lazy -> true
 
 (* Written as a non-fragile matching, PR#7451 originated from a fragile matching
@@ -963,7 +990,7 @@ let should_extend ext env = match ext with
       | Construct ({cstr_tag=Extension _}, _, _) -> false
       | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
       | Variant _ | Record _ | Record_unboxed_product _
-      | Array _ | Lazy -> false
+      | Array _ | Addr _ | Lazy -> false
       | Any -> assert false
       end
 end
@@ -1205,9 +1232,10 @@ let build_other ext env =
       | Constant Const_untagged_char _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_char c) -> c
+            ~proj:(function Constant(Const_untagged_char c) ->
+                              Numbers.Int8.to_int c
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_char i)
+            ~make:(fun i -> Const_untagged_char (Numbers.Int8.of_int_exn i))
             [ Char.code 'a', Char.code 'z' ; Char.code 'A', Char.code 'Z' ;
               Char.code '0', Char.code '9' ; Char.code ' ', Char.code '~' ;
               0, 0x7f ; -0x80, -1 ] d env
@@ -1224,28 +1252,32 @@ let build_other ext env =
       | Constant Const_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int8 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int8 i)
+            ~proj:(function Constant(Const_int8 i) -> Numbers.Int8.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_untagged_int8 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int8 i) -> i
+            ~proj:(function Constant(Const_untagged_int8 i) ->
+                            Numbers.Int8.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int8 i)
+            ~make:(fun i -> Const_untagged_int8 (Numbers.Int8.of_int_exn i))
             [0, 0x7f; -0x80, -1] d env
       | Constant Const_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_int16 i) -> i | _ -> assert false)
-            ~make:(fun i -> Const_int16 i)
+            ~proj:(function Constant(Const_int16 i) -> Numbers.Int16.to_int i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_untagged_int16 _ ->
           build_exhaustable_constant
             ~to_int:Fun.id
-            ~proj:(function Constant(Const_untagged_int16 i) -> i
+            ~proj:(function Constant(Const_untagged_int16 i) ->
+                            Numbers.Int16.to_int i
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_int16 i)
+            ~make:(fun i -> Const_untagged_int16 (Numbers.Int16.of_int_exn i))
             [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_int32 _ ->
           build_other_constant
@@ -1261,7 +1293,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_unboxed_int32 _ ->
           build_other_constant
             (function Constant(Const_unboxed_int32 i) -> i | _ -> assert false)
@@ -1276,7 +1308,7 @@ let build_other ext env =
           build_other_constant
             (function Constant(Const_unboxed_nativeint i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_unboxed_nativeint i))
-            0n Nativeint.succ d env
+            Targetint.zero Targetint.succ d env
       | Constant Const_string _ ->
           build_other_constant
             (function Constant(Const_string (s, _, _)) -> String.length s
@@ -1331,7 +1363,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_lazy p
+  | Tpat_addr (_, _, p) | Tpat_lazy p
     -> has_instance p
 
 and has_instances = function
@@ -1965,6 +1997,8 @@ let rec le_pat p q =
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
+  | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
+  | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
   | Tpat_construct(_,c1,_,ps,_), Tpat_construct(_,c2,_,qs,_) ->
       let ps = List.map snd ps in
       let qs = List.map snd qs in
@@ -1977,14 +2011,25 @@ let rec le_pat p q =
   | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs)
   | Tpat_unboxed_tuple(labeled_ps), Tpat_unboxed_tuple(labeled_qs) ->
       le_tuple_pats labeled_ps labeled_qs
+  | Tpat_addr (mut1, _, p), Tpat_addr (mut2, _, q) ->
+      mut1 = mut2 && le_pat p q
   | Tpat_lazy p, Tpat_lazy q -> le_pat p q
   | Tpat_record (l1,_,_), Tpat_record (l2,_,_) ->
+      let ps,qs = records_args l1 l2 in
+      le_pats ps qs
+  | Tpat_record_unboxed_product (l1,_,_),
+    Tpat_record_unboxed_product (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
       le_pats ps qs
   | Tpat_array(am1, _, ps), Tpat_array(am2, _, qs) ->
       am1 = am2 && List.length ps = List.length qs && le_pats ps qs
 (* In all other cases, enumeration is performed *)
-  | _,_  -> not (satisfiable [[p]] [q])
+  | ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
+    | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
+    | Tpat_construct _ | Tpat_variant _ | Tpat_record _
+    | Tpat_record_unboxed_product _ | Tpat_array _ | Tpat_addr _
+    | Tpat_lazy _ | Tpat_or _ ), _ ->
+      not (satisfiable [[p]] [q])
 
 and le_pats ps qs =
   match ps,qs with
@@ -2024,12 +2069,17 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
 | _,Tpat_or (q1,q2,_)     -> orlub q1 q2 p (* Thanks god, lub is commutative *)
 | Tpat_constant c1, Tpat_constant c2 when const_compare c1 c2 = 0 -> p
+| Tpat_unboxed_unit, Tpat_unboxed_unit -> p
+| Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 when Bool.equal b1 b2 -> p
 | Tpat_tuple ps, Tpat_tuple qs ->
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_tuple rs) p.pat_type p.pat_env
 | Tpat_unboxed_tuple ps, Tpat_unboxed_tuple qs ->
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_unboxed_tuple rs) p.pat_type p.pat_env
+| Tpat_addr (mut1, arg_sort, p1), Tpat_addr (mut2, _, q1) when mut1 = mut2 ->
+    let r = lub p1 q1 in
+    make_pat (Tpat_addr (mut1, arg_sort, r)) p.pat_type p.pat_env
 | Tpat_lazy p, Tpat_lazy q ->
     let r = lub p q in
     make_pat (Tpat_lazy r) p.pat_type p.pat_env
@@ -2051,12 +2101,21 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     (* CR-someday lmaurer: Take lubs of reprs? *)
     make_pat (Tpat_record (rs, repr, closed))
       p.pat_type p.pat_env
+| Tpat_record_unboxed_product (l1,repr,closed),
+  Tpat_record_unboxed_product (l2,_,_) ->
+    let rs = record_lubs l1 l2 in
+    make_pat (Tpat_record_unboxed_product (rs, repr, closed))
+      p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
         let rs = lubs ps qs in
         make_pat (Tpat_array (am1, arg_sort, rs))
           p.pat_type p.pat_env
-| _,_  ->
+| ( Tpat_fun_layout _ | Tpat_constant _ | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_unboxed_tuple _
+  | Tpat_construct _ | Tpat_variant _ | Tpat_record _
+  | Tpat_record_unboxed_product _ | Tpat_array _ | Tpat_addr _
+  | Tpat_lazy _ ), _ ->
     raise Empty
 
 and orlub p1 p2 q =
@@ -2069,7 +2128,11 @@ and orlub p1 p2 q =
 with
 | Empty -> lub p2 q
 
-and record_lubs l1 l2 =
+and record_lubs :
+  type rep. (_ * rep gen_label_description * _) list ->
+  (_ * rep gen_label_description * _) list ->
+  (_ * rep gen_label_description * _) list =
+  fun l1 l2 ->
   let rec lub_rec l1 l2 = match l1,l2 with
   | [],_ -> l2
   | _,[] -> l1
@@ -2258,7 +2321,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
-| Tpat_lazy p
+| Tpat_addr (_, _, p) | Tpat_lazy p
     ->
     collect_paths_from_pat r p
 
@@ -2376,7 +2439,8 @@ let inactive ~partial pat =
   | Total -> begin
       let rec loop pat =
         match pat.pat_desc with
-        | Tpat_lazy _ | Tpat_array (Mutable _, _, _) ->
+        | Tpat_lazy _ | Tpat_addr (Mutable _, _, _)
+        | Tpat_array (Mutable _, _, _) ->
           false
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
         | Tpat_variant (_, None, _) | Tpat_fun_layout _
@@ -2400,21 +2464,20 @@ let inactive ~partial pat =
             List.for_all (fun (_, p) -> loop p) ps
         | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
-        | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _) ->
+        | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _)
+        | Tpat_addr (Immutable, _, p) ->
             loop p
         | Tpat_record (ldps,_,_) ->
             List.for_all
               (fun (_, lbl, p) -> lbl.lbl_mut = Immutable && loop p)
               ldps
         | Tpat_record_unboxed_product (ldps,_,_) ->
+          (* CR mutable-kinds: this does not check for mutability, to agree with
+             the [matching.ml] code, but does also rely on the inability to
+             mutate mutable unboxed records.
+             (Also, this function is seemingly dead). *)
             List.for_all
-              (fun (_, lbl, p) ->
-                 match lbl.lbl_mut with
-                 | Immutable -> loop p
-                 | Mutable _ ->
-                   fatal_error
-                     ("Parmatch.inactive: "
-                        ^ "unboxed record labels are never mutable"))
+              (fun (_, _lbl, p) -> loop p)
               ldps
         | Tpat_or (p,q,_) ->
             loop p && loop q
@@ -2531,7 +2594,7 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
     match (Patterns.General.view p).pat_desc with
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _, _) ->
+    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps
@@ -2708,5 +2771,6 @@ let report_error ppf = function
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error.In_context err ->
+      Some (Location.error_of_printer_file report_error err)
     | _ -> None)

@@ -76,6 +76,20 @@ val create_call_line : int -> Dwarf_attribute_values.Attribute_value.t
 
 val create_call_column : int -> Dwarf_attribute_values.Attribute_value.t
 
+(** [DW_AT_decl_line] and [DW_AT_decl_column] for a declaration at [line] and
+    [column]. Nothing is emitted when [line] is negative (unknown), since a
+    column is meaningless without a line, and only [DW_AT_decl_line] is emitted
+    when [column] is negative. *)
+val create_decl_line_and_column :
+  line:int -> column:int -> Dwarf_attribute_values.Attribute_value.t list
+
+(** [DW_AT_call_line] and [DW_AT_call_column] for a call site at [line] and
+    [column]. Nothing is emitted when [line] is negative (unknown), since a
+    column is meaningless without a line, and only [DW_AT_call_line] is emitted
+    when [column] is negative. *)
+val create_call_line_and_column :
+  line:int -> column:int -> Dwarf_attribute_values.Attribute_value.t list
+
 val create_call_pc : Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_call_return_pc :

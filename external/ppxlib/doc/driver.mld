@@ -1,10 +1,10 @@
-{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"compatibility"}Compatibility With Multiple OCaml Versions >}{%html: </div></div>%}
 
 {0 How It Works}
 
 {1 General Concepts}
 
-{2 The Driver}
+{2:driver The Driver}
 
 [ppxlib] sits in between the PPXs authors and the compiler toolchain. For the PPX
 author, it provides an API to define the transformation and register it to
@@ -91,8 +91,23 @@ driver.exe [extra_args] [<files>]
   -no-merge                   Do not merge context free transformations (better for debugging rewriters). As a result, the context-free transformations are not all applied before all impl and intf.
   -cookie NAME=EXPR           Set the cookie NAME to EXPR
   --cookie                    Same as -cookie
-  -help                       Display this list of options
-  --help                      Display this list of options
+  -deriving-keep-w32 {impl|intf|both}
+                               Do not try to disable warning 32 for the generated code
+  -deriving-disable-w32-method {code|attribute}
+                               How to disable warning 32 for the generated code
+  -type-conv-keep-w32 {impl|intf|both}
+                               Deprecated, use -deriving-keep-w32
+  -type-conv-w32 {code|attribute}
+                               Deprecated, use -deriving-disable-w32-method
+  -deriving-keep-w60 {impl|intf|both}
+                               Do not try to disable warning 60 for the generated code
+  -unused-code-warnings {true|false|force}
+                               Allow ppx derivers to enable unused code warnings (default: false)
+  -unused-type-warnings {true|false|force}
+                               Allow unused type warnings for types with [@@deriving ...] (default: false)
+  -help                        Display this list of options
+  --help                       Display this list of options
+
 v}
 {%html: </details>%}
 
@@ -119,6 +134,28 @@ driver.exe [extra_args] <infile> <outfile>
 v}
 {%html: </details>%}
 
+{3:exception_handling Exception handling}
+
+In general, raising an exception in a registered transformation will make the
+ppxlib driver crash with an uncaught exception error. However, when spawned with
+the [-embed-errors] or [-as-ppx] flags (that's the case when Merlin calls the
+driver) the ppxlib driver still handles a specific kind of exception: Located
+exceptions. They have type {{!Ppxlib.Location.exception-Error}[Location.Error]}
+and contain enough information to display a located error message.
+
+During its {{!page-driver.driver_execution}execution}, the driver will run many
+different rewriters. In the case described above, it will catch any located
+exception thrown by a rewriter. When catching an exception, it will collect the
+error in a list, take the last valid AST (the one that was given to the raising
+rewriter) and continue its execution from there.
+
+At the end of the rewriting process, the driver will prepend all collected errors
+to the beginning of the AST, in the order in which they appeared.
+
+The same mechanism applies for the {{!"derivers-and-extenders"}context-free rewriters}: if any of them raises,
+the error is collected, the part of the AST that the rewriter was responsible to
+rewrite remains unmodified, and the {{!"context-free-phase"}context-free phase} continues.
+
 {2 Cookies}
 
 Cookies are values that are passed to the driver via the command line, or set as
@@ -139,41 +176,6 @@ Moreover, [ppxlib] communicates with Dune through [.corrected] files to allow fo
 promotion, for instance when using {{!"writing-ppxs"."inlining-transformations"}[[@@deriving_inline]]}. A PPX author can also
 generate its own promotion suggestion using the
 {{!Ppxlib.Driver.register_correction}[Driver.register_correction]} function.
-
-{1:compat_mult_ver Compatibility With Multiple OCaml Versions}
-
-One of the important issues with working with the
-{{!Ppxlib.Parsetree}[Parsetree]} is that the API is not stable. For instance, in
-the {{:https://ocaml.org/releases/4.13.0}OCaml 4.13 release}, the following
-{{:https://github.com/ocaml/ocaml/pull/9584/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}two}
-{{:https://github.com/ocaml/ocaml/pull/10133/files#diff-ebecf307cba2d756cc28f0ec614dfc57d3adc6946eb4faa9825eb25a92b2596d}changes}
-were made to the {{!Ppxlib.Parsetree}[Parsetree]} type. Although they are small changes, they may
-break any PPX that is written to directly manipulate the (evolving) type.
-
-This instability causes an issue with maintenance. PPX authors wish to maintain
-a single version of their PPX, not one per OCaml version, and ideally not have
-to update their code when an irrelevant (for them) field is changed in the
-{{!Ppxlib.Parsetree}[Parsetree]}.
-
-[ppxlib] helps to solve both issues. The first one, having to maintain a single
-PPX version working for every OCaml version, is done by migrating the
-{{!Ppxlib.Parsetree}[Parsetree]}. The PPX author only maintains a version
-working with the latest version, and the [ppxlib] driver will convert the values from one version to another.
-
-For example, say a deriver is applied in the context of OCaml 4.08. After the
-4.08 {{!Ppxlib.Parsetree}[Parsetree]} has been given to it, the [ppxlib] driver
-will migrate this value into the latest {{!Ppxlib.Parsetree}[Parsetree]}
-version, using the {!Astlib} module. The "latest" here depends on the version of
-[ppxlib], but at any given time, the latest released version of [ppxlib] will always
-use the latest released version of the {{!Ppxlib.Parsetree}[Parsetree]}.
-
-After the migration to the latest {{!Ppxlib.Parsetree}[Parsetree]},
-the driver runs all transformations on it, which ends with a rewritten
-{{!Ppxlib.Parsetree}[Parsetree]} of the latest version. However, since the
-context of rewriting is OCaml 4.08 (in this example), the driver needs to
-migrate back the rewritten {{!Ppxlib.Parsetree}[Parsetree]} to an OCaml 4.08
-version. Again, [ppxlib] uses the {!Astlib} module for this migration. Once the
-driver has rewritten the AST for OCaml 4.08, the compilation can continue as usual.
 
 {1:derivers-and-extenders Context-Free Transformations}
 
@@ -373,4 +375,4 @@ one of them. Thus, only register your transformation in this phase if it is
 absolutely vital to be the last transformation, as your PPX will become
 incompatible with any other that registers a transformation during this phase.
 
-{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"writing-ppxs"}Writing PPXs >}{%html: </div></div>%}
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"quick_intro"}< Introduction}{%html: </div><div>%}{{!"compatibility"}Compatibility With Multiple OCaml Versions >}{%html: </div></div>%}

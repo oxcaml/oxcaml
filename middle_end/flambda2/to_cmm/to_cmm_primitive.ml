@@ -125,7 +125,7 @@ let make_block ~dbg kind alloc_mode args =
   match (kind : P.Block_kind.t) with
   | Values (tag, _) ->
     let tag = Tag.Scannable.to_int tag in
-    C.make_alloc ~mode dbg ~tag args
+    C.make_alloc ~strict_init:false ~mode dbg ~tag args
   | Naked_floats ->
     let tag = Tag.to_int Tag.double_array_tag in
     C.make_float_alloc ~mode dbg ~tag args
@@ -135,7 +135,8 @@ let make_block ~dbg kind alloc_mode args =
       List.map C.memory_chunk_of_kind (mixed_block_kinds shape)
     in
     let tag = Tag.Scannable.to_int tag in
-    C.make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks
+    C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag ~value_prefix_size args
+      args_memory_chunks
 
 let memory_chunk_of_flat_suffix_element :
     K.flat_suffix_element -> Cmm.memory_chunk = function
@@ -238,14 +239,15 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
         mem_chunks_per_non_unarized_element.(index))
       args
   in
-  C.make_mixed_alloc ~mode dbg ~tag:0 ~value_prefix_size:0 args mem_chunks
+  C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag:0 ~value_prefix_size:0
+    args mem_chunks
 
 let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
   let mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
   match (kind : P.Array_kind.t) with
   | Immediates | Gc_ignorable_values | Values ->
-    C.make_alloc ~mode dbg ~tag:0 args
+    C.make_alloc ~strict_init:false ~mode dbg ~tag:0 args
   | Naked_floats ->
     C.make_float_alloc ~mode dbg ~tag:(Tag.to_int Tag.double_array_tag) args
   | Naked_float32s -> C.allocate_unboxed_float32_array ~elements:args mode dbg
@@ -262,7 +264,7 @@ let make_array ~dbg kind alloc_mode args =
   | Naked_masks -> C.allocate_unboxed_mask_array ~elements:args mode dbg
   | Unboxed_product _ ->
     if P.Array_kind.must_be_gc_scannable kind
-    then C.make_alloc ~mode dbg ~tag:0 args
+    then C.make_alloc ~strict_init:false ~mode dbg ~tag:0 args
     else make_non_scannable_unboxed_product_array ~dbg kind mode args
 
 let array_length ~dbg arr (kind : P.Array_kind.t) =
@@ -746,7 +748,9 @@ let string_like_load ~dbg kind width ~str ~index =
     string_like_load_aux ~ptr_out_of_heap:false ~dbg width ~str ~index
   | Bigstring ->
     let ba_data_addr = C.field_address str 1 dbg in
-    let ba_data = C.load ~dbg Word_int Mutable ~addr:ba_data_addr in
+    let ba_data =
+      C.load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_addr
+    in
     C.bind "ba_data" ba_data (fun str ->
         string_like_load_aux ~ptr_out_of_heap:true ~dbg width ~str ~index)
 
@@ -783,7 +787,7 @@ let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
         ~new_value
     | Bigstring ->
       let addr = C.field_address bytes 1 dbg in
-      let ba_data = C.load ~dbg Word_int Mutable ~addr in
+      let ba_data = C.load ~dbg Word_out_of_heap_data_pointer Mutable ~addr in
       C.bind "ba_data" ba_data (fun bytes ->
           bytes_or_bigstring_set_aux ~ptr_out_of_heap:true ~dbg width ~bytes
             ~index ~new_value)
@@ -853,15 +857,12 @@ let scalar_type_of_standard_int_or_float :
 
 let unary_int_arith_primitive _env dbg kind op arg =
   match (op : P.unary_int_arith_op) with
-  | Not ->
-    let mask =
-      match (kind : K.Standard_int.t) with
-      | Tagged_immediate -> -2
-      | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
-      | Naked_nativeint ->
-        -1
-    in
-    C.xor_int arg (C.int ~dbg mask) dbg
+  | Not -> (
+    match (kind : K.Standard_int.t) with
+    | Tagged_immediate -> C.xor_int arg (C.int ~dbg (-2)) dbg
+    | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
+      C.not_int arg dbg)
   | Swap_byte_endianness -> (
     (* CR lthls: Swap_byte_endianness is a weird primitive, that is only defined
        on a subset of the naked types with tricky semantics, so I would be in
@@ -1169,6 +1170,7 @@ let nullary_primitive _env res dbg prim =
   | Dls_get -> None, res, C.dls_get ~dbg
   | Tls_get -> None, res, C.tls_get ~dbg
   | Domain_index -> None, res, C.domain_index ~dbg
+  | Thread_self_id -> None, res, C.thread_self_id ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 
@@ -1214,8 +1216,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | String_length _ -> None, res, C.string_length arg dbg
   | Int_as_pointer _ -> None, res, C.int_as_pointer arg dbg
   | Opaque_identity { middle_end_only = true; kind = _ } -> None, res, arg
-  | Opaque_identity { middle_end_only = false; kind = _ } ->
-    None, res, C.opaque arg dbg
+  | Opaque_identity { middle_end_only = false; kind } ->
+    let ty = C.machtype_of_kind (KS.anything kind) in
+    None, res, C.opaque ~ty arg dbg
   | Int_arith (kind, op) ->
     None, res, unary_int_arith_primitive env dbg kind op arg
   | Float_arith (width, op) ->
@@ -1223,7 +1226,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Num_conv { src; dst } ->
     let extra, expr = arithmetic_conversion dbg src dst arg in
     extra, res, expr
-  | Boolean_not -> None, res, C.mk_not dbg arg
+  | Boolean_not Tagged_bool -> None, res, C.mk_not dbg arg
+  | Boolean_not Naked_bool -> None, res, C.mk_not_untagged dbg arg
   | Reinterpret_64_bit_word reinterpret ->
     let cmm =
       match reinterpret with
@@ -1322,7 +1326,7 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Make_lazy { lazy_tag; alloc_region = _ } ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
-    None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
+    None, res, C.make_alloc ~strict_init:true ~mode:Heap dbg ~tag [arg]
 
 let binary_primitive env dbg f (_x_simple : Simple.t option)
     (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =

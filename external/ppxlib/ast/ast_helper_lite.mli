@@ -72,7 +72,7 @@ module Typ : sig
     ?loc:loc -> ?attrs:attrs -> object_field list -> closed_flag -> core_type
 
   val class_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
-  val alias : ?loc:loc -> ?attrs:attrs -> core_type -> string -> core_type
+  val alias : ?loc:loc -> ?attrs:attrs -> core_type -> str -> core_type
 
   val variant :
     ?loc:loc ->
@@ -158,7 +158,8 @@ module Exp : sig
       "Use [Ppxlib_jane.Ast_builder] for constructing functions ASTs that are handed to \
        the ocaml compiler, e.g. in ppxes"]
 
-  val function_ : ?loc:loc -> ?attrs:attrs -> case list -> expression
+  val function_ :
+    ?loc:loc -> ?attrs:attrs -> ?loc_location:loc -> case list -> expression
   [@@alert
      prefer_jane_syntax
        "Use [Ppxlib_jane.Ast_builder] for constructing function ASTs that are handed to \
@@ -500,7 +501,13 @@ end
 
 (** Value bindings *)
 module Vb : sig
-  val mk : ?loc:loc -> ?attrs:attrs -> pattern -> expression -> value_binding
+  val mk :
+    ?loc:loc ->
+    ?attrs:attrs ->
+    ?value_constraint:value_constraint ->
+    pattern ->
+    expression ->
+    value_binding
 end
 
 (** {1 Class language} *)

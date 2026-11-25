@@ -423,6 +423,8 @@ let rec subst_patt initial ~by patt =
       { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
     | Tpat_or (p1, p2, row) ->
       { patt with pat_desc = Tpat_or (f p1, f p2, row) }
+    | Tpat_addr (mut, sort, p) ->
+      { patt with pat_desc = Tpat_addr (mut, sort, f p) }
     | Tpat_lazy p -> { patt with pat_desc = Tpat_lazy (f p) }
 
 let rec rm_sub patt sub =
@@ -472,6 +474,8 @@ let rec rm_sub patt sub =
     if p1 == sub then p2
     else if p2 == sub then p1
     else { patt with pat_desc = Tpat_or (f p1, f p2, row) }
+  | Tpat_addr (mut, sort, p) ->
+    { patt with pat_desc = Tpat_addr (mut, sort, f p) }
   | Tpat_lazy p -> { patt with pat_desc = Tpat_lazy (f p) }
 
 let rec qualify_constructors ~unmangling_tables f pat =
@@ -555,6 +559,7 @@ let rec qualify_constructors ~unmangling_tables f pat =
       Tpat_array (m, sort, List.map ps ~f:(qualify_constructors f))
     | Tpat_or (p1, p2, row_desc) ->
       Tpat_or (qualify_constructors f p1, qualify_constructors f p2, row_desc)
+    | Tpat_addr (mut, sort, p) -> Tpat_addr (mut, sort, qualify_constructors f p)
     | Tpat_lazy p -> Tpat_lazy (qualify_constructors f p)
     | desc -> desc
   in
@@ -571,6 +576,7 @@ let find_branch patterns sub =
       | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> false
       | Tpat_alias { pattern = p; _ }
       | Tpat_variant (_, Some p, _)
+      | Tpat_addr (_, _, p)
       | Tpat_lazy p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
         List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
@@ -689,6 +695,13 @@ module Conv = struct
           | Immutable -> Immutable
         in
         mkpat (Ppat_array (mut, lst))
+      | Tpat_addr (mut, _, p) ->
+        let mut : Asttypes.mutable_flag =
+          match mut with
+          | Mutable _mode -> Mutable
+          | Immutable -> Immutable
+        in
+        mkpat (Ppat_addr (mut, loop p))
       | Tpat_lazy p -> mkpat (Ppat_lazy (loop p))
       | Tpat_unboxed_bool b -> mkpat (Ppat_unboxed_bool b)
       | Tpat_unboxed_unit -> mkpat Ppat_unboxed_unit

@@ -659,11 +659,19 @@ let register_primary_file ~file_emitter ~sourcefile =
     file_emitter ~file_num:0 ~file_name:sourcefile;
     file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
 
+let debug_line_info_enabled () =
+  is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+
+let has_source_line dbg =
+  match List.rev (Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg)) with
+  | [] -> false
+  | { Debuginfo.dinfo_line; _ } :: _ -> dinfo_line > 0
+
 (* We only display .file if the file has not been seen before. We display .loc
    for every instruction. *)
 let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
   let dbg = Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg) in
-  if is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+  if debug_line_info_enabled ()
   then
     match List.rev dbg with
     | [] -> ()
@@ -817,7 +825,8 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
+        | Tls_get | Domain_index | Thread_self_id | Poll | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _ | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
         | Const_vec512 _ | Const_mask _ | Load _
         | Store (_, _, _)

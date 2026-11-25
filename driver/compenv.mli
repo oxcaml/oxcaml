@@ -26,8 +26,8 @@ val fatal : string -> 'a
 
 val first_ccopts : string list ref
 val first_ppx : string list ref
-val first_include_dirs : Clflags.visible_include list ref
-val last_include_dirs : Clflags.visible_include list ref
+val first_include_dirs : Clflags.include_dir list ref
+val last_include_dirs : Clflags.include_dir list ref
 
 (* return the list of objfiles, after OCAMLPARAM and List.rev *)
 val get_objfiles : with_ocamlparam:bool -> string list
@@ -35,6 +35,7 @@ val last_objfiles : string list ref
 val first_objfiles : string list ref
 
 val stop_early : bool ref
+val add_first_jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
 val has_linker_inputs : bool ref
 
 type filename = string

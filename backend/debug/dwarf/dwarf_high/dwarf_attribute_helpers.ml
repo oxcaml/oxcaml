@@ -135,6 +135,24 @@ let create_call_column column =
   let column = Uint64.of_nonnegative_int_exn column in
   AV.create spec (V.uleb128 ~comment:"column number" column)
 
+(* A column is only meaningful together with a line: when the line is unknown
+   ([pos_lnum = -1], as in some ppx-generated code), the start character is an
+   offset into the file, not a column. *)
+let line_and_column ~create_line ~create_column ~line ~column =
+  if line < 0
+  then []
+  else if column < 0
+  then [create_line line]
+  else [create_line line; create_column column]
+
+let create_decl_line_and_column ~line ~column =
+  line_and_column ~create_line:create_decl_line
+    ~create_column:create_decl_column ~line ~column
+
+let create_call_line_and_column ~line ~column =
+  line_and_column ~create_line:create_call_line
+    ~create_column:create_call_column ~line ~column
+
 let create_call_pc label =
   let spec = AS.create Call_pc Addr in
   needs_dwarf_five ();

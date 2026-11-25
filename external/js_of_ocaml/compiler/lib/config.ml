@@ -190,6 +190,14 @@ module Param = struct
       ~desc:"set the maximum depth of generated literal JavaScript values"
       (int 10)
 
+  let list_literal_max_length =
+    p
+      ~name:"list_depth"
+      ~desc:
+        "set the maximum number of list cells emitted as a nested JavaScript array \
+         literal; longer lists are built at runtime from a flat array"
+      (int 100)
+
   let merge_node_max =
     (* Above this many sibling merge-node branch targets, emit a flat
        selector-driven dispatch loop instead of a tower of nested labelled

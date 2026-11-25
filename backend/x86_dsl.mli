@@ -182,6 +182,8 @@ module I : sig
 
   val nop : unit -> unit
 
+  val not_ : arg -> unit
+
   val or_ : arg -> arg -> unit
 
   val pause : unit -> unit

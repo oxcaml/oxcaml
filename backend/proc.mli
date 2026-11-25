@@ -42,7 +42,8 @@ val has_three_operand_float_ops : unit -> bool
 
 (* For argument number [n] split across multiple registers, the target-specific
    implementation of [loc_external_arguments] must return [regs] such that
-   [regs.(n).(0)] is to hold the part of the value at the lowest address. *)
+   [regs.(n).(0)] is to hold the part of the value at the lowest address.
+   [regs.(n)] is empty for dummy arguments. *)
 val loc_external_arguments :
   Cmm.exttype list -> Reg.t array array * int * Cmm.stack_align
 
@@ -67,6 +68,15 @@ val destroyed_at_pushtrap : Reg.t array
 val destroyed_at_basic : Cfg_intf.S.basic -> Reg.t array
 
 val destroyed_at_terminator : Cfg_intf.S.terminator -> Reg.t array
+
+(** Whether a C function may clobber, in whole or in part, the hardware register
+    that the given register is in, according to the C calling convention. This
+    is unlike the registers destroyed at an external call, which also include
+    those used by the code sequence for such calls. The answer may be [true] for
+    a register that C functions preserve under some calling conventions of the
+    target. It is [false] for a register whose location is not a hardware
+    register. *)
+val may_be_destroyed_by_c_function : Reg.t -> bool
 
 val is_destruction_point :
   more_destruction_points:bool -> Cfg_intf.S.terminator -> bool

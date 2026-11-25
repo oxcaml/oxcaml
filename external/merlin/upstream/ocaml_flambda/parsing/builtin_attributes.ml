@@ -58,7 +58,7 @@ let compiler_stops_before_attributes_consumed () =
   let stops_before_lambda =
     match !Clflags.stop_after with
     | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+    | Some pass -> Clflags.Compiler_pass.(compare pass Transl) < 0
   in
   stops_before_lambda || !Clflags.print_types
 
@@ -135,6 +135,8 @@ let builtin_attrs =
   ; "untagged"
   ; "unpacked"
   ; "unsafe_unextended"
+  ; "elide_void"
+  ; "fat_ptr"
   ; "poll"
   ; "loop"
   ; "tail_mod_cons"
@@ -156,6 +158,7 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "rec"
   ]
 
 let builtin_attrs =
@@ -472,6 +475,14 @@ let has_attribute nm attrs =
        if attr_equals_builtin a nm
        then (mark_used a.attr_name; true)
        else false)
+    attrs
+
+let attribute_location nm attrs =
+  List.find_map
+    (fun a ->
+       if attr_equals_builtin a nm
+       then (mark_used a.attr_name; Some a.attr_name.loc)
+       else None)
     attrs
 
 type attr_action = Mark_used_only | Return

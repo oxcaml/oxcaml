@@ -27,29 +27,32 @@ let is_cons = function
 let pretty_const c = match c with
 | Const_int i -> Printf.sprintf "%d" i
 | Const_char c -> Printf.sprintf "%C" c
-| Const_untagged_char c -> Printf.sprintf "#%C" (Char.chr (c land 0xff))
+| Const_untagged_char c ->
+  Printf.sprintf "#%C" (Char.chr (Numbers.Int8.to_int c land 0xff))
 | Const_string (s, _, _) -> Printf.sprintf "%S" s
 | Const_float f -> Printf.sprintf "%s" f
 | Const_float32 f -> Printf.sprintf "%s" f
 | Const_unboxed_float f -> Printf.sprintf "%s" (Misc.format_as_unboxed_literal f)
 | Const_unboxed_float32 f -> Printf.sprintf "%ss" (Misc.format_as_unboxed_literal f)
-| Const_int8 i -> Printf.sprintf "%ds" i
-| Const_int16 i -> Printf.sprintf "%dS" i
+| Const_int8 i -> Printf.sprintf "%ds" (Numbers.Int8.to_int i)
+| Const_int16 i -> Printf.sprintf "%dS" (Numbers.Int16.to_int i)
 | Const_int32 i -> Printf.sprintf "%ldl" i
 | Const_int64 i -> Printf.sprintf "%LdL" i
-| Const_nativeint i -> Printf.sprintf "%ndn" i
+| Const_nativeint i -> Printf.sprintf "%sn" (Targetint.to_string i)
 | Const_untagged_int i ->
   Printf.sprintf "%sm" (Misc.format_as_unboxed_literal (Int.to_string i))
 | Const_untagged_int8 i ->
-  Printf.sprintf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+  Printf.sprintf "%ss"
+    (Misc.format_as_unboxed_literal (Int.to_string (Numbers.Int8.to_int i)))
 | Const_untagged_int16 i ->
-  Printf.sprintf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
+  Printf.sprintf "%sS"
+    (Misc.format_as_unboxed_literal (Int.to_string (Numbers.Int16.to_int i)))
 | Const_unboxed_int32 i ->
   Printf.sprintf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
 | Const_unboxed_int64 i ->
   Printf.sprintf "%sL" (Misc.format_as_unboxed_literal (Int64.to_string i))
 | Const_unboxed_nativeint i ->
-  Printf.sprintf "%sn" (Misc.format_as_unboxed_literal (Nativeint.to_string i))
+  Printf.sprintf "%sn" (Misc.format_as_unboxed_literal (Targetint.to_string i))
 
 let bool ppf = function
   | false -> fprintf ppf "false"
@@ -130,6 +133,10 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
+  | Tpat_addr (Mutable _, _, v) ->
+      fprintf ppf "@[<2>addr_@ %a@]" pretty_arg v
+  | Tpat_addr (Immutable, _, v) ->
+      fprintf ppf "@[<2>addr_imm_@ %a@]" pretty_arg v
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
   | Tpat_alias { pattern = v; id = x; _ } ->
@@ -156,7 +163,9 @@ and pretty_cdr ppf v = match v.pat_desc with
 
 and pretty_arg ppf v = match v.pat_desc with
 | Tpat_construct (_,_,_,_::_,None)
-| Tpat_variant (_, Some _, _) -> fprintf ppf "(%a)" pretty_val v
+| Tpat_variant (_, Some _, _)
+| Tpat_lazy _
+| Tpat_addr _ -> fprintf ppf "(%a)" pretty_val v
 |  _ -> pretty_val ppf v
 
 and pretty_or : type k . _ -> k general_pattern -> _ = fun ppf v ->

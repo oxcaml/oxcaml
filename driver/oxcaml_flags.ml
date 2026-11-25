@@ -41,9 +41,6 @@ let x86_peephole_remove_redundant_test = ref true
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref true
-(* -cfg-eliminate-dead-trap-handlers *)
-
 let cfg_eliminate_dead_code_validate = ref false
 (* -cfg-eliminate-dead-code-validate *)
 
@@ -124,6 +121,8 @@ end
 
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
+let float_op_fusion = ref true          (* -[no-]float-op-fusion *)
+
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
 let disable_poll_insertion = ref (not Config.poll_insertion)
                                         (* -disable-poll-insertion *)
@@ -156,7 +155,6 @@ let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
-type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
@@ -193,6 +191,8 @@ let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
 
+let fdo_counters = ref false (* -fdo-counters *)
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
   let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
@@ -207,11 +207,11 @@ module Flambda2 = struct
     let join_algorithm = Binary
     let function_result_types : function_result_types = Never
     let enable_reaper = false
-    let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
     let reaper_local_fields = false
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let lto_support = false
     let simplify_stubs =
       (* CR pchambart: should be changed to true after proper testing *)
       false
@@ -230,11 +230,11 @@ module Flambda2 = struct
     join_algorithm : join_algorithm;
     function_result_types : function_result_types;
     enable_reaper : bool;
-    reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    lto_support : bool;
     simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
@@ -251,12 +251,12 @@ module Flambda2 = struct
     join_algorithm = Default.join_algorithm;
     function_result_types = Default.function_result_types;
     enable_reaper = Default.enable_reaper;
-    reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     reaper_local_fields = Default.reaper_local_fields;
     reaper_unbox = Default.reaper_unbox;
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    lto_support = Default.lto_support;
     simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
@@ -302,11 +302,11 @@ module Flambda2 = struct
   let kind_checks = ref Default
   let function_result_types = ref Default
   let enable_reaper = ref Default
-  let reaper_preserve_direct_calls = ref Default
   let reaper_local_fields = ref Default
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let lto_support = ref Default
   let match_in_match = ref Default
   let simplify_stubs = ref Default
 
@@ -319,9 +319,12 @@ module Flambda2 = struct
     let fexpr_after = ref Last_pass
     let fexpr_annot = ref false
     let fexpr_annot_after = ref []
+    let fexpr_print_branch_annotations = ref false
+    let fexpr_print_fdo_counters = ref false
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
+    let simplified = ref false
     let simplify = ref false
     let reaper = ref false
   end

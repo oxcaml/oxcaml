@@ -22,11 +22,5 @@ val main
    : (module Compiler_owee.Unix_intf.S)
   -> string array
   -> Format.formatter
-  -> flambda2:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    keep_symbol_tables:bool ->
-    Lambda.program ->
-    Cmm.phrase list)
+  -> flambda2:(module Optcomp_intf.Flambda2)
   -> int

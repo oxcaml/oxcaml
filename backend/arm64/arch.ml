@@ -84,6 +84,8 @@ type specific_operation =
   | Inegmulsubf   (* floating-point negate, multiply and subtract *)
   | Isqrtf        (* floating-point square root *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Imove8        (* 8-bit integer move *)
+  | Imove16       (* 16-bit integer move *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
@@ -251,6 +253,12 @@ let print_specific_operation printreg op ppf arg =
       let n = int_of_bswap_bitwidth bitwidth in
       fprintf ppf "bswap%i %a" n
         printreg arg.(0)
+  | Imove8 ->
+      fprintf ppf "move8 %a"
+        printreg arg.(0)
+  | Imove16 ->
+      fprintf ppf "move16 %a"
+        printreg arg.(0)
   | Imove32 ->
       fprintf ppf "move32 %a"
         printreg arg.(0)
@@ -290,6 +298,8 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Inegmulsubf -> "negmulsubf"
   | Isqrtf -> "sqrtf"
   | Ibswap _ -> "bswap"
+  | Imove8 -> "move8"
+  | Imove16 -> "move16"
   | Imove32 -> "move32"
   | Isignext _ -> "signext"
   | Isimd _ -> "simd"
@@ -334,13 +344,16 @@ let equal_specific_operation left right =
   | Isqrtf, Isqrtf -> true
   | Ibswap { bitwidth = left }, Ibswap { bitwidth = right } ->
     Int.equal (int_of_bswap_bitwidth left) (int_of_bswap_bitwidth right)
+  | Imove8, Imove8 -> true
+  | Imove16, Imove16 -> true
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
   | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll | Ifar_stackcheck _ | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Inegmulsubf | Isqrtf | Ibswap _ | Imove8 | Imove16 | Imove32
+    | Isignext _ | Isimd _
     | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
@@ -360,6 +373,8 @@ let operation_is_pure : specific_operation -> bool = function
   | Inegmulsubf -> true
   | Isqrtf -> true
   | Ibswap _ -> true
+  | Imove8 -> true
+  | Imove16 -> true
   | Imove32 -> true
   | Isignext _ -> true
   | Isimd op -> Simd.operation_is_pure op
@@ -382,6 +397,8 @@ let operation_allocates = function
   | Imulsubf
   | Inegmulsubf
   | Isqrtf
+  | Imove8
+  | Imove16
   | Imove32
   | Ishiftarith (_, _)
   | Isignext _

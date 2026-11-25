@@ -420,6 +420,7 @@ external map_internal:
      = "caml_unix_map_file_bytecode" "caml_unix_map_file"
 
 let map_file fd ?(pos=0L) kind layout shared dims =
+  if pos < 0L then invalid_arg "Unix.map_file: negative position";
   map_internal fd kind layout shared dims pos
 
 (* File permissions and ownership *)
@@ -537,7 +538,7 @@ type tm =
 external time : unit -> (float [@unboxed]) @@ portable =
   "caml_unix_time" "caml_unix_time_unboxed" [@@noalloc]
 external gettimeofday : unit -> (float [@unboxed]) @@ portable =
-  "caml_unix_gettimeofday" "caml_unix_gettimeofday_unboxed" [@@noalloc]
+  "caml_sys_gettimeofday" "caml_sys_gettimeofday_unboxed" [@@noalloc]
 external gmtime : float @ local -> tm @@ portable = "caml_unix_gmtime"
 external localtime : float @ local -> tm @@ portable = "caml_unix_localtime"
 external mktime : tm @ local -> float * tm @@ portable = "caml_unix_mktime"

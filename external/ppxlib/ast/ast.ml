@@ -73,7 +73,32 @@ and location_stack = location list
 and modality = Parsetree.modality = | Modality of string [@@unboxed]
 and modalities = modality loc list
 
-and mode = Parsetree.mode = | Mode of string [@@unboxed]
+and mode_const = string
+and mode_var = string
+and mode_morph = string
+
+and mode = Parsetree.mode =
+  | Pmode of mode_const
+  | Pmode_var of mode_var
+  | Pmode_bounded of mode_bounded
+
+and mode_bounded = Parsetree.mode_bounded = {
+  pmode_upper : mode_bound;
+  pmode_lower : mode_bound;
+}
+
+and mode_bound = mode_bound_elem list
+
+and mode_bound_elem = Parsetree.mode_bound_elem =
+  | Pbound_var of mode_bound_var
+  | Pbound_const of mode_const loc list
+
+and mode_bound_var = Parsetree.mode_bound_var = {
+  pbound_morph : mode_morph loc option;
+  pbound_var : mode_var loc;
+  pbound_mod : mode_const loc list;
+}
+
 and modes = mode loc list
 
 and include_kind = Parsetree.include_kind =
@@ -106,10 +131,7 @@ and direction_flag = Asttypes.direction_flag = Upto | Downto
 and private_flag = Asttypes.private_flag = Private | Public
 and mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
 and atomic_flag = Asttypes.atomic_flag = Nonatomic | Atomic
-and access_flag = Asttypes.access_flag =
-  | Immutable_access
-  | Mutable_access
-  | Atomic_access
+and access_flag = Asttypes.access_flag = Immutable_access | Mutable_access | Atomic_access
 and virtual_flag = Asttypes.virtual_flag = Virtual | Concrete
 and override_flag = Asttypes.override_flag = Override | Fresh
 and closed_flag = Asttypes.closed_flag = Closed | Open
@@ -420,6 +442,11 @@ and pattern_desc = Parsetree.pattern_desc =
           - [(P @ modes)] when [tyopt] is [None]
          *)
   | Ppat_type of longident_loc  (** Pattern [#tconst] *)
+  | Ppat_addr of mutable_flag * pattern
+      (** [Ppat_addr(flag, P)] represents:
+          - [addr_ P]     when [flag] is [Mutable]
+          - [addr_imm_ P] when [flag] is [Immutable]
+       *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:
@@ -713,9 +740,9 @@ and block_access = Parsetree.block_access =
   | Baccess_field of longident_loc
       (** [.foo] *)
   | Baccess_block of access_flag * expression
-      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-          (usually followed by unboxed accesses, to deepen the index).
-      *)
+      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+          [.idx_atomic(E)] (usually followed by unboxed accesses,
+          to deepen the index). *)
 
 and unboxed_access = Parsetree.unboxed_access =
   | Uaccess_unboxed_field of longident_loc
@@ -934,6 +961,17 @@ and extension_constructor_kind = Parsetree.extension_constructor_kind =
       pjkind_attributes : attributes;
       pjkind_loc : location
     }
+
+  and law_declaration = Parsetree.law_declaration =
+    {
+      plaw_name : string loc;
+      plaw_params : (string loc * core_type option) list;
+      plaw_assumptions : expression list;
+      plaw_conclusion : expression;
+      plaw_attributes : attributes;
+      plaw_loc : location
+    }
+  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] *)
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1171,6 +1209,8 @@ and signature_item_desc = Parsetree.signature_item_desc =
   | Psig_extension of extension * attributes  (** [\[%%id\]] *)
   | Psig_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
+  | Psig_law of law_declaration
+      (** [law_? name x (y : T) : A implies_ C] *)
 
 and module_declaration = Parsetree.module_declaration = {
   pmd_name : string option loc;
@@ -1275,6 +1315,7 @@ and module_expr_desc = Parsetree.module_expr_desc =
   | Pmod_functor of functor_parameter * module_expr
       (** [functor(X : MT1) -> ME] *)
   | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
+  | Pmod_apply_unit of module_expr  (** [ME1()] *)
   | Pmod_constraint of module_expr * module_type option * modes  (** [(ME : MT)] *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [\[%id\]] *)
@@ -1328,11 +1369,21 @@ and structure_item_desc = Parsetree.structure_item_desc =
   | Pstr_extension of extension * attributes  (** [\[%%id\]] *)
   | Pstr_jkind of jkind_declaration
       (** [kind_abbrev_ name = k] *)
+  | Pstr_law of law_declaration
+      (** [law_? name x (y : T) : A implies_ C] *)
+
+and value_constraint = Parsetree.value_constraint =
+  | Pvc_constraint of {
+      locally_abstract_univars : string loc list;
+      typ : core_type;
+    }
+  | Pvc_coercion of { ground : core_type option; coercion : core_type }
 
 and value_binding = Parsetree.value_binding = {
   pvb_is_poly: bool; (** [let poly_ ] *)
   pvb_pat : pattern;
   pvb_expr : expression;
+  pvb_constraint : value_constraint option;
   pvb_modes: modes;
   pvb_attributes : attributes;
   pvb_loc : location;
@@ -1417,8 +1468,38 @@ class virtual map =
         match x with | Modality a -> let a = self#string a in Modality a
     method modalities : modalities -> modalities=
       self#list (self#loc self#modality)
+    method mode_const : mode_const -> mode_const= self#string
+    method mode_var : mode_var -> mode_var= self#string
+    method mode_morph : mode_morph -> mode_morph= self#string
     method mode : mode -> mode=
-      fun x -> match x with | Mode a -> let a = self#string a in Mode a
+      fun x ->
+        match x with
+        | Pmode a ->
+            let a = self#mode_const a in Pmode a
+        | Pmode_var a ->
+            let a = self#mode_var a in Pmode_var a
+        | Pmode_bounded a ->
+            let a = self#mode_bounded a in Pmode_bounded a
+    method mode_bounded : mode_bounded -> mode_bounded=
+      fun { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound pmode_upper in
+        let pmode_lower = self#mode_bound pmode_lower in
+        { pmode_upper; pmode_lower }
+    method mode_bound : mode_bound -> mode_bound=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : mode_bound_elem -> mode_bound_elem=
+      fun x ->
+        match x with
+        | Pbound_var a ->
+            let a = self#mode_bound_var a in Pbound_var a
+        | Pbound_const a ->
+            let a = self#list (self#loc self#mode_const) a in Pbound_const a
+    method mode_bound_var : mode_bound_var -> mode_bound_var=
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+        let pbound_var = self#loc self#mode_var pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+        { pbound_morph; pbound_var; pbound_mod }
     method modes : modes -> modes= self#list (self#loc self#mode)
     method include_kind : include_kind -> include_kind= fun x -> x
     method loc : 'a . ('a -> 'a) -> 'a loc -> 'a loc=
@@ -1678,6 +1759,9 @@ class virtual map =
             let b = self#option self#core_type b in
             let c = self#modes c in Ppat_constraint (a, b, c)
         | Ppat_type a -> let a = self#longident_loc a in Ppat_type a
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag a in
+            let b = self#pattern b in Ppat_addr (a, b)
         | Ppat_lazy a -> let a = self#pattern a in Ppat_lazy a
         | Ppat_unpack a ->
             let a = self#loc (self#option self#string) a in Ppat_unpack a
@@ -2141,6 +2225,23 @@ class virtual map =
         let pjkind_attributes = self#attributes pjkind_attributes in
         let pjkind_loc = self#location pjkind_loc in
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    method law_declaration : law_declaration -> law_declaration=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string plaw_name in
+        let plaw_params =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#core_type b in (a, b))
+            plaw_params in
+        let plaw_assumptions = self#list self#expression plaw_assumptions in
+        let plaw_conclusion = self#expression plaw_conclusion in
+        let plaw_attributes = self#attributes plaw_attributes in
+        let plaw_loc = self#location plaw_loc in
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc }
     method class_type : class_type -> class_type=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc pcty_desc in
@@ -2395,6 +2496,7 @@ class virtual map =
             let a = self#extension a in
             let b = self#attributes b in Psig_extension (a, b)
         | Psig_jkind a -> let a = self#jkind_declaration a in Psig_jkind a
+        | Psig_law a -> let a = self#law_declaration a in Psig_law a
     method module_declaration : module_declaration -> module_declaration=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         let pmd_name = self#loc (self#option self#string) pmd_name in
@@ -2485,6 +2587,8 @@ class virtual map =
         | Pmod_apply (a, b) ->
             let a = self#module_expr a in
             let b = self#module_expr b in Pmod_apply (a, b)
+        | Pmod_apply_unit a ->
+            let a = self#module_expr a in Pmod_apply_unit a
         | Pmod_constraint (a, b, c) ->
             let a = self#module_expr a in
             let b = self#option self#module_type b in
@@ -2543,18 +2647,39 @@ class virtual map =
             let a = self#extension a in
             let b = self#attributes b in Pstr_extension (a, b)
         | Pstr_jkind a -> let a = self#jkind_declaration a in Pstr_jkind a
+        | Pstr_law a -> let a = self#law_declaration a in Pstr_law a
+    method value_constraint : value_constraint -> value_constraint=
+      fun x ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let locally_abstract_univars =
+              self#list (self#loc self#string) locally_abstract_univars in
+            let typ = self#core_type typ in
+            Pvc_constraint { locally_abstract_univars; typ }
+        | Pvc_coercion { ground; coercion } ->
+            let ground = self#option self#core_type ground in
+            let coercion = self#core_type coercion in
+            Pvc_coercion { ground; coercion }
     method value_binding : value_binding -> value_binding=
       fun
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         ->
         let pvb_is_poly = self#bool pvb_is_poly in
         let pvb_pat = self#pattern pvb_pat in
         let pvb_expr = self#expression pvb_expr in
+        let pvb_constraint = self#option self#value_constraint pvb_constraint in
         let pvb_modes = self#modes pvb_modes in
         let pvb_attributes = self#attributes pvb_attributes in
         let pvb_loc = self#location pvb_loc in
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes; pvb_loc
+        {
+          pvb_is_poly;
+          pvb_pat;
+          pvb_expr;
+          pvb_constraint;
+          pvb_modes;
+          pvb_attributes;
+          pvb_loc
         }
     method module_binding : module_binding -> module_binding=
       fun { pmb_name; pmb_expr; pmb_attributes; pmb_loc } ->
@@ -2569,12 +2694,10 @@ class virtual map =
         match x with
         | Pjk_default -> Pjk_default
         | Pjk_abbreviation a ->
-            let a = self#longident_loc a in
-            Pjk_abbreviation a
+            let a = self#longident_loc a in Pjk_abbreviation a
         | Pjk_operator (a, b) ->
             let a = self#jkind_annotation a in
-            let b = self#list (self#loc self#string) b in
-            Pjk_operator (a, b)
+            let b = self#list (self#loc self#string) b in Pjk_operator (a, b)
         | Pjk_mod (a, b) ->
             let a = self#jkind_annotation a in
             let b = self#modes b in Pjk_mod (a, b)
@@ -2639,8 +2762,34 @@ class virtual iter =
       fun x -> match x with | Modality a -> self#string a
     method modalities : modalities -> unit=
       self#list (self#loc self#modality)
+    method mode_const : mode_const -> unit= self#string
+    method mode_var : mode_var -> unit= self#string
+    method mode_morph : mode_morph -> unit= self#string
     method mode : mode -> unit=
-      fun x -> match x with | Mode a -> self#string a
+      fun x ->
+        match x with
+        | Pmode a ->
+            self#mode_const a
+        | Pmode_var a ->
+            self#mode_var a
+        | Pmode_bounded a ->
+            self#mode_bounded a
+    method mode_bounded : mode_bounded -> unit=
+      fun { pmode_upper; pmode_lower } ->
+        self#mode_bound pmode_upper;
+        self#mode_bound pmode_lower
+    method mode_bound : mode_bound -> unit=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : mode_bound_elem -> unit=
+      fun x ->
+        match x with
+        | Pbound_var a -> self#mode_bound_var a
+        | Pbound_const a -> self#list (self#loc self#mode_const) a
+    method mode_bound_var : mode_bound_var -> unit=
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        self#option (self#loc self#mode_morph) pbound_morph;
+        self#loc self#mode_var pbound_var;
+        self#list (self#loc self#mode_const) pbound_mod
     method modes : modes -> unit= self#list (self#loc self#mode)
     method include_kind : include_kind -> unit= fun _ -> ()
     method loc : 'a . ('a -> unit) -> 'a loc -> unit=
@@ -2821,6 +2970,7 @@ class virtual iter =
         | Ppat_constraint (a, b, c) ->
             (self#pattern a; self#option self#core_type b; self#modes c)
         | Ppat_type a -> self#longident_loc a
+        | Ppat_addr (a, b) -> (self#mutable_flag a; self#pattern b)
         | Ppat_lazy a -> self#pattern a
         | Ppat_unpack a -> self#loc (self#option self#string) a
         | Ppat_exception a -> self#pattern a
@@ -3127,6 +3277,18 @@ class virtual iter =
         self#option self#jkind_annotation pjkind_manifest;
         self#attributes pjkind_attributes;
         self#location pjkind_loc
+    method law_declaration : law_declaration -> unit=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        self#loc self#string plaw_name;
+        self#list
+          (fun (a, b) -> self#loc self#string a; self#option self#core_type b)
+          plaw_params;
+        self#list self#expression plaw_assumptions;
+        self#expression plaw_conclusion;
+        self#attributes plaw_attributes;
+        self#location plaw_loc
     method class_type : class_type -> unit=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         self#class_type_desc pcty_desc;
@@ -3311,6 +3473,7 @@ class virtual iter =
         | Psig_attribute a -> self#attribute a
         | Psig_extension (a, b) -> (self#extension a; self#attributes b)
         | Psig_jkind a -> self#jkind_declaration a
+        | Psig_law a -> self#law_declaration a
     method module_declaration : module_declaration -> unit=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         self#loc (self#option self#string) pmd_name;
@@ -3380,6 +3543,7 @@ class virtual iter =
         | Pmod_functor (a, b) ->
             (self#functor_parameter a; self#module_expr b)
         | Pmod_apply (a, b) -> (self#module_expr a; self#module_expr b)
+        | Pmod_apply_unit a -> self#module_expr a
         | Pmod_constraint (a, b, c) ->
             (self#module_expr a; self#option self#module_type b; self#modes c)
         | Pmod_unpack a -> self#expression a
@@ -3416,14 +3580,24 @@ class virtual iter =
         | Pstr_attribute a -> self#attribute a
         | Pstr_extension (a, b) -> (self#extension a; self#attributes b)
         | Pstr_jkind a -> self#jkind_declaration a
+        | Pstr_law a -> self#law_declaration a
+    method value_constraint : value_constraint -> unit=
+      fun x ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            (self#list (self#loc self#string) locally_abstract_univars;
+             self#core_type typ)
+        | Pvc_coercion { ground; coercion } ->
+            (self#option self#core_type ground; self#core_type coercion)
     method value_binding : value_binding -> unit=
       fun
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         ->
         self#bool pvb_is_poly;
         self#pattern pvb_pat;
         self#expression pvb_expr;
+        self#option self#value_constraint pvb_constraint;
         self#modes pvb_modes;
         self#attributes pvb_attributes;
         self#location pvb_loc
@@ -3497,8 +3671,36 @@ class virtual ['acc] fold =
       fun x acc -> match x with | Modality a -> self#string a acc
     method modalities : modalities -> 'acc -> 'acc=
       self#list (self#loc self#modality)
+    method mode_const : mode_const -> 'acc -> 'acc= self#string
+    method mode_var : mode_var -> 'acc -> 'acc= self#string
+    method mode_morph : mode_morph -> 'acc -> 'acc= self#string
     method mode : mode -> 'acc -> 'acc=
-      fun x acc -> match x with | Mode a -> self#string a acc
+      fun x acc ->
+        match x with
+        | Pmode a ->
+            self#mode_const a acc
+        | Pmode_var a ->
+            self#mode_var a acc
+        | Pmode_bounded a ->
+            self#mode_bounded a acc
+    method mode_bounded : mode_bounded -> 'acc -> 'acc=
+      fun { pmode_upper; pmode_lower } acc ->
+        let acc = self#mode_bound pmode_upper acc in
+        let acc = self#mode_bound pmode_lower acc in
+        acc
+    method mode_bound : mode_bound -> 'acc -> 'acc=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : mode_bound_elem -> 'acc -> 'acc=
+      fun x acc ->
+        match x with
+        | Pbound_var a -> self#mode_bound_var a acc
+        | Pbound_const a -> self#list (self#loc self#mode_const) a acc
+    method mode_bound_var : mode_bound_var -> 'acc -> 'acc=
+      fun { pbound_morph; pbound_var; pbound_mod } acc ->
+        let acc = self#option (self#loc self#mode_morph) pbound_morph acc in
+        let acc = self#loc self#mode_var pbound_var acc in
+        let acc = self#list (self#loc self#mode_const) pbound_mod acc in
+        acc
     method modes : modes -> 'acc -> 'acc= self#list (self#loc self#mode)
     method include_kind : include_kind -> 'acc -> 'acc= fun _ acc -> acc
     method loc : 'a . ('a -> 'acc -> 'acc) -> 'a loc -> 'acc -> 'acc=
@@ -3746,6 +3948,9 @@ class virtual ['acc] fold =
             let acc = self#option self#core_type b acc in
             let acc = self#modes c acc in acc
         | Ppat_type a -> self#longident_loc a acc
+        | Ppat_addr (a, b) ->
+            let acc = self#mutable_flag a acc in
+            let acc = self#pattern b acc in acc
         | Ppat_lazy a -> self#pattern a acc
         | Ppat_unpack a -> self#loc (self#option self#string) a acc
         | Ppat_exception a -> self#pattern a acc
@@ -4135,6 +4340,21 @@ class virtual ['acc] fold =
         let acc = self#option self#jkind_annotation pjkind_manifest acc in
         let acc = self#attributes pjkind_attributes acc in
         let acc = self#location pjkind_loc acc in acc
+    method law_declaration : law_declaration -> 'acc -> 'acc=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } acc ->
+        let acc = self#loc self#string plaw_name acc in
+        let acc =
+          self#list
+            (fun (a, b) acc ->
+               let acc = self#loc self#string a acc in
+               let acc = self#option self#core_type b acc in acc)
+            plaw_params acc in
+        let acc = self#list self#expression plaw_assumptions acc in
+        let acc = self#expression plaw_conclusion acc in
+        let acc = self#attributes plaw_attributes acc in
+        let acc = self#location plaw_loc acc in acc
     method class_type : class_type -> 'acc -> 'acc=
       fun { pcty_desc; pcty_loc; pcty_attributes } acc ->
         let acc = self#class_type_desc pcty_desc acc in
@@ -4355,6 +4575,7 @@ class virtual ['acc] fold =
             let acc = self#extension a acc in
             let acc = self#attributes b acc in acc
         | Psig_jkind a -> self#jkind_declaration a acc
+        | Psig_law a -> self#law_declaration a acc
     method module_declaration : module_declaration -> 'acc -> 'acc=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } acc
         ->
@@ -4441,6 +4662,7 @@ class virtual ['acc] fold =
         | Pmod_apply (a, b) ->
             let acc = self#module_expr a acc in
             let acc = self#module_expr b acc in acc
+        | Pmod_apply_unit a -> self#module_expr a acc
         | Pmod_constraint (a, b, c) ->
             let acc = self#module_expr a acc in
             let acc = self#option self#module_type b acc in
@@ -4492,14 +4714,26 @@ class virtual ['acc] fold =
             let acc = self#extension a acc in
             let acc = self#attributes b acc in acc
         | Pstr_jkind a -> self#jkind_declaration a acc
+        | Pstr_law a -> self#law_declaration a acc
+    method value_constraint : value_constraint -> 'acc -> 'acc=
+      fun x acc ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let acc =
+              self#list (self#loc self#string) locally_abstract_univars acc in
+            let acc = self#core_type typ acc in acc
+        | Pvc_coercion { ground; coercion } ->
+            let acc = self#option self#core_type ground acc in
+            let acc = self#core_type coercion acc in acc
     method value_binding : value_binding -> 'acc -> 'acc=
       fun
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         acc ->
         let acc = self#bool pvb_is_poly acc in
         let acc = self#pattern pvb_pat acc in
         let acc = self#expression pvb_expr acc in
+        let acc = self#option self#value_constraint pvb_constraint acc in
         let acc = self#modes pvb_modes acc in
         let acc = self#attributes pvb_attributes acc in
         let acc = self#location pvb_loc acc in acc
@@ -4590,10 +4824,38 @@ class virtual ['acc] fold_map =
             let (a, acc) = self#string a acc in ((Modality a), acc)
     method modalities : modalities -> 'acc -> (modalities * 'acc)=
       self#list (self#loc self#modality)
+    method mode_const : mode_const -> 'acc -> (mode_const * 'acc)= self#string
+    method mode_var : mode_var -> 'acc -> (mode_var * 'acc)= self#string
+    method mode_morph : mode_morph -> 'acc -> (mode_morph * 'acc)= self#string
     method mode : mode -> 'acc -> (mode * 'acc)=
       fun x acc ->
         match x with
-        | Mode a -> let (a, acc) = self#string a acc in ((Mode a), acc)
+        | Pmode a ->
+            let (a, acc) = self#mode_const a acc in ((Pmode a), acc)
+        | Pmode_var a ->
+            let (a, acc) = self#mode_var a acc in ((Pmode_var a), acc)
+        | Pmode_bounded a ->
+            let (a, acc) = self#mode_bounded a acc in ((Pmode_bounded a), acc)
+    method mode_bounded : mode_bounded -> 'acc -> (mode_bounded * 'acc)=
+      fun { pmode_upper; pmode_lower } acc ->
+        let (pmode_upper, acc) = self#mode_bound pmode_upper acc in
+        let (pmode_lower, acc) = self#mode_bound pmode_lower acc in
+        ({ pmode_upper; pmode_lower }, acc)
+    method mode_bound : mode_bound -> 'acc -> (mode_bound * 'acc)=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : mode_bound_elem -> 'acc -> (mode_bound_elem * 'acc)=
+      fun x acc ->
+        match x with
+        | Pbound_var a ->
+            let (a, acc) = self#mode_bound_var a acc in ((Pbound_var a), acc)
+        | Pbound_const a ->
+            let (a, acc) = self#list (self#loc self#mode_const) a acc in ((Pbound_const a), acc)
+    method mode_bound_var : mode_bound_var -> 'acc -> (mode_bound_var * 'acc)=
+      fun { pbound_morph; pbound_var; pbound_mod } acc ->
+        let (pbound_morph, acc) = self#option (self#loc self#mode_morph) pbound_morph acc in
+        let (pbound_var, acc) = self#loc self#mode_var pbound_var acc in
+        let (pbound_mod, acc) = self#list (self#loc self#mode_const) pbound_mod acc in
+        ({ pbound_morph; pbound_var; pbound_mod }, acc)
     method modes : modes -> 'acc -> (modes * 'acc)=
       self#list (self#loc self#mode)
     method include_kind : include_kind -> 'acc -> (include_kind * 'acc)=
@@ -4917,6 +5179,9 @@ class virtual ['acc] fold_map =
             ((Ppat_constraint (a, b, c)), acc)
         | Ppat_type a ->
             let (a, acc) = self#longident_loc a acc in ((Ppat_type a), acc)
+        | Ppat_addr (a, b) ->
+            let (a, acc) = self#mutable_flag a acc in
+            let (b, acc) = self#pattern b acc in ((Ppat_addr (a, b)), acc)
         | Ppat_lazy a ->
             let (a, acc) = self#pattern a acc in ((Ppat_lazy a), acc)
         | Ppat_unpack a ->
@@ -5474,6 +5739,26 @@ class virtual ['acc] fold_map =
         let (pjkind_loc, acc) = self#location pjkind_loc acc in
         ({ pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc },
           acc)
+    method law_declaration :
+      law_declaration -> 'acc -> (law_declaration * 'acc)=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } acc ->
+        let (plaw_name, acc) = self#loc self#string plaw_name acc in
+        let (plaw_params, acc) =
+          self#list
+            (fun (a, b) acc ->
+               let (a, acc) = self#loc self#string a acc in
+               let (b, acc) = self#option self#core_type b acc in
+               ((a, b), acc)) plaw_params acc in
+        let (plaw_assumptions, acc) =
+          self#list self#expression plaw_assumptions acc in
+        let (plaw_conclusion, acc) = self#expression plaw_conclusion acc in
+        let (plaw_attributes, acc) = self#attributes plaw_attributes acc in
+        let (plaw_loc, acc) = self#location plaw_loc acc in
+        ({ plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc },
+          acc)
     method class_type : class_type -> 'acc -> (class_type * 'acc)=
       fun { pcty_desc; pcty_loc; pcty_attributes } acc ->
         let (pcty_desc, acc) = self#class_type_desc pcty_desc acc in
@@ -5802,6 +6087,9 @@ class virtual ['acc] fold_map =
         | Psig_jkind a ->
             let (a, acc) = self#jkind_declaration a acc in
             ((Psig_jkind a), acc)
+        | Psig_law a ->
+            let (a, acc) = self#law_declaration a acc in
+            ((Psig_law a), acc)
     method module_declaration :
       module_declaration -> 'acc -> (module_declaration * 'acc)=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } acc
@@ -5920,6 +6208,8 @@ class virtual ['acc] fold_map =
             let (a, acc) = self#module_expr a acc in
             let (b, acc) = self#module_expr b acc in
             ((Pmod_apply (a, b)), acc)
+        | Pmod_apply_unit a ->
+            let (a, acc) = self#module_expr a acc in ((Pmod_apply_unit a), acc)
         | Pmod_constraint (a, b, c) ->
             let (a, acc) = self#module_expr a acc in
             let (b, acc) = self#option self#module_type b acc in
@@ -6006,18 +6296,43 @@ class virtual ['acc] fold_map =
         | Pstr_jkind a ->
             let (a, acc) = self#jkind_declaration a acc in
             ((Pstr_jkind a), acc)
+        | Pstr_law a ->
+            let (a, acc) = self#law_declaration a acc in
+            ((Pstr_law a), acc)
+    method value_constraint :
+      value_constraint -> 'acc -> (value_constraint * 'acc)=
+      fun x acc ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let (locally_abstract_univars, acc) =
+              self#list (self#loc self#string) locally_abstract_univars acc in
+            let (typ, acc) = self#core_type typ acc in
+            ((Pvc_constraint { locally_abstract_univars; typ }), acc)
+        | Pvc_coercion { ground; coercion } ->
+            let (ground, acc) = self#option self#core_type ground acc in
+            let (coercion, acc) = self#core_type coercion acc in
+            ((Pvc_coercion { ground; coercion }), acc)
     method value_binding : value_binding -> 'acc -> (value_binding * 'acc)=
       fun
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         acc ->
         let (pvb_is_poly, acc) = self#bool pvb_is_poly acc in
         let (pvb_pat, acc) = self#pattern pvb_pat acc in
         let (pvb_expr, acc) = self#expression pvb_expr acc in
+        let (pvb_constraint, acc) =
+          self#option self#value_constraint pvb_constraint acc in
         let (pvb_modes, acc) = self#modes pvb_modes acc in
         let (pvb_attributes, acc) = self#attributes pvb_attributes acc in
         let (pvb_loc, acc) = self#location pvb_loc acc in
-        ({ pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes; pvb_loc
+        ({
+           pvb_is_poly;
+           pvb_pat;
+           pvb_expr;
+           pvb_constraint;
+           pvb_modes;
+           pvb_attributes;
+           pvb_loc
          }, acc)
     method module_binding :
       module_binding -> 'acc -> (module_binding * 'acc)=
@@ -6033,7 +6348,8 @@ class virtual ['acc] fold_map =
         match x with
         | Pjk_default -> (Pjk_default, acc)
         | Pjk_abbreviation a ->
-            let (a, acc) = self#longident_loc a acc in ((Pjk_abbreviation a), acc)
+            let (a, acc) = self#longident_loc a acc in
+            ((Pjk_abbreviation a), acc)
         | Pjk_operator (a, b) ->
             let (a, acc) = self#jkind_annotation a acc in
             let (b, acc) = self#list (self#loc self#string) b acc in
@@ -6126,9 +6442,38 @@ class virtual ['ctx] map_with_context =
         match x with | Modality a -> let a = self#string ctx a in Modality a
     method modalities : 'ctx -> modalities -> modalities=
       self#list (self#loc self#modality)
+    method mode_const : 'ctx -> mode_const -> mode_const= self#string
+    method mode_var : 'ctx -> mode_var -> mode_var= self#string
+    method mode_morph : 'ctx -> mode_morph -> mode_morph= self#string
     method mode : 'ctx -> mode -> mode=
       fun ctx x ->
-        match x with | Mode a -> let a = self#string ctx a in Mode a
+        match x with
+        | Pmode a ->
+            let a = self#mode_const ctx a in Pmode a
+        | Pmode_var a ->
+            let a = self#mode_var ctx a in Pmode_var a
+        | Pmode_bounded a ->
+            let a = self#mode_bounded ctx a in Pmode_bounded a
+    method mode_bounded : 'ctx -> mode_bounded -> mode_bounded=
+      fun ctx { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound ctx pmode_upper in
+        let pmode_lower = self#mode_bound ctx pmode_lower in
+        { pmode_upper; pmode_lower }
+    method mode_bound : 'ctx -> mode_bound -> mode_bound=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : 'ctx -> mode_bound_elem -> mode_bound_elem=
+      fun ctx x ->
+        match x with
+        | Pbound_var a ->
+            let a = self#mode_bound_var ctx a in Pbound_var a
+        | Pbound_const a ->
+            let a = self#list (self#loc self#mode_const) ctx a in Pbound_const a
+    method mode_bound_var : 'ctx -> mode_bound_var -> mode_bound_var=
+      fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+        let pbound_var = self#loc self#mode_var ctx pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+        { pbound_morph; pbound_var; pbound_mod }
     method modes : 'ctx -> modes -> modes= self#list (self#loc self#mode)
     method include_kind : 'ctx -> include_kind -> include_kind=
       fun _ctx x -> x
@@ -6406,6 +6751,9 @@ class virtual ['ctx] map_with_context =
             let b = self#option self#core_type ctx b in
             let c = self#modes ctx c in Ppat_constraint (a, b, c)
         | Ppat_type a -> let a = self#longident_loc ctx a in Ppat_type a
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag ctx a in
+            let b = self#pattern ctx b in Ppat_addr (a, b)
         | Ppat_lazy a -> let a = self#pattern ctx a in Ppat_lazy a
         | Ppat_unpack a ->
             let a = self#loc (self#option self#string) ctx a in Ppat_unpack a
@@ -6890,6 +7238,24 @@ class virtual ['ctx] map_with_context =
         let pjkind_attributes = self#attributes ctx pjkind_attributes in
         let pjkind_loc = self#location ctx pjkind_loc in
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    method law_declaration : 'ctx -> law_declaration -> law_declaration=
+      fun ctx
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_params =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#core_type ctx b in (a, b)) ctx
+            plaw_params in
+        let plaw_assumptions =
+          self#list self#expression ctx plaw_assumptions in
+        let plaw_conclusion = self#expression ctx plaw_conclusion in
+        let plaw_attributes = self#attributes ctx plaw_attributes in
+        let plaw_loc = self#location ctx plaw_loc in
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc }
     method class_type : 'ctx -> class_type -> class_type=
       fun ctx { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc ctx pcty_desc in
@@ -7160,6 +7526,8 @@ class virtual ['ctx] map_with_context =
             let b = self#attributes ctx b in Psig_extension (a, b)
         | Psig_jkind a ->
             let a = self#jkind_declaration ctx a in Psig_jkind a
+        | Psig_law a ->
+            let a = self#law_declaration ctx a in Psig_law a
     method module_declaration :
       'ctx -> module_declaration -> module_declaration=
       fun ctx { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc }
@@ -7258,6 +7626,8 @@ class virtual ['ctx] map_with_context =
         | Pmod_apply (a, b) ->
             let a = self#module_expr ctx a in
             let b = self#module_expr ctx b in Pmod_apply (a, b)
+        | Pmod_apply_unit a ->
+            let a = self#module_expr ctx a in Pmod_apply_unit a
         | Pmod_constraint (a, b, c) ->
             let a = self#module_expr ctx a in
             let b = self#option self#module_type ctx b in
@@ -7322,18 +7692,41 @@ class virtual ['ctx] map_with_context =
             let b = self#attributes ctx b in Pstr_extension (a, b)
         | Pstr_jkind a ->
             let a = self#jkind_declaration ctx a in Pstr_jkind a
+        | Pstr_law a ->
+            let a = self#law_declaration ctx a in Pstr_law a
+    method value_constraint : 'ctx -> value_constraint -> value_constraint=
+      fun ctx x ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let locally_abstract_univars =
+              self#list (self#loc self#string) ctx locally_abstract_univars in
+            let typ = self#core_type ctx typ in
+            Pvc_constraint { locally_abstract_univars; typ }
+        | Pvc_coercion { ground; coercion } ->
+            let ground = self#option self#core_type ctx ground in
+            let coercion = self#core_type ctx coercion in
+            Pvc_coercion { ground; coercion }
     method value_binding : 'ctx -> value_binding -> value_binding=
       fun ctx
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         ->
         let pvb_is_poly = self#bool ctx pvb_is_poly in
         let pvb_pat = self#pattern ctx pvb_pat in
         let pvb_expr = self#expression ctx pvb_expr in
+        let pvb_constraint =
+          self#option self#value_constraint ctx pvb_constraint in
         let pvb_modes = self#modes ctx pvb_modes in
         let pvb_attributes = self#attributes ctx pvb_attributes in
         let pvb_loc = self#location ctx pvb_loc in
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes; pvb_loc
+        {
+          pvb_is_poly;
+          pvb_pat;
+          pvb_expr;
+          pvb_constraint;
+          pvb_modes;
+          pvb_attributes;
+          pvb_loc
         }
     method module_binding : 'ctx -> module_binding -> module_binding=
       fun ctx { pmb_name; pmb_expr; pmb_attributes; pmb_loc } ->
@@ -7348,8 +7741,7 @@ class virtual ['ctx] map_with_context =
         match x with
         | Pjk_default -> Pjk_default
         | Pjk_abbreviation a ->
-            let a = self#longident_loc ctx a in
-            Pjk_abbreviation a
+            let a = self#longident_loc ctx a in Pjk_abbreviation a
         | Pjk_operator (a, b) ->
             let a = self#jkind_annotation ctx a in
             let b = self#list (self#loc self#string) ctx b in
@@ -7437,10 +7829,37 @@ class virtual ['res] lift =
         | Modality a -> let a = self#string a in self#constr "Modality" [a]
     method modalities : modalities -> 'res=
       self#list (self#loc self#modality)
+    method mode_const : mode_const -> 'res= self#string
+    method mode_var : mode_var -> 'res= self#string
+    method mode_morph : mode_morph -> 'res= self#string
     method mode : mode -> 'res=
       fun x ->
         match x with
-        | Mode a -> let a = self#string a in self#constr "Mode" [a]
+        | Pmode a ->
+            let a = self#mode_const a in self#constr "Pmode" [a]
+        | Pmode_var a ->
+            let a = self#mode_var a in self#constr "Pmode_var" [a]
+        | Pmode_bounded a ->
+            let a = self#mode_bounded a in self#constr "Pmode_bounded" [a]
+    method mode_bounded : mode_bounded -> 'res=
+      fun { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound pmode_upper in
+        let pmode_lower = self#mode_bound pmode_lower in
+        self#record [("pmode_upper", pmode_upper); ("pmode_lower", pmode_lower)]
+    method mode_bound : mode_bound -> 'res= self#list self#mode_bound_elem
+    method mode_bound_elem : mode_bound_elem -> 'res=
+      fun x ->
+        match x with
+        | Pbound_var a ->
+            let a = self#mode_bound_var a in self#constr "Pbound_var" [a]
+        | Pbound_const a ->
+            let a = self#list (self#loc self#mode_const) a in self#constr "Pbound_const" [a]
+    method mode_bound_var : mode_bound_var -> 'res=
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+        let pbound_var = self#loc self#mode_var pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+        self#record [("pbound_morph", pbound_morph); ("pbound_var", pbound_var); ("pbound_mod", pbound_mod)]
     method modes : modes -> 'res= self#list (self#loc self#mode)
     method include_kind : include_kind -> 'res=
       fun x ->
@@ -7798,6 +8217,9 @@ class virtual ['res] lift =
             let c = self#modes c in self#constr "Ppat_constraint" [a; b; c]
         | Ppat_type a ->
             let a = self#longident_loc a in self#constr "Ppat_type" [a]
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag a in
+            let b = self#pattern b in self#constr "Ppat_addr" [a; b]
         | Ppat_lazy a ->
             let a = self#pattern a in self#constr "Ppat_lazy" [a]
         | Ppat_unpack a ->
@@ -8336,6 +8758,28 @@ class virtual ['res] lift =
           ("pjkind_manifest", pjkind_manifest);
           ("pjkind_attributes", pjkind_attributes);
           ("pjkind_loc", pjkind_loc)]
+    method law_declaration : law_declaration -> 'res=
+      fun
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string plaw_name in
+        let plaw_params =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#core_type b in self#tuple [a; b])
+            plaw_params in
+        let plaw_assumptions = self#list self#expression plaw_assumptions in
+        let plaw_conclusion = self#expression plaw_conclusion in
+        let plaw_attributes = self#attributes plaw_attributes in
+        let plaw_loc = self#location plaw_loc in
+        self#record
+          [("plaw_name", plaw_name);
+          ("plaw_params", plaw_params);
+          ("plaw_assumptions", plaw_assumptions);
+          ("plaw_conclusion", plaw_conclusion);
+          ("plaw_attributes", plaw_attributes);
+          ("plaw_loc", plaw_loc)]
     method class_type : class_type -> 'res=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc pcty_desc in
@@ -8648,6 +9092,8 @@ class virtual ['res] lift =
             let b = self#attributes b in self#constr "Psig_extension" [a; b]
         | Psig_jkind a ->
             let a = self#jkind_declaration a in self#constr "Psig_jkind" [a]
+        | Psig_law a ->
+            let a = self#law_declaration a in self#constr "Psig_law" [a]
     method module_declaration : module_declaration -> 'res=
       fun { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc } ->
         let pmd_name = self#loc (self#option self#string) pmd_name in
@@ -8768,6 +9214,8 @@ class virtual ['res] lift =
         | Pmod_apply (a, b) ->
             let a = self#module_expr a in
             let b = self#module_expr b in self#constr "Pmod_apply" [a; b]
+        | Pmod_apply_unit a ->
+            let a = self#module_expr a in self#constr "Pmod_apply_unit" [a]
         | Pmod_constraint (a, b, c) ->
             let a = self#module_expr a in
             let b = self#option self#module_type b in
@@ -8844,14 +9292,33 @@ class virtual ['res] lift =
             let b = self#attributes b in self#constr "Pstr_extension" [a; b]
         | Pstr_jkind a ->
             let a = self#jkind_declaration a in self#constr "Pstr_jkind" [a]
+        | Pstr_law a ->
+            let a = self#law_declaration a in self#constr "Pstr_law" [a]
+    method value_constraint : value_constraint -> 'res=
+      fun x ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let locally_abstract_univars =
+              self#list (self#loc self#string) locally_abstract_univars in
+            let typ = self#core_type typ in
+            self#constr "Pvc_constraint"
+              [self#record
+                 [("locally_abstract_univars", locally_abstract_univars);
+                 ("typ", typ)]]
+        | Pvc_coercion { ground; coercion } ->
+            let ground = self#option self#core_type ground in
+            let coercion = self#core_type coercion in
+            self#constr "Pvc_coercion"
+              [self#record [("ground", ground); ("coercion", coercion)]]
     method value_binding : value_binding -> 'res=
       fun
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         ->
         let pvb_is_poly = self#bool pvb_is_poly in
         let pvb_pat = self#pattern pvb_pat in
         let pvb_expr = self#expression pvb_expr in
+        let pvb_constraint = self#option self#value_constraint pvb_constraint in
         let pvb_modes = self#modes pvb_modes in
         let pvb_attributes = self#attributes pvb_attributes in
         let pvb_loc = self#location pvb_loc in
@@ -8859,6 +9326,7 @@ class virtual ['res] lift =
           [("pvb_is_poly", pvb_is_poly);
           ("pvb_pat", pvb_pat);
           ("pvb_expr", pvb_expr);
+          ("pvb_constraint", pvb_constraint);
           ("pvb_modes", pvb_modes);
           ("pvb_attributes", pvb_attributes);
           ("pvb_loc", pvb_loc)]
@@ -8994,12 +9462,45 @@ class virtual ['ctx,'res] lift_map_with_context =
               (self#constr ctx "Modality" [Stdlib.snd a]))
     method modalities : 'ctx -> modalities -> (modalities * 'res)=
       self#list (self#loc self#modality)
+    method mode_const : 'ctx -> mode_const -> (mode_const * 'res)= self#string
+    method mode_var : 'ctx -> mode_var -> (mode_var * 'res)= self#string
+    method mode_morph : 'ctx -> mode_morph -> (mode_morph * 'res)= self#string
     method mode : 'ctx -> mode -> (mode * 'res)=
       fun ctx x ->
         match x with
-        | Mode a ->
-            let a = self#string ctx a in
-            ((Mode (Stdlib.fst a)), (self#constr ctx "Mode" [Stdlib.snd a]))
+        | Pmode a ->
+            let a = self#mode_const ctx a in
+            ((Pmode (Stdlib.fst a)), (self#constr ctx "Pmode" [Stdlib.snd a]))
+        | Pmode_var a ->
+            let a = self#mode_var ctx a in
+            ((Pmode_var (Stdlib.fst a)), (self#constr ctx "Pmode_var" [Stdlib.snd a]))
+        | Pmode_bounded a ->
+            let a = self#mode_bounded ctx a in
+            ((Pmode_bounded (Stdlib.fst a)), (self#constr ctx "Pmode_bounded" [Stdlib.snd a]))
+    method mode_bounded : 'ctx -> mode_bounded -> (mode_bounded * 'res)=
+      fun ctx { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound ctx pmode_upper in
+        let pmode_lower = self#mode_bound ctx pmode_lower in
+        ({ pmode_upper = (Stdlib.fst pmode_upper); pmode_lower = (Stdlib.fst pmode_lower) },
+          (self#record ctx [("pmode_upper", (Stdlib.snd pmode_upper)); ("pmode_lower", (Stdlib.snd pmode_lower))]))
+    method mode_bound : 'ctx -> mode_bound -> (mode_bound * 'res)=
+      self#list self#mode_bound_elem
+    method mode_bound_elem : 'ctx -> mode_bound_elem -> (mode_bound_elem * 'res)=
+      fun ctx x ->
+        match x with
+        | Pbound_var a ->
+            let a = self#mode_bound_var ctx a in
+            ((Pbound_var (Stdlib.fst a)), (self#constr ctx "Pbound_var" [Stdlib.snd a]))
+        | Pbound_const a ->
+            let a = self#list (self#loc self#mode_const) ctx a in
+            ((Pbound_const (Stdlib.fst a)), (self#constr ctx "Pbound_const" [Stdlib.snd a]))
+    method mode_bound_var : 'ctx -> mode_bound_var -> (mode_bound_var * 'res)=
+      fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+        let pbound_var = self#loc self#mode_var ctx pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+        ({ pbound_morph = (Stdlib.fst pbound_morph); pbound_var = (Stdlib.fst pbound_var); pbound_mod = (Stdlib.fst pbound_mod) },
+          (self#record ctx [("pbound_morph", (Stdlib.snd pbound_morph)); ("pbound_var", (Stdlib.snd pbound_var)); ("pbound_mod", (Stdlib.snd pbound_mod))]))
     method modes : 'ctx -> modes -> (modes * 'res)=
       self#list (self#loc self#mode)
     method include_kind : 'ctx -> include_kind -> (include_kind * 'res)=
@@ -9485,6 +9986,11 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#longident_loc ctx a in
             ((Ppat_type (Stdlib.fst a)),
               (self#constr ctx "Ppat_type" [Stdlib.snd a]))
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag ctx a in
+            let b = self#pattern ctx b in
+            ((Ppat_addr ((Stdlib.fst a), (Stdlib.fst b))),
+              (self#constr ctx "Ppat_addr" [Stdlib.snd a; Stdlib.snd b]))
         | Ppat_lazy a ->
             let a = self#pattern ctx a in
             ((Ppat_lazy (Stdlib.fst a)),
@@ -10337,6 +10843,40 @@ class virtual ['ctx,'res] lift_map_with_context =
              ("pjkind_manifest", (Stdlib.snd pjkind_manifest));
              ("pjkind_attributes", (Stdlib.snd pjkind_attributes));
              ("pjkind_loc", (Stdlib.snd pjkind_loc))]))
+    method law_declaration :
+      'ctx -> law_declaration -> (law_declaration * 'res)=
+      fun ctx
+        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+          plaw_attributes; plaw_loc } ->
+        let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_params =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#core_type ctx b in
+               (((Stdlib.fst a), (Stdlib.fst b)),
+                 (self#tuple ctx [Stdlib.snd a; Stdlib.snd b]))) ctx
+            plaw_params in
+        let plaw_assumptions =
+          self#list self#expression ctx plaw_assumptions in
+        let plaw_conclusion = self#expression ctx plaw_conclusion in
+        let plaw_attributes = self#attributes ctx plaw_attributes in
+        let plaw_loc = self#location ctx plaw_loc in
+        ({
+           plaw_name = (Stdlib.fst plaw_name);
+           plaw_params = (Stdlib.fst plaw_params);
+           plaw_assumptions = (Stdlib.fst plaw_assumptions);
+           plaw_conclusion = (Stdlib.fst plaw_conclusion);
+           plaw_attributes = (Stdlib.fst plaw_attributes);
+           plaw_loc = (Stdlib.fst plaw_loc)
+         },
+          (self#record ctx
+             [("plaw_name", (Stdlib.snd plaw_name));
+             ("plaw_params", (Stdlib.snd plaw_params));
+             ("plaw_assumptions", (Stdlib.snd plaw_assumptions));
+             ("plaw_conclusion", (Stdlib.snd plaw_conclusion));
+             ("plaw_attributes", (Stdlib.snd plaw_attributes));
+             ("plaw_loc", (Stdlib.snd plaw_loc))]))
     method class_type : 'ctx -> class_type -> (class_type * 'res)=
       fun ctx { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc ctx pcty_desc in
@@ -10846,6 +11386,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#jkind_declaration ctx a in
             ((Psig_jkind (Stdlib.fst a)),
               (self#constr ctx "Psig_jkind" [Stdlib.snd a]))
+        | Psig_law a ->
+            let a = self#law_declaration ctx a in
+            ((Psig_law (Stdlib.fst a)),
+              (self#constr ctx "Psig_law" [Stdlib.snd a]))
     method module_declaration :
       'ctx -> module_declaration -> (module_declaration * 'res)=
       fun ctx { pmd_name; pmd_type; pmd_modalities; pmd_attributes; pmd_loc }
@@ -11039,6 +11583,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let b = self#module_expr ctx b in
             ((Pmod_apply ((Stdlib.fst a), (Stdlib.fst b))),
               (self#constr ctx "Pmod_apply" [Stdlib.snd a; Stdlib.snd b]))
+        | Pmod_apply_unit a ->
+            let a = self#module_expr ctx a in
+            ((Pmod_apply_unit (Stdlib.fst a)),
+              (self#constr ctx "Pmod_apply_unit" [Stdlib.snd a]))
         | Pmod_constraint (a, b, c) ->
             let a = self#module_expr ctx a in
             let b = self#option self#module_type ctx b in
@@ -11165,14 +11713,51 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#jkind_declaration ctx a in
             ((Pstr_jkind (Stdlib.fst a)),
               (self#constr ctx "Pstr_jkind" [Stdlib.snd a]))
+        | Pstr_law a ->
+            let a = self#law_declaration ctx a in
+            ((Pstr_law (Stdlib.fst a)),
+              (self#constr ctx "Pstr_law" [Stdlib.snd a]))
+    method value_constraint :
+      'ctx -> value_constraint -> (value_constraint * 'res)=
+      fun ctx x ->
+        match x with
+        | Pvc_constraint { locally_abstract_univars; typ } ->
+            let locally_abstract_univars =
+              self#list (self#loc self#string) ctx locally_abstract_univars in
+            let typ = self#core_type ctx typ in
+            ((Pvc_constraint
+                {
+                  locally_abstract_univars =
+                    (Stdlib.fst locally_abstract_univars);
+                  typ = (Stdlib.fst typ)
+                }),
+              (self#constr ctx "Pvc_constraint"
+                 [self#record ctx
+                    [("locally_abstract_univars",
+                       (Stdlib.snd locally_abstract_univars));
+                    ("typ", (Stdlib.snd typ))]]))
+        | Pvc_coercion { ground; coercion } ->
+            let ground = self#option self#core_type ctx ground in
+            let coercion = self#core_type ctx coercion in
+            ((Pvc_coercion
+                {
+                  ground = (Stdlib.fst ground);
+                  coercion = (Stdlib.fst coercion)
+                }),
+              (self#constr ctx "Pvc_coercion"
+                 [self#record ctx
+                    [("ground", (Stdlib.snd ground));
+                    ("coercion", (Stdlib.snd coercion))]]))
     method value_binding : 'ctx -> value_binding -> (value_binding * 'res)=
       fun ctx
-        { pvb_is_poly; pvb_pat; pvb_expr; pvb_modes; pvb_attributes;
-          pvb_loc }
+        { pvb_is_poly; pvb_pat; pvb_expr; pvb_constraint; pvb_modes;
+          pvb_attributes; pvb_loc }
         ->
         let pvb_is_poly = self#bool ctx pvb_is_poly in
         let pvb_pat = self#pattern ctx pvb_pat in
         let pvb_expr = self#expression ctx pvb_expr in
+        let pvb_constraint =
+          self#option self#value_constraint ctx pvb_constraint in
         let pvb_modes = self#modes ctx pvb_modes in
         let pvb_attributes = self#attributes ctx pvb_attributes in
         let pvb_loc = self#location ctx pvb_loc in
@@ -11180,6 +11765,7 @@ class virtual ['ctx,'res] lift_map_with_context =
            pvb_is_poly = (Stdlib.fst pvb_is_poly);
            pvb_pat = (Stdlib.fst pvb_pat);
            pvb_expr = (Stdlib.fst pvb_expr);
+           pvb_constraint = (Stdlib.fst pvb_constraint);
            pvb_modes = (Stdlib.fst pvb_modes);
            pvb_attributes = (Stdlib.fst pvb_attributes);
            pvb_loc = (Stdlib.fst pvb_loc)
@@ -11188,6 +11774,7 @@ class virtual ['ctx,'res] lift_map_with_context =
              [("pvb_is_poly", (Stdlib.snd pvb_is_poly));
              ("pvb_pat", (Stdlib.snd pvb_pat));
              ("pvb_expr", (Stdlib.snd pvb_expr));
+             ("pvb_constraint", (Stdlib.snd pvb_constraint));
              ("pvb_modes", (Stdlib.snd pvb_modes));
              ("pvb_attributes", (Stdlib.snd pvb_attributes));
              ("pvb_loc", (Stdlib.snd pvb_loc))]))

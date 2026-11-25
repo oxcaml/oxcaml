@@ -1,6 +1,0 @@
-(library
- (name ppx_warning_flags_testing)
- (kind ppx_deriver)
- (libraries ppxlib)
- (preprocess
-  (pps ppxlib.metaquot)))

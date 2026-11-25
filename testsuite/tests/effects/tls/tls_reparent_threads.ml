@@ -17,12 +17,7 @@ type _ Effect.t += Suspend : unit Effect.t
 
 module TLS = Thread.TLS
 
-let get (type a : value mod many portable contended) (k : a ref TLS.key) : a =
-  (TLS.access k (fun r -> { Modes.Global.global = !r })).global
-let set (type a : value mod many portable contended) (k : a ref TLS.key) (v : a) =
-  TLS.access k (fun r -> r := v) [@nontail]
-
-let k = TLS.new_key (fun () -> ref "init")
+let k = TLS.new_key (fun () -> "init")
 
 type stash =
   | Empty
@@ -33,18 +28,18 @@ let () =
   let observed_in_handler = ref "" in
 
   let thread_a = Thread.create (fun () ->
-      set k "thread-a";
+      TLS.set k "thread-a";
       let r =
         Preemptible.match_with (fun () ->
-            set k "fiber";
+            TLS.set k "fiber";
             perform Suspend;
-            "fiber result: " ^ get k)
+            "fiber result: " ^ TLS.get k)
           ()
           { retc = Fun.id; exnc = raise;
             effc = (fun (type a) (e : a Effect.t) ->
               match e with
               | Suspend -> Some (fun (k' : (a, _) continuation) ->
-                  observed_in_handler := get k;
+                  observed_in_handler := TLS.get k;
                   Atomic.set stash (Cont k');
                   "suspended")
               | _ -> None);
@@ -56,7 +51,7 @@ let () =
   assert (!observed_in_handler = "thread-a");
 
   let thread_b = Thread.create (fun () ->
-      set k "thread-b";
+      TLS.set k "thread-b";
       match Atomic.get stash with
       | Empty -> assert false
       | Cont k' ->
@@ -64,7 +59,7 @@ let () =
         let r = continue k' () in
         assert (r = "fiber result: fiber");
         (* This thread's state is untouched by the fiber. *)
-        assert (get k = "thread-b")) ()
+        assert (TLS.get k = "thread-b")) ()
   in
   Thread.join thread_b;
   print_endline "OK"

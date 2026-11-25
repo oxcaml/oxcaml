@@ -58,8 +58,8 @@ let spellcheck names name =
   in
   let _, suggestions =
     List.fold_left names ~init:(Int.max_int, [])
-      ~f:(fun ((best_distance, names_at_best_distance) as acc) registered_name
-         ->
+      ~f:(fun
+          ((best_distance, names_at_best_distance) as acc) registered_name ->
         match levenshtein_distance name registered_name cutoff with
         | None -> acc
         | Some dist ->

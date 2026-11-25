@@ -7,6 +7,9 @@
    native;
  }{
    flags = "-extension layouts_beta";
+   jsir;
+ }{
+   flags = "-extension layouts_beta";
    bytecode;
  }
 *)

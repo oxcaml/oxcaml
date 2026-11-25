@@ -107,6 +107,46 @@ Warning 69 [unused-field]: unused unboxed record field "b".
 module Unused_field_disable_one_warning : sig end
 |}]
 
+(* No "never mutated" warning, as unboxed record fields can't be mutated *)
+module Mutable_field_never_mutated : sig end = struct
+  type t = #{ mutable a : int }
+  let foo x = x.#a
+  let _ = foo
+end;;
+[%%expect {|
+module Mutable_field_never_mutated : sig end
+|}]
+
+(* Other unused field warnings still apply to [mutable] fields *)
+module Mutable_field_unused : sig end = struct
+  type t = #{ mutable a : int }
+  let foo (x : t) = x
+  let _ = foo
+end;;
+[%%expect {|
+Line 2, characters 14-29:
+2 |   type t = #{ mutable a : int }
+                  ^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: unused unboxed record field "a".
+
+module Mutable_field_unused : sig end
+|}]
+
+module Mutable_field_not_read : sig end = struct
+  type t = #{ mutable a : int }
+  let foo () = #{ a = 0 }
+  let _ = foo
+end;;
+[%%expect {|
+Line 2, characters 14-29:
+2 |   type t = #{ mutable a : int }
+                  ^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: unboxed record field "a" is never read.
+  (However, this field is used to build or mutate values.)
+
+module Mutable_field_not_read : sig end
+|}]
+
 (****************************************************)
 (* Using records via their implicit unboxed records *)
 
@@ -167,4 +207,19 @@ end = struct
 end;;
 [%%expect {|
 module Unused_field_exported_private : sig type t = private { a : int; } end
+|}]
+
+(* The boxed label still gets the "never mutated" warning *)
+module Mutable_field_never_mutated : sig end = struct
+  type t = { mutable a : int }
+  let foo x = x.#a
+  let _ = foo
+end;;
+[%%expect {|
+Line 2, characters 13-28:
+2 |   type t = { mutable a : int }
+                 ^^^^^^^^^^^^^^^
+Warning 69 [unused-field]: mutable record field "a" is never mutated.
+
+module Mutable_field_never_mutated : sig end
 |}]

@@ -1,0 +1,17 @@
+(executable
+ (name driver)
+ (enabled_if
+  (>= %{ocaml_version} "5.2"))
+ (libraries
+  ppxlib
+  ppxlib.ast
+  ppxlib.astlib
+  ppxlib_ast.private.compiler_libs
+  compiler-libs.common)
+ (flags (:standard -open Oxcaml_private_compiler_libs)))
+
+(cram
+ (package ppxlib)
+ (enabled_if
+  (>= %{ocaml_version} "5.2"))
+ (deps driver.exe))

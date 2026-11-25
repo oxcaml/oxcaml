@@ -53,7 +53,7 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
 let analyze ?(speculative = false) ?print_name ~machine_width
     ~return_continuation ~exn_continuation ~code_age_relation ~used_value_slots
     ~code_ids_to_never_delete ~specialization_map t : T.Flow_result.t =
-  Profile.record_call ~accumulate:true "data_flow" (fun () ->
+  Profile.record_call ~accumulate:true ~level:2 "data_flow" (fun () ->
       if Flambda_features.dump_flow ()
       then
         Format.eprintf "PRESOURCE:@\nspec:%a@\n%a@\n@."

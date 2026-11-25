@@ -87,6 +87,7 @@ val cut_and_n_way_join_with_analysis :
   n_way_join_type:n_way_join_type ->
   meet_expanded_head:Meet_env.meet_expanded_head ->
   cut_after:Scope.t ->
+  params:Bound_parameter.t list ->
   Typing_env.t ->
   ('a * Typing_env.t) list ->
   Typing_env.t * 'a Analysis.t

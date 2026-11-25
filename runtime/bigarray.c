@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 #include "caml/alloc.h"
 #include "caml/bigarray.h"
 #include "caml/custom.h"
@@ -45,12 +46,6 @@ Caml_inline float caml_float16_to_float(uint16 d)
 {
   union float16_bits u;
   u.i = d; return u.f;
-}
-
-Caml_inline uint16 caml_float_to_float16(float d)
-{
-  union float16_bits u;
-  u.f = d; return u.i;
 }
 
 #elif defined(__GNUC__) && defined(__F16C__)
@@ -147,6 +142,34 @@ static uint16 caml_float_to_float16(float d)
 
 #endif  /* defined(__GNUC__) && defined(__F16C__) */
 
+#if defined(__GNUC__) && defined(__aarch64__)
+
+Caml_inline uint16 caml_double_to_float16(double d)
+{
+  union float16_bits u;
+  u.f = d;
+  return u.i;
+}
+
+#else
+
+Caml_inline uint16 caml_double_to_float16(double d)
+{
+  union { uint32_t i; float f; } u;
+  u.f = (float) d;
+
+  /* Round to odd so that rounding to float32 and then to float16
+     gives the same result as rounding straight to float16. */
+  if ((u.i & 0x7f800000) != 0x7f800000
+      && (u.i & 1) == 0 && (double) u.f != d) {
+    // finite, even and inexact: move to the odd neighbour nearer to f
+    if (fabs((double) u.f) < fabs(d)) u.i++; else u.i--;
+  }
+  return caml_float_to_float16(u.f);
+}
+
+#endif
+
 CAMLexport double caml_double_of_float16(intnat x)
 {
   return (double) caml_float16_to_float((uint16) x);
@@ -154,7 +177,7 @@ CAMLexport double caml_double_of_float16(intnat x)
 
 CAMLexport intnat caml_float16_of_double(double x)
 {
-  return (intnat) caml_float_to_float16((float) x);
+  return (intnat) caml_double_to_float16(x);
 }
 
 Caml_inline uint32_t caml_hash_mix_float16(uint32_t hash, uint16 d)
@@ -890,7 +913,7 @@ static value caml_ba_set_aux(value vb, volatile value * vind,
   switch ((enum caml_ba_kind)(b->flags & CAML_BA_KIND_MASK)) {
   case CAML_BA_FLOAT16:
     ((uint16 *) b->data)[offset] =
-      caml_float_to_float16(Double_val(newval)); break;
+      caml_double_to_float16(Double_val(newval)); break;
   case CAML_BA_FLOAT32:
     ((float *) b->data)[offset] = Double_val(newval); break;
   case CAML_BA_FLOAT64:
@@ -1470,7 +1493,7 @@ CAMLprim value caml_ba_fill(value vb, value vinit)
 
   switch ((enum caml_ba_kind)(b->flags & CAML_BA_KIND_MASK)) {
   case CAML_BA_FLOAT16: {
-    uint16 init = caml_float_to_float16(Double_val(vinit));
+    uint16 init = caml_double_to_float16(Double_val(vinit));
     FILL_SCALAR_LOOP(uint16 *);
     break;
   }

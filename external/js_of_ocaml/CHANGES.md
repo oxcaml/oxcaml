@@ -1,6 +1,11 @@
 # dev
 
 ## Features/Changes
+* Compiler: emit lists of more than `list_depth` (default 100) cells that are
+  not compile-time constants as a flat array converted at runtime by
+  `caml_list_of_js_array` or the new `caml_list_of_js_array_with_tail`, rather
+  than as one deeply nested array literal, which overflows the stack of some
+  JavaScript parsers (e.g. `[@@deriving enumerate]` on a large variant)
 * Compiler: with `--effects={cps,double-translation}`, specialize calls to
   known functions using the global flow analysis before the CPS transformation
   (#2456)
@@ -104,8 +109,10 @@
   targeting JavaScript (#2441)
 * Compiler: with `--effects=double-translation`, only generate a CPS version
   of the functions that may run below an effect handler (#2441)
+* Runtime: faster conversion of float16 values to doubles (#2634)
 
 ## Bug fixes
+* Runtime: round doubles to float16 only once (#2634)
 * Compiler: with `--effects=double-translation`, fix calls with too many
   arguments to a function that does not perform effects (#2455)
 * Runtime/Wasm: with `--effects=native`, performing an effect that no

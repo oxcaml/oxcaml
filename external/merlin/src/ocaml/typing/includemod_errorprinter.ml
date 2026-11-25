@@ -180,9 +180,9 @@ module Runtime_coercion = struct
             find env (Context.Module id :: ctx) q md.md_type
         | _ -> raise Not_found
         end
-    | Mty_functor(Named (_,mt,_) as arg,_,_), InArg :: q ->
+    | Mty_functor(Named (_,mt,_) as arg,_,_,_), InArg :: q ->
         find env (Context.Arg arg :: ctx) q mt
-    | Mty_functor(arg, mt,_), InBody :: q ->
+    | Mty_functor(arg, mt,_,_), InBody :: q ->
         find env (Context.Body arg :: ctx) q mt
     | _ -> raise Not_found
 
@@ -304,7 +304,7 @@ module Is_modal = struct
   and sigitem_symptom = function
     | Core s -> core_sigitem_symptom s
     | Module_type d -> module_type_symptom d.symptom
-    | Module_type_declaration _ -> None
+    | Module_type_declaration _ | Unrepresentable_item _ -> None
 
   and core_sigitem_symptom = function
     | Value_descriptions d -> value_mismatch d.symptom
@@ -1144,6 +1144,13 @@ and functor_symptom ~expansion_token ~env ~before ~ctx = function
   | Result res ->
       module_type ~expansion_token ~eqmode:false ~env ~before ~ctx res
   | Params d -> functor_params ~expansion_token ~env ~before ~ctx d
+  | Staticity ->
+      let printer =
+        Fmt.dprintf
+          "@[Their staticities disagree:@ \
+          one is a template functor@ and the other is not.@]"
+      in
+      dwith_context ctx printer :: before
 
 and signature ~expansion_token ~env:_ ~before ~ctx sgs =
   Printtyp.Doc.wrap_printing_env ~error:true sgs.env (fun () ->
@@ -1169,6 +1176,17 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
         ~ctx:(Context.Module name :: ctx) diff
   | Module_type_declaration diff ->
       module_type_decl ~expansion_token ~env ~before ~ctx name diff
+  | Unrepresentable_item (ty, violation) ->
+      let printer =
+        Fmt.dprintf
+          "@[<v>@[Signatures containing unrepresentable items cannot be@ \
+           coerced to other module types.@]@ %a is not representable.@ %a@]"
+          Style.inline_code (Ident.name name)
+          (Jkind.Violation.report_with_offender
+             ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty) env.i_env)
+          violation
+      in
+      dwith_context ctx printer :: before
 and module_type_decl ~expansion_token ~env ~before ~ctx id diff =
   let next =
     dwith_context_and_elision ctx (module_type_declarations id diff) in
@@ -1358,8 +1376,8 @@ let register () =
   Location.register_error_of_exn
     (function
       | Includemod.Error err -> Some (report_error_doc err)
-      | Includemod.Apply_error {loc; env; app_name; mty_f; args} ->
-          Some (Printtyp.Doc.wrap_printing_env env ~error:true (fun () ->
+      | Includemod.Apply_error.In_context {loc; env; app_name; mty_f; args} ->
+          Some (Printtyp.wrap_printing_env env ~error:true (fun () ->
               report_apply_error_doc ~loc env (app_name, mty_f, args))
             )
       | _ -> None

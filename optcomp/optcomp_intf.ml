@@ -32,6 +32,47 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(** A compilation unit translated to JSIR. *)
+type jsir_program =
+  { program : Jsoo_imports.Code.program;
+    imported_compilation_units : Compilation_unit.Set.t;
+        (** The compilation units whose toplevel module block or symbols
+            [program] reads from js_of_ocaml's symbol tables. *)
+    symbol_imports :
+      (Jsoo_imports.Code.Var.t * Jsoo_imports.Code.Linkage_name.t) list;
+        (** The variables bound at the start of the entry block of [program] to
+            the symbols of other compilation units, by linkage name. *)
+    symbol_exports :
+      (Jsoo_imports.Code.Linkage_name.t * Jsoo_imports.Code.Var.t) list
+        (** The symbols other compilation units may fetch from [program], by
+            linkage name, with the variables holding their values. *)
+  }
+
+module type Flambda2 = sig
+  val lambda_to_cmm :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    Cmm.phrase list
+
+  val lambda_to_jsir :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    jsir_program
+
+  (** Link the JSIR of compilation units, given in initialisation order, into
+      the JSIR of a whole program. Module blocks are only registered with the
+      runtime if [register_globals]. *)
+  val link_jsir :
+    register_globals:bool ->
+    Jsoo_imports.Code.jsir_file list ->
+    Jsoo_imports.Code.program
+end
+
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
       string append, and removed by Filename.strip_extension *)

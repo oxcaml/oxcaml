@@ -106,6 +106,19 @@ let env_find_static_exception id env =
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
+let dbg_of_test (test : Cmm.expression) dbg =
+  if not (Debuginfo.is_none dbg)
+  then dbg
+  else
+    match test with
+    | Cop (_, _, dbg) -> dbg
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
+    | Cinvalid _ ->
+      Debuginfo.none
+
 let phantom_vars_from_env env =
   if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 
@@ -214,25 +227,32 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_static_block -> typ_static_block
+    | Word_code_pointer -> typ_code_pointer
+    | Word_out_of_heap_data_pointer -> typ_out_of_heap_data_pointer
     | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
     | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
     | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
-    | _ -> typ_int)
+    | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
+      typ_int)
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
   | Cdomain_index -> typ_int
+  | Cthread_self_id -> typ_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
-  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Cnot | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _
+  | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
@@ -290,7 +310,7 @@ let oper_result_type = function
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
-  | Copaque -> typ_val
+  | Copaque ty -> ty
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
@@ -305,7 +325,8 @@ let oper_result_type = function
 (* [size_component] is placed here and not in [Cmm] to avoid cyclic
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
-  | Val | Addr -> Arch.size_addr
+  | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer ->
+    Arch.size_addr
   | Int ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
@@ -338,7 +359,7 @@ let size_machtype mty =
 let size_expr_with ~size_of_var exp =
   let rec size localenv = function
     | Cconst_int _ | Cconst_natint _ -> Arch.size_int
-    | Cconst_symbol _ -> Arch.size_addr
+    | Cconst_symbol (s, _) -> size_machtype s.sym_type
     | Cconst_float _ -> Arch.size_float
     | Cconst_float32 _ ->
       (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
@@ -547,7 +568,11 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Vec256 -> Twofiftysix_unaligned
   | Vec512 -> Fivetwelve_unaligned
   | Mask -> Word_mask
-  | Val | Addr | Int -> Word_val
+  | Val | Addr -> Word_val
+  | Int -> Word_int
+  | Static_block -> Word_static_block
+  | Code_pointer -> Word_code_pointer
+  | Out_of_heap_data_pointer -> Word_out_of_heap_data_pointer
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :
@@ -618,10 +643,9 @@ let terminator_of_test :
   | Ieventest -> Parity_test { ifso = label_true; ifnot = label_false }
 
 module Stack_offset_and_exn = struct
-  (* This module relies on the field `can_raise` of basic blocks but does not
-     rely on this field of individual Cfg instructions. This may need to be
-     revisited when we remove dead trap handlers and the associated
-     pushtrap/poptrap operations. *)
+  (* This module derives exception edges from block-level [can_raise]. It runs
+     before CFG simplification; [Cfg.remove_blocks] adjusts stack offsets when
+     dead handlers are removed. *)
   type handler_stack = Label.t list
 
   let fun_name = ref ""
@@ -651,7 +675,8 @@ module Stack_offset_and_exn = struct
         InstructionId.format term.id
     | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
     | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Invalid _ | Call _ | Prim _ ->
+    | Tailcall_func _ | Call_no_return _ | External_call_no_return _ | Invalid _
+    | Call _ | Prim _ ->
       stack_offset, traps
 
   let rec process_basic :
@@ -690,7 +715,8 @@ module Stack_offset_and_exn = struct
         | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
         | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause | Alloc _ )
+        | Domain_index | Thread_self_id | Poll | Pause | Trace_pc_guard_gate
+        | Trace_pc_guard _ | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -762,8 +788,6 @@ let make_const_vec512 x = Operation.Const_vec512 x
 
 let make_const_symbol x = Operation.Const_symbol x
 
-let make_opaque () = Operation.Opaque
-
 let insert_debug (env : environment) sub_cfg basic dbg arg res =
   let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
@@ -815,6 +839,20 @@ let insert_move_args env sub_cfg arg loc stacksize =
   if stacksize <> 0
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
+
+let call_arg_locations (call : Cfg.func_call_operation) args =
+  let rarg =
+    match call with
+    | Indirect _ -> Array.sub args 1 (Array.length args - 1)
+    | Direct _ -> args
+  in
+  let loc_arg, stack_ofs = Proc.loc_arguments (Reg.typv rarg) in
+  rarg, loc_arg, stack_ofs
+
+let call_arg_for_terminator (call : Cfg.func_call_operation) args loc_arg =
+  match call with
+  | Indirect _ -> Array.append [| args.(0) |] loc_arg
+  | Direct _ -> loc_arg
 
 let result_needs_mask_of_int64 (src : Reg.t) (dst : Reg.t) =
   (* The C ABI passes masks in GPRs. *)
