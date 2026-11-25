@@ -22,5 +22,5 @@
 (function "fib" (n: int)
   (if (<s n 2)
       1
-    (+ (app "fib" (- n 1) int)
-       (app "fib" (- n 2) int))))
+    (+ (app "fib":code_pointer (- n 1) int)
+       (app "fib":code_pointer (- n 2) int))))

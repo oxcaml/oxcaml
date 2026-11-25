@@ -41,6 +41,9 @@ let reg ppf r =
     | Val -> "V"
     | Addr -> "A"
     | Int -> "I"
+    | Static_block -> "B"
+    | Code_pointer -> "C"
+    | Out_of_heap_data_pointer -> "P"
     | Float -> "F"
     | Vec128 -> "X"
     | Vec256 -> "Y"
@@ -104,7 +107,9 @@ let regsetaddr' ?(print_reg = reg) ppf s =
       match r.typ with
       | Val -> fprintf ppf "*"
       | Addr -> fprintf ppf "!"
-      | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 -> ())
+      | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Float
+      | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+        ())
     s
 
 let regsetaddr ppf s = regsetaddr' ppf s

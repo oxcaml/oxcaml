@@ -133,12 +133,10 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Return -> fprintf ppf "return%a" print_args args
   | Raise _ -> fprintf ppf "raise%a" print_args args
   | Tailcall_self { destination } ->
-    dump_linear_call_op ppf
-      (Linear.Ltailcall_imm
-         { func =
-             Cmm.local_symbol ~ty:Cmm.typ_int
-               (Printf.sprintf "self(%s)" (Label.to_string destination))
-         })
+    fprintf ppf "tailcall \"self(%s)\" %a"
+      (Label.to_string destination)
+      (Printreg.regs' ~print_reg)
+      args
   | Tailcall_func call ->
     (* CR ncourant: here and below, maybe the callees should be printed when
        they are known *)

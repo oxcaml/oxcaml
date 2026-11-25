@@ -69,30 +69,29 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlDls_get__entry(i64 
   store i64 %1, ptr %alloc
   %3 = alloca i64
   %4 = alloca ptr addrspace(1)
-  %5 = alloca i64
-  %6 = alloca i64
+  %5 = alloca ptr
+  %6 = alloca ptr
   %7 = alloca i64
   br label %L1
 L1:
   br label %L115
 L115:
-  %8 = ptrtoint ptr @camlDls_get to i64
-  store i64 %8, ptr %5
-  %9 = load i64, ptr %5
-  store i64 %9, ptr %6
-  %10 = load i64, ptr %6
-  %11 = inttoptr i64 %10 to ptr addrspace(1)
-  store ptr addrspace(1) %11, ptr %4
+  store ptr @camlDls_get, ptr %5
+  %8 = load ptr, ptr %5
+  store ptr %8, ptr %6
+  %9 = load ptr, ptr %6
+  %10 = addrspacecast ptr %9 to ptr addrspace(1)
+  store ptr addrspace(1) %10, ptr %4
   store i64 1, ptr %7
-  %12 = load i64, ptr %7
-  store i64 %12, ptr %3
-  %13 = load ptr addrspace(1), ptr %3
-  %14 = load i64, ptr %ds
-  %15 = load i64, ptr %alloc
-  %16 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %14, 0, 0
-  %17 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %16, i64 %15, 0, 1
-  %18 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %17, ptr addrspace(1) %13, 1, 0
-  ret { { i64, i64 }, { ptr addrspace(1) } } %18
+  %11 = load i64, ptr %7
+  store i64 %11, ptr %3
+  %12 = load ptr addrspace(1), ptr %3
+  %13 = load i64, ptr %ds
+  %14 = load i64, ptr %alloc
+  %15 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %13, 0, 0
+  %16 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %15, i64 %14, 0, 1
+  %17 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %16, ptr addrspace(1) %12, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %17
 }
 
 define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) returns_twice noinline {

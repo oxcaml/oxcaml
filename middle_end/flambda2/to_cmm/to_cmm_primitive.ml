@@ -746,7 +746,9 @@ let string_like_load ~dbg kind width ~str ~index =
     string_like_load_aux ~ptr_out_of_heap:false ~dbg width ~str ~index
   | Bigstring ->
     let ba_data_addr = C.field_address str 1 dbg in
-    let ba_data = C.load ~dbg Word_int Mutable ~addr:ba_data_addr in
+    let ba_data =
+      C.load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_addr
+    in
     C.bind "ba_data" ba_data (fun str ->
         string_like_load_aux ~ptr_out_of_heap:true ~dbg width ~str ~index)
 
@@ -783,7 +785,7 @@ let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
         ~new_value
     | Bigstring ->
       let addr = C.field_address bytes 1 dbg in
-      let ba_data = C.load ~dbg Word_int Mutable ~addr in
+      let ba_data = C.load ~dbg Word_out_of_heap_data_pointer Mutable ~addr in
       C.bind "ba_data" ba_data (fun bytes ->
           bytes_or_bigstring_set_aux ~ptr_out_of_heap:true ~dbg width ~bytes
             ~index ~new_value)
