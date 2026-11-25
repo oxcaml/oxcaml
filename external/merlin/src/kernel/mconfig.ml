@@ -768,6 +768,8 @@ let ocaml_ignored_flags =
     "-no-reaper-change-calling-conventions";
     "-flambda2-expert-cmm-safe-subst";
     "-no-flambda2-expert-cmm-safe-subst";
+    "-flambda2-expert-cmm-pin-local-values";
+    "-no-flambda2-expert-cmm-pin-local-values";
     "-dissector";
     "-ddissector";
     "-ddissector-sizes";

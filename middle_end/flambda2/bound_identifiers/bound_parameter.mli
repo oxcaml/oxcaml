@@ -37,6 +37,13 @@ val kind : t -> Flambda_kind.With_subkind.t
 (** Replace the kind of the given parameter. *)
 val with_kind : t -> Flambda_kind.With_subkind.t -> t
 
+(** Whether the parameter may hold a value allocated in a region that is ended
+    in the function body binding it. Only [To_cmm_local_values] sets this,
+    immediately before translation to Cmm. *)
+val maybe_local : t -> bool
+
+val mark_maybe_local : t -> t
+
 val rename : t -> t
 
 val is_renamed_version_of : t -> t -> bool

@@ -17,20 +17,23 @@
 type t =
   { var : Variable.t;
     debug_uid : Flambda_debug_uid.t;
-    name_mode : Name_mode.t
+    name_mode : Name_mode.t;
+    maybe_local : bool
   }
 
 let print_debug_uid ppf duid =
   if !Clflags.dump_debug_uids
   then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
 
-let [@ocamlformat "disable"] print ppf { var; debug_uid; name_mode = _; } =
-  Format.fprintf ppf "%a%a" Variable.print var print_debug_uid debug_uid
+let [@ocamlformat "disable"] print ppf
+    { var; debug_uid; name_mode = _; maybe_local } =
+  Format.fprintf ppf "%a%a%s" Variable.print var print_debug_uid debug_uid
+    (if maybe_local then "[maybe_local]" else "")
 
 let create var debug_uid name_mode =
   (* Note that [name_mode] might be [In_types], e.g. when dealing with function
      return types and also using [Typing_env.add_definition]. *)
-  { var; debug_uid; name_mode }
+  { var; debug_uid; name_mode; maybe_local = false }
 
 let var t = t.var
 
@@ -44,6 +47,10 @@ let with_var t var = { t with var }
 
 let with_name_mode t name_mode = { t with name_mode }
 
+let maybe_local t = t.maybe_local
+
+let mark_maybe_local t = { t with maybe_local = true }
+
 let rename t = with_var t (Variable.rename t.var)
 
 let is_renamed_version_of t t' =
@@ -56,11 +63,13 @@ let apply_renaming t renaming =
 
 let free_names t = Name_occurrences.singleton_variable t.var t.name_mode
 
-let ids_for_export { var; debug_uid = _; name_mode = _ } =
+let ids_for_export { var; debug_uid = _; name_mode = _; maybe_local = _ } =
   Ids_for_export.add_variable Ids_for_export.empty var
 
-let renaming { var; debug_uid = _; name_mode = _ } ~guaranteed_fresh =
-  let { var = guaranteed_fresh; debug_uid = _; name_mode = _ } =
+let renaming { var; debug_uid = _; name_mode = _; maybe_local = _ }
+    ~guaranteed_fresh =
+  let { var = guaranteed_fresh; debug_uid = _; name_mode = _; maybe_local = _ }
+      =
     guaranteed_fresh
   in
   Renaming.add_fresh_variable Renaming.empty var ~guaranteed_fresh

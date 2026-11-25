@@ -889,6 +889,22 @@ let mk_no_flambda2_expert_cmm_safe_subst f =
       " Allow more substitutions in cmm, even ones that may be unsafe%s"
       (format_not_default Flambda2.Expert.Default.cmm_safe_subst) )
 
+let mk_flambda2_expert_cmm_pin_local_values f =
+  ( "-flambda2-expert-cmm-pin-local-values",
+    Arg.Unit f,
+    Printf.sprintf
+      " Never substitute or move in cmm a binding that involves a value\n\
+      \     which may be allocated in a region ended in the same function%s"
+      (format_default Flambda2.Expert.Default.cmm_pin_local_values) )
+
+let mk_no_flambda2_expert_cmm_pin_local_values f =
+  ( "-no-flambda2-expert-cmm-pin-local-values",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow bindings involving locally allocated values to be substituted\n\
+      \     or moved in cmm%s"
+      (format_not_default Flambda2.Expert.Default.cmm_pin_local_values) )
+
 let mk_flambda2_expert_phantom_lets f =
   ( "-flambda2-expert-phantom-lets",
     Arg.Unit f,
@@ -1625,6 +1641,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
   val flambda2_expert_cmm_safe_subst : unit -> unit
   val no_flambda2_expert_cmm_safe_subst : unit -> unit
+  val flambda2_expert_cmm_pin_local_values : unit -> unit
+  val no_flambda2_expert_cmm_pin_local_values : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -1863,6 +1881,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_expert_inline_effects_in_cmm;
       mk_flambda2_expert_cmm_safe_subst F.flambda2_expert_cmm_safe_subst;
       mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
+      mk_flambda2_expert_cmm_pin_local_values
+        F.flambda2_expert_cmm_pin_local_values;
+      mk_no_flambda2_expert_cmm_pin_local_values
+        F.no_flambda2_expert_cmm_pin_local_values;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
       mk_flambda2_expert_max_block_size_for_projections
@@ -2360,6 +2382,13 @@ module Oxcaml_options_impl = struct
 
   let flambda2_expert_cmm_safe_subst = set Flambda2.Expert.cmm_safe_subst
   let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
+
+  let flambda2_expert_cmm_pin_local_values =
+    set Flambda2.Expert.cmm_pin_local_values
+
+  let no_flambda2_expert_cmm_pin_local_values =
+    clear Flambda2.Expert.cmm_pin_local_values
+
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
 
@@ -2899,6 +2928,8 @@ module Extra_params = struct
     | "flambda2-expert-inline-effects-in-cmm" ->
         set Flambda2.Expert.inline_effects_in_cmm
     | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
+    | "flambda2-expert-cmm-pin-local-values" ->
+        set Flambda2.Expert.cmm_pin_local_values
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth

@@ -19,38 +19,46 @@ module Simple = Int_ids.Simple
 type t =
   { param : Variable.t;
     uid : Flambda_debug_uid.t;
-    kind : Flambda_kind.With_subkind.t
+    kind : Flambda_kind.With_subkind.t;
+    maybe_local : bool
   }
 
 include Container_types.Make (struct
   type nonrec t = t
 
-  let compare { param = param1; kind = kind1; uid = uid1 }
-      { param = param2; kind = kind2; uid = uid2 } =
+  let compare
+      { param = param1; kind = kind1; uid = uid1; maybe_local = maybe_local1 }
+      { param = param2; kind = kind2; uid = uid2; maybe_local = maybe_local2 } =
     let c = Variable.compare param1 param2 in
     if c <> 0
     then c
     else
       let c = Flambda_kind.With_subkind.compare kind1 kind2 in
-      if c <> 0 then c else Flambda_debug_uid.compare uid1 uid2
+      if c <> 0
+      then c
+      else
+        let c = Flambda_debug_uid.compare uid1 uid2 in
+        if c <> 0 then c else Bool.compare maybe_local1 maybe_local2
 
   let equal t1 t2 = compare t1 t2 = 0
 
-  let hash { param; kind; uid } =
+  let hash { param; kind; uid; maybe_local } =
     Hashtbl.hash
       ( Variable.hash param,
         Flambda_kind.With_subkind.hash kind,
-        Flambda_debug_uid.hash uid )
+        Flambda_debug_uid.hash uid,
+        maybe_local )
 
   let print_debug_uid ppf duid =
     if !Clflags.dump_debug_uids
     then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
 
-  let [@ocamlformat "disable"] print ppf { param; kind; uid } =
-    Format.fprintf ppf "@[(%t%a%a%t @<1>\u{2237} %a)@]"
+  let [@ocamlformat "disable"] print ppf { param; kind; uid; maybe_local } =
+    Format.fprintf ppf "@[(%t%a%a%s%t @<1>\u{2237} %a)@]"
       Flambda_colours.parameter
       Variable.print param
       print_debug_uid uid
+      (if maybe_local then "[maybe_local]" else "")
       Flambda_colours.pop
       Flambda_kind.With_subkind.print kind
 end)
@@ -66,7 +74,7 @@ let create param kind uid =
       "Cannot create parameter %a with kind %a: it must have a subkind of %a"
       Variable.print param Flambda_kind.With_subkind.print kind
       Flambda_kind.print (Variable.kind param);
-  { param; kind; uid }
+  { param; kind; uid; maybe_local = false }
 
 let var t = t.param
 
@@ -80,22 +88,28 @@ let kind t = t.kind
 
 let with_kind t kind = { t with kind }
 
+let maybe_local t = t.maybe_local
+
+let mark_maybe_local t = { t with maybe_local = true }
+
 let rename t = { t with param = Variable.rename t.param }
 
 let is_renamed_version_of t t' =
   Flambda_kind.With_subkind.equal t.kind t'.kind
   && Variable.is_renamed_version_of t.param t'.param
 
-let free_names { param; kind = _; uid = _ } =
+let free_names { param; kind = _; uid = _; maybe_local = _ } =
   Name_occurrences.singleton_variable param Name_mode.normal
 
-let apply_renaming ({ param; kind; uid } as t) renaming =
+let apply_renaming ({ param; kind = _; uid = _; maybe_local = _ } as t) renaming
+    =
   let param' = Renaming.apply_variable renaming param in
-  if param == param' then t else create param' kind uid
+  if param == param' then t else { t with param = param' }
 
-let import_and_rename { param; kind; uid } renaming =
+let import_and_rename ({ param; kind = _; uid = _; maybe_local = _ } as t)
+    renaming =
   let renaming, param = Renaming.bind_variable renaming param in
-  renaming, create param kind uid
+  renaming, { t with param }
 
-let ids_for_export { param; kind = _; uid = _ } =
+let ids_for_export { param; kind = _; uid = _; maybe_local = _ } =
   Ids_for_export.add_variable Ids_for_export.empty param

@@ -92,12 +92,20 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       (Flambda_unit.return_continuation flambda_unit)
       ~param_types:(List.map snd return_cont_params)
   in
+  let body = Flambda_unit.body flambda_unit in
+  let body =
+    if Flambda_features.Expert.cmm_pin_local_values ()
+    then
+      To_cmm_local_values.rewrite ~params:Bound_parameters.empty ~my_region:None
+        ~my_ghost_region:None body
+    else body
+  in
   let r =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
   let body, body_free_vars, body_symbol_inits, res =
-    To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
+    To_cmm_expr.expr env r body
   in
   if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
   then

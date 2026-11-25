@@ -611,10 +611,32 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
     in
     expr env res body
   in
+  (* With [-flambda2-expert-cmm-pin-local-values], a binding that involves a
+     value which may be allocated in a region ended in this body (a variable
+     marked by [To_cmm_local_values]) is never substituted: it is bound here, at
+     its position in the Flambda term. A pinned binding never moves, so neither
+     the translation of the handler of a non-inlined continuation from the
+     environment of its [Let_cont] (which runs before the body, and so does not
+     see the [End_region]s the body executes) nor the flushing of delayed
+     bindings at [End_region] matters for it. We do not otherwise know which
+     variables hold local values (and no variable is marked unless the flag is
+     set). *)
+  let pin_local =
+    Env.is_maybe_local env (Bound_var.var v)
+    || List.exists
+         (fun arg ->
+           match Simple.must_be_var arg with
+           | None -> false
+           | Some (var, _coercion) -> Env.is_maybe_local env var)
+         (Flambda_primitive.args p)
+  in
   match inline with
   (* It can be useful to translate a dropped expression because it allows to
      inline (and thus remove from the env) the arguments in it. *)
   | Drop_defining_expr | Regular -> simple_case Do_not_inline
+  | (May_inline_once | Must_inline_once | Must_inline_and_duplicate)
+    when pin_local ->
+    simple_case Do_not_inline
   | May_inline_once -> simple_case May_inline_once
   | Must_inline_once -> complex_case Must_inline_once
   | Must_inline_and_duplicate -> complex_case Must_inline_and_duplicate
@@ -695,6 +717,7 @@ and let_expr env res let_expr =
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
       match Bound_pattern.name_mode bound_pattern with
       | Normal ->
+        let env = Env.add_maybe_local_bound_pattern env bound_pattern in
         let_expr0 env res let_expr bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
       | Phantom -> expr env res body
@@ -733,6 +756,7 @@ and let_cont env res (let_cont : Flambda.Let_cont.t) =
 and let_cont_inlined env res k handler body =
   Continuation_handler.pattern_match' handler
     ~f:(fun handler_params ~num_normal_occurrences_of_params ~handler ->
+      let env = Env.add_maybe_local_bound_parameters env handler_params in
       let env =
         Env.add_inline_cont env k ~handler_params
           ~handler_params_occurrences:num_normal_occurrences_of_params
@@ -854,6 +878,7 @@ and let_cont_rec env res invariant_params conts body =
       conts_to_handlers env
   in
   (* Generate variables for the invariant params *)
+  let env = Env.add_maybe_local_bound_parameters env invariant_params in
   let env, invariant_vars =
     C.continuation_bound_parameters env invariant_params
   in
@@ -904,6 +929,7 @@ and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
+      let env = Env.add_maybe_local_bound_parameters env params in
       let env, vars = C.continuation_bound_parameters env params in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler

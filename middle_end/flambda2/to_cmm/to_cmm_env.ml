@@ -188,6 +188,9 @@ type t =
     (* Stages of let-bindings, most recent at the head. *)
     validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
+    maybe_local : Variable.Set.t;
+    (* Variables in scope that may hold values allocated in a region ended in
+       the current function body (see [To_cmm_local_values]). *)
     symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
            value for the symbol field initialization. *)
@@ -299,6 +302,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
+    maybe_local = Variable.Set.empty;
     symbol_inits = Backend_var.Map.empty
   }
 
@@ -306,6 +310,28 @@ let enter_function_body env ~return_continuation ~return_continuation_arity
     ~exn_continuation =
   create env.offsets env.functions_info ~trans_prim:env.trans_prim
     ~return_continuation ~return_continuation_arity ~exn_continuation
+
+(* Variables that may hold local values *)
+
+let add_maybe_local env var =
+  { env with maybe_local = Variable.Set.add var env.maybe_local }
+
+let add_maybe_local_bound_pattern env bound_pattern =
+  Bound_pattern.fold_all_bound_vars bound_pattern ~init:env ~f:(fun env bv ->
+      if Bound_var.maybe_local bv
+      then add_maybe_local env (Bound_var.var bv)
+      else env)
+
+let add_maybe_local_bound_parameters env params =
+  List.fold_left
+    (fun env param ->
+      if Bound_parameter.maybe_local param
+      then add_maybe_local env (Bound_parameter.var param)
+      else env)
+    env
+    (Bound_parameters.to_list params)
+
+let is_maybe_local env var = Variable.Set.mem var env.maybe_local
 
 (* Debuginfo *)
 

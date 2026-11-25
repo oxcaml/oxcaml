@@ -568,6 +568,18 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       in
       env, Some region, Some ghost_region
   in
+  let body =
+    if Flambda_features.Expert.cmm_pin_local_values ()
+    then
+      let my_region, my_ghost_region =
+        match (my_alloc_mode : Alloc_mode.For_applications.t) with
+        | Not_alloc_stack { alloc_region = _ } -> None, None
+        | Maybe_alloc_stack { alloc_region = _; region; ghost_region } ->
+          Some region, Some ghost_region
+      in
+      To_cmm_local_values.rewrite ~params ~my_region ~my_ghost_region body
+    else body
+  in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
