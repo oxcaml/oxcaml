@@ -385,6 +385,21 @@ module type S = sig
 
   val with_copy_scope : (copy_scope -> 'a) -> 'a
 
+  (** A mode variable, of any axis *)
+  type packed_var
+
+  (** See [Solver_intf.add_to_pool_later] *)
+  val add_to_pool_later : (packed_var -> unit) Defined_later.Fun.t
+
+  val var_level : packed_var -> int
+
+  (** [lower_var ~level v] lowers the level of [v] to [level]. *)
+  val lower_var : level:int -> packed_var -> unit
+
+  (** [generalize_var ~current_level v] generalizes [v], returning whether it is
+      (still) a partial generic (see [Solver_intf.generalize_var]). *)
+  val generalize_var : current_level:int -> packed_var -> bool
+
   type nonrec allowed = allowed
 
   type nonrec disallowed = disallowed
@@ -1047,6 +1062,9 @@ module type S = sig
         current level *)
     val instantiate :
       copy_scope:copy_scope -> current_level:int -> ('l * 'r) t -> ('l * 'r) t
+
+    (** Guards the mode variables of a mode with a guard. *)
+    val guard : Typing_guard.t -> ('l * 'r) t -> unit
 
     (** Copies a mode variable and its children at generic level, preserving
         levels *)

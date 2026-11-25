@@ -251,6 +251,7 @@
   ;; TYPING
   typing_scheduler
   typing_ivar
+  typing_guard
   path
   current_unit
   jkind

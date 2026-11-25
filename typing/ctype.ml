@@ -191,11 +191,13 @@ let scheduler = s_ref_of_create Typing_scheduler.create ()
 
 let scheduler () = !scheduler
 
-let get_local_ivars ~level =
+(* The ivars with handlers of the [Tivar]s of the pool for [level] whose level
+   is at least [min_level] *)
+let get_pool_ivars ~level ~min_level =
   let ivars = ref [] in
-  iter_pool ~level (fun ty ->
+  iter_ivar_pool ~level (fun ty ->
       let ty = Transient_expr.type_expr ty in
-      if get_level ty >= level
+      if get_level ty >= min_level
       then
         match get_desc ty with
         | Tivar { ivar; _ } when Typing_ivar.has_handlers ivar ->
@@ -203,8 +205,10 @@ let get_local_ivars ~level =
         | _ -> ());
   !ivars
 
+let get_local_ivars ~level = get_pool_ivars ~level ~min_level:level
+
 let get_all_ivars () =
-  List.filter Typing_ivar.has_handlers (take_ivar_pool ~level:!current_level)
+  get_pool_ivars ~level:!current_level ~min_level:lowest_level
 
 (* Runs the scheduler, then defaults any still-empty ivars returned
    by [get_ivars], until none remain. *)
@@ -241,8 +245,11 @@ let default_all_ivars_if_toplevel () =
 
 (* No pool walk generalizes the nodes of the initial pool *)
 let rewrite_defaulted_toplevel_tivars () =
-  if Language_extension.is_enabled Omnidirectionality then
-    iter_pool ~level:!current_level (fun ty ->
+  if Language_extension.is_enabled Omnidirectionality
+  then
+    List.iter
+      (fun ty ->
+        let ty = Transient_expr.(repr (type_expr ty)) in
         match ty.desc with
         | Tivar { ivar; name; jkind } ->
           if Typing_ivar.has_handlers ivar
@@ -251,6 +258,7 @@ let rewrite_defaulted_toplevel_tivars () =
               "Ctype.rewrite_defaulted_toplevel_tivars: undefaulted Tivar";
           set_type_desc (Transient_expr.type_expr ty) (Tvar { name; jkind })
         | _ -> ())
+      (take_ivar_pool ~level:!current_level)
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -280,26 +288,41 @@ let mark_persistent_in_quotations env =
   let _ = create_scope () in
   Env.mark_persistent_in_quotations ~scope env
 
-(* [with_local_level_gen] handles both the scoping structure of levels
-   and automatic generalization through pools (cf. btype.ml) *)
-let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
-    =
-  begin_def ();
-  let level = !current_level in
-  let result, pool, sort_pool, ivars =
-    with_new_pool ~level:!current_level begin fun () ->
-      let result = wrap_end_def f in
-      Option.iter (fun g -> g result) before_generalize;
-      if not structure then default_ivars (fun () -> get_local_ivars ~level);
-      generalize result;
-      result
-    end
-  in
-  List.iter (add_to_ivar_pool ~level:!current_level) ivars;
+let default_local_ivars ~level =
+  default_ivars (fun () -> get_local_ivars ~level)
+
+(* Leaving the pool of a generalization point (cf. btype.ml), including after
+   a suspended constraint re-entered it: defaults the ivars that block its
+   generalization, then generalizes the nodes and mode variables of the pool
+   (or only the structure of the nodes, if [structure]), or lowers them to an
+   outer pool. *)
+let exit_pool ~structure pool =
+  let level = pool_level pool in
+  if not structure then default_local_ivars ~level;
+  let { nodes; sorts; tivars; modes } = take_pool_contents pool in
+  (* The level outside, which the pool's nodes may be lowered to *)
+  let outer_level = level - 1 in
+  List.iter
+    (fun v ->
+      let v_level = Mode.var_level v in
+      if v_level >= generic_level
+      then ()
+      else if v_level < level
+      then add_to_mode_pool ~level:v_level v
+      else if structure
+      then (
+        Mode.lower_var ~level:outer_level v;
+        add_to_mode_pool ~level:outer_level v)
+      else if
+        (* If [Mode.generalize_var] returns [true], then [v] is a partially generalized
+           mode variable. In this case, we should add it to the pool since it is still
+           live. *)
+        Mode.generalize_var ~current_level:outer_level v
+      then add_to_mode_pool ~level v)
+    modes;
   simple_abbrevs := Mnil;
-  (* Nodes in [pool] were either created by the above calls to [f]
-     and [before_generalize], or they were created before, generalized,
-     and then added to the pool by [update_level].
+  (* Nodes in [nodes] were either created in the pool, or they were created
+     before, generalized, and then added to the pool by [update_level].
      In the latter case, their level was already kept for backtracking
      by a call to [set_level] inside [update_level].
      Since backtracking can only go back to a snapshot taken before [f] was
@@ -316,7 +339,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
            so we need to lower their level, and move them to an outer pool.
            The goal of this mode is to allow unsharing inner nodes
            without introducing polymorphism *)
-        if ty.level >= level then Transient_expr.set_level ty !current_level;
+        if ty.level >= level then Transient_expr.set_level ty outer_level;
         add_to_pool ~level:ty.level ty
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need
@@ -334,35 +357,57 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
           | Tivar { ivar; name; jkind } ->
               (* Only empty generalizable [Tivar]s exist after defaulting *)
               if Typing_ivar.has_handlers ivar
-              then fatal_error "Ctype.with_local_level_gen: unsupported Tivar";
+              then
+                fatal_error "Ctype.with_local_level_gen: unsupported Tivar";
               Transient_expr.set_desc ty (Tvar { name; jkind })
           | Tconstr (_, _, abbrev) when structure ->
               (* In structure mode, we drop abbreviations, as the goal of
                  this mode is to reduce sharing *)
               abbrev := Mnil
-          | Tarrow ((_, marg, mret), _, _, _) when not structure ->
-              With_locality.generalize_topology
-                ~current_level:!current_level
-                marg;
-              With_locality.generalize_topology
-                ~current_level:!current_level
-                mret
           | _ -> ()
         end
-  end pool;
+  end nodes;
   List.iter begin fun s ->
     let open Jkind_types.Sort in
-    (* In contrast to types, which can be generalised implicitly, sort variables
-       need to be explicitly generalized and instantiated in [Typecore].
-       Hence, we lower all non-generic variables like type variables
-       in [structure] mode. *)
+    (* In contrast to types, which can be generalised implicitly, sort
+       variables need to be explicitly generalized and instantiated in
+       [Typecore]. Hence, we lower all non-generic variables like type
+       variables in [structure] mode. *)
     iter_var s ~f:(fun v ->
       let t = of_var v in
       if get_level t = generic_level then () else
-      update_level !current_level t;
+      update_level outer_level t;
       add_to_sort_pool ~level:(get_level t) t)
-  end sort_pool;
-  result
+  end sorts;
+  (* The [Tivar]s waited on in the pool that are not local to it (they were
+     lowered, or are of an outer level) move to the pool of their level, to be
+     defaulted if they block its generalization (or rewritten at toplevel).
+     The local ones were generalized. *)
+  List.iter begin fun ty ->
+    let ty = Transient_expr.(repr (type_expr ty)) in
+    match ty.desc with
+    | Tivar _ when ty.level < level -> add_to_ivar_pool ~level:ty.level ty
+    | _ -> ()
+  end tivars
+
+let exit_generalized_pool = exit_pool ~structure:false
+let exit_structure_pool = exit_pool ~structure:true
+
+(* [with_local_level_gen] handles both the scoping structure of levels
+   and automatic generalization through pools (cf. btype.ml) *)
+let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
+    =
+  begin_def ();
+  let level = !current_level in
+  let exit = if structure then exit_structure_pool else exit_generalized_pool in
+  with_new_pool ~level ~exit begin fun () ->
+    let result = wrap_end_def f in
+    Option.iter (fun g -> g result) before_generalize;
+    (* Before generalizing [result], as [exit] does *)
+    if not structure then default_local_ivars ~level;
+    generalize result;
+    result
+  end
 
 let with_local_level_generalize ?before_generalize ~generalize f =
   with_local_level_gen ~begin_def ~structure:false ?before_generalize
@@ -1120,6 +1165,7 @@ let rec lower_all ty =
 let rec generalize stage_offset ty =
   let level = get_level ty in
   let current_level = !current_level in
+  let mgen m = Mode.With_locality.generalize ~current_level m in
   if (level > current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     begin match get_desc ty with
@@ -1151,12 +1197,9 @@ let rec generalize stage_offset ty =
         lower_all ty
     (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
-        let mgen m = Mode.With_locality.generalize ~current_level m in
         iter_abbrev (generalize stage_offset) !abbrev;
         iter_type_expr (generalize stage_offset) mgen ty
     | _ ->
-
-      let mgen m = Mode.With_locality.generalize ~current_level m in
       iter_type_expr (generalize stage_offset) mgen ty
     end;
   end
@@ -5465,21 +5508,22 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       end
 
 (* [at_current_levels f] is [f], run with the current and non-generalizable
-   levels set to their values when [at_current_levels f] was called.
+   levels and the pool set to their values when [at_current_levels f] was
+   called. If the pool has been left, [f] re-enters it (see
+   [Btype.with_pool]).
 
    Handlers in [upon_shape] run whenever the scheduler does, so without
-   this the types they create would get the level of whichever region
+   this the types they create would get the level of whichever pool
    the scheduler is currently running in. *)
 let at_current_levels f =
   let level = !current_level and nongen = !nongen_level in
+  let pool = current_pool () in
   fun x ->
-    (* Like [begin_def] (without allocating a tuple or cons-cell) *)
     let saved_current = !current_level and saved_nongen = !nongen_level in
     current_level := level;
     nongen_level := nongen;
-    (* This is equivalent to [wrap_end_def (fun () -> f x)]
-       (without allocating a closure) *)
-    match f x with
+    (* CR aobrien: TODO: remove closures *)
+    match with_pool pool (fun () -> f x) with
     | result ->
       current_level := saved_current;
       nongen_level := saved_nongen;
@@ -5490,11 +5534,11 @@ let at_current_levels f =
       nongen_level := saved_nongen;
       Printexc.raise_with_backtrace exn bt
 
-let wait_for_ivar ivar ~run ~default ~scheduler =
-  Typing_ivar.upon ivar ~run ~cancel:default ~scheduler;
-  add_to_ivar_pool ~level:!current_level ivar
+let wait_for_ivar ty ivar ~guard ~run ~default ~scheduler =
+  Typing_ivar.upon ivar ~guard ~run ~cancel:default ~scheduler;
+  add_to_ivar_pool ~level:!current_level (Transient_expr.coerce ty)
 
-let upon_shape env ty ~run ~default =
+let upon_shape env ty ~guard ~run ~default =
   let run = at_current_levels run in
   let default = at_current_levels default in
   let scheduler = scheduler () in
@@ -5503,18 +5547,18 @@ let upon_shape env ty ~run ~default =
   let ty = expand_head_ignoring_local_constraints env ty in
   match Type_head.of_expanded_type env ty with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
-    Typing_scheduler.add scheduler default
+    Typing_scheduler.add scheduler ~guard default
   | Var ->
     let ivar = Typing_ivar.create () in
     transfer_ivar ivar ty;
-    wait_for_ivar ivar ~run ~default ~scheduler
-  | Ivar ivar -> wait_for_ivar ivar ~run ~default ~scheduler
+    wait_for_ivar ty ivar ~guard ~run ~default ~scheduler
+  | Ivar ivar -> wait_for_ivar ty ivar ~guard ~run ~default ~scheduler
   | Shape s ->
     (* Fast path: [ty] is not a variable, so behaves as if its ivar
        were already filled, or defaulted if [ty] has no shape. *)
-    Typing_scheduler.add scheduler (fun () -> run s)
+    Typing_scheduler.add scheduler ~guard (fun () -> run s)
   | Locally_abstract | Undefined ->
-    Typing_scheduler.add scheduler (fun () -> default ())
+    Typing_scheduler.add scheduler ~guard (fun () -> default ())
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -6945,6 +6989,8 @@ module Cross (M : sig
 
   val newvar : int -> ('l * 'r) t
 
+  val guard : Typing_guard.t -> ('l * 'r) t -> unit
+
   val disallow_left : ('l * 'r) t -> (disallowed * 'r) t
 
   val disallow_right : ('l * 'r) t -> ('l * disallowed) t
@@ -6965,27 +7011,34 @@ end) = struct
     | Ok () -> ()
     | Error e -> raise (M.crossing_failed e)
 
+  let later ~guard mode check =
+    (* [mode'] must not be rigid, as the modes of a moregen subject are. *)
+    let mode' = M.newvar (min (get_current_level ()) (subject_level - 1)) in
+    M.guard guard mode;
+    M.guard guard mode';
+    mode', ~run:(check mode')
+
   (* If the crossing is delayed, return a fresh [mode'] and check
      [apply crossing mode <= mode'] once the crossing is known. *)
   let left ~apply env ?modalities ?pp ty mode =
-    let mode = M.disallow_right mode in
     upon_crossing env ?modalities ty
-      ~cross:(fun crossing -> apply crossing mode)
-      ~later:(fun () ->
-        let mode' = M.newvar (get_current_level ()) in
-        ( M.disallow_right mode',
-          ~run:(fun crossed -> check ?pp crossed mode') ))
+      ~cross:(fun crossing -> apply crossing (M.disallow_right mode))
+      ~later:(fun guard ->
+        let mode', ~run =
+          later ~guard mode (fun mode' crossed -> check ?pp crossed mode')
+        in
+        M.disallow_right mode', ~run)
 
   (* If the crossing is delayed, return a fresh [mode'] and check
      [mode' <= apply crossing mode] once the crossing is known. *)
   let right ~apply env ?modalities ?pp ty mode =
-    let mode = M.disallow_left mode in
     upon_crossing env ?modalities ty
-      ~cross:(fun crossing -> apply crossing mode)
-      ~later:(fun () ->
-        let mode' = M.newvar (get_current_level ()) in
-        ( M.disallow_left mode',
-          ~run:(fun crossed -> check ?pp mode' crossed) ))
+      ~cross:(fun crossing -> apply crossing (M.disallow_left mode))
+      ~later:(fun guard ->
+        let mode', ~run =
+          later ~guard mode (fun mode' crossed -> check ?pp mode' crossed)
+        in
+        M.disallow_left mode', ~run)
 end
 
 module Cross_with_regionality = Cross (struct

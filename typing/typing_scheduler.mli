@@ -47,9 +47,10 @@ type t
 
 val create : unit -> t
 
-(** [add ?monitor t job] enqueues [job] at the back of [t], to run in [monitor]
-    (by default, [Monitor.current ()]). *)
-val add : ?monitor:Monitor.t -> t -> Job.t -> unit
+(** [add ?monitor ~guard t job] enqueues [job] at the back of [t], to run in
+    [monitor] (by default, [Monitor.current ()]). [job] holds [guard] until it
+    has run or been cleared. *)
+val add : ?monitor:Monitor.t -> guard:Typing_guard.t -> t -> Job.t -> unit
 
 (** [run t] runs jobs until [t] is empty, including any jobs enqueued by the
     jobs themselves.
@@ -62,8 +63,8 @@ val add : ?monitor:Monitor.t -> t -> Job.t -> unit
     {!Monitor}), and the remaining jobs stay in [t]. *)
 val run : t -> unit
 
-(** [clear t] removes every job from [t] without running it. This is logged, so
-    backtracking restores them. *)
+(** [clear t] removes every job from [t] without running it, releasing their
+    guards. This is logged, so backtracking restores them. *)
 val clear : t -> unit
 
 include With_backtracking.S

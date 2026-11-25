@@ -4445,6 +4445,17 @@ module S = Solver_mono (Hint_for_solver) (C)
 
 let erase_hints () = S.erase_hints ()
 
+type packed_var = S.packed_var
+
+let add_to_pool_later = S.add_to_pool_later
+
+let var_level = S.var_level
+
+let lower_var ~level v = S.lower_var ~log:None ~level v
+
+let generalize_var ~current_level v =
+  S.generalize_var ~log:None ~current_level v
+
 let reset_persistent_id () = S.reset_persistent_id ()
 
 type monadic = C.monadic =
@@ -5479,14 +5490,26 @@ module type Obj = sig
   val obj : const C.obj
 end
 
+(* Forwards the changes to partial generics (see [Solver_intf]) made by an
+   operation. A forwarded change that fails is an error in an instance. *)
+let flush_forwards ~log log' =
+  match S.flush_forwards ~log with
+  | () -> ()
+  | exception S.Forward_failure (obj, e) ->
+    !append_changes log';
+    raise
+      (Submode_error_simple_context ((Location.none, Unknown), All (obj, e)))
+
 let try_with_log op =
   let log' = ref S.empty_changes in
   let log = Some log' in
   match op ~log with
   | Ok _ as x ->
+    flush_forwards ~log log';
     !append_changes log';
     x
   | Error _ as x ->
+    S.discard_forwards ();
     S.undo_changes !log';
     x
 [@@inline]
@@ -5495,6 +5518,7 @@ let with_log op =
   let log' = ref S.empty_changes in
   let log = Some log' in
   let r = op ~log in
+  flush_forwards ~log log';
   !append_changes log';
   r
 [@@inline]
@@ -5592,7 +5616,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let generalize_topology ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
-    then S.generalize_topology ~log:None ~current_level a
+    then S.generalize_topology ~log:None ~current_level obj a
 
   let generalize ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
@@ -5606,22 +5630,27 @@ module Comonadic_gen (Obj : Obj) = struct
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
     let copy_to_level = choose_level current_level in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
+    with_log (fun ~log ->
+        S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level
+          ~log obj a)
 
   let copy_generic ~copy_scope a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level obj a
+    with_log (fun ~log ->
+        S.copy ~copy_scope ~copy_from_level ~copy_below_level ~log obj a)
 
   let copy_for_saving ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save ~log:None
+      obj a
 
   let copy_for_restoring ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore
+      ~log:None obj a
 
   let join l = S.join obj l
 
@@ -5643,6 +5672,10 @@ module Comonadic_gen (Obj : Obj) = struct
   let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let check_generic a = S.check_generic a
+
+  let guard g a =
+    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    then with_log (S.guard_mode g obj a)
 
   let iter_covariant a iter = S.iter_covariant obj a iter
 
@@ -5799,7 +5832,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let generalize_topology ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
-    then S.generalize_topology ~log:None ~current_level a
+    then S.generalize_topology ~log:None ~current_level obj a
 
   let generalize ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
@@ -5813,22 +5846,27 @@ module Monadic_gen (Obj : Obj) = struct
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
     let copy_to_level = choose_level current_level in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
+    with_log (fun ~log ->
+        S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level
+          ~log obj a)
 
   let copy_generic ~copy_scope a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level obj a
+    with_log (fun ~log ->
+        S.copy ~copy_scope ~copy_from_level ~copy_below_level ~log obj a)
 
   let copy_for_saving ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save ~log:None
+      obj a
 
   let copy_for_restoring ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore
+      ~log:None obj a
 
   let print_error pp err = Error.print_all pp obj err
 
@@ -5852,6 +5890,10 @@ module Monadic_gen (Obj : Obj) = struct
   let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let check_generic a = S.check_generic a
+
+  let guard g a =
+    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    then with_log (S.guard_mode g obj a)
 
   let iter_covariant a iter = S.iter_contravariant obj a iter
 
@@ -7232,6 +7274,10 @@ module Mode_with (Areality : Areality) = struct
 
   let check_generic { monadic = monadic0; comonadic = comonadic0 } =
     Monadic.check_generic monadic0 || Comonadic.check_generic comonadic0
+
+  let guard g { monadic = monadic0; comonadic = comonadic0 } =
+    Monadic.guard g monadic0;
+    Comonadic.guard g comonadic0
 
   let equate_err pp a b =
     Comonadic.equate_err pp a.comonadic b.comonadic;

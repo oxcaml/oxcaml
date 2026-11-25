@@ -375,8 +375,8 @@ val try_expand_safe_opt: Env.t -> type_expr -> type_expr
 val expand_head_once: Env.t -> type_expr -> type_expr
 val expand_head: Env.t -> type_expr -> type_expr
 
-(** [upon_shape env ty ~run ~default] adds [run shape] to {!scheduler} once
-    [ty]'s head has a shape. If instead [ty] is defaulted, [default ()] is
+(** [upon_shape env ty ~guard ~run ~default] adds [run shape] to {!scheduler}
+    once [ty]'s head has a shape. If instead [ty] is defaulted, [default ()] is
     added. Both [run] and [default] run at the levels and the monitor (see
     {!Typing_scheduler.Monitor}) current when [upon_shape] was called. Depending
     on the scheduling policy (see {!Typing_scheduler}), [run] or [default] may
@@ -392,11 +392,15 @@ val expand_head: Env.t -> type_expr -> type_expr
     [ty] must not be generic: [run] or [default] (and [upon_shape] itself) may
     mutate it.
 
+    [guard] is held until [run] or [default] has run. They may only update
+    generalized mode variables guarded by [guard] (see {!Typing_guard}).
+
     Safety: [run shape] must give [ty]'s head shape [shape] (e.g. by
     unification), which fails if a different shape is already there. *)
 val upon_shape :
   Env.t ->
   type_expr ->
+  guard:Typing_guard.t ->
   run:(type_shape -> unit) ->
   default:(unit -> unit) ->
   unit

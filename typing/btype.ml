@@ -125,24 +125,51 @@ let lowest_level = Ident.lowest_scope
    and the only functions reading them are [with_new_pool] and
    [iter_pool], so that the initial pool's nodes can be added to, but
    never read from.
-   A pool also holds the ivars waited on at its level, added by
-   [add_to_ivar_pool]. They are read with [take_ivar_pool] while the pool
-   is open (including the initial pool, at the toplevel), or returned by
-   [with_new_pool]. *)
+
+   A pool also holds the sort and mode variables (with mode polymorphism)
+   created at its level, added by [add_to_mode_pool], and the [Tivar]s
+   waited on at its level, added by [add_to_ivar_pool].
+
+   Pools form a tree: [pool_stack] is the path from the current pool to the
+   initial one. A pool is closed once [with_new_pool] has left it. A
+   suspended constraint runs in the pool it was created in ([with_pool]),
+   which may be closed: it then re-enters the pool, which is left again
+   afterwards. *)
+
+type pool_contents =
+  { nodes : transient_expr list;
+    sorts : Jkind_types.Sort.t list;
+    tivars : transient_expr list;
+    modes : Mode.packed_var list
+  }
 
 type pool =
   { level : int;
+    exit : pool -> unit;
     mutable pool : transient_expr list;
     mutable sort_pool: Jkind_types.Sort.t list;
-    mutable ivars : type_shape Typing_ivar.t list;
-    next : pool
+    mutable tivars : transient_expr list;
+    mutable modes : Mode.packed_var list;
+    mutable closed : bool;
+    next : pool  (* The parent pool *)
   }
+
+let dummy_exit (_ : pool) = ()
 
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
    with [level >= 0]. *)
 let rec dummy =
-  { level = max_int; pool = []; sort_pool = []; ivars = []; next = dummy }
+  { level = max_int;
+    exit = dummy_exit;
+    pool = [];
+    sort_pool = [];
+    tivars = [];
+    modes = [];
+    closed = false;
+    next = dummy
+  }
+
 let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 
 (* Lookup in the stack is linear, but the depth is the number of nested
@@ -158,15 +185,77 @@ let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 let rec pool_of_level level pool =
   if level >= pool.level then pool else pool_of_level level pool.next
 
-(* Create a new pool at given level, and use it locally. *)
-let with_new_pool ~level f =
+let pool_level pool = pool.level
+
+let clear_pool pool =
+  pool.pool <- [];
+  pool.sort_pool <- [];
+  pool.tivars <- [];
+  pool.modes <- []
+
+let take_pool_contents pool =
+  let contents =
+    { nodes = pool.pool;
+      sorts = pool.sort_pool;
+      tivars = pool.tivars;
+      modes = pool.modes
+    }
+  in
+  clear_pool pool;
+  contents
+
+let in_pool pool f = Misc.protect_refs [ R(pool_stack, pool) ] f
+
+let leave_pool pool =
+  pool.closed <- false;
+  in_pool pool (fun () ->
+      Misc.try_finally
+        (fun () -> pool.exit pool)
+        ~always:(fun () -> pool.closed <- true))
+
+let with_new_pool ~level ~exit f =
   let pool =
-    { level; pool = []; sort_pool = []; ivars = []; next = !pool_stack }
+    { level;
+      exit;
+      pool = [];
+      sort_pool = [];
+      tivars = [];
+      modes = [];
+      closed = false;
+      next = !pool_stack
+    }
   in
-  let r =
-    Misc.protect_refs [ R(pool_stack, pool) ] f
+  match in_pool pool f with
+  | r ->
+    leave_pool pool;
+    r
+  | exception exn ->
+    (* What [f] added is never processed, as before closing *)
+    pool.closed <- true;
+    clear_pool pool;
+    raise exn
+
+let current_pool () = !pool_stack
+
+let is_empty_pool pool =
+  match pool with
+  | { pool = []; sort_pool = []; tivars = []; modes = []; _ } -> true
+  | _ -> false
+
+let with_pool pool f =
+  let r = in_pool pool f in
+  (* Entering [pool] enters its path in the tree. The closed pools on it are
+     left again, innermost first, as leaving one may lower nodes to the next.
+     They end at an open pool, which is left later. *)
+  let rec leave_closed pool =
+    if pool.closed
+    then begin
+      if not (is_empty_pool pool) then leave_pool pool;
+      leave_closed pool.next
+    end
   in
-  (r, pool.pool, pool.sort_pool, pool.ivars)
+  leave_closed pool;
+  r
 
 let add_to_pool ~level ty =
   if level >= generic_level || level <= lowest_level then () else
@@ -181,23 +270,33 @@ let add_to_sort_pool ~level v =
 let () =
   Jkind_types.Sort.set_add_to_pool add_to_sort_pool
 
-let add_to_ivar_pool ~level ivar =
-  if Typing_ivar.has_handlers ivar
-  then
+let add_to_mode_pool ~level v =
+  if level >= generic_level || level <= lowest_level
+  then ()
+  else
     let pool = pool_of_level level !pool_stack in
-    pool.ivars <- ivar :: pool.ivars
+    pool.modes <- v :: pool.modes
+
+let () =
+  Defined_later.Fun.define_exn Mode.add_to_pool_later (fun v ->
+      if Language_extension.(is_at_least Mode_polymorphism Alpha)
+      then add_to_mode_pool ~level:(Mode.var_level v) v)
+
+let add_to_ivar_pool ~level ty =
+  let pool = pool_of_level level !pool_stack in
+  pool.tivars <- ty :: pool.tivars
 
 let in_generalization_scope () = !pool_stack.next != dummy
 
+let iter_ivar_pool ~level f =
+  let pool = pool_of_level level !pool_stack in
+  List.iter f pool.tivars
+
 let take_ivar_pool ~level =
   let pool = pool_of_level level !pool_stack in
-  let ivars = pool.ivars in
-  pool.ivars <- [];
-  ivars
-
-let iter_pool ~level f =
-  let pool = pool_of_level level !pool_stack in
-  List.iter f pool.pool
+  let tivars = pool.tivars in
+  pool.tivars <- [];
+  tivars
 
 (**** Some type creators ****)
 

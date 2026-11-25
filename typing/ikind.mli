@@ -82,9 +82,11 @@ val crossing_of_type : Env.t -> Types.type_expr -> Mode.Crossing.t
     [crossing_of_type] does. If [c] does not depend on any non-generic type
     variables, it returns [cross c].
 
-    Otherwise, it calls [later ()] to get [(p, ~run)], returns [p], and calls
+    Otherwise, it calls [later g] to get [(p, ~run)], returns [p], and calls
     [run (cross c)] once those variables are solved or defaulted. [run] is
-    called from a {!Ctype.scheduler} job (see [Ctype.upon_shape]).
+    called from a {!Ctype.scheduler} job (see [Ctype.upon_shape]). [g] is live
+    until then, so [later] should guard by [g] the mode variables [run] may
+    update.
 
     Note that principality is not checked here. Only used when
     omnidirectionality is enabled. *)
@@ -92,13 +94,14 @@ val upon_crossing_of_type :
   Env.t ->
   Types.type_expr ->
   cross:(Mode.Crossing.t -> 'a) ->
-  later:(unit -> 'a * run:('a -> unit)) ->
+  later:(Typing_guard.t -> 'a * run:('a -> unit)) ->
   'a
 
 (** [Ctype.upon_shape] *)
 val upon_shape_later :
   (Env.t ->
   Types.type_expr ->
+  guard:Typing_guard.t ->
   run:(Types.type_shape -> unit) ->
   default:(unit -> unit) ->
   unit)
