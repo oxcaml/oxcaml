@@ -67,12 +67,11 @@ let parse s =
   let invalid variant =
     invalid_arg (Printf.sprintf "Ppxlib.Longident.parse(%s): %S" variant s)
   in
-  if String.length s < 1 then invalid "empty string";
   match parentheses (-1) 0 0 (String.length s) s with
   | Ok None ->
       if Ocaml_common.Misc.Utf8_lexeme.starts_like_a_valid_identifier s then
         parse_simple s
-      else Lident s (* This is a raw operator, no module path *)
+      else Lident s (* This is a raw operator, no module path, or "" *)
   | Error _ -> invalid "unbalanced parenthesis"
   | Ok (Some (l, r)) -> (
       if Int.(r <> String.length s - 1) then
