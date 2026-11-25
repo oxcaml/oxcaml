@@ -1,4 +1,4 @@
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type shape_format = Old_merlin | Debugging_shapes
 type include_dir =
   { path : string;
