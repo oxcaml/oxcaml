@@ -252,6 +252,120 @@ branch_and_return:
   ret
 |}]
 
+(* CR mshinwell: Branching on a boolean returned by a call should test the
+   tagged value directly, rather than untagging it first. *)
+let branch_on_call_result (f : int -> bool) x =
+  if f x then x else 7
+[%%expect_asm X86_64{|
+branch_on_call_result:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  (%rdi), %rsi
+  movq  %rbx, %rax
+  movq  %rbx, (%rsp)
+  movq  %rdi, %rbx
+  call  *%rsi
+.L0:
+  movq  %rax, %rbx
+  sarq  $1, %rbx
+  movq  (%rsp), %rax
+  testq %rbx, %rbx
+  je    .L1
+  addq  $8, %rsp
+  ret
+.L1:
+  movl  $15, %eax
+  addq  $8, %rsp
+  ret
+|}]
+
+let branch_on_negated_call_result (f : int -> bool) x =
+  if not (f x) then x else 7
+[%%expect_asm X86_64{|
+branch_on_negated_call_result:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  (%rdi), %rsi
+  movq  %rbx, %rax
+  movq  %rbx, (%rsp)
+  movq  %rdi, %rbx
+  call  *%rsi
+.L0:
+  movq  %rax, %rbx
+  sarq  $1, %rbx
+  movq  (%rsp), %rax
+  testq %rbx, %rbx
+  je    .L1
+  movl  $15, %eax
+  addq  $8, %rsp
+  ret
+.L1:
+  addq  $8, %rsp
+  ret
+|}]
+
+let branch_on_two_call_results (f : int -> bool) x y =
+  if f x && f y then x else 7
+[%%expect_asm X86_64{|
+branch_on_two_call_results:
+  subq  $24, %rsp
+  movq  %rax, %rsi
+  movq  %rdi, 16(%rsp)
+  movq  (%rsi), %rdi
+  movq  %rbx, %rax
+  movq  %rbx, 8(%rsp)
+  movq  %rsi, %rbx
+  movq  %rsi, (%rsp)
+  call  *%rdi
+.L0:
+  movq  %rax, %rdi
+  sarq  $1, %rdi
+  movq  (%rsp), %rbx
+  movq  16(%rsp), %rax
+  testq %rdi, %rdi
+  je    .L2
+  movq  (%rbx), %rdi
+  call  *%rdi
+.L1:
+  movq  %rax, %rbx
+  sarq  $1, %rbx
+  movq  8(%rsp), %rax
+  testq %rbx, %rbx
+  je    .L2
+  addq  $24, %rsp
+  ret
+.L2:
+  movl  $15, %eax
+  addq  $24, %rsp
+  ret
+|}]
+
+let branch_on_and_return_call_result (f : int -> bool) (x : bool) =
+  let r = f 0 in
+  if r then x else r
+[%%expect_asm X86_64{|
+branch_on_and_return_call_result:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, (%rsp)
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  call  *%rsi
+.L0:
+  movq  %rax, %rbx
+  sarq  $1, %rbx
+  movq  (%rsp), %rdi
+  testq %rbx, %rbx
+  je    .L1
+  movq  %rdi, %rax
+  addq  $8, %rsp
+  ret
+.L1:
+  addq  $8, %rsp
+  ret
+|}]
+
 
 (* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with
    the subsequent addition. *)
