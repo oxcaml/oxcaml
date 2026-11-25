@@ -187,6 +187,8 @@
 * Compiler: fix reference unboxing when a variable read from an unboxed
   reference is stored into another unboxed reference in a nested closure
   (#2426)
+* Compiler: do not inline functions with open recursion through a record
+  of closures as functors (memory blow-up at --opt 2 with OCaml 5.6) (#2599)
 # 6.4.1 (2026-06-30) - Lille
 
 ## Bug fixes
