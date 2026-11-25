@@ -87,6 +87,10 @@ module Instruction_requirements = struct
   let basic (instr : Cfg.basic Cfg.instruction) ~fun_prologue_required =
     (* Incoming offsets include the full frame size, so their accesses must
        follow the prologue unless the function is entirely frameless. *)
+    (* CR-someday xclerc: Incoming parameter moves are in the entry block, so
+       this prevents shrink wrapping for functions with stack-passed parameters
+       that need a frame. Track whether the frame is active when emitting
+       [Incoming] accesses so that these moves can precede the prologue. *)
     if
       instr_uses_stack_slots instr
         ~incoming_needs_prologue:fun_prologue_required
@@ -421,9 +425,7 @@ let find_prologue_and_epilogues_shrink_wrapped
      was computed before CFG simplification, which can remove calls if they are
      dead, making the prologue unnecessary). *)
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if cfg.fun_prologue_required
   then (
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     (* note: the other entries in the forest are dead code *)
@@ -445,9 +447,7 @@ let find_prologue_and_epilogues_shrink_wrapped
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if cfg.fun_prologue_required
   then
     let epilogue_blocks =
       Cfg.fold_blocks cfg
