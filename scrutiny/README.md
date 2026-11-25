@@ -9,10 +9,10 @@ enough to sit behind a flag qualifies, for example new debug-info emission.
 An experimental feature may be written by a person, by an AI model, or both.
 The process is the same.
 
-The metadata checker, status table generation, CI check, and build-time
-feature registry are implemented. The remaining compiler integration described
-below—per-feature flags, universe selection, and selecting a universe through
-`-test-optimizations`—is planned for a follow-up.
+The metadata checker, status table generation, CI check, build-time registry,
+and native compiler's per-feature flags and universe selection are implemented.
+Selecting a universe through `-test-optimizations` and Merlin handling of
+generated per-feature switches remain planned for follow-ups.
 
 ## Code layout
 
@@ -43,16 +43,39 @@ backend/debug/dwarf/call_sites/SCRUTINY
   common prefix `-experimental-<name>`, where `<name>` comes from the
   directory's `SCRUTINY` file. The names and review levels come from the
   generated registry described below.
-- `-experimental-universe=<level>` enables every experimental feature whose
-  review level (below) is at least `<level>`. Individual `-experimental-<name>`
-  and `-no-experimental-<name>` flags apply on top, in command-line order, so
-  a universe sets the baseline and single features can be added or removed
-  from it.
+- `-experimental-universe=<level>` replaces the selection with every registered
+  feature whose review level (below) is at least `<level>`; `none` disables all
+  registered features. Options apply in command-line order: a later universe
+  replaces earlier choices, and later `-experimental-<name>` or
+  `-no-experimental-<name>` flags override it. Ordinary compiler flags are
+  unaffected. Both `-experimental-universe=<level>` and
+  `-experimental-universe <level>` are accepted.
 - The default test suite runs with every experimental flag off, unless
   explicitly overridden.
 - When a feature is promoted (enabled by default), its flag is renamed
   without the prefix or removed entirely. The prefix therefore always means
   "not yet promoted". Options that have become invariants are removed.
+
+The options are available in `ocamlopt` and the native toplevel. In `ocamlopt`,
+they also support `OCAMLPARAM`. `experimental-universe=<level>` selects a
+universe, `experimental-<name>=1` enables a feature, and `experimental-<name>=0`
+disables it. `no-experimental-<name>=1` disables the feature and `=0` enables
+it. Parameters before `_` apply before command-line options; parameters after
+`_` apply before each compilation or link, overriding command-line choices.
+Invalid boolean values warn without changing the selection; unknown parameter
+names use the compiler's existing discarded-parameter warning.
+
+Feature code queries the typed selection through
+`Oxcaml_flags.Experimental.is_enabled`. For example, once a feature is
+registered as `reaper-escape`, its guard can use:
+
+```ocaml
+Oxcaml_flags.Experimental.is_enabled
+  Experimental_feature_registry.Feature_reaper_escape
+```
+
+Selecting a feature does not implicitly enable prerequisite passes, such as
+the reaper, or change target capabilities.
 
 ### Testing preset
 
@@ -63,8 +86,8 @@ registrations or review headers. Being off by default does not itself put a
 feature under this workflow.
 
 The flag currently enables only that bundle, including its register-allocation
-parameter settings. Once universe selection is implemented, it will also
-select `-experimental-universe=ai-reviewed`. These remain separate operations:
+parameter settings. A follow-up will make it also select
+`-experimental-universe=ai-reviewed`. These remain separate operations:
 selecting a universe affects only registered features. In particular,
 `-experimental-universe=none` after the testing preset will disable registered
 features but leave the older bundle enabled. Individual flags retain their
@@ -77,8 +100,8 @@ join that universe, so their expected assembly may change. Tests that require
 a fixed configuration should use explicit flags instead.
 
 CI enables the preset with `OCAMLPARAM=_,test-optimizations=1`. CI must retain
-coverage of both the older bundle and the registered features once universe
-selection is implemented.
+coverage of both the older bundle and the registered features when the preset
+is extended to select a universe.
 
 ## Build-time registry
 
@@ -103,11 +126,13 @@ With no registrations, `t` is empty and `all` is `[]`.
 The generator rejects malformed registrations and duplicate flag names before
 writing either output. Source-header checks and verification of declared
 review levels remain the responsibility of `scrutiny/check.py`. The registry
-contains metadata only: it neither parses compiler options nor enables
-features yet.
+contains metadata only; `Oxcaml_flags.Experimental` owns the selection state,
+and `Oxcaml_args` derives option names and actions from the registry.
 
-The generator's cram tests are in `scrutiny/generate_registry.t` and run under
-`make runtest`. To run just these tests with the bootstrap compiler:
+The cram tests in `scrutiny/generate_registry.t` and `scrutiny/selection.t`
+run under `make runtest`. Selection tests compile the production flag modules
+against a synthetic registry, without registering real compiler features.
+To run these tests with the bootstrap compiler:
 
 ```sh
 make boot-runtest runtest_targets=@scrutiny/runtest

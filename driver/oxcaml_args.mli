@@ -79,6 +79,11 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_flow : unit -> unit
   val cfg_copy_propagation : unit -> unit
   val no_cfg_copy_propagation : unit -> unit
+
+  val experimental_feature :
+    Experimental_feature_registry.t -> enabled:bool -> unit
+
+  val experimental_universe : string -> unit
   val test_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit

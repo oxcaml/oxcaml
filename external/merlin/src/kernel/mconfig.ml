@@ -841,7 +841,8 @@ let ocaml_ignored_flags =
   ]
 
 let ocaml_ignored_parametrized_flags =
-  [ "-cc";
+  [ "-experimental-universe";
+    "-cc";
     "-cclib";
     "-ccopt";
     "-color";

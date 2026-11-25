@@ -1,3 +1,36 @@
 (cram
  (applies_to generate_registry)
  (deps ../tools/gen_experimental_features.exe))
+
+; Compile the production flag modules against a synthetic registry. These
+; inputs are not named SCRUTINY, so they do not register compiler features.
+(copy_files# ../driver/oxcaml_flags.ml{,i})
+(copy_files# ../driver/oxcaml_args.ml{,i})
+
+(rule
+ (targets ai.registration human.registration)
+ (action
+  (progn
+   (write-file ai.registration "flag sample-ai\nlevel ai-reviewed\n")
+   (write-file human.registration
+    "flag sample-human\nlevel human-reviewed\n"))))
+
+(rule
+ (targets experimental_feature_registry.ml experimental_feature_registry.mli)
+ (deps ai.registration human.registration)
+ (action
+  (run %{exe:../tools/gen_experimental_features.exe}
+   experimental_feature_registry.ml experimental_feature_registry.mli
+   %{deps})))
+
+(executable
+ (name selection_driver)
+ (modes native)
+ (modules
+  selection_driver experimental_feature_registry oxcaml_flags oxcaml_args)
+ (libraries
+  ocamlfrontend dwarf_flags asm_targets arm64_ast arm64_binary_emitter))
+
+(cram
+ (applies_to selection)
+ (deps selection_driver.exe))
