@@ -33,7 +33,14 @@ val get_changed_representation :
   Code_id_or_name.t ->
   Unboxing_analysis.Changed_representation.t option
 
-val has_use : 'f Solution.t -> Code_id_or_name.t -> bool
+type decision =
+  | Keep
+  | Delete
+  | Unbox of Unboxing_analysis.unboxed
+
+val get_decision : 'f Solution.t -> Name.t -> decision
+
+val code_id_has_use : 'f Solution.t -> Code_id.t -> bool
 
 val has_source : 'f Solution.t -> Code_id_or_name.t -> bool
 
