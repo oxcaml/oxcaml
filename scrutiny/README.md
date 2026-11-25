@@ -10,9 +10,9 @@ An experimental feature may be written by a person, by an AI model, or both.
 The process is the same.
 
 The metadata checker, status table generation, CI check, build-time registry,
-and native compiler's per-feature flags and universe selection are implemented.
-Selecting a universe through `-test-optimizations` and Merlin handling of
-generated per-feature switches remain planned for follow-ups.
+and native compiler's per-feature flags, universe selection and testing preset
+are implemented. Merlin handling of generated per-feature switches remains
+planned for a follow-up.
 
 ## Code layout
 
@@ -85,23 +85,21 @@ flags outside the `-experimental-*` namespace and do not need `SCRUTINY`
 registrations or review headers. Being off by default does not itself put a
 feature under this workflow.
 
-The flag currently enables only that bundle, including its register-allocation
-parameter settings. A follow-up will make it also select
-`-experimental-universe=ai-reviewed`. These remain separate operations:
-selecting a universe affects only registered features. In particular,
-`-experimental-universe=none` after the testing preset will disable registered
-features but leave the older bundle enabled. Individual flags retain their
-normal command-line ordering.
+The flag enables that bundle, including its register-allocation parameter
+settings, then selects `-experimental-universe=ai-reviewed`. These remain
+separate operations: selecting a universe affects only registered features.
+In particular, `-experimental-universe=none` after the testing preset disables
+registered features but leaves the older bundle enabled. Individual flags
+retain their normal command-line ordering: a later feature flag overrides the
+preset, and a later preset replaces earlier feature selections.
 
 The preset is intended for CI, regression tests and fuzzing, not as an
-optimization level. Registered features need not be optimizations. Once the
-preset selects a universe, tests using it will opt into new features as they
-join that universe, so their expected assembly may change. Tests that require
-a fixed configuration should use explicit flags instead.
+optimization level. Registered features need not be optimizations. Tests using
+the preset opt into new features as they join the universe, so their expected
+assembly may change. Tests that require a fixed configuration should use
+explicit flags instead.
 
-CI enables the preset with `OCAMLPARAM=_,test-optimizations=1`. CI must retain
-coverage of both the older bundle and the registered features when the preset
-is extended to select a universe.
+CI enables the same preset with `OCAMLPARAM=_,test-optimizations=1`.
 
 ## Build-time registry
 

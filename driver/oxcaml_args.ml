@@ -317,7 +317,7 @@ let mk_experimental_features f =
 let mk_test_optimizations f =
   ( "-test-optimizations",
     Arg.Unit f,
-    " Enable a bundle of codegen optimizations for testing (subject to change)"
+    " Enable the codegen test bundle and the ai-reviewed experimental universe"
   )
 
 let mk_reorder_blocks_random f =
@@ -2581,14 +2581,15 @@ module Oxcaml_options_impl = struct
              "Unknown experimental universe %S (expected one of: %s)" value
              (String.concat ", " (List.map fst experimental_universes)))
 
-  (* Bundle of codegen optimizations enabled by [-test-optimizations]. *)
+  (* Testing preset: the legacy codegen bundle plus reviewed experiments. *)
   let test_optimizations () =
     x86_peephole_optimize ();
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_value_propagation_flow ();
-    use_ssa ()
+    use_ssa ();
+    Oxcaml_flags.Experimental.set_universe (Some Ai_reviewed)
 end
 
 module type Debugging_options = sig

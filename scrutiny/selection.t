@@ -39,13 +39,41 @@ Both the separate-argument and equals spellings are accepted.
   >   -experimental-universe=none
   sample-ai=false sample-human=false cfg-merge-blocks=false
 
-Universe selection does not change ordinary flags. The testing preset does
-not select a universe yet.
+Universe selection does not change ordinary flags.
 
   $ ./selection_driver.exe -cfg-merge-blocks -experimental-universe=none
   sample-ai=false sample-human=false cfg-merge-blocks=true
+
+The testing preset enables the legacy bundle and the ai-reviewed universe.
+Later options override it; a later preset replaces earlier selections.
+Disabling the universe does not undo the legacy bundle.
+
   $ ./selection_driver.exe -test-optimizations
+  sample-ai=true sample-human=true cfg-merge-blocks=true
+  $ ./selection_driver.exe -test-optimizations -no-experimental-sample-ai
+  sample-ai=false sample-human=true cfg-merge-blocks=true
+  $ ./selection_driver.exe -no-experimental-sample-ai -test-optimizations
+  sample-ai=true sample-human=true cfg-merge-blocks=true
+  $ ./selection_driver.exe -test-optimizations \
+  >   -experimental-universe=human-reviewed
+  sample-ai=false sample-human=true cfg-merge-blocks=true
+  $ ./selection_driver.exe -test-optimizations -experimental-universe=none
   sample-ai=false sample-human=false cfg-merge-blocks=true
+  $ ./selection_driver.exe -experimental-universe=none -test-optimizations
+  sample-ai=true sample-human=true cfg-merge-blocks=true
+  $ ./selection_driver.exe -test-optimizations -no-cfg-merge-blocks
+  sample-ai=true sample-human=true cfg-merge-blocks=false
+
+The environment spelling applies the same preset, at the usual phase.
+
+  $ OCAMLPARAM='_,test-optimizations=1' ./selection_driver.exe
+  sample-ai=true sample-human=true cfg-merge-blocks=true
+  $ OCAMLPARAM='test-optimizations=1,_' \
+  >   ./selection_driver.exe -no-experimental-sample-ai
+  sample-ai=false sample-human=true cfg-merge-blocks=true
+  $ OCAMLPARAM='_,test-optimizations=1' \
+  >   ./selection_driver.exe -no-experimental-sample-ai
+  sample-ai=true sample-human=true cfg-merge-blocks=true
 
 OCAMLPARAM supports universes and positive/negative feature names, with 0 or 1.
 Values before _ precede the arguments; values after _ override them.
