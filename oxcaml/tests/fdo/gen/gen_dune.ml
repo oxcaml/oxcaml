@@ -48,6 +48,12 @@ type step =
   | Annotations of string list  (** A command of [tools/fdo_annotations.exe]. *)
   | Cat of string
 
+(** Where a test runs. *)
+type platform =
+  | Any
+  | Linux
+  | Linux_amd64
+
 type test =
   | Unit of
       { name : string;
@@ -57,7 +63,7 @@ type test =
       { name : string;
         compiles : compile list;
         steps : step list;
-        linux_only : bool;
+        platform : platform;
         ci_flags : bool
       }
       (** Compiles sources with dumps, reads their FDO annotations with
@@ -70,18 +76,22 @@ type test =
       (** Compiles each source with each named set of flags, with and without
           counters, and checks that the code is the same. *)
 
-let enabled_if ~linux_only =
-  let main = List (atoms ["="; "%{context_name}"; "\"main\""]) in
+let enabled_if ~platform =
+  let equal var value = List (atoms ["="; var; "\"" ^ value ^ "\""]) in
+  let main = equal "%{context_name}" "main" in
+  let linux = equal "%{system}" "linux" in
   field "enabled_if"
-    [ (if linux_only
-       then List [Atom "and"; main; List (atoms ["="; "%{system}"; "\"linux\""])]
-       else main) ]
+    [ (match platform with
+      | Any -> main
+      | Linux -> List [Atom "and"; main; linux]
+      | Linux_amd64 ->
+        List [Atom "and"; main; linux; equal "%{architecture}" "amd64"]) ]
 
-let diff ~linux_only name =
+let diff ~platform name =
   let output = name ^ ".output" and corrected = name ^ ".output.corrected" in
   field "rule"
     [ field "alias" [Atom "runtest"];
-      enabled_if ~linux_only;
+      enabled_if ~platform;
       field "deps" (atoms [output; corrected]);
       field "action" [field "diff" (atoms [output; corrected])] ]
 
@@ -121,12 +131,12 @@ let stanzas = function
           field "modules" [Atom name];
           field "libraries" [Atom libraries] ];
       field "rule"
-        [ enabled_if ~linux_only:false;
+        [ enabled_if ~platform:Any;
           field "action"
             [ field "with-stdout-to"
                 [ Atom (name ^ ".output.corrected");
                   field "run" [Atom ("./" ^ name ^ ".exe")] ] ] ];
-      diff ~linux_only:false name ]
+      diff ~platform:Any name ]
   | Codegen { sources; configs } ->
     List.concat_map
       (fun (config, flags) ->
@@ -152,7 +162,7 @@ let stanzas = function
             [ field "rule"
                 [ field "targets" (atoms [code "without"; code "with"]);
                   field "deps" [Atom source];
-                  enabled_if ~linux_only:true;
+                  enabled_if ~platform:Linux;
                   field "action"
                     [ field "progn"
                         (mkdir [dir "without"; dir "with"]
@@ -160,12 +170,12 @@ let stanzas = function
                         @ build "with" ["-fdo-counters"]) ] ];
               field "rule"
                 [ field "alias" [Atom "runtest"];
-                  enabled_if ~linux_only:true;
+                  enabled_if ~platform:Linux;
                   field "action"
                     [field "diff" (atoms [code "without"; code "with"])] ] ])
           sources)
       configs
-  | Dumps { name; compiles; steps; linux_only; ci_flags } ->
+  | Dumps { name; compiles; steps; platform; ci_flags } ->
     let dedup l =
       List.rev
         (List.fold_left
@@ -195,19 +205,19 @@ let stanzas = function
     [ field "rule"
         [ field "targets" [Atom (name ^ ".output.corrected")];
           field "deps" (atoms sources);
-          enabled_if ~linux_only;
+          enabled_if ~platform;
           field "action"
             [ field "progn"
                 (mkdir dirs
                 @ List.map (compile_action ~ci_flags) compiles
                 @ [ field "with-stdout-to"
                       [Atom (name ^ ".output.corrected"); steps] ]) ] ];
-      diff ~linux_only name ]
+      diff ~platform name ]
 
 let unit name = Unit { name; libraries = "ocamloptcomp" }
 
-let dumps ?(linux_only = false) ?(ci_flags = false) name compiles steps =
-  Dumps { name; compiles; steps; linux_only; ci_flags }
+let dumps ?(platform = Any) ?(ci_flags = false) name compiles steps =
+  Dumps { name; compiles; steps; platform; ci_flags }
 
 let list file = Annotations ["list"; file]
 
@@ -333,8 +343,9 @@ let tests =
       [ compare_sets "to_cmm_reaper.reaper.fl" "to_cmm_reaper.cmx.dump";
         list "to_cmm_reaper.cmx.dump";
         dropped "to_cmm_reaper.cmx.dump" ];
-    (* Probes are only supported on Linux. *)
-    dumps "to_cmm_probe" ~linux_only:true
+    (* Only x86-64 Linux has optimized probes: elsewhere a probe is a
+       conditional call of its handler, with counters of its own. *)
+    dumps "to_cmm_probe" ~platform:Linux_amd64
       [ compile ~dump:true
           ["-fdo-counters"; "-dcmm"; "-dfdo-dropped-counters"]
           "to_cmm_probe.ml" ]
