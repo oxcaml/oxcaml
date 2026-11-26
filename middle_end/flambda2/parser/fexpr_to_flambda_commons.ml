@@ -69,7 +69,7 @@ end
 module WT = Hashtbl.Make (W)
 
 type env =
-  { done_continuation : Continuation.t;
+  { done_continuation : Continuation.t * int;
     error_continuation : Exn_continuation.t;
     continuations : (Continuation.t * int) CM.t;
     exn_continuations : Continuation.t CM.t;
@@ -92,7 +92,7 @@ let init_env () =
   let toplevel_alloc_region =
     Variable.create "toplevel_alloc_region" Flambda_kind.region
   in
-  { done_continuation;
+  { done_continuation = done_continuation, 1;
     error_continuation;
     continuations = CM.empty;
     exn_continuations = CM.empty;
@@ -228,7 +228,7 @@ let find_cont_id env c =
 
 let find_cont env (c : Fexpr.continuation) =
   match c with
-  | Special Done -> env.done_continuation, 1
+  | Special Done -> env.done_continuation
   | Special Error -> Exn_continuation.exn_handler env.error_continuation, 1
   | Named cont_id -> find_cont_id env cont_id
 
