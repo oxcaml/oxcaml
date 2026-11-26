@@ -305,7 +305,7 @@ module Expr : sig
           init_name : Name.t;
           init : t
         }
-    | Unboxed_tuple of (Name.t * t) list
+    | Unboxed_tuple of t list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -317,7 +317,7 @@ module Expr : sig
     | Construct of
         { sum : Sum.t;
           constructor : Ty.constructor;
-          args : (Name.t * t) list
+          args : t list
         }
     | Match of
         { sum : Sum.t;
