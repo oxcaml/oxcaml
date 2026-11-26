@@ -36,6 +36,9 @@ module Reason = struct
     | Switch_to_lookup_table
     | Cmm_switch_collapsed
     | Probe_handler_call
+    | Cfg_self_tail_call_to_jump
+    | Cfg_branch_to_jump
+    | Cfg_blocks_merged
 
   let to_string = function
     | Inlined_call -> "inlined_call"
@@ -46,6 +49,9 @@ module Reason = struct
     | Switch_to_lookup_table -> "switch_to_lookup_table"
     | Cmm_switch_collapsed -> "cmm_switch_collapsed"
     | Probe_handler_call -> "probe_handler_call"
+    | Cfg_self_tail_call_to_jump -> "cfg_self_tail_call_to_jump"
+    | Cfg_branch_to_jump -> "cfg_branch_to_jump"
+    | Cfg_blocks_merged -> "cfg_blocks_merged"
 end
 
 module Counter_map = Map.Make (Fdo_counter)
@@ -86,3 +92,7 @@ let register_all t = registered_in_unit := union !registered_in_unit t
 let registered () = !registered_in_unit
 
 let reset () = registered_in_unit := empty
+
+let without_registering f =
+  let saved = !registered_in_unit in
+  Fun.protect f ~finally:(fun () -> registered_in_unit := saved)

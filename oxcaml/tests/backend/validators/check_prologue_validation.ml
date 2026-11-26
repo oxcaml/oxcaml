@@ -190,7 +190,11 @@ let () =
                 exn = None;
                 terminator =
                   { id = make_id ();
-                    desc = Truth_test { ifso = loop_body; ifnot = loop_exit };
+                    desc =
+                      Truth_test
+                        { ifso = Cfg.successor loop_body;
+                          ifnot = Cfg.successor loop_exit
+                        };
                     arg = [| int.(0) |];
                     res = [||]
                   }
@@ -268,7 +272,11 @@ let () =
                 terminator =
                   { id = make_id ();
                     desc =
-                      Call { op = Indirect None; label_after = new_label 1 };
+                      Call
+                        { op =
+                            Indirect { callees = None; callsite_counter = None };
+                          label_after = new_label 1
+                        };
                     arg = [||];
                     res = [||]
                   }

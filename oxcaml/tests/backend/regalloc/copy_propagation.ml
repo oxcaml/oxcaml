@@ -32,8 +32,9 @@ let block label body terminator =
 let cfg blocks =
   let cfg =
     Cfg.create ~fun_name:"copy_propagation_test" ~fun_args:[||]
-      ~fun_codegen_options:[] ~fun_dbg:Debuginfo.none ~fun_contains_calls:false
-      ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+      ~fun_codegen_options:[] ~fun_dbg:Debuginfo.none
+      ~fun_fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
+      ~fun_contains_calls:false ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
       ~fun_poll:Lambda.Default_poll ~next_instruction_id:instruction_ids
       ~fun_ret_type:[| Cmm.Int |] ~fun_phantom_lets:Backend_var.Map.empty
       ~allowed_to_be_irreducible:false
@@ -123,7 +124,11 @@ let test_propagates_into_terminator () =
   let ifso = Label.new_label () in
   let ifnot = Label.new_label () in
   let copy = move src dst in
-  let test = instruction (Cfg.Truth_test { ifso; ifnot }) ~arg:[| dst |] in
+  let test =
+    instruction
+      (Cfg.Truth_test { ifso = Cfg.successor ifso; ifnot = Cfg.successor ifnot })
+      ~arg:[| dst |]
+  in
   let entry = block Label.entry_label [const 1n src; copy] test in
   let return_block label n =
     block label [const n result] (instruction Cfg.Return ~arg:[| result |])

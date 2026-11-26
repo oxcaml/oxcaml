@@ -1,0 +1,55 @@
+identical tests:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    100: if true goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); else goto 103 fdo_annotation("Test.f":0:00000001:0:branch(3))
+    101: if true goto 102 fdo_annotation("Test.f":0:00000001:0:branch(4)); else goto 103 fdo_annotation("Test.f":0:00000001:0:branch(5))
+  after:
+    1: goto 103
+  dropped:
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(0)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(1)
+    cfg_blocks_merged: "Test.f":0:00000001:0:branch(2)
+    cfg_blocks_merged: "Test.f":0:00000001:0:branch(3)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(4)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(5)
+  lost:
+
+identical calls:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    100: call "g"  callsite_counter("Test.f":0:00000001:0:call); 
+           goto 102
+    101: call "g"  callsite_counter("Test.f":0:00000001:1:call); 
+           goto 102
+  after:
+    1: goto 101
+    101: call "g"  callsite_counter("Test.f":0:00000001:1:call); 
+           goto 102
+  dropped:
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(0)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(1)
+    cfg_blocks_merged: "Test.f":0:00000001:0:call
+  lost:
+
+empty block with a single successor:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    100: if true goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); else goto 102 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: if true goto 102 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(2)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(3)
+  lost:
+
+block with a single successor:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    100: if true goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); else goto 102 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(2)
+    cfg_branch_to_jump: "Test.f":0:00000001:0:branch(3)
+  lost:
+

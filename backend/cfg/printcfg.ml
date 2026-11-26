@@ -66,6 +66,45 @@ let basic_desc ppf (basic : Cfg.basic) =
   | Stack_check { max_frame_size_bytes } ->
     fprintf ppf "stack_check size=%d" max_frame_size_bytes
 
+(* The FDO counters are printed as in Cmm dumps, when there are any, but without
+   boxes: the rest of the dump is laid out by hand. *)
+let fdo_annotation ppf annotation =
+  if not (Fdo_annotation.is_empty annotation)
+  then
+    Format.fprintf ppf " fdo_annotation(%s)"
+      (Fdo_annotation.to_list annotation
+      |> List.map ~f:Fdo_counter.to_string
+      |> String.concat " ")
+
+let fdo_entry_annotation ppf entry_annotation =
+  let module Entry = Fdo_annotation.With_body_hash in
+  if not (Entry.is_empty entry_annotation)
+  then
+    let body_hash =
+      Entry.body_hash entry_annotation
+      |> Option.map (fun body_hash ->
+          "body_hash:" ^ Fdo_counter.Body_hash.to_string body_hash)
+      |> Option.to_list
+    in
+    Format.fprintf ppf "  fdo_entry_annotation(%s)\n"
+      ( Fdo_annotation.to_list (Entry.annotation entry_annotation)
+      |> List.map ~f:Fdo_counter.to_string
+      |> fun counters -> String.concat " " (counters @ body_hash) )
+
+let callsite_counter ppf = function
+  | None -> ()
+  | Some counter ->
+    Format.fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
+
+let func_call_callsite_counter ppf (call : Cfg.func_call_operation) =
+  match call with
+  | Indirect { callees = _; callsite_counter = counter }
+  | Direct { sym = _; callsite_counter = counter } ->
+    callsite_counter ppf counter
+
+let successor ppf ({ target; fdo_annotation = annotation } : Cfg.successor) =
+  Format.fprintf ppf "%a%a" Label.format target fdo_annotation annotation
+
 (* Shared implementation between [terminator_desc] (no args, desc-only) and
    [print_terminator_body] (args drawn from the instruction). *)
 let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
@@ -93,40 +132,41 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
   | Never -> fprintf ppf "deadend"
   | Always l -> fprintf ppf "goto %a" Label.format l
   | Parity_test { ifso; ifnot } ->
-    fprintf ppf "if even%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
+    fprintf ppf "if even%s goto %a%selse goto %a" first_arg successor ifso sep
+      successor ifnot
   | Truth_test { ifso; ifnot } ->
-    fprintf ppf "if true%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
+    fprintf ppf "if true%s goto %a%selse goto %a" first_arg successor ifso sep
+      successor ifnot
   | Float_test { width = _; lt; eq; gt; uo } ->
-    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg Label.format gt sep;
-    fprintf ppf "else goto %a" Label.format uo
+    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg successor lt sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg successor eq sep;
+    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg successor gt sep;
+    fprintf ppf "else goto %a" successor uo
   | Int_test { lt; eq; gt; is_signed; imm } ->
     let cmp =
       Printf.sprintf " %s%s"
         (match is_signed with Signed -> "s" | Unsigned -> "u")
         (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
     in
-    fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg cmp Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a" first_arg cmp Label.format gt
-  | Switch labels ->
+    fprintf ppf "if%s <%s goto %a%s" first_arg cmp successor lt sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg cmp successor eq sep;
+    fprintf ppf "if%s >%s goto %a" first_arg cmp successor gt
+  | Switch successors ->
     fprintf ppf "switch%s%s" first_arg sep;
-    let label_count = Array.length labels in
+    let label_count = Array.length successors in
     if label_count >= 1
     then (
       for i = 0 to label_count - 2 do
-        fprintf ppf "case %d: goto %a%s" i Label.format labels.(i) sep
+        fprintf ppf "case %d: goto %a%s" i successor successors.(i) sep
       done;
       let i = label_count - 1 in
-      fprintf ppf "case %d: goto %a" i Label.format labels.(i))
+      fprintf ppf "case %d: goto %a" i successor successors.(i))
   | Call_no_return call ->
     dump_linear_call_op ppf
       (match call with
       | Indirect _ -> Linear.Lcall_ind
-      | Direct func -> Linear.Lcall_imm { func });
+      | Direct { sym = func; callsite_counter = _ } -> Linear.Lcall_imm { func });
+    func_call_callsite_counter ppf call;
     fprintf ppf " (no return)"
   | External_call_no_return { func_symbol; _ } ->
     fprintf ppf "external_call_no_return %s%a" func_symbol print_args args
@@ -142,13 +182,16 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
        they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect _callees -> Linear.Ltailcall_ind
-      | Direct func -> Linear.Ltailcall_imm { func })
+      | Indirect _ -> Linear.Ltailcall_ind
+      | Direct { sym = func; callsite_counter = _ } ->
+        Linear.Ltailcall_imm { func });
+    func_call_callsite_counter ppf call
   | Call { op = call; label_after } ->
     dump_linear_call_op ppf
       (match call with
-      | Indirect _callees -> Linear.Lcall_ind
-      | Direct func -> Linear.Lcall_imm { func });
+      | Indirect _ -> Linear.Lcall_ind
+      | Direct { sym = func; callsite_counter = _ } -> Linear.Lcall_imm { func });
+    func_call_callsite_counter ppf call;
     Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
     dump_linear_call_op ppf
@@ -314,6 +357,7 @@ let format :
  fun fmt cfg labels liveness ->
   Format.fprintf fmt "cfg for %t%s%t\n" Cfg_colours.function_name cfg.fun_name
     Cfg_colours.pop;
+  fdo_entry_annotation fmt cfg.fun_fdo_entry_annotation;
   Format.fprintf fmt "  args: %a\n" Printreg.regs cfg.fun_args;
   Format.fprintf fmt "  ret_type: %a\n" Printcmm.machtype cfg.fun_ret_type;
   Format.fprintf fmt "  entry_label: %a\n" Label.format cfg.entry_label;
