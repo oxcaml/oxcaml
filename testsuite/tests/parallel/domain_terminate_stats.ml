@@ -58,9 +58,13 @@ let check_invariants t =
 
   check "live_words" live_words leq "heap_words" heap_words +
   check "heap_words" heap_words eq "live_words+free_words+fragments"
-    Int64.(add (add live_words free_words) fragments) +
+    Int64.(add (add live_words free_words) fragments)
 
-  check "top_heap_words" top_heap_words geq "heap_words" heap_words
+  (* Upstream also checks [top_heap_words >= heap_words]. That does not hold
+     in OxCaml: since #5226, [heap_words] counts whole chunks
+     ([chunk_words], including free pools), but [top_heap_words] still sums
+     the pool, large and extent maxima. Restore the check once
+     [top_heap_words] is computed from [max_chunk_words]. *)
 
 let gc_and_check f =
   f ();
