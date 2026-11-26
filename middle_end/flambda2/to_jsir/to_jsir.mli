@@ -33,5 +33,6 @@ val unit :
   offsets:Exported_offsets.t ->
   all_code:Exported_code.t ->
   reachable_names:Name_occurrences.t ->
+  find_imported_code:(Code_id.t -> Code_or_metadata.t option) ->
   Flambda_unit.t ->
   To_jsir_result.program

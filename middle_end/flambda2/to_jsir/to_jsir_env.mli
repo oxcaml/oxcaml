@@ -40,6 +40,7 @@ val create :
   module_symbol:Symbol.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
+  find_imported_code:(Code_id.t -> Code_or_metadata.t option) ->
   t
 
 val return_continuation : t -> Continuation.t
@@ -130,13 +131,20 @@ type closure =
     loc : Parse_info.t option
   }
 
+type shared =
+  | Current_unit of closure
+  | Other_unit of Code_metadata.t
+
 type code =
-  | Shared of closure
-      (** Translated once with a single closure reused across all
-          [Set_of_closures]. *)
+  | Shared of shared
+      (** Translated once, by the compilation unit defining the code, with a
+          single closure reused across all [Set_of_closures]. *)
   | Instantiated of Code.t
       (** Translated afresh with a new closure for each [Set_of_closures]
-          containing it. *)
+          containing it. Code of another compilation unit is translated from its
+          definition in the .cmx file of that unit. *)
+
+val code_is_shared : Code.t -> bool
 
 val add_code : t -> Code_id.t -> code -> t
 
@@ -176,7 +184,14 @@ val get_symbol :
 val get_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
+(** Code of the current compilation unit is looked up in the environment. Code
+    of other units is looked up in their .cmx files instead, and is [Shared] or
+    [Instantiated] as it is in the unit defining it. *)
 val get_code_exn : t -> Code_id.t -> code
+
+(** Return the JSIR variable for the closure of the given [Shared] code. *)
+val get_shared_closure :
+  res:To_jsir_result.t -> Code_id.t -> shared -> Jsir.Var.t * To_jsir_result.t
 
 (** Look up a slot in the set of closures associated with [closure]. Raises if
     [closure] was not registered via [add_closure_slots] or does not contain the

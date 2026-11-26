@@ -357,9 +357,9 @@ and apply_expr0 ~env ~res e =
     apply_fn ~res ~f ~args ~exact ~yielding
   | None, Function { function_call = Direct code_id } ->
     let args, res = To_jsir_shared.simples ~env ~res args in
-    let f =
+    let f, res =
       match To_jsir_env.get_code_exn env code_id with
-      | Shared closure -> closure.var
+      | Shared shared -> To_jsir_env.get_shared_closure ~res code_id shared
       | Instantiated _ ->
         Misc.fatal_errorf
           "Missing callee for a direct call to code that depends on its \
@@ -677,13 +677,15 @@ and invalid ~env ~res msg =
   in
   env, To_jsir_result.end_block_with_last_exn res (Raise (var, `Normal))
 
-let unit ~offsets:_ ~all_code:_ ~reachable_names flambda_unit =
+let unit ~offsets:_ ~all_code:_ ~reachable_names ~find_imported_code
+    flambda_unit =
   To_jsir_target.set_num_bits ();
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
+      ~find_imported_code
   in
   let res = To_jsir_result.create ~reachable_names in
   let res, _addr = To_jsir_result.new_block res ~params:[] in

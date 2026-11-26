@@ -91,7 +91,9 @@ type flambda_result =
   { flambda : Flambda_unit.t;
     all_code : Exported_code.t;
     offsets : Exported_offsets.t;
-    reachable_names : NO.t
+    reachable_names : NO.t;
+    find_imported_code :
+      Flambda2_identifiers.Code_id.t -> Code_or_metadata.t option
   }
 
 let finalize_offsets ~free_names slot_offsets =
@@ -343,7 +345,12 @@ let flambda_to_flambda0 : type m.
   (match lto_info with
   | None -> ()
   | Some lto_info -> Compilenv.set_lto_info lto_info);
-  { flambda; offsets = exported_offsets; reachable_names; all_code }
+  { flambda;
+    offsets = exported_offsets;
+    reachable_names;
+    all_code;
+    find_imported_code = Flambda_cmx.find_imported_code cmx_loader
+  }
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
     (unit : Flambda_unit.t) =
@@ -423,7 +430,8 @@ let reset_symbol_tables () =
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
-    let { flambda; all_code; offsets; reachable_names } =
+    let { flambda; all_code; offsets; reachable_names; find_imported_code = _ }
+        =
       lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
     in
     let cmm =
@@ -443,7 +451,7 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
     (match !Oxcaml_flags.opt_level with
     | Set Oclassic -> Oxcaml_flags.reset_opt_level ()
     | Default | Set (O2 | O3 | O4) -> ());
-    let { flambda; all_code; offsets; reachable_names } =
+    let { flambda; all_code; offsets; reachable_names; find_imported_code } =
       lambda_to_flambda ~ppf_dump ~prefixname
         ~machine_width:(Flambda2_to_jsir.To_jsir_target.machine_width ())
         program
@@ -453,17 +461,8 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
           symbol_imports;
           symbol_exports
         } =
-      Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
-    in
-    let linkage_name symbol =
-      Flambda2_identifiers.Symbol.linkage_name_as_string symbol
-      |> Jsoo_imports.Code.Linkage_name.of_string
-    in
-    let symbol_imports =
-      List.map (fun (var, symbol) -> var, linkage_name symbol) symbol_imports
-    in
-    let symbol_exports =
-      List.map (fun (symbol, var) -> linkage_name symbol, var) symbol_exports
+      Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names
+        ~find_imported_code flambda
     in
     if not keep_symbol_tables then reset_symbol_tables ();
     { Optcomp_intf.program;

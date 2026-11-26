@@ -43,7 +43,9 @@ open! Jsoo_imports.Import
     with the variable of the exporting unit that holds its value, and the
     [caml_register_symbol] calls are removed. js_of_ocaml can then see through
     references across units. For this, the exporting unit must come before the
-    importing one, and linking fails otherwise.
+    importing one, and linking fails otherwise. The closures of code that units
+    share are imported and exported like symbols, under the linkage names of the
+    code.
 
     The [caml_register_global] calls are removed too unless [register_globals],
     so that js_of_ocaml can remove the fields of module blocks that are not

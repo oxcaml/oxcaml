@@ -103,6 +103,12 @@ let create_loader ~get_module_info =
 
 let get_imported_code loader () = loader.imported_code
 
+let find_imported_code loader code_id =
+  let (_ : TE.Serializable.t option) =
+    load_cmx_file_contents loader (Code_id.get_compilation_unit code_id)
+  in
+  Exported_code.find loader.imported_code code_id
+
 let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
   let rec fixpoint names_to_add names_already_added =
     if Name_occurrences.is_empty names_to_add

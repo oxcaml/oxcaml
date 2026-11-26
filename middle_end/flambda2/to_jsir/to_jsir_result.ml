@@ -51,10 +51,16 @@ type t =
     external_symbols : Jsir.Var.t Symbol.Map.t;
         (** The variables bound in [entry_prelude] to symbols from other
             compilation units. *)
+    external_code : Jsir.Var.t Code_id.Map.t;
+        (** The variables bound in [entry_prelude] to the closures of code from
+            other compilation units. *)
     symbol_exports : (Symbol.t * Jsir.Var.t) list;
         (** The symbols of this unit that other compilation units may refer to,
             with the variables holding their values (before the resolution of
             [var_aliases]), most recent first. *)
+    code_exports : (Code_id.t * Jsir.Var.t) list;
+        (** The code of this unit that other compilation units may refer to,
+            with the variables holding its closures. *)
     var_aliases : Jsir.Var.t Jsir.Var.Map.t;
         (** A mapping of variables created ahead of their definition to their
             materialised variables. *)
@@ -79,7 +85,9 @@ let create ~reachable_names =
     imported_compilation_units = Compilation_unit.Set.empty;
     entry_prelude = [];
     external_symbols = Symbol.Map.empty;
+    external_code = Code_id.Map.empty;
     symbol_exports = [];
+    code_exports = [];
     var_aliases = Jsir.Var.Map.empty;
     call_events = None;
     reachable_names
@@ -319,9 +327,26 @@ let symbol_to_name_constants symbol : Jsir.constant * Jsir.constant =
     |> compilation_unit_name |> To_jsir_target.name_constant,
     Symbol.linkage_name_as_string symbol |> To_jsir_target.name_constant )
 
+let code_linkage_name_as_string code_id =
+  Code_id.linkage_name code_id |> Linkage_name.to_string
+
+let code_id_to_name_constants code_id : Jsir.constant * Jsir.constant =
+  ( Code_id.get_compilation_unit code_id
+    |> compilation_unit_name |> To_jsir_target.name_constant,
+    code_linkage_name_as_string code_id |> To_jsir_target.name_constant )
+
 let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
+
+let add_to_symbol_table t ?loc (compilation_unit_name, name) var =
+  let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
+  add_instr_exn t
+    (Let
+       ( Jsir.Var.fresh (),
+         Prim
+           ( Extern ("caml_register_symbol", None),
+             [Pc compilation_unit_name; Pc name; Pv var] ) ))
 
 let register_symbol t ?loc symbol var =
   if symbol_is_for_compilation_unit symbol
@@ -337,15 +362,18 @@ let register_symbol t ?loc symbol var =
        exported *)
     t
   else
-    let compilation_unit_name, symbol_name = symbol_to_name_constants symbol in
     let t = { t with symbol_exports = (symbol, var) :: t.symbol_exports } in
-    let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
-    add_instr_exn t
-      (Let
-         ( Jsir.Var.fresh (),
-           Prim
-             ( Extern ("caml_register_symbol", None),
-               [Pc compilation_unit_name; Pc symbol_name; Pv var] ) ))
+    add_to_symbol_table t ?loc (symbol_to_name_constants symbol) var
+
+let register_code t ?loc code_id var =
+  if not (Name_occurrences.mem_code_id t.reachable_names code_id)
+  then
+    (* No other compilation unit can refer to this code, as it is not
+       exported *)
+    t
+  else
+    let t = { t with code_exports = (code_id, var) :: t.code_exports } in
+    add_to_symbol_table t ?loc (code_id_to_name_constants code_id) var
 
 let predef_exception_lookup symbol : Jsir.expr =
   let symbol_name = Symbol.linkage_name_as_string symbol in
@@ -402,12 +430,37 @@ let external_symbol_var t symbol =
     ( { t with external_symbols = Symbol.Map.add symbol var t.external_symbols },
       var )
 
+let external_code_var t code_id =
+  match Code_id.Map.find_opt code_id t.external_code with
+  | Some var -> t, var
+  | None ->
+    (* The unit defining the code must be linked (and initialised) before this
+       one, so record it as an import. *)
+    let t = import_compilation_unit t (Code_id.get_compilation_unit code_id) in
+    let compilation_unit_name, code_name = code_id_to_name_constants code_id in
+    let var = Jsir.Var.fresh () in
+    let t =
+      add_entry_prelude_instr t
+        (Let
+           ( var,
+             Prim
+               ( Extern ("caml_get_symbol", None),
+                 [Pc compilation_unit_name; Pc code_name] ) ))
+    in
+    { t with external_code = Code_id.Map.add code_id var t.external_code }, var
+
 type program =
   { program : Jsir.program;
     imported_compilation_units : Compilation_unit.Set.t;
-    symbol_imports : (Jsir.Var.t * Symbol.t) list;
-    symbol_exports : (Symbol.t * Jsir.Var.t) list
+    symbol_imports : (Jsir.Var.t * Jsir.Linkage_name.t) list;
+    symbol_exports : (Jsir.Linkage_name.t * Jsir.Var.t) list
   }
+
+let symbol_linkage_name symbol =
+  Symbol.linkage_name_as_string symbol |> Jsir.Linkage_name.of_string
+
+let code_linkage_name code_id =
+  code_linkage_name_as_string code_id |> Jsir.Linkage_name.of_string
 
 let to_program_exn
     { complete_blocks;
@@ -417,7 +470,9 @@ let to_program_exn
       imported_compilation_units;
       entry_prelude;
       external_symbols;
+      external_code;
       symbol_exports;
+      code_exports;
       var_aliases;
       call_events = _;
       reachable_names = _
@@ -454,10 +509,23 @@ let to_program_exn
       (fun symbol var imports ->
         if Symbol.is_predefined_exception symbol
         then imports
-        else (var, symbol) :: imports)
+        else (var, symbol_linkage_name symbol) :: imports)
       external_symbols []
   in
+  let symbol_imports =
+    Code_id.Map.fold
+      (fun code_id var imports -> (var, code_linkage_name code_id) :: imports)
+      external_code symbol_imports
+  in
   let symbol_exports =
-    List.rev_map (fun (symbol, var) -> symbol, resolve var) symbol_exports
+    List.rev_map
+      (fun (symbol, var) -> symbol_linkage_name symbol, resolve var)
+      symbol_exports
+  in
+  let symbol_exports =
+    List.fold_left
+      (fun exports (code_id, var) ->
+        (code_linkage_name code_id, resolve var) :: exports)
+      symbol_exports code_exports
   in
   { program; imported_compilation_units; symbol_imports; symbol_exports }
