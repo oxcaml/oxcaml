@@ -140,5 +140,6 @@
   flambda2_numbers
   flambda2_lattices
   flambda2_nominal
+  flambda2_simplify
   flambda2_simplify_shared
   flambda2_ui))
