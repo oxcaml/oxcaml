@@ -2,11 +2,13 @@ Entry point: 0
 
 ==== 0 () ====
   v2 = fun(v1){1 ()} [hint:(int)->int never_inline]
-  v13 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_up_1"j, v2) 
-  v15 = fun(v14){7 ()} [hint:(int)->int never_inline]
-  v25 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_down_2"j, v15) 
-  v26 = imm{tag=0; 0 = v2; 1 = v15}
-  v27 = "caml_register_global"(v26, "For_loop"j)
+  v12 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_up_0_2_code"j, v2) 
+  v14 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_up_1"j, v2) 
+  v16 = fun(v15){7 ()} [hint:(int)->int never_inline]
+  v25 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_down_1_3_code"j, v16) 
+  v27 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_down_2"j, v16) 
+  v28 = imm{tag=0; 0 = v2; 1 = v16}
+  v29 = "caml_register_global"(v28, "For_loop"j)
   stop
 
 ==== 1 () ====
@@ -35,27 +37,27 @@ Entry point: 0
   return v9
 
 ==== 7 () ====
-  v16 = 0 <= v14
-  v17 = CONST{0}
-  if v16 then 8 () else 9 ()
+  v17 = 0 <= v15
+  v18 = CONST{0}
+  if v17 then 8 () else 9 ()
 
 ==== 8 () ====
-  v18 = CONST{0}
-  branch 10 (v14, v18)
+  v19 = CONST{0}
+  branch 10 (v15, v19)
 
 ==== 9 () ====
-  return v17
+  return v18
 
-==== 10 (v20, v19) ====
-  v21 = v19 - v20
-  v22 = !(v20 === 0)
-  if v22 then 11 () else 12 ()
+==== 10 (v21, v20) ====
+  v22 = v20 - v21
+  v23 = !(v21 === 0)
+  if v23 then 11 () else 12 ()
 
 ==== 11 () ====
-  v23 = v20 - 1
-  branch 10 (v23, v21)
+  v24 = v21 - 1
+  branch 10 (v24, v22)
 
 ==== 12 () ====
-  return v21
+  return v22
 
 

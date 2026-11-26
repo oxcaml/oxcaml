@@ -60,9 +60,9 @@ let definitions ~env ~res consts bound_static =
       ~init:(env, res, [])
       ~code:(fun (env, res, acc) code_id code ->
         match To_jsir_env.get_code_exn env code_id with
-        | Shared { closure; code = _ } ->
+        | Shared (Current_unit { closure; code = _ }) ->
           env, res, Code (code_id, code, closure) :: acc
-        | Instantiated _ -> env, res, acc)
+        | Shared (Other_unit _) | Instantiated _ -> env, res, acc)
       ~deleted_code:(fun acc _ -> acc)
       ~set_of_closures:(fun (env, res, acc) ~closure_symbols soc ->
         let env, res, static =
@@ -328,5 +328,14 @@ let translate ~env ~res ~translate_body bound_static consts =
         let loc = Symbol.Map.find_opt symbol closure_locs in
         To_jsir_env.register_symbol_exn env ~res ?loc symbol)
       symbols res
+  in
+  let res =
+    Array.fold_left
+      (fun res definition ->
+        match definition with
+        | Code (code_id, _, closure) ->
+          To_jsir_result.register_code res ?loc:closure.loc code_id closure.var
+        | Closure _ | Block _ -> res)
+      res definitions
   in
   env, res

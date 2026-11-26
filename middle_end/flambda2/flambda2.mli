@@ -42,7 +42,9 @@ type flambda_result =
   { flambda : Flambda_unit.t;
     all_code : Exported_code.t;
     offsets : Exported_offsets.t;
-    reachable_names : Flambda2_nominal.Name_occurrences.t
+    reachable_names : Flambda2_nominal.Name_occurrences.t;
+    find_imported_code :
+      Flambda2_identifiers.Code_id.t -> Code_or_metadata.t option
   }
 
 (** Translate Lambda code into (potentially Simplified) Flambda 2. This function

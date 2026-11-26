@@ -88,8 +88,15 @@ The JSIR linker renumbers the variables and block addresses of each unit so that
 The JSIR of a unit refers to the symbols of other units through the runtime's symbol table: a unit binds `caml_get_symbol` (or `caml_get_global`, for a module block) to a fresh variable at the start of its entry block, and registers its own symbols with `caml_register_symbol` (`caml_register_global` for its module block) where they are defined.
 JSIR files record these variables (`symbol_imports` and `symbol_exports` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli)), and the linker substitutes the importing unit's variable with the exporting unit's, deleting the `caml_get_symbol` binding.
 The `caml_register_global` calls are deleted too, so that `js_of_ocaml` can remove the fields of module blocks that are not used.
+The closures of code that units share (see [Code of other compilation units](#code-of-other-compilation-units)) are in the symbol table too, and are linked in the same way.
 
 A unit whose toplevel code never exits normally (it always raises) makes the units after it unreachable, and the linker leaves them out.
+
+## Code of other compilation units
+When Flambda 2 inlines a function from another compilation unit, the copied body can refer to a code ID of that unit, either in a set of closures it creates or in a direct call with no callee.
+The pass classifies code as `Instantiated` or `Shared` (`To_jsir_env.code_is_shared`), and handles external code IDs accordingly:
+- `Instantiated` code (which uses its closure) is translated afresh for each set of closures that contains it. When the code belongs to another unit, the pass looks up its definition in that unit's `.cmx-js` or `.cmx-wasm` file (`Flambda_cmx.find_imported_code`).
+- `Shared` code has a single JSIR closure, defined by the unit that owns the code. Another unit fetches this closure with `caml_get_symbol` at the start of its entry block, under the code's linkage name, and `-link-jsir` resolves it like a symbol. A unit registers the closure of all of its `Shared` code that other units can reach, with `caml_register_symbol` where the closure is defined.
 
 ## Number representations
 The JSIR produced for `-target js_of_ocaml` and `-target wasm_of_ocaml` differs in a few places, chosen by [`To_jsir_target`](to_jsir_target.mli).

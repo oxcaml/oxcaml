@@ -50,8 +50,11 @@ let name_closure slot fn_var =
 
 let value_slots_projected_by (code : To_jsir_env.code) =
   match code with
-  | Shared { closure = _; code } | Instantiated code ->
+  | Shared (Current_unit { closure = _; code }) | Instantiated code ->
     Name_occurrences.value_slots_in_normal_projections (Code0.free_names code)
+  | Shared (Other_unit _) ->
+    (* This code cannot project from the closures of the current unit. *)
+    Value_slot.Set.empty
 
 let used_value_slots ~env soc =
   Function_slot.Lmap.fold
@@ -66,12 +69,14 @@ let used_value_slots ~env soc =
     Value_slot.Set.empty
 
 let closure_for_code ~env ~res code_id :
-    To_jsir_result.t * To_jsir_env.closure * instance option =
+    To_jsir_result.t * Jsir.Var.t * instance option =
   match To_jsir_env.get_code_exn env code_id with
-  | Shared { closure; code = _ } -> res, closure, None
+  | Shared shared ->
+    let var, res = To_jsir_env.get_shared_closure ~res code_id shared in
+    res, var, None
   | Instantiated code ->
     let closure, res = To_jsir_static_const.new_closure ~res code in
-    res, closure, Some { closure; code }
+    res, closure.var, Some { closure; code }
 
 (* Allocate fresh closures for any [Instantiated] code in [soc] and register
    this set's slots on each new closure and on [symbols] (the static closure
@@ -91,9 +96,9 @@ let prepare ~env ~res ~symbols soc =
         with
         | Deleted _ -> res, None
         | Code_id { code_id; only_full_applications = _ } ->
-          let res, closure, instance = closure_for_code ~env ~res code_id in
-          name_closure slot closure.var;
-          res, Some (slot, closure.var, instance))
+          let res, var, instance = closure_for_code ~env ~res code_id in
+          name_closure slot var;
+          res, Some (slot, var, instance))
       res decls
   in
   let closure_vars =
@@ -169,8 +174,11 @@ let closure_symbol_locs ~env ~closure_symbols soc =
       | Code_id { code_id; only_full_applications = _ } -> (
         let loc =
           match To_jsir_env.get_code_exn env code_id with
-          | Shared { closure; code = _ } -> closure.loc
-          | Instantiated code -> To_jsir_static_const.closure_loc code
+          | Shared (Current_unit { closure; code = _ }) -> closure.loc
+          | Shared (Other_unit code_metadata) ->
+            To_jsir_static_const.closure_loc code_metadata
+          | Instantiated code ->
+            To_jsir_static_const.closure_loc (Code0.code_metadata code)
         in
         match loc with
         | None -> locs
