@@ -43,7 +43,10 @@ type closure =
   }
 
 type code =
-  | Shared of closure
+  | Shared of
+      { closure : closure;
+        code : Code.t
+      }
   | Instantiated of Code.t
 
 type slots =

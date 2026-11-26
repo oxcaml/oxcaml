@@ -60,7 +60,8 @@ let definitions ~env ~res consts bound_static =
       ~init:(env, res, [])
       ~code:(fun (env, res, acc) code_id code ->
         match To_jsir_env.get_code_exn env code_id with
-        | Shared closure -> env, res, Code (code_id, code, closure) :: acc
+        | Shared { closure; code = _ } ->
+          env, res, Code (code_id, code, closure) :: acc
         | Instantiated _ -> env, res, acc)
       ~deleted_code:(fun acc _ -> acc)
       ~set_of_closures:(fun (env, res, acc) ~closure_symbols soc ->

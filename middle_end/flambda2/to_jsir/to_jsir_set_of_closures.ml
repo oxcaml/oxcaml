@@ -50,8 +50,7 @@ let name_closure slot fn_var =
 
 let value_slots_projected_by (code : To_jsir_env.code) =
   match code with
-  | Shared _ -> Value_slot.Set.empty
-  | Instantiated code ->
+  | Shared { closure = _; code } | Instantiated code ->
     Name_occurrences.value_slots_in_normal_projections (Code0.free_names code)
 
 let used_value_slots ~env soc =
@@ -69,7 +68,7 @@ let used_value_slots ~env soc =
 let closure_for_code ~env ~res code_id :
     To_jsir_result.t * To_jsir_env.closure * instance option =
   match To_jsir_env.get_code_exn env code_id with
-  | Shared closure -> res, closure, None
+  | Shared { closure; code = _ } -> res, closure, None
   | Instantiated code ->
     let closure, res = To_jsir_static_const.new_closure ~res code in
     res, closure, Some { closure; code }
@@ -122,7 +121,7 @@ let prepare ~env ~res ~symbols soc =
   in
   let slots : To_jsir_env.slots = { function_slots; value_slots } in
   (* Do not attach slots to [Shared] closures, as they may belong to multiple
-     sets of closures and their code never projects from them. *)
+     sets of closures and their code never projects from [my_closure]. *)
   let env =
     List.fold_left
       (fun env closure -> To_jsir_env.add_closure_slots env ~closure slots)
@@ -170,7 +169,7 @@ let closure_symbol_locs ~env ~closure_symbols soc =
       | Code_id { code_id; only_full_applications = _ } -> (
         let loc =
           match To_jsir_env.get_code_exn env code_id with
-          | Shared closure -> closure.loc
+          | Shared { closure; code = _ } -> closure.loc
           | Instantiated code -> To_jsir_static_const.closure_loc code
         in
         match loc with

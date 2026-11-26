@@ -292,17 +292,12 @@ let initialise_block_like ~env ~res ~symbols_in_cycle symbol const =
   in
   res
 
-(* Code that neither uses [my_closure] nor projects from any closure can reuse a
-   single closure defined with the code. This also ensures a closure binding
-   exists when the reaper unboxes a closure and removes its
+(* Code that does not use [my_closure] can reuse a single closure defined with
+   the code. This is because the closures that it projects from, if any, do not
+   depend on the closure it is called through. This also ensures a closure
+   binding exists when the reaper unboxes a closure and removes its
    [Set_of_closures]. *)
-let code_is_shared code =
-  let free_names = Code0.free_names code in
-  (not (Code0.is_my_closure_used code))
-  && Function_slot.Set.is_empty
-       (Name_occurrences.function_slots_in_normal_projections free_names)
-  && Value_slot.Set.is_empty
-       (Name_occurrences.value_slots_in_normal_projections free_names)
+let code_is_shared code = not (Code0.is_my_closure_used code)
 
 let closure_loc code =
   To_jsir_result.parse_info_of_debuginfo (Code0.dbg code) ~pos:`End
@@ -328,7 +323,7 @@ let prepare_code ~env ~res ~code_id code =
   if code_is_shared code
   then
     let closure, res = new_closure ~res code in
-    To_jsir_env.add_code env code_id (Shared closure), res
+    To_jsir_env.add_code env code_id (Shared { closure; code }), res
   else To_jsir_env.add_code env code_id (Instantiated code), res
 
 let code ~env ~res ~translate_body ~(closure : To_jsir_env.closure) code =

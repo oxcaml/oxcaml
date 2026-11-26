@@ -359,7 +359,7 @@ and apply_expr0 ~env ~res e =
     let args, res = To_jsir_shared.simples ~env ~res args in
     let f =
       match To_jsir_env.get_code_exn env code_id with
-      | Shared closure -> closure.var
+      | Shared { closure; code = _ } -> closure.var
       | Instantiated _ ->
         Misc.fatal_errorf
           "Missing callee for a direct call to code that depends on its \

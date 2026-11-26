@@ -131,8 +131,13 @@ type closure =
   }
 
 type code =
-  | Shared of closure
+  | Shared of
+      { closure : closure;
+        code : Code.t
+      }
       (** Translated once with a single closure reused across all
+          [Set_of_closures]. The code does not use its closure, but it can
+          project from other closures, such as the closure symbols of its
           [Set_of_closures]. *)
   | Instantiated of Code.t
       (** Translated afresh with a new closure for each [Set_of_closures]
