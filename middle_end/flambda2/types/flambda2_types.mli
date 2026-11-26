@@ -808,6 +808,8 @@ val prove_unique_fully_constructed_immutable_heap_block :
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
 
+val prove_is_null : Typing_env.t -> t -> bool proof_of_property
+
 (* Either a tagged integer or a null poitner. *)
 val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
 
