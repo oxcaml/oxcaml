@@ -2,17 +2,18 @@ The build preprocesses with [-as-pp], which is [-dump-ast -embed-errors]. [as_pp
 prints the result as source instead. Merlin and the compiler's [-ppx] run the driver
 with [-as-ppx], on a binary AST: [as_ppx] prints the result as source.
 
-These show the default, [Options.continue_after_exception = true]: when a rewriter
-raises, the error takes the place of the code the rewriter was to generate, and the
-other rewriters still run. With [-stop-after-exception], which drivers linking
-[ppxlib.runner] get, the first exception stops the driver instead (see the end).
+By default ([Options.continue_after_exception = false]), the first rewriter which
+raises stops the driver (see the end). These first pass [-continue-after-exception
+-no-check], upstream ppxlib's defaults: when a rewriter raises, the error takes the
+place of the code the rewriter was to generate, and the other rewriters still run.
 
-  $ as_pp() { ./raising_rewriters.exe -embed-errors -no-color -diff-cmd - "$@"; }
+  $ as_pp() { ./raising_rewriters.exe -embed-errors $EXC -no-color -diff-cmd - "$@"; }
   $ as_ppx() {
   >   ./raising_rewriters.exe -apply '' -no-check -dump-ast -o input.ast "$1" "$2" &&
-  >   ./raising_rewriters.exe -as-ppx input.ast output.ast &&
+  >   ./raising_rewriters.exe -as-ppx $EXC input.ast output.ast &&
   >   ./raising_rewriters.exe -apply '' -no-check -no-color "$1" output.ast
   > }
+  $ EXC='-continue-after-exception -no-check'
 
 When a deriver raises, its error takes the place of the code it was to generate.
 
@@ -122,19 +123,21 @@ extension was in.
   $ as_ppx -impl test.ml
   let y = ()
 
-With [-stop-after-exception], the driver stops at the first rewriter which raises, and
-reports its error with the code as it was before any rewriting.
+By default, the driver stops at the first rewriter which raises, and reports its error
+with the code as it was before any rewriting.
+
+  $ EXC=
 
   $ cat > test.ml <<EOF
   > type t = int [@@deriving raise]
   > EOF
-  $ as_pp -stop-after-exception test.ml
+  $ as_pp test.ml
   [%%ocaml.error "the deriver raised"]
   type t = int[@@deriving raise]
   $ cat > test.mli <<EOF
   > type t = int [@@deriving raise]
   > EOF
-  $ as_pp -stop-after-exception test.mli
+  $ as_pp test.mli
   [%%ocaml.error "the deriver raised"]
   type t = int[@@deriving raise]
 
@@ -147,7 +150,7 @@ correction.
   > [@@@end]
   > EOF
   $ rm -f test.ml.ppx-corrected
-  $ as_pp -stop-after-exception test.ml
+  $ as_pp test.ml
   [%%ocaml.error "the deriver raised"]
   type t = int[@@deriving_inline raise]
   let stale = ()
@@ -161,7 +164,7 @@ And a later pass doesn't lose the error.
   > let x = [%raise] [@@drop]
   > let y = ()
   > EOF
-  $ as_pp -stop-after-exception test.ml
+  $ as_pp test.ml
   [%%ocaml.error "the extension raised"]
   let x = [%raise ][@@drop ]
   let y = ()

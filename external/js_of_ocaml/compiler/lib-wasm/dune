@@ -15,4 +15,4 @@
    -open
    Oxcaml_private_yojson))
  (preprocess
-  (pps ppx_optcomp_light oxcaml_private_sedlex_ppx)))
+  (pps ppx_optcomp_light -no-check oxcaml_private_sedlex_ppx)))

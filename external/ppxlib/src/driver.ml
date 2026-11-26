@@ -1351,11 +1351,11 @@ let shared_args =
       " Enable checks on extension point only" );
     ( "-continue-after-exception",
       Arg.Set continue_after_exception,
-      " When embedding errors, carry on after a rewriter raises (default)" );
+      " When embedding errors, carry on after a rewriter raises" );
     ( "-stop-after-exception",
       Arg.Clear continue_after_exception,
       " When embedding errors, stop at the first rewriter which raises, and \
-       report its error with the code as it was before any rewriting" );
+       report its error with the code as it was before any rewriting (default)" );
     ( "-no-locations-check",
       Arg.Clear perform_locations_check,
       " Disable locations check only" );
