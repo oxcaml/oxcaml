@@ -75,8 +75,6 @@ val get_continuation_scope : t -> Scope.t
 
 val typing_env : t -> Flambda2_types.Typing_env.t
 
-val define_continuations : can_be_lifted:bool -> t -> Continuation.t list -> t
-
 val define_variable : t -> Bound_var.t -> Flambda_kind.t -> t
 
 val define_extra_variable : t -> Bound_var.t -> Flambda_kind.t -> t
@@ -301,15 +299,6 @@ val add_lifted_args_to_apply_cont : t -> Apply_cont.t -> Apply_cont.t
 val add_lifted_args_to_exn_continuation :
   t -> Exn_continuation.t -> Exn_continuation.t
 
-val must_inline : t -> bool
-
-val replay_history : t -> Replay_history.t
-
-val with_replay_history : (Replay_history.t * bool) option -> t -> t
-
-val record_inlining_decision :
-  apply:Apply_expr.t -> Call_site_inlining_decision_type.t -> t -> t
-
 val with_join_analysis :
   Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
 
@@ -321,10 +310,6 @@ val map_specialization_cost :
 val specialization_cost : t -> Specialization_cost.t
 
 val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
-
-val has_seen_a_non_liftable_continuation : t -> bool
-
-val set_has_seen_a_non_liftable_continuation : t -> t
 
 val is_cold : t -> bool
 

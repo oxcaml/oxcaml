@@ -298,19 +298,20 @@ let add_equations_on_params typing_env ~is_recursive ~params:params'
   in
   add_equations_on_params typing_env params param_types
 
-let compute_use_env_with_ids ?replay ~is_recursive ~params use =
+let compute_use_env_with_ids ~is_recursive ~params use =
   let add_or_meet_param_type typing_env =
     let param_types = U.arg_types use in
     add_equations_on_params typing_env ~is_recursive ~params ~param_types
   in
   let use_env =
-    let use_env = DE.with_replay_history replay (U.env_at_use use) in
-    let use_env = DE.define_parameters ~extra:false use_env ~params in
+    let use_env =
+      DE.define_parameters ~extra:false (U.env_at_use use) ~params
+    in
     DE.map_typing_env use_env ~f:add_or_meet_param_type
   in
   use_env, U.id use, U.use_kind use
 
-let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
+let compute_handler_env ?cut_after uses ~is_recursive ~env_at_fork
     ~consts_lifted_after_fork ~params =
   (* Augment the environment at each use with the parameter definitions and
      associated equations. *)
@@ -322,7 +323,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
          | Inlinable -> true
          | Non_inlinable _ -> false ->
     let use_env, _use_id, _use_kind =
-      compute_use_env_with_ids ?replay ~is_recursive ~params use
+      compute_use_env_with_ids ~is_recursive ~params use
     in
     (* There is only one use of the continuation and it is inlinable. No join
        calculations are required.
@@ -368,9 +369,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
     }
   | _ ->
     let use_envs_with_ids =
-      List.map
-        (compute_use_env_with_ids ?replay:None ~is_recursive ~params)
-        uses
+      List.map (compute_use_env_with_ids ~is_recursive ~params) uses
     in
     (* This is the general case.
 
@@ -378,8 +377,9 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
        overall makes things easier; the join operation can just discard any
        equation about a lifted constant (any such equation could not be
        materially more precise anyway). *)
-    let denv = DE.with_replay_history replay env_at_fork in
-    let denv = DE.add_lifted_constant_state denv consts_lifted_after_fork in
+    let denv =
+      DE.add_lifted_constant_state env_at_fork consts_lifted_after_fork
+    in
     let should_do_join =
       Flambda_features.join_points ()
       || match use_envs_with_ids with [] | [_] -> true | _ :: _ :: _ -> false
