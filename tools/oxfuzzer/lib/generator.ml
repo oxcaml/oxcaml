@@ -969,7 +969,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
     Gen.create (fun () ->
         let inner_ty = gen_ty nty in
         let binop =
-          Bin_op.ops_for_ty (Ty.Number inner_ty)
+          Bin_op.numeric_ops_for_ty (Ty.Number inner_ty)
           |> List.filter (fun (op : Bin_op.t) ->
               match op with
               | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right

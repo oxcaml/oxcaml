@@ -606,7 +606,7 @@ module Bin_op = struct
         Shift_right;
         Shift_right_logical ]
 
-  let ops_for_ty (ty : Ty.t) =
+  let numeric_ops_for_ty (ty : Ty.t) =
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty
@@ -614,7 +614,7 @@ module Bin_op = struct
       else integral_binops
     | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
     | Or_null _ | Arrow _ ->
-      Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
+      Misc.fatal_errorf "Bin_op.numeric_ops_for_ty: expected a numeric type"
 
   let compare_ops_for_ty (ty : Ty.t) =
     match ty with

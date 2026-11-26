@@ -251,7 +251,7 @@ module Bin_op : sig
     | Or
 
   (** Numeric operations returning [ty]. *)
-  val ops_for_ty : Ty.t -> t list
+  val numeric_ops_for_ty : Ty.t -> t list
 
   (** Comparisons of operands of type [ty], returning a boxed [int]. *)
   val compare_ops_for_ty : Ty.t -> t list
