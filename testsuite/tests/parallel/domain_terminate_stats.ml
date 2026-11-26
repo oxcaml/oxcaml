@@ -1,4 +1,8 @@
-(* TEST *)
+(* TEST
+ multicore;
+ { bytecode; }
+ { native; }
+*)
 
 let alloc_workload () =
   Array.init 10000 (fun _ -> String.make 100 'x') |> ignore
