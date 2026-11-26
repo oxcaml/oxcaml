@@ -73,6 +73,11 @@ let lphantom_block ~tag ~fields =
 
 let lphantom_optimised_out = Lphantom_optimised_out
 
+type successor =
+  { target : label;
+    fdo_annotation : Fdo_annotation.t
+  }
+
 (* N.B. [Branch_relaxation] relies on physical equality being precise on values
    of this type. *)
 type instruction =
@@ -100,9 +105,21 @@ and instruction_desc =
   | Llabel_for_jump_target of label
   | Llabel_for_dwarf of label
   | Lbranch of label
-  | Lcondbranch of Operation.test * label
-  | Lcondbranch3 of label option * label option * label option
-  | Lswitch of label array
+  | Lcondbranch of
+      { test : Operation.test;
+        taken : successor;
+        fallthrough_annotation : Fdo_annotation.t
+            (** The FDO counters of the edge to the next instruction. *)
+      }
+  | Lcondbranch3 of
+      { lt : successor option;
+        eq : successor option;
+        gt : successor option;
+        fallthrough_annotation : Fdo_annotation.t
+            (** The FDO counters of the edge to the next instruction, for the
+                outcomes without a jump. *)
+      }
+  | Lswitch of successor array
   | Lentertrap
   | Ladjust_stack_offset of { delta_bytes : int }
   | Lpushtrap of { lbl_handler : label }
@@ -111,10 +128,16 @@ and instruction_desc =
   | Lstackcheck of { max_frame_size_bytes : int }
 
 and call_operation =
-  | Lcall_ind
-  | Lcall_imm of { func : Cmm.symbol }
-  | Ltailcall_ind
-  | Ltailcall_imm of { func : Cmm.symbol }
+  | Lcall_ind of { callsite_counter : Fdo_counter.t option }
+  | Lcall_imm of
+      { func : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
+  | Ltailcall_ind of { callsite_counter : Fdo_counter.t option }
+  | Ltailcall_imm of
+      { func : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
   | Lextcall of
       { func : string;
         ty_res : Cmm.machtype;
@@ -132,16 +155,14 @@ and call_operation =
 
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _
-  | Lcall_op Ltailcall_ind
+  | Lcall_op (Ltailcall_ind _)
   | Lcall_op (Ltailcall_imm _)
   | Lepilogue_close ->
     false
-  | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _)
+  | Lcall_op (Lcall_ind _ | Lcall_imm _ | Lextcall _ | Lprobe _)
   | Lprologue | Lepilogue_open | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _
-  | Lop _ | Llabel_for_jump_target _ | Llabel_for_dwarf _
-  | Lcondbranch (_, _)
-  | Lcondbranch3 (_, _, _)
-  | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->
+  | Lop _ | Llabel_for_jump_target _ | Llabel_for_dwarf _ | Lcondbranch _
+  | Lcondbranch3 _ | Ladjust_stack_offset _ | Lpushtrap _ | Lstackcheck _ ->
     true
 
 type fundecl =
@@ -150,6 +171,7 @@ type fundecl =
     fun_body : instruction;
     fun_fast : bool;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     fun_tailrec_entry_point_label : label option;
     fun_contains_calls : bool;
     fun_num_stack_slots : int Stack_class.Tbl.t;

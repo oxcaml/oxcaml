@@ -72,6 +72,12 @@ module Reason : sig
     | Ssa_self_tail_call_to_jump
         (** The counter of a self tail call that [Ssa_tail_call] turns into a
             jump. *)
+    | Linear_branch_to_jump
+        (** The counters of the edges of a branch that is linearized to a jump
+            or a fallthrough. *)
+    | Linear_branch_relaxed
+        (** The counters of a conditional branch too far from its target, which
+            [Branch_relaxation] replaces by branches without counters. *)
 
   val to_string : t -> string
 end

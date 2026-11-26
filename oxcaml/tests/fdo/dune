@@ -118,6 +118,52 @@
  (action
   (diff ssa_counters.output ssa_counters.output.corrected)))
 
+; The counters on the machine edges of the terminators that [Cfg_to_linear] linearizes.
+
+(executable
+ (name cfg_to_linear_counters)
+ (modules cfg_to_linear_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   cfg_to_linear_counters.output.corrected
+   (run ./cfg_to_linear_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)
+ (action
+  (diff cfg_to_linear_counters.output cfg_to_linear_counters.output.corrected)))
+
+; The counters of the conditional branches that [Branch_relaxation] relaxes.
+
+(executable
+ (name branch_relaxation_counters)
+ (modules branch_relaxation_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   branch_relaxation_counters.output.corrected
+   (run ./branch_relaxation_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps branch_relaxation_counters.output branch_relaxation_counters.output.corrected)
+ (action
+  (diff branch_relaxation_counters.output branch_relaxation_counters.output.corrected)))
+
 ; The counters of the blocks that [Cfg_merge_blocks] merges.
 
 (executable
@@ -819,3 +865,128 @@
  (deps ssa.output ssa.output.corrected)
  (action
   (diff ssa.output ssa.output.corrected)))
+
+; The counters in Linear: none of the Cmm is lost through the Cfg passes apart
+; from the dropped ones, and none is added. A conditional branch has the
+; counters of its taken edge and of its fallthrough edge.
+
+(rule
+ (targets linear.output.corrected)
+ (deps linear.ml cfg.ml to_cmm.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p linear_cmm linear_linear)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_cmm/linear.cmx
+     linear.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dlinear
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_linear/linear.cmx
+     linear.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_cmm/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dlinear
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_linear/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_cmm/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dlinear
+     -dump-into-file
+     -color
+     never
+     -o
+     linear_linear/to_cmm.cmx
+     to_cmm.ml))
+   (with-stdout-to
+    linear.output.corrected
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      linear_cmm/linear.cmx.dump
+      linear_linear/linear.cmx.dump)
+     (run ./fdo_annotations.exe list linear_linear/linear.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      linear_cmm/cfg.cmx.dump
+      linear_linear/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list linear_linear/cfg.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      linear_cmm/to_cmm.cmx.dump
+      linear_linear/to_cmm.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps linear.output linear.output.corrected)
+ (action
+  (diff linear.output linear.output.corrected)))

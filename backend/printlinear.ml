@@ -23,14 +23,37 @@ open Linear
 
 let label ppf l = Format.fprintf ppf "L%a" Label.format l
 
+(* The FDO counters are printed as in Cmm dumps, when there are any. *)
+let callsite_counter ppf = function
+  | None -> ()
+  | Some counter ->
+    fprintf ppf " callsite_counter(%s)" (Fdo_counter.to_string counter)
+
+let fdo_annotation ~keyword ppf annotation =
+  if not (Fdo_annotation.is_empty annotation)
+  then fprintf ppf " %s%a" keyword Fdo_annotation.print annotation
+
+let successor ppf { target; fdo_annotation = annotation } =
+  fprintf ppf "%a%a" label target
+    (fdo_annotation ~keyword:"fdo_annotation")
+    annotation
+
+let fallthrough_annotation =
+  fdo_annotation ~keyword:"fallthrough_fdo_annotation"
+
 let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   let regs = Printreg.regs' ~print_reg in
   match op with
-  | Lcall_ind -> fprintf ppf "call %a" regs arg
-  | Lcall_imm { func } -> fprintf ppf "call \"%s\" %a" func.sym_name regs arg
-  | Ltailcall_ind -> fprintf ppf "tailcall %a" regs arg
-  | Ltailcall_imm { func } ->
-    fprintf ppf "tailcall \"%s\" %a" func.sym_name regs arg
+  | Lcall_ind { callsite_counter = counter } ->
+    fprintf ppf "call %a%a" regs arg callsite_counter counter
+  | Lcall_imm { func; callsite_counter = counter } ->
+    fprintf ppf "call \"%s\" %a%a" func.sym_name regs arg callsite_counter
+      counter
+  | Ltailcall_ind { callsite_counter = counter } ->
+    fprintf ppf "tailcall %a%a" regs arg callsite_counter counter
+  | Ltailcall_imm { func; callsite_counter = counter } ->
+    fprintf ppf "tailcall \"%s\" %a%a" func.sym_name regs arg callsite_counter
+      counter
   | Lextcall { func; alloc; _ } ->
     fprintf ppf "extcall \"%s\" %a%s" func regs arg
       (if alloc then "" else " (noalloc)")
@@ -83,32 +106,33 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     operation op i.arg ppf i.res
   | Lcall_op op ->
     (match op with
-    | Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _ ->
+    | Lcall_ind _ | Lcall_imm _ | Lextcall _ | Lprobe _ ->
       fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
-    | Ltailcall_imm _ | Ltailcall_ind -> ());
+    | Ltailcall_imm _ | Ltailcall_ind _ -> ());
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
   | Llabel_for_jump_target lbl -> fprintf ppf "%a:" label lbl
   | Llabel_for_dwarf lbl -> fprintf ppf "%a: (DWARF only label)" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
-  | Lcondbranch (tst, lbl) ->
-    fprintf ppf "if %a goto %a" (test tst) i.arg label lbl
-  | Lcondbranch3 (lbl0, lbl1, lbl2) ->
-    fprintf ppf "switch3 %a" reg i.arg.(0);
+  | Lcondbranch { test = tst; taken; fallthrough_annotation = annotation } ->
+    fprintf ppf "if %a goto %a%a" (test tst) i.arg successor taken
+      fallthrough_annotation annotation
+  | Lcondbranch3 { lt; eq; gt; fallthrough_annotation = annotation } ->
+    fprintf ppf "switch3 %a%a" reg i.arg.(0) fallthrough_annotation annotation;
     let case n = function
       | None -> ()
-      | Some lbl -> fprintf ppf "@,case %i: goto %a" n label lbl
+      | Some lbl -> fprintf ppf "@,case %i: goto %a" n successor lbl
     in
-    case 0 lbl0;
-    case 1 lbl1;
-    case 2 lbl2;
+    case 0 lt;
+    case 1 eq;
+    case 2 gt;
     fprintf ppf "@,endswitch"
-  | Lswitch lblv ->
+  | Lswitch successors ->
     fprintf ppf "switch %a" reg i.arg.(0);
-    for i = 0 to Array.length lblv - 1 do
-      fprintf ppf "case %i: goto %a" i label lblv.(i)
-    done;
+    Array.iteri
+      (fun i lbl -> fprintf ppf "@,case %i: goto %a" i successor lbl)
+      successors;
     fprintf ppf "@,endswitch"
   | Lentertrap -> fprintf ppf "enter trap"
   | Ladjust_stack_offset { delta_bytes } ->
@@ -134,4 +158,11 @@ let fundecl ppf f =
     then ""
     else " " ^ Debuginfo.to_string f.fun_dbg
   in
-  fprintf ppf "@[<v 2>%s:%s@,%a@]" f.fun_name dbg all_instr f.fun_body
+  let entry_annotation ppf entry_annotation =
+    if not (Fdo_annotation.With_body_hash.is_empty entry_annotation)
+    then
+      fprintf ppf " fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print
+        entry_annotation
+  in
+  fprintf ppf "@[<v 2>%s:%s%a@,%a@]" f.fun_name dbg entry_annotation
+    f.fun_fdo_entry_annotation all_instr f.fun_body

@@ -63,6 +63,12 @@ val lphantom_read_symbol_field :
 val lphantom_block :
   tag:int -> fields:Backend_var.t list -> phantom_defining_expr
 
+(** A jump target, with the FDO counters of the edge the jump takes. *)
+type successor =
+  { target : label;
+    fdo_annotation : Fdo_annotation.t
+  }
+
 type instruction =
   { mutable desc : instruction_desc;
     mutable next : instruction;
@@ -100,9 +106,21 @@ and instruction_desc =
   | Llabel_for_dwarf of label
       (** Only delimits DWARF ranges, never a jump target. *)
   | Lbranch of label
-  | Lcondbranch of Operation.test * label
-  | Lcondbranch3 of label option * label option * label option
-  | Lswitch of label array
+  | Lcondbranch of
+      { test : Operation.test;
+        taken : successor;
+        fallthrough_annotation : Fdo_annotation.t
+            (** The FDO counters of the edge to the next instruction. *)
+      }
+  | Lcondbranch3 of
+      { lt : successor option;
+        eq : successor option;
+        gt : successor option;
+        fallthrough_annotation : Fdo_annotation.t
+            (** The FDO counters of the edge to the next instruction, for the
+                outcomes without a jump. *)
+      }
+  | Lswitch of successor array
   | Lentertrap
   | Ladjust_stack_offset of { delta_bytes : int }
   | Lpushtrap of { lbl_handler : label }
@@ -110,11 +128,18 @@ and instruction_desc =
   | Lraise of Lambda.raise_kind
   | Lstackcheck of { max_frame_size_bytes : int }
 
+(* [callsite_counter] is the FDO counter of the call site. *)
 and call_operation =
-  | Lcall_ind
-  | Lcall_imm of { func : Cmm.symbol }
-  | Ltailcall_ind
-  | Ltailcall_imm of { func : Cmm.symbol }
+  | Lcall_ind of { callsite_counter : Fdo_counter.t option }
+  | Lcall_imm of
+      { func : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
+  | Ltailcall_ind of { callsite_counter : Fdo_counter.t option }
+  | Ltailcall_imm of
+      { func : Cmm.symbol;
+        callsite_counter : Fdo_counter.t option
+      }
   | Lextcall of
       { func : string;
         ty_res : Cmm.machtype;
@@ -150,6 +175,7 @@ type fundecl =
     fun_body : instruction;
     fun_fast : bool;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     fun_tailrec_entry_point_label : label option;
     fun_contains_calls : bool;
     fun_num_stack_slots : int Stack_class.Tbl.t;

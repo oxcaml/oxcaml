@@ -1,0 +1,19 @@
+Labels: near = 100, far = 101
+
+  if anon:I/0 != 0 goto L102
+  goto L101
+  L102:
+  if anon:I/0 == 0 goto L101
+  if anon:I/0 == 2 goto L100
+  if anon:I/0 <s 0 goto L100 fdo_annotation("Test.f":0:00000001:0:branch(5)) fallthrough_fdo_annotation("Test.f":0:00000001:0:branch(6))
+  L100:
+  (padding)
+  L101:
+  return anon:I/0
+
+linear_branch_relaxed: "Test.f":0:00000001:0:branch(0)
+linear_branch_relaxed: "Test.f":0:00000001:0:branch(1)
+linear_branch_relaxed: "Test.f":0:00000001:0:branch(2)
+linear_branch_relaxed: "Test.f":0:00000001:0:branch(3)
+linear_branch_relaxed: "Test.f":0:00000001:0:branch(4)
+lost:
