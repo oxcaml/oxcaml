@@ -201,7 +201,9 @@ let blockers_of_args (args : value array) =
       match Value.typ arg with
       | Val | Valx2 -> { blockers with end_region = true }
       | Addr -> { blockers with gc = true }
-      | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> blockers)
+      | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Float
+      | Float32 | Vec128 | Vec256 | Vec512 | Mask ->
+        blockers)
     { end_region = false; gc = false }
     args
 
