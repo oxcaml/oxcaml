@@ -1,0 +1,17 @@
+only in to_cmm_reaper.reaper.fl:
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(1)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(2)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(3)
+  "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(4)
+only in to_cmm_reaper.cmx.dump:
+to_cmm_reaper.cmx.dump:
+  entry: "To_cmm_reaper.side":0 body_hash:00000000
+  entry: "To_cmm_reaper.g":0 body_hash:3371523c
+  call: "To_cmm_reaper.g":0:3371523c:0:call
+  entry: "To_cmm_reaper.collapsed":0 body_hash:5f59ba30
+  call: "To_cmm_reaper.collapsed":0:5f59ba30:1:call
+dropped in to_cmm_reaper.cmx.dump:
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(1)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(2)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(3)
+  cmm_switch_collapsed: "To_cmm_reaper.collapsed":0:5f59ba30:0:branch(4)

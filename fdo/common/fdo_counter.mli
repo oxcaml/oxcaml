@@ -49,6 +49,11 @@
       callee (e.g. by an inlined functor application), the call site and its
       inlining context are appended to the copy context of the copy's counters.
 
+    A counter can be on several edges or calls of the compiled code, as long as
+    each execution of its point goes through only one of them (e.g. the cases of
+    a switch that share a handler, or the two calls of the inline fast path of
+    [caml_apply]). Its count is then the sum of theirs.
+
     Profiles must match across builds, so identities come from source scopes and
     numbering (see {!Fdo_counter_identity}). Function entries and module-level
     calls survive edits of function bodies, while interior positions do not. *)

@@ -34,6 +34,8 @@ module Reason = struct
     | Switch_to_single_arm
     | Switch_with_identical_arms
     | Switch_to_lookup_table
+    | Cmm_switch_collapsed
+    | Probe_handler_call
 
   let to_string = function
     | Inlined_call -> "inlined_call"
@@ -42,6 +44,8 @@ module Reason = struct
     | Switch_to_single_arm -> "switch_to_single_arm"
     | Switch_with_identical_arms -> "switch_with_identical_arms"
     | Switch_to_lookup_table -> "switch_to_lookup_table"
+    | Cmm_switch_collapsed -> "cmm_switch_collapsed"
+    | Probe_handler_call -> "probe_handler_call"
 end
 
 module Counter_map = Map.Make (Fdo_counter)

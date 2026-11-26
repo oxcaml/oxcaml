@@ -458,7 +458,8 @@ type operation =
         callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
-        returns : bool (* [true] is the conservative default. *)
+        returns : bool; (* [true] is the conservative default. *)
+        callsite_counter : Fdo_counter.t option
       }
   | Cextcall of
       { func : string;
@@ -654,6 +655,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     fun_ret_type : machtype
   }
 

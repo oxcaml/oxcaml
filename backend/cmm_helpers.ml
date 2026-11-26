@@ -2660,8 +2660,8 @@ let send_function_name arity result (mode : Cmx_format.return_mode) =
   global_symbol ~ty:typ_code_pointer
     ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
-let call_cached_method obj tag cache pos args args_type result (apos, mode)
-    ~returns dbg =
+let call_cached_method ~callsite_counter obj tag cache pos args args_type result
+    (apos, mode) ~returns dbg =
   Compilenv.need_send_fun
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
@@ -2677,7 +2677,8 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode)
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
@@ -3489,9 +3490,15 @@ let set_mask = set_chunk Word_mask
 
 let opaque ~ty e dbg = Cop (Copaque ty, [e], dbg)
 
+(* An actual switch, or the expression it was simplified to if it no longer
+   branches to its actions. *)
+type made_switch =
+  | Branching of expression
+  | Collapsed of expression
+
 (* Build an actual switch (ie jump table) *)
 
-let make_switch arg cases actions dbg =
+let make_switch arg cases actions dbg : made_switch =
   let extract_uconstant = function
     (* Constant integers loaded from a table should end in 1, so that Cload
        never produces untagged integers *)
@@ -3586,10 +3593,10 @@ let make_switch arg cases actions dbg =
       Classify.Init actions
   with
   | Init -> Misc.fatal_error "Empty switch"
-  | Not_constant -> Cswitch (arg, cases, actions, dbg)
-  | Constant_rev items_rev -> transl_constant_switch ~items_rev
+  | Not_constant -> Branching (Cswitch (arg, cases, actions, dbg))
+  | Constant_rev items_rev -> Collapsed (transl_constant_switch ~items_rev)
   | Jump_rev (lbl, items_rev) ->
-    Cexit (lbl, [transl_constant_switch ~items_rev], [])
+    Collapsed (Cexit (lbl, [transl_constant_switch ~items_rev], []))
 
 module SArgBlocks = struct
   type primitive = operation
@@ -3644,10 +3651,11 @@ module SArgBlocks = struct
 
   let make_switch dbg (_ : layout) arg cases actions =
     let annots =
-      Branch_annotations.fork_point
-        (Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list)
+      Array.map (fun (_, _, annots) -> annots) actions |> Array.to_list
     in
-    make_switch arg cases actions dbg, dbg, annots
+    match make_switch arg cases actions dbg with
+    | Branching expr -> expr, dbg, Branch_annotations.fork_point annots
+    | Collapsed expr -> expr, dbg, Branch_annotations.join_point annots
 
   let bind arg body = bind_with_annotations "switcher" arg body
 
@@ -3720,18 +3728,20 @@ let transl_switch_clambda loc arg index cases =
       this_act := act)
   done;
   inters := (0, !this_high, !this_act) :: !inters;
-  match !inters with
-  | [_] ->
-    let case, _, _ = cases.(0) in
-    case
-  | inters ->
-    bind "switcher" arg (fun a ->
-        let body, _, _ =
+  let case, _, annots =
+    match !inters with
+    | [_] -> (
+      match (store.Switch.act_get_shared ()).(0) with
+      | Single case | Shared case -> case)
+    | inters ->
+      bind_with_annotations "switcher" arg (fun a ->
           SwitcherBlocks.zyva loc loc
             (0, n_index - 1)
-            a (Array.of_list inters) store
-        in
-        body)
+            a (Array.of_list inters) store)
+  in
+  Fdo_dropped_counters.register ~reason:Cmm_switch_collapsed
+    (Branch_annotations.fdo_annotation annots);
+  case
 
 let split_arity_for_apply arity args =
   (* Decides whether a caml_applyN needs to be split. If N <= max_arity, then
@@ -3744,8 +3754,8 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode
-    ~returns dbg =
+let call_caml_apply ~callsite_counter extended_ty extended_args_type mut clos
+    args pos mode ~returns dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
   let ty = Extended_machtype.to_machtype extended_ty in
@@ -3753,7 +3763,13 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
     let sym = apply_function_sym extended_args_type extended_ty mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
     Cop
-      ( Capply { result_type = ty; region = pos; callees = Some [sym]; returns },
+      ( Capply
+          { result_type = ty;
+            region = pos;
+            callees = Some [sym];
+            returns;
+            callsite_counter
+          },
         cargs,
         dbg )
   in
@@ -3785,7 +3801,8 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
                       { result_type = ty;
                         region = pos;
                         callees = None;
-                        returns
+                        returns;
+                        callsite_counter
                       },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
@@ -3813,7 +3830,8 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
            Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) )),
       dbg () )
 
-let apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg =
+let apply_or_call_caml_apply ~callsite_counter result arity mut clos args pos
+    mode ~returns dbg =
   match arity with
   | [_] ->
     bind "fun" clos (fun clos ->
@@ -3822,35 +3840,42 @@ let apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg =
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
                 callees = None;
-                returns
+                returns;
+                callsite_counter
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
-  | _ -> call_caml_apply result arity mut clos args pos mode ~returns dbg
+  | _ ->
+    call_caml_apply ~callsite_counter result arity mut clos args pos mode
+      ~returns dbg
 
-let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
-    mode ~returns dbg =
+let rec might_split_call_caml_apply ?old_region ~callsite_counter result arity
+    mut clos args pos mode ~returns dbg =
   match split_arity_for_apply arity args with
   | (arity, args), None -> (
     match old_region with
     | None ->
-      apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg
+      apply_or_call_caml_apply ~callsite_counter result arity mut clos args pos
+        mode ~returns dbg
     | Some old_region ->
       maybe_reset_current_region ~dbg:placeholder_dbg
         ~body_tail:
-          (apply_or_call_caml_apply result arity mut clos args pos mode ~returns
-             dbg)
+          (apply_or_call_caml_apply ~callsite_counter result arity mut clos args
+             pos mode ~returns dbg)
         ~body_nontail:
-          (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Maybe_alloc_stack ~returns dbg)
+          (apply_or_call_caml_apply ~callsite_counter result arity mut clos args
+             Rc_normal Cmx_format.Maybe_alloc_stack ~returns dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
-        (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Maybe_alloc_stack ~returns:true dbg) (fun clos ->
-          might_split_call_caml_apply ?old_region result arity' mut clos args'
-            pos mode ~returns dbg)
+        (call_caml_apply ~callsite_counter [| Val |] arity mut clos args
+           Rc_normal Cmx_format.Maybe_alloc_stack ~returns:true dbg)
+        (fun clos ->
+          (* Only the first of the calls has the counter, as for an
+             over-application in Flambda. *)
+          might_split_call_caml_apply ?old_region ~callsite_counter:None result
+            arity' mut clos args' pos mode ~returns dbg)
     in
     (* When splitting [caml_applyM] into [caml_applyN] and [caml_applyK] it is
        possible for [caml_applyN] to allocate on the local stack. If we are not
@@ -3869,15 +3894,17 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
         (fun region -> body (Some region))
     | _ -> body old_region)
 
-let generic_apply mut clos args args_type result (pos, mode) ~returns dbg =
-  might_split_call_caml_apply result args_type mut clos args pos mode ~returns
-    dbg
+let generic_apply ~callsite_counter mut clos args args_type result (pos, mode)
+    ~returns dbg =
+  might_split_call_caml_apply ~callsite_counter result args_type mut clos args
+    pos mode ~returns dbg
 
-let send kind met obj args args_type result akind ~returns dbg =
+let send ~callsite_counter kind met obj args args_type result akind ~returns dbg
+    =
   let call_met obj args args_type clos =
     (* met is never a simple expression, so it never gets turned into an
        Immutable load *)
-    generic_apply Asttypes.Mutable clos (obj :: args)
+    generic_apply ~callsite_counter Asttypes.Mutable clos (obj :: args)
       (Extended_machtype.typ_val :: args_type)
       result akind ~returns dbg
   in
@@ -3886,8 +3913,8 @@ let send kind met obj args args_type result akind ~returns dbg =
       | Self, _, _ ->
         bind "met" (lookup_label obj met dbg) (call_met obj args args_type)
       | Cached, cache :: pos :: args, _ :: _ :: args_type ->
-        call_cached_method obj met cache pos args args_type result akind
-          ~returns dbg
+        call_cached_method ~callsite_counter obj met cache pos args args_type
+          result akind ~returns dbg
       | _ -> bind "met" (lookup_tag obj met dbg) (call_met obj args args_type))
 
 (*
@@ -4050,7 +4077,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
               { result_type = result;
                 region = Rc_normal;
                 callees = None;
-                returns = true
+                returns = true;
+                callsite_counter = None
               },
             (* The code pointer and closure info of a closure are write-once;
                reading them immutably is correct and lets the debugger describe
@@ -4077,7 +4105,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 { result_type = typ_val;
                   region = Rc_normal;
                   callees = None;
-                  returns = true
+                  returns = true;
+                  callsite_counter = None
                 },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
@@ -4114,7 +4143,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 { result_type = result;
                   region = Rc_normal;
                   callees = None;
-                  returns = true
+                  returns = true;
+                  callsite_counter = None
                 },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
@@ -4200,6 +4230,7 @@ let send_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4217,6 +4248,7 @@ let apply_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4257,7 +4289,8 @@ let tuplify_function arity return =
               { result_type = return;
                 region = Rc_normal;
                 callees = None;
-                returns = true
+                returns = true;
+                callsite_counter = None
               },
             (* The closure code pointer is write-once; see
                [apply_function_body]. *)
@@ -4267,6 +4300,7 @@ let tuplify_function arity return =
             dbg () );
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
       fun_poll = Default_poll;
       fun_ret_type = return
     }
@@ -4427,7 +4461,8 @@ let rec make_curry_apply result narity args_type args clos n =
           { result_type = result;
             region = Rc_normal;
             callees = None;
-            returns = true
+            returns = true;
+            callsite_counter = None
           },
         (* Code pointer and chain links of a partial-application closure are
            write-once; reading them immutably lets the debugger describe the
@@ -4469,6 +4504,7 @@ let final_curry_function nlocal arity result =
           last_clos (narity - 1);
       fun_codegen_options = [];
       fun_dbg;
+      fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
       fun_poll = Default_poll;
       fun_ret_type = result
     }
@@ -4531,6 +4567,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                 dbg () );
           fun_codegen_options = [];
           fun_dbg;
+          fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
           fun_poll = Default_poll;
           fun_ret_type = typ_val
         }
@@ -4564,6 +4601,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                    clos (num + 1);
                fun_codegen_options = [];
                fun_dbg;
+               fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
                fun_poll = Default_poll;
                fun_ret_type = result
              }
@@ -4883,6 +4921,7 @@ let fail_if_called_indirectly_function () =
       fun_args = [];
       fun_body;
       fun_codegen_options = [];
+      fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
       fun_poll = Default_poll;
       fun_dbg = Debuginfo.none;
       fun_ret_type =
@@ -4953,7 +4992,8 @@ let entry_point namelist =
               { result_type = typ_void;
                 region = Rc_normal;
                 callees = None;
-                returns = true
+                returns = true;
+                callsite_counter = None
               },
             [Cop (mk_load_immut Word_code_pointer, [f], dbg ())],
             dbg () ),
@@ -5015,6 +5055,7 @@ let entry_point namelist =
         fun_body = Csequence (body, cconst_int 1);
         fun_codegen_options = [Reduce_code_size; Use_linscan_regalloc];
         fun_dbg;
+        fun_fdo_entry_annotation = Fdo_annotation.With_body_hash.empty;
         fun_poll = Default_poll;
         fun_ret_type = typ_val
       } ]
@@ -5495,18 +5536,25 @@ let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
 let load ~dbg memory_chunk mutability ~addr =
   Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)
 
-let direct_call ~dbg ~returns ty pos f_code_sym args =
+let direct_call ~dbg ~returns ~callsite_counter ty pos f_code_sym args =
   Cop
     ( Capply
-        { result_type = ty; region = pos; callees = Some [f_code_sym]; returns },
+        { result_type = ty;
+          region = pos;
+          callees = Some [f_code_sym];
+          returns;
+          callsite_counter
+        },
       Cconst_symbol (f_code_sym, dbg) :: args,
       dbg )
 
-let indirect_call ~dbg ~returns ty pos alloc_mode f args_type args =
-  might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
-    alloc_mode ~returns dbg
+let indirect_call ~dbg ~returns ~callsite_counter ty pos alloc_mode f args_type
+    args =
+  might_split_call_caml_apply ~callsite_counter ty args_type Asttypes.Mutable f
+    args pos alloc_mode ~returns dbg
 
-let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
+let indirect_full_call ~dbg ~returns ~callsite_counter ty pos f ~callees
+    args_type args =
   (* Use a variable to avoid duplicating the cmm code of the closure [f]. *)
   let v = Backend_var.create_local "*closure*" in
   let v' = Backend_var.With_provenance.create v in
@@ -5528,7 +5576,8 @@ let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
              { result_type = Extended_machtype.to_machtype ty;
                region = pos;
                callees;
-               returns
+               returns;
+               callsite_counter
              },
            (fun_ptr :: args) @ [Cvar v],
            dbg ))
@@ -5635,13 +5684,14 @@ let cfunction decl = Cmm.Cfunction decl
 
 let cdata d = Cmm.Cdata d
 
-let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll
-    fun_ret_type =
+let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg
+    ~fdo_entry_annotation fun_poll fun_ret_type =
   { Cmm.fun_name;
     fun_args;
     fun_body;
     fun_codegen_options;
     fun_dbg;
+    fun_fdo_entry_annotation = fdo_entry_annotation;
     fun_poll;
     fun_ret_type
   }
@@ -5907,7 +5957,8 @@ let perform ~dbg ~returns eff =
         { result_type = typ_val;
           region = Rc_nontail;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
@@ -5919,7 +5970,8 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [ Cconst_symbol
           (Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack", dbg);
@@ -5948,7 +6000,8 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [ Cconst_symbol
           (Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack", dbg);
@@ -5981,7 +6034,8 @@ let continue ~dbg ~cont ~value ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
@@ -5993,7 +6047,8 @@ let discontinue ~dbg ~cont ~exn ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
@@ -6007,7 +6062,8 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
@@ -6021,7 +6077,8 @@ let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [sym];
-          returns
+          returns;
+          callsite_counter = None
         },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )
