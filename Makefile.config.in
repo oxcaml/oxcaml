@@ -76,6 +76,7 @@ CPP=@CPP@
 
 ### How to invoke ar
 ARCMD=@AR@
+AR_SUPPORTS_DETERMINISTIC_ARCHIVES=@ar_supports_deterministic_archives@
 
 ### Extension of object files
 O=@OBJEXT@

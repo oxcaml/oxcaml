@@ -1352,7 +1352,9 @@ stdlib/dune_rules/build_settings.txt:
 	echo runtime_sources.native; printf ' %s\n' $(runtime_NATIVE_C_SOURCES) $(runtime_ASM_OBJECTS:.$(O)=.S); \
 	echo cc; printf ' %s\n' $(CC) -c $(CFLAGS) $(runtime_CPPFLAGS) $(CPPFLAGS); \
 	echo aspp; printf ' %s\n' $(ASPP) $(OC_ASPPFLAGS); \
-	echo ar; printf ' %s\n' $(AR); \
+	echo ar; printf ' %s\n' $(ARCMD); \
+	echo arflags; printf ' %s\n' \
+	  rc$(if $(filter true,$(AR_SUPPORTS_DETERMINISTIC_ARCHIVES)),D); \
 	echo cflags.byte; printf ' %s\n' $(OC_BYTECODE_CFLAGS) $(OC_BYTECODE_CPPFLAGS); \
 	echo cflags.native; printf ' %s\n' $(OC_NATIVE_CFLAGS) $(OC_NATIVE_CPPFLAGS); \
 	echo cflags.debug; printf ' %s\n' -DDEBUG; \

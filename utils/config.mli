@@ -416,6 +416,10 @@ val poll_insertion : bool
 val ar_supports_response_files: bool
 (** Whether ar supports @FILE arguments. *)
 
+val ar_supports_deterministic_archives: bool
+(** Whether ar supports the D modifier, which records zero for the timestamp,
+    uid and gid of each member and a fixed mode. *)
+
 val no_stack_checks : bool
 (** [true] if stack checks are disabled. *)
 

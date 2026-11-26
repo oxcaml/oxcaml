@@ -89,6 +89,7 @@ let host = "zinc-boot-ocaml"
 let target = host
 let systhread_supported = false
 let flexdll_dirs = []
+let ar_supports_deterministic_archives = false
 let ar_supports_response_files = true
 let shebangscripts = false
 

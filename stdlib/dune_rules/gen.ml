@@ -404,13 +404,13 @@ let write_runtime_dune ppf =
       match variant, mode with
       | (`Normal|`Debug|`PIC) as variant, `Byte ->
          "libcamlrun" ^ variant_suff ~variant ^ ".a",
-         setting "ar", ["rc"], []
+         setting "ar", setting "arflags", []
       | (`Normal|`Debug|`PIC) as variant, `Native ->
          "libasmrun" ^ variant_suff ~variant ^ ".a",
-         setting "ar", ["rc"], []
+         setting "ar", setting "arflags", []
       | `Zstd, _ ->
          "libcomprmarsh.a",
-         setting "ar", ["rc"], []
+         setting "ar", setting "arflags", []
       | `Shared, `Byte ->
          "libcamlrun_shared.so",
          setting "mkdll", ["-o"], setting "bytecclibs"

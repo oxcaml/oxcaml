@@ -493,6 +493,7 @@ AC_SUBST([ocaml_libdir_boot])
 AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
+AC_SUBST([ar_supports_deterministic_archives])
 AC_SUBST([target_bindir])
 AC_SUBST([target_libdir_is_relative])
 AC_SUBST([srcdir_abs])
@@ -1128,13 +1129,19 @@ AS_CASE([$target],
       mkexe_via_cc_extra_cmd=' && $(call MERGEMANIFESTEXE,$(1))'
       libext=lib
       AR=""
+      ar_supports_deterministic_archives=false
       AS_IF([test "$target_cpu" = "x86_64" ],
         [machine="-machine:AMD64 "],
         [machine=""])
       mklib="link -lib -nologo $machine /out:\$(1) \$(2)"
     ],
   [
-    mklib="rm -f \$(1) && ${AR} rc \$(1) \$(2)"
+    OCAML_AR_SUPPORTS_DETERMINISTIC_ARCHIVES
+    AS_IF([test x"$ocaml_cv_prog_ar_deterministic" = xyes],
+      [ar_supports_deterministic_archives=true
+      mklib="rm -f \$(1) && ${AR} rcD \$(1) \$(2)"],
+      [ar_supports_deterministic_archives=false
+      mklib="rm -f \$(1) && ${AR} rc \$(1) \$(2)"])
   ])
 
 ## Find vendor of the C compiler
