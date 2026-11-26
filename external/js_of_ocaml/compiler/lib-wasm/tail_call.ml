@@ -67,7 +67,7 @@ let rec instruction ~no_tail_call ~tail i =
   | Unreachable
   | Event _ -> i
 
-and instructions ~no_tail_call ~tail l =
+and[@tail_mod_cons] instructions ~no_tail_call ~tail l =
   match l with
   | [] -> []
   | [ i ] -> [ instruction ~no_tail_call ~tail i ]
