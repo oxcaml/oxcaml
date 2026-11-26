@@ -137,7 +137,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
     ~uacc_after_upwards_traversal =
   let lifted_consts_after_this_function =
-    (* Subtle point: the uacc may haveslightly more lifted constants than the
+    (* Subtle point: the uacc may have slightly more lifted constants than the
        dacc (e.g. switch blocks are added on the upwards path), so we need to
        look up the lifted constants from the uacc and not the dacc. *)
     match UA.lifted_constants uacc_after_upwards_traversal with
