@@ -83,7 +83,7 @@ module type Many = sig
 end
 [%%expect{|
 module type Many =
-  sig val many : 'a @ 'p -> 'b @ 'o -> 'c @ 'n -> unit @ 'm end
+  sig val many : 'a @ 'm -> 'b @ 'n -> 'c @ 'o -> unit @ 'p end
 |}]
 
 module M_many : Many = struct
@@ -100,7 +100,7 @@ end
 module type Apply =
   sig
     val apply :
-      ('a @ [> 'n] -> 'b @ [< 'm]) @ 'o -> 'a @ [< 'n] -> 'b @ [> 'm]
+      ('a @ [> 'm] -> 'b @ [< 'n]) @ 'o -> 'a @ [< 'm] -> 'b @ [> 'n]
   end
 |}]
 
@@ -113,7 +113,7 @@ module type Bare_vars_3 = sig
 end
 [%%expect{|
 module type Bare_vars_3 =
-  sig val f : 'a @ 'p -> 'b @ 'o -> 'c @ 'n -> unit @ 'm end
+  sig val f : 'a @ 'm -> 'b @ 'n -> 'c @ 'o -> unit @ 'p end
 |}]
 
 module type Bare_vars_4 = sig
@@ -121,7 +121,7 @@ module type Bare_vars_4 = sig
 end
 [%%expect{|
 module type Bare_vars_4 =
-  sig val f : 'a @ 'q -> 'b @ 'p -> 'c @ 'o -> 'd @ 'n -> unit @ 'm end
+  sig val f : 'a @ 'm -> 'b @ 'n -> 'c @ 'o -> 'd @ 'p -> unit @ 'q end
 |}]
 
 (* currying in argument position *)
@@ -212,16 +212,16 @@ Error: Signature mismatch:
        is not included in
          val f : (int @ [> 'm] -> int @ 'n -> int @ [< 'm]) @ local -> unit
        The type
-         "(int @ 'o -> (int @ 'n -> int @ [< 'm]) @ [< global]) @ 'p ->
+         "(int @ 'm -> (int @ 'n -> int @ [< 'o]) @ [< global]) @ 'p ->
          unit @ [> dynamic]"
        is not compatible with the type
-         "(int @ [< past('q) > 'm] ->
-          (int @ 'n -> int @ [< 'm]) @ [> past('q) | local nonportable unforkable yielding stateful]) @ local ->
+         "(int @ [< past('q) > 'o] ->
+          (int @ 'n -> int @ [< 'o]) @ [> past('q) | local nonportable unforkable yielding stateful]) @ local ->
          unit"
-       Type "int @ 'o -> (int @ 'n -> int @ [< 'm]) @ [< global]"
+       Type "int @ 'm -> (int @ 'n -> int @ [< 'o]) @ [< global]"
        is not compatible with type
-         "int @ [< past('q) > 'm] ->
-         (int @ 'n -> int @ [< 'm]) @ [> past('q) | local nonportable unforkable yielding stateful]"
+         "int @ [< past('q) > 'o] ->
+         (int @ 'n -> int @ [< 'o]) @ [> past('q) | local nonportable unforkable yielding stateful]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -276,9 +276,9 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ local
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'p & past('o)] -> ('b @ [< past('n)] -> 'a @ [> 'p]) @ local"
+         "'a @ [< 'p & past('n)] -> ('b @ [< past('o)] -> 'a @ [> 'p]) @ local"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -315,11 +315,11 @@ Error: Signature mismatch:
            'a @ [< 'm > aliased] ->
            ('b @ 'n -> 'a @ [> 'm | aliased]) @ local
        The type
-         "'a @ [< 'm > past('o) | aliased] ->
-         'b @ [> past('n)] -> 'a @ [> 'm | aliased]"
+         "'a @ [< 'm > past('n) | aliased] ->
+         'b @ [> past('o)] -> 'a @ [> 'm | aliased]"
        is not compatible with the type
-         "'a @ [< 'p & past('o) > aliased] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p | aliased]) @ local"
+         "'a @ [< 'p & past('n) > aliased] ->
+         ('b @ [< past('o)] -> 'a @ [> 'p | aliased]) @ local"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -351,10 +351,10 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst : 'a @ [< 'm & many] -> ('b @ 'n -> 'a @ [> 'm]) @ local
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'p & past('o) & many] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ local"
+         "'a @ [< 'p & past('n) & many] ->
+         ('b @ [< past('o)] -> 'a @ [> 'p]) @ local"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -408,9 +408,9 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ once
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'p & past('o)] -> ('b @ [< past('n)] -> 'a @ [> 'p]) @ once"
+         "'a @ [< 'p & past('n)] -> ('b @ [< past('o)] -> 'a @ [> 'p]) @ once"
        The return mode was expected to be "global"
        because it crosses with something but is "local"
 |}]
@@ -442,10 +442,10 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ once
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'p & past('o) & global] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ once"
+         "'a @ [< 'p & past('n) & global] ->
+         ('b @ [< past('o)] -> 'a @ [> 'p]) @ once"
        The return mode was expected to be "forkable" but is "unforkable"
 |}]
 
@@ -477,9 +477,9 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'p & past('o)] -> 'b @ [< past('n)] -> 'a @ [> 'p]"
+         "'a @ [< 'p & past('n)] -> 'b @ [< past('o)] -> 'a @ [> 'p]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -491,7 +491,7 @@ end
 [%%expect{|
 module type Explicit_curry_bound =
   sig
-    val fst : 'a @ [< 'n & 'm] -> ('b @ 'o -> 'a @ [> 'n]) @ [> 'm | local]
+    val fst : 'a @ [< 'm & 'n] -> ('b @ 'o -> 'a @ [> 'm]) @ [> 'n | local]
   end
 |}]
 
@@ -512,11 +512,11 @@ Error: Signature mismatch:
          val fst : 'a @ [< 'm] -> 'b @ 'n -> 'a @ [> 'm]
        is not included in
          val fst :
-           'a @ [< 'n & 'm] -> ('b @ 'o -> 'a @ [> 'n]) @ [> 'm | local]
-       The type "'a @ [< 'm > past('o)] -> 'b @ [> past('n)] -> 'a @ [> 'm]"
+           'a @ [< 'm & 'n] -> ('b @ 'o -> 'a @ [> 'm]) @ [> 'n | local]
+       The type "'a @ [< 'm > past('n)] -> 'b @ [> past('o)] -> 'a @ [> 'm]"
        is not compatible with the type
-         "'a @ [< 'q & 'p & past('o)] ->
-         ('b @ [< past('n)] -> 'a @ [> 'q]) @ [> 'p | local]"
+         "'a @ [< 'p & 'q & past('n)] ->
+         ('b @ [< past('o)] -> 'a @ [> 'p]) @ [> 'q | local]"
        The return mode was expected to be "many" but is "once"
 |}]
 
@@ -529,7 +529,7 @@ end
 [%%expect{|
 module type Explicit_curry_base =
   sig
-    val f : 'a @ [< 'm] -> ('b @ 'o -> 'c @ 'n -> 'a @ [> 'm]) @ local once
+    val f : 'a @ [< 'm] -> ('b @ 'n -> 'c @ 'o -> 'a @ [> 'm]) @ local once
   end
 |}]
 

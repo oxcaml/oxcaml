@@ -35,7 +35,7 @@ module type Const = sig
   val const : 'a @ 'm -> unit @ 'n
 end
 [%%expect{|
-module type Const = sig val const : 'a @ 'n -> unit @ 'm end
+module type Const = sig val const : 'a @ 'm -> unit @ 'n end
 |}]
 
 module M_const : Const = struct
@@ -64,9 +64,9 @@ Error: Signature mismatch:
        Values do not match:
          val const : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
-         val const : 'a @ 'n -> unit @ 'm
+         val const : 'a @ 'm -> unit @ 'n
        The type "'a @ [< 'm] -> 'a @ [> 'm]" is not compatible with the type
-         "'a @ 'o -> unit @ 'n"
+         "'a @ 'n -> unit @ 'o"
        Type "'a" is not compatible with type "unit"
 |}]
 
@@ -79,7 +79,7 @@ module type Shared = sig
 end
 [%%expect{|
 module type Shared =
-  sig val shared : 'a @ [< 'o > 'n] -> 'b @ [< 'n > 'o] -> unit @ 'm end
+  sig val shared : 'a @ [< 'm > 'n] -> 'b @ [< 'n > 'm] -> unit @ 'o end
 |}]
 
 (* Bounds do not need a counterpart *)
@@ -88,7 +88,7 @@ module type No_counterpart = sig
   val f : 'a @ [< 'm] -> 'b @ 'n
 end
 [%%expect{|
-module type No_counterpart = sig val f : 'a @ 'n -> 'b @ 'm end
+module type No_counterpart = sig val f : 'a @ 'm -> 'b @ 'n end
 |}]
 
 (* Bounds are not restricted by variance *)
@@ -138,7 +138,7 @@ module type Combined = sig
   val f : 'a @ [< 'm > 'n] -> 'a @ [< 'n > 'm]
 end
 [%%expect{|
-module type Combined = sig val f : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] end
+module type Combined = sig val f : 'a @ [< 'm > 'n] -> 'a @ [< 'n > 'm] end
 |}]
 
 (* notice how the [contended] lower bound propagates to the result:

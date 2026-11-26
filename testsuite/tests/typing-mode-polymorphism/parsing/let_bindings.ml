@@ -51,7 +51,7 @@ val j :
 
 let k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = fun x -> x
 [%%expect{|
-val k : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] = <fun>
+val k : 'a @ [< 'm > 'n] -> 'a @ [< 'n > 'm] = <fun>
 |}, Principal{|
 val k :
   'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
