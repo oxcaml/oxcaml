@@ -270,11 +270,7 @@ let import_compilation_unit t compilation_unit =
 let add_var_alias_exn t ~bound_var ~defining_var =
   if Jsir.Var.Map.mem bound_var t.var_aliases
   then
-    Misc.fatal_errorf
-      "JSIR variable %a is bound twice. This usually means that a function or \
-       value slot appears in more than one set of closures, which the JSIR \
-       translation does not support."
-      Jsir.Var.print bound_var;
+    Misc.fatal_errorf "JSIR variable %a is bound twice" Jsir.Var.print bound_var;
   { t with var_aliases = Jsir.Var.Map.add bound_var defining_var t.var_aliases }
 
 type var_binding =

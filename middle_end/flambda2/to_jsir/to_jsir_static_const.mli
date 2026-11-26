@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Jsoo_imports.Import
+
 (** Bind a fresh variable to the result of [Static_const.t], and map the symbol
     to this new variable in the environment, for "block-like" constants (i.e.
     not [Set_of_closures]).
@@ -63,24 +65,27 @@ val initialise_block_like :
   Static_const.t ->
   To_jsir_result.t
 
-(** Prepare a static block of code to be translated: reserve its address and
-    parameter variables, and add them and any used value or function slots to
-    the environment. This does not emit any instructions (see [code_closure]).
-*)
+(** Register a static block of code in the environment without emitting
+    instructions. Reserves a single closure if the code is [To_jsir_env.Shared],
+    and otherwise stores the [Code.t] as [To_jsir_env.Instantiated]. *)
 val prepare_code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
   code_id:Code_id.t ->
-  Flambda.function_params_and_body Code0.t ->
+  Code.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** If the code does not depend on its closure, bind its shared closure (see
-    [To_jsir_env.code_id]) in the current block; otherwise, do nothing. The code
-    must have been prepared with [prepare_code]. *)
-val code_closure :
-  env:To_jsir_env.t -> res:To_jsir_result.t -> Code_id.t -> To_jsir_result.t
+(** Reserve a fresh block address, parameter variables, and closure variable for
+    a closure of the given code. The caller must later translate its body with
+    [code] and bind its variable to [closure_expr]. *)
+val new_closure :
+  res:To_jsir_result.t -> Code.t -> To_jsir_env.closure * To_jsir_result.t
 
-(** Translate a static block of code. *)
+val closure_expr : To_jsir_env.closure -> Jsir.expr
+
+val closure_loc : Code.t -> Parse_info.t option
+
+(** Translate [code] into the block reserved by [closure]. *)
 val code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
@@ -89,6 +94,6 @@ val code :
     res:To_jsir_result.t ->
     Flambda.expr ->
     To_jsir_env.t * To_jsir_result.t) ->
-  code_id:Code_id.t ->
-  Flambda.function_params_and_body Code0.t ->
-  To_jsir_env.t * To_jsir_result.t
+  closure:To_jsir_env.closure ->
+  Code.t ->
+  To_jsir_result.t

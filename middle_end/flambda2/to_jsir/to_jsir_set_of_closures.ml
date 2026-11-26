@@ -28,9 +28,13 @@
 
 open! Jsoo_imports.Import
 
-type initialisation =
-  { value_slot_bindings : To_jsir_result.var_binding list;
-    closures : To_jsir_shared.expr_binding list;
+type instance =
+  { closure : To_jsir_env.closure;
+    code : Code.t
+  }
+
+type static =
+  { instances : instance list;
     aliases : To_jsir_result.var_binding list
   }
 
@@ -44,93 +48,115 @@ let name_closure slot fn_var =
     if not (String.equal name "fn" || String.starts_with ~prefix:"fn[" name)
     then Jsir.Var.set_name fn_var name
 
-let prepare ~env ~res ~bindings ~add_to_env soc =
-  let fun_decls = Set_of_closures.function_decls soc in
+let value_slots_projected_by (code : To_jsir_env.code) =
+  match code with
+  | Shared _ -> Value_slot.Set.empty
+  | Instantiated code ->
+    Name_occurrences.value_slots_in_normal_projections (Code0.free_names code)
+
+let used_value_slots ~env soc =
+  Function_slot.Lmap.fold
+    (fun _slot (decl : Function_declarations.code_id_in_function_declaration)
+         used ->
+      match decl with
+      | Deleted _ -> used
+      | Code_id { code_id; only_full_applications = _ } ->
+        To_jsir_env.get_code_exn env code_id
+        |> value_slots_projected_by |> Value_slot.Set.union used)
+    (Function_declarations.funs_in_order (Set_of_closures.function_decls soc))
+    Value_slot.Set.empty
+
+let closure_for_code ~env ~res code_id :
+    To_jsir_result.t * To_jsir_env.closure * instance option =
+  match To_jsir_env.get_code_exn env code_id with
+  | Shared closure -> res, closure, None
+  | Instantiated code ->
+    let closure, res = To_jsir_static_const.new_closure ~res code in
+    res, closure, Some { closure; code }
+
+(* Allocate fresh closures for any [Instantiated] code in [soc] and register
+   this set's slots on each new closure and on [symbols] (the static closure
+   symbol variables, if any). Returns the instances for the caller to translate
+   and bind, along with the closure variable for each function declaration in
+   order ([None] for deleted code). *)
+let prepare ~env ~res ~symbols soc =
   let decls =
-    Function_declarations.funs_in_order fun_decls |> Function_slot.Lmap.bindings
+    Set_of_closures.function_decls soc
+    |> Function_declarations.funs_in_order |> Function_slot.Lmap.bindings
   in
-  (* Return value-slot bindings, closures and alias bindings separately, as
-     static groups may need to emit several sets of recursive closures as one
-     consecutive run (since JSOO allows closures to refer to one another only if
-     they are consecutive). *)
-  let value_slot_bindings, res =
-    Value_slot.Map.fold
-      (fun slot simple (bindings, res) ->
-        match To_jsir_env.get_value_slot env slot with
-        | Some var ->
-          (* This value slot has been used in the function body, so we should
-             bind the used variable to the appropriate [Simple.t] *)
-          let simple_var, res = To_jsir_shared.simple ~env ~res simple in
-          ( { To_jsir_result.bound_var = var; defining_var = simple_var }
-            :: bindings,
-            res )
-        | None ->
-          (* This value slot is not used, so we don't need to do anything *)
-          bindings, res)
-      (Set_of_closures.value_slots soc)
-      ([], res)
-  in
-  let env, res, closures, aliases =
-    List.fold_left2
-      (fun (env, res, closures, aliases) binding (slot, decl) ->
+  let res, closures =
+    List.fold_left_map
+      (fun res (slot, decl) ->
         match
           (decl : Function_declarations.code_id_in_function_declaration)
         with
-        | Deleted _ -> env, res, closures, aliases
+        | Deleted _ -> res, None
         | Code_id { code_id; only_full_applications = _ } ->
-          let ({ addr;
-                 params;
-                 closure = fn_var;
-                 closure_bound_with_code;
-                 hint;
-                 loc
-               }
-                : To_jsir_env.code_id) =
-            To_jsir_env.get_code_id_exn env code_id
-          in
-          name_closure slot fn_var;
-          let closures =
-            if closure_bound_with_code
-            then closures (* The code definition will later bind its closure. *)
-            else
-              let expr : Jsir.expr =
-                Closure (params, (addr, []), (hint, loc))
-              in
-              { To_jsir_shared.bound_var = fn_var; defining_expr = expr }
-              :: closures
-          in
-          (* If this function slot is used, its corresponding variable should've
-             already been added to the environment when the code using it was
-             translated. We should make sure that this matches up with our
-             preemptively declared closure variable for this closure. *)
-          let aliases =
-            match To_jsir_env.get_function_slot env slot with
-            | None -> aliases
-            | Some fn_var' ->
-              { To_jsir_result.bound_var = fn_var'; defining_var = fn_var }
-              :: aliases
-          in
-          let env, res, aliases' = add_to_env ~env ~res binding fn_var in
-          env, res, closures, aliases' @ aliases)
-      (env, res, [], []) bindings decls
+          let res, closure, instance = closure_for_code ~env ~res code_id in
+          name_closure slot closure.var;
+          res, Some (slot, closure.var, instance))
+      res decls
   in
-  env, res, { value_slot_bindings; closures = List.rev closures; aliases }
-
-let dynamic_set_of_closures ~env ~res ~bound_vars soc =
-  let vars = List.map Bound_var.var bound_vars in
-  let env, res, { value_slot_bindings; closures; aliases } =
-    prepare ~env ~res ~bindings:vars
-      ~add_to_env:(fun ~env ~res var fn_var ->
-        To_jsir_env.add_var env var fn_var, res, [])
-      soc
+  let closure_vars =
+    List.map (Option.map (fun (_slot, var, _instance) -> var)) closures
   in
-  let res =
+  let closures = List.filter_map Fun.id closures in
+  let function_slots =
+    List.map (fun (slot, var, _instance) -> slot, var) closures
+    |> Function_slot.Map.of_list
+  in
+  let instances =
+    List.filter_map (fun (_slot, _var, instance) -> instance) closures
+  in
+  let used_value_slots = used_value_slots ~env soc in
+  let value_slots, res =
+    Value_slot.Map.fold
+      (fun slot simple (value_slots, res) ->
+        if Value_slot.Set.mem slot used_value_slots
+        then
+          let var, res = To_jsir_shared.simple ~env ~res simple in
+          Value_slot.Map.add slot var value_slots, res
+        else value_slots, res)
+      (Set_of_closures.value_slots soc)
+      (Value_slot.Map.empty, res)
+  in
+  let slots : To_jsir_env.slots = { function_slots; value_slots } in
+  (* Do not attach slots to [Shared] closures, as they may belong to multiple
+     sets of closures and their code never projects from them. *)
+  let env =
     List.fold_left
-      (fun res { To_jsir_shared.bound_var; defining_expr } ->
-        To_jsir_result.add_instr_exn res (Let (bound_var, defining_expr)))
-      res closures
+      (fun env closure -> To_jsir_env.add_closure_slots env ~closure slots)
+      env
+      (symbols @ List.map (fun { closure; code = _ } -> closure.var) instances)
   in
-  env, To_jsir_result.add_var_aliases_exn res (aliases @ value_slot_bindings)
+  env, res, instances, closure_vars
+
+let translate_instances ~env ~res ~translate_body instances =
+  List.fold_left
+    (fun res { closure; code } ->
+      To_jsir_static_const.code ~env ~res ~translate_body ~closure code)
+    res instances
+
+let bind_instances ~res instances =
+  List.fold_left
+    (fun res { closure; code = _ } ->
+      To_jsir_result.add_instr_exn res
+        (Let (closure.var, To_jsir_static_const.closure_expr closure)))
+    res instances
+
+let dynamic_set_of_closures ~env ~res ~translate_body ~bound_vars soc =
+  let env, res, instances, closure_vars = prepare ~env ~res ~symbols:[] soc in
+  let env =
+    List.fold_left2
+      (fun env bound_var closure_var ->
+        match closure_var with
+        | None -> env
+        | Some closure_var ->
+          To_jsir_env.add_var env (Bound_var.var bound_var) closure_var)
+      env bound_vars closure_vars
+  in
+  let res = translate_instances ~env ~res ~translate_body instances in
+  env, bind_instances ~res instances
 
 let closure_symbol_locs ~env ~closure_symbols soc =
   let funs = Set_of_closures.function_decls soc |> Function_declarations.funs in
@@ -142,18 +168,34 @@ let closure_symbol_locs ~env ~closure_symbols soc =
       with
       | Deleted _ -> locs
       | Code_id { code_id; only_full_applications = _ } -> (
-        match (To_jsir_env.get_code_id_exn env code_id).loc with
+        let loc =
+          match To_jsir_env.get_code_exn env code_id with
+          | Shared closure -> closure.loc
+          | Instantiated code -> To_jsir_static_const.closure_loc code
+        in
+        match loc with
         | None -> locs
         | Some loc -> Symbol.Map.add symbol loc locs))
     closure_symbols Symbol.Map.empty
 
 let prepare_static_set_of_closures ~env ~res ~closure_symbols soc =
-  let add_to_env ~env ~res symbol fn_var =
-    let var, res = To_jsir_env.get_symbol_exn env ~res symbol in
-    env, res, [{ To_jsir_result.bound_var = var; defining_var = fn_var }]
+  let symbols, res =
+    List.fold_right
+      (fun symbol (symbols, res) ->
+        let var, res = To_jsir_env.get_symbol_exn env ~res symbol in
+        var :: symbols, res)
+      (Function_slot.Lmap.data closure_symbols)
+      ([], res)
   in
-  let symbols = Function_slot.Lmap.data closure_symbols in
-  let _env, res, initialisation =
-    prepare ~env ~res ~bindings:symbols ~add_to_env soc
+  let env, res, instances, closure_vars = prepare ~env ~res ~symbols soc in
+  let aliases =
+    List.fold_left2
+      (fun aliases symbol closure_var ->
+        match closure_var with
+        | None -> aliases
+        | Some closure_var ->
+          { To_jsir_result.bound_var = symbol; defining_var = closure_var }
+          :: aliases)
+      [] symbols closure_vars
   in
-  res, initialisation
+  env, res, { instances; aliases }
