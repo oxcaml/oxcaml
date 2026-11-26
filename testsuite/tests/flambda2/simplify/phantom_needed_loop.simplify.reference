@@ -41,6 +41,6 @@ let code loopify(never) size(34) newer_version_of(test_0)
       cont k (acc_unboxed0)
 in
 let $camlPhantom_needed_loop__test_1 = closure test_0_1 @test &toplevel in
-let phantom test = $camlPhantom_needed_loop__test_1 in
 let $camlPhantom_needed_loop = Block 0 ($camlPhantom_needed_loop__test_1) in
+let phantom test = $camlPhantom_needed_loop__test_1 in
 cont done ($camlPhantom_needed_loop)

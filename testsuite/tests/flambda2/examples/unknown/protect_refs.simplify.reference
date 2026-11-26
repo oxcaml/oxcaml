@@ -10,7 +10,7 @@ let code loopify(done) size(22) newer_version_of(iter_0)
         : imm tagged =
   cont `self` (param)
     where rec `self` (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-      let f_1 = %optimised_out () in
+      let phantom f_1 = %optimised_out () in
       let f_2 = f in
       let prim = %is_int (param_1) in
       (switch prim
@@ -72,10 +72,8 @@ let $`camlProtect_refs__fn[protect_refs.ml:41,26--40]_8` =
 in
 let umode = %block.mut.[`0`].`toplevel` (0) in
 let umode_1 = umode in
-let $camlProtect_refs__Pmakeblock_7 =
-  Block 0 ($camlProtect_refs__Pmakeblock_6, 0)
-and $camlProtect_refs__Pmakeblock_6 =
-  Block 0 (umode_1, 1)
+let $camlProtect_refs__set_mode_pattern_5 =
+  closure set_mode_pattern_4_1 @set_mode_pattern &toplevel
 and code inline(never) loopify(never) size(4) newer_version_of(set_mode_pattern_4)
       set_mode_pattern_4_1 (f : val)
         my_closure &my_alloc_region my_depth
@@ -84,8 +82,10 @@ and code inline(never) loopify(never) size(4) newer_version_of(set_mode_pattern_
     $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_4`
       ($camlProtect_refs__Pmakeblock_7, f)
       -> k * k1
-and $camlProtect_refs__set_mode_pattern_5 =
-  closure set_mode_pattern_4_1 @set_mode_pattern &toplevel
+and $camlProtect_refs__Pmakeblock_7 =
+  Block 0 ($camlProtect_refs__Pmakeblock_6, 0)
+and $camlProtect_refs__Pmakeblock_6 =
+  Block 0 (umode_1, 1)
   with { umode = umode }
 in
 let $camlProtect_refs =

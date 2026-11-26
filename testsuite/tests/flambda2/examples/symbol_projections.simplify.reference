@@ -19,25 +19,10 @@ let $camlSymbol_projections__immstring_0 = "FOO" in
      cont k (0))
   where k (foo : imm tagged) =
     let foo_1 = foo in
-    let code loopify(never) size(15) newer_version_of(g_1)
-          g_1_1 (y : imm tagged)
-            my_closure &my_alloc_region my_depth
-            -> k * k1
-            : imm tagged =
-      let foo_2 =
-        %project_value_slot.[g].[foo] ($camlSymbol_projections__g_2)
-      in
-      (let untagged = %untag_imm (foo_2) in
-       switch untagged
-         | 0 -> k (y)
-         | 1 -> k2)
-        where k2 =
-          let int_add = %int_barith.add (y, y) in
-          cont k (int_add)
-    and set_of_closures
-          $camlSymbol_projections__g_2 =
-          closure g_1_1 @g &toplevel
-          with { foo = foo_1 }
+    let set_of_closures
+          $camlSymbol_projections__f_1 =
+          closure f_0_1 @f &toplevel
+          with { foo = foo }
         end
     and code loopify(never) size(8) newer_version_of(f_0)
           f_0_1 (x)
@@ -49,10 +34,25 @@ let $camlSymbol_projections__immstring_0 = "FOO" in
       in
       cont k (Pmakeblock)
     and set_of_closures
-          $camlSymbol_projections__f_1 =
-          closure f_0_1 @f &toplevel
-          with { foo_1 = foo }
+          $camlSymbol_projections__g_2 =
+          closure g_1_1 @g &toplevel
+          with { foo_1 = foo_1 }
         end
+    and code loopify(never) size(15) newer_version_of(g_1)
+          g_1_1 (y : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let foo_2 =
+        %project_value_slot.[g].[foo_1] ($camlSymbol_projections__g_2)
+      in
+      (let untagged = %untag_imm (foo_2) in
+       switch untagged
+         | 0 -> k (y)
+         | 1 -> k2)
+        where k2 =
+          let int_add = %int_barith.add (y, y) in
+          cont k (int_add)
     in
     let $camlSymbol_projections = Block 0 (foo, $camlSymbol_projections__f_1)
     in

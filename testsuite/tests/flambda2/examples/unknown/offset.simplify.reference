@@ -2,6 +2,21 @@ let code f_2 deleted in
 let code g_3 deleted in
 let code h_4 deleted in
 let code inline_0 deleted in
+let code loopify(never) size(16) newer_version_of(f_2)
+      f_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let a = %project_value_slot.[f].[a] (my_closure) in
+  let r = %project_value_slot.[f].[r] (my_closure) in
+  (let untagged = %untag_imm (a) in
+   switch untagged
+     | 0 -> k (0)
+     | 1 -> k2)
+    where k2 =
+      let int_add = %int_barith.add (r, x) in
+      cont k (int_add)
+in
 let code loopify(never) size(20) newer_version_of(g_3)
       g_3_1 (x : imm tagged, y : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -16,21 +31,6 @@ let code loopify(never) size(20) newer_version_of(g_3)
     where k2 =
       let int_mul = %int_barith.mul (x, y) in
       let int_add = %int_barith.add (s, int_mul) in
-      cont k (int_add)
-in
-let code loopify(never) size(16) newer_version_of(f_2)
-      f_2_1 (x : imm tagged)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let a = %project_value_slot.[f].[a] (my_closure) in
-  let r = %project_value_slot.[f].[r] (my_closure) in
-  (let untagged = %untag_imm (a) in
-   switch untagged
-     | 0 -> k (0)
-     | 1 -> k2)
-    where k2 =
-      let int_add = %int_barith.add (r, x) in
       cont k (int_add)
 in
 let code rec loopify(never) size(39) newer_version_of(h_4)
@@ -102,8 +102,8 @@ let code loopify(never) size(1) newer_version_of(g_3_1)
         : imm tagged =
   cont k (0)
 in
-let code loopify(never) size(1) newer_version_of(h_4_1)
-      h_4_2 (x : imm tagged, y : imm tagged)
+let code loopify(never) size(1) newer_version_of(f_2_1)
+      f_2_2 (x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -116,8 +116,8 @@ let code loopify(never) size(1) newer_version_of(g_3_1)
         : imm tagged =
   cont k (0)
 in
-let code loopify(never) size(1) newer_version_of(f_2_1)
-      f_2_2 (x : imm tagged)
+let code loopify(never) size(1) newer_version_of(h_4_1)
+      h_4_2 (x : imm tagged, y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -137,14 +137,12 @@ apply direct(partial_apply1_44 &toplevel) inlined(never)
          (10)
          -> k * error
        where k (s : imm tagged) =
-         let code loopify(never) size(4) newer_version_of(f_2_1)
-               f_2_3 (x : imm tagged)
-                 my_closure &my_alloc_region my_depth
-                 -> k * k1
-                 : imm tagged =
-           let r_1 = %project_value_slot.[f].[r] ($camlOffset__f_3) in
-           let int_add = %int_barith.add (r_1, x) in
-           cont k (int_add)
+         let $camlOffset__f_3 =
+           closure f_2_3 @f &toplevel
+         and $camlOffset__g_4 =
+           closure g_3_2 @g &toplevel
+         and $camlOffset__h_5 =
+           closure h_4_3 @h &toplevel
          and code rec loopify(never) size(6) newer_version_of(h_4_1)
                h_4_3 (x : imm tagged, y : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -156,12 +154,14 @@ apply direct(partial_apply1_44 &toplevel) inlined(never)
               : _ -> imm tagged)
                (int_add)
                -> k * k1
-         and $camlOffset__f_3 =
-           closure f_2_3 @f &toplevel
-         and $camlOffset__g_4 =
-           closure g_3_2 @g &toplevel
-         and $camlOffset__h_5 =
-           closure h_4_3 @h &toplevel
+         and code loopify(never) size(4) newer_version_of(f_2_1)
+               f_2_3 (x : imm tagged)
+                 my_closure &my_alloc_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let r_1 = %project_value_slot.[f].[r] ($camlOffset__f_3) in
+           let int_add = %int_barith.add (r_1, x) in
+           cont k (int_add)
            with { a = 1; b = 0; r = r; s = s }
          in
          (apply direct(partial_apply1_44 &toplevel) inlined(never)

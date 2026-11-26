@@ -60,7 +60,9 @@ let $camlMap_remove__Pmakeblock_4 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
            $camlMap_remove__immstring_0)
 in
-let code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
+let $camlMap_remove__remove_min_binding_3 =
+  closure remove_min_binding_2_1 @remove_min_binding &toplevel
+and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
       remove_min_binding_2_1
         (param :
            [ 0
@@ -111,8 +113,6 @@ let code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
                    )
                     (apply_result, Pfield_1, Pfield)
                     -> k * k1))
-and $camlMap_remove__remove_min_binding_3 =
-  closure remove_min_binding_2_1 @remove_min_binding &toplevel
 in
 let code loopify(never) size(34) newer_version_of(merge_3)
       merge_3_1

@@ -70,22 +70,10 @@ let $camlData_flow_bug__Pmakeblock_8 = Block 0 (906850200, Popaque) in
                                      | 1 -> k (0i)))
                            where k (naked_immediate_2 : imm) =
                              (switch naked_immediate_2
-<<<<<<< HEAD
-                                | 0 -> k1
-                                | 1 -> k
-                                where k1 =
-                                  (apply ccall noalloc &toplevel
-||||||| parent of b06baf7923 (rework lifted constants)
-                                | 0 -> k1
-                                | 1 -> k
-                                where k1 =
-                                  (apply ccall noalloc
-=======
                                 | 0 -> k
                                 | 1 -> done ($camlData_flow_bug)
                                 where k =
-                                  (apply ccall noalloc
->>>>>>> b06baf7923 (rework lifted constants)
+                                  (apply ccall noalloc &toplevel
                                      ($`*extern*`.caml_string_notequal
                                       : val * val -> val)
                                        (Popaque,
