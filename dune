@@ -192,6 +192,7 @@
   fdo_counter
   fdo_annotation
   fdo_dropped_counters
+  fdo_metadata_format
   file_sections
   lru
   id_counter
@@ -623,6 +624,7 @@
   emit_sancov_common
   emitaux
   fdo_info
+  fdo_metadata_encode
   generic_fns
   instructionId
   linear

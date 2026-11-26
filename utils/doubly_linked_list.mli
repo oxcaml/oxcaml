@@ -65,6 +65,9 @@ val delete_after : 'a cell -> unit
 
 val delete_curr : 'a cell -> unit
 
+(** Whether the cell's element is still in its list (has not been deleted). *)
+val is_attached : 'a cell -> bool
+
 val filter_left : 'a t -> f:('a -> bool) -> unit
 
 val filter_right : 'a t -> f:('a -> bool) -> unit

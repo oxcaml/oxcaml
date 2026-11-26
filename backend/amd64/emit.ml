@@ -943,7 +943,7 @@ let output_test_zero arg =
 (* Output a floating-point compare and branch *)
 
 let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
-    ~(taken : X86_ast.condition -> unit) =
+    ~(taken : X86_ast.condition -> unit) ~(skipped : unit -> unit) =
   (*= Effect of comisd on flags and conditional branches:
                      ZF PF CF  cond. branches taken
         unordered     1  1  1  je, jb, jbe, jp
@@ -970,6 +970,7 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
     ucomi (arg i 1) (arg i 0);
     I.jp (emit_asm_label_arg next);
     (* skip if unordered *)
+    skipped ();
     taken E;
     (* branch taken if x=y *)
     D.define_label next
@@ -1010,7 +1011,9 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
     (* swap compare *)
     taken B (* taken if unordered or x<y i.e. !(x>=y) *)
 
-let emit_test i ~(taken : X86_ast.condition -> unit) = function
+(* [taken c] emits the conditional jump or move on [c]. [skipped ()] is called
+   right after emitting a jump from the test straight to the code after it. *)
+let emit_test i ~(taken : X86_ast.condition -> unit) ~skipped = function
   | Itruetest ->
     output_test_zero i.arg.(0);
     taken NE
@@ -1028,7 +1031,7 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
         n ) ->
     I.cmp (int n) (arg i 0);
     taken (cond cmp)
-  | Ifloattest (width, cmp) -> emit_float_test width cmp i ~taken
+  | Ifloattest (width, cmp) -> emit_float_test width cmp i ~taken ~skipped
   | Ioddtest ->
     I.test (int 1) (arg8 i 0);
     taken NE
@@ -2108,6 +2111,188 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
+(* Instrumented instructions of the current function, recorded with their output
+   position during emission. After peephole optimization, the counters of the
+   surviving instructions are recorded as emitted and, with -fdo-metadata, the
+   instructions get assembler labels and are recorded in
+   [Fdo_metadata_encode]. *)
+module Fdo_instruction = struct
+  type t =
+    | Call of Fdo_counter.t
+    | Tail_call of Fdo_counter.t
+    | Conditional_branch of
+        { taken : Fdo_annotation.t;
+          fallthrough : Fdo_annotation.t
+        }
+    | Jump_table of (Linear.label * Fdo_annotation.t) list
+
+  let counters = function
+    | Call counter | Tail_call counter -> Fdo_annotation.singleton counter
+    | Conditional_branch { taken; fallthrough } ->
+      Fdo_annotation.combine taken fallthrough
+    | Jump_table targets -> Fdo_annotation.union (List.map snd targets)
+end
+
+let fdo_instructions : (X86_proc.output_pos * Fdo_instruction.t) list ref =
+  ref []
+
+let fdo_handler_labels : L.t list ref = ref []
+
+let fdo_counters_enabled () = Oxcaml_flags.fdo_counters_enabled ()
+
+let fdo_metadata_enabled () = !Oxcaml_flags.fdo_metadata
+
+let fdo_metadata = ref (Fdo_metadata_encode.create ~record_names:false)
+
+let record_fdo_instruction pos instruction =
+  if fdo_counters_enabled ()
+  then fdo_instructions := (pos, instruction) :: !fdo_instructions
+
+let record_fdo_here instruction =
+  record_fdo_instruction (X86_proc.current_output_pos ()) instruction
+
+(* The conditional jumps emitted for one instruction. Only the last can fall
+   through to the instruction's fallthrough successor, so only it gets the
+   fallthrough counters. *)
+module Fdo_jumps : sig
+  type t
+
+  val create : unit -> t
+
+  (* Call right after emitting a conditional jump whose taken edge has
+     [taken]. *)
+  val add : t -> taken:Fdo_annotation.t -> unit
+
+  val record : t -> fallthrough:Fdo_annotation.t -> unit
+end = struct
+  type t = { mutable rev_jumps : (X86_proc.output_pos * Fdo_annotation.t) list }
+
+  let create () = { rev_jumps = [] }
+
+  let add t ~taken =
+    t.rev_jumps <- (X86_proc.current_output_pos (), taken) :: t.rev_jumps
+
+  let record_jump ~fallthrough (pos, taken) =
+    if not (Fdo_annotation.is_empty taken && Fdo_annotation.is_empty fallthrough)
+    then record_fdo_instruction pos (Conditional_branch { taken; fallthrough })
+
+  let record t ~fallthrough =
+    match t.rev_jumps with
+    | [] -> ()
+    | last :: rev_earlier ->
+      List.iter
+        (record_jump ~fallthrough:Fdo_annotation.empty)
+        (List.rev rev_earlier);
+      record_jump ~fallthrough last
+end
+
+let record_fdo_jump_table (jumptbl : Linear.successor array) =
+  let targets =
+    Array.fold_left
+      (fun targets ({ target; fdo_annotation } : Linear.successor) ->
+        if Fdo_annotation.is_empty fdo_annotation
+        then targets
+        else
+          Label.Map.update target
+            (function
+              | None -> Some fdo_annotation
+              | Some annotation ->
+                Some (Fdo_annotation.combine annotation fdo_annotation))
+            targets)
+      Label.Map.empty jumptbl
+  in
+  if not (Label.Map.is_empty targets)
+  then record_fdo_here (Jump_table (Label.Map.bindings targets))
+
+(* Returns the function's metadata, with -fdo-metadata. *)
+let begin_fdo_function (fundecl : Linear.fundecl) ~start =
+  let entry = fundecl.fun_fdo_entry_annotation in
+  let entry_annotation = Fdo_annotation.With_body_hash.annotation entry in
+  if fdo_counters_enabled ()
+  then Fdo_dropped_counters.record_emitted entry_annotation;
+  if not (fdo_metadata_enabled ())
+  then None
+  else
+    (* The body hash belongs to the compiled function itself, identified by the
+       entry counter with an empty inlining stack. *)
+    let function_ =
+      List.find_map
+        (fun counter ->
+          let position = Fdo_counter.position counter in
+          if
+            Fdo_counter.Position.is_function_entry position
+            && List.is_empty (Fdo_counter.inlining_stack counter)
+          then Some (Fdo_counter.Position.function_ position)
+          else None)
+        (Fdo_annotation.to_list entry_annotation)
+    in
+    (match function_, Fdo_annotation.With_body_hash.body_hash entry with
+    | Some function_, Some body_hash ->
+      Fdo_metadata_encode.record_body !fdo_metadata ~function_ ~body_hash
+    | None, _ | _, None -> ());
+    Some
+      (Fdo_metadata_encode.begin_function !fdo_metadata ~start ~entry_annotation)
+
+(* The labels of the metadata are numbered as DWARF labels are, apart from those
+   of the code: taking the numbers of the code's labels would renumber those of
+   the following functions, which can change their code (e.g. which block
+   [Cfg_merge_blocks] keeps). *)
+let record_fdo_metadata_event fdo_function pos (instruction : Fdo_instruction.t)
+    =
+  let label = L.create_int Text (Label.to_int (Label.new_dwarf_label ())) in
+  X86_proc.insert_label_before pos label;
+  let record = Fdo_metadata_encode.record_event fdo_function label in
+  match instruction with
+  | Call counter ->
+    let return_address =
+      L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
+    in
+    X86_proc.insert_label_after pos return_address;
+    record (Call { return_address; counter })
+  | Tail_call counter -> record (Tail_call counter)
+  | Conditional_branch { taken; fallthrough } ->
+    record (Conditional_branch { taken; fallthrough })
+  | Jump_table targets ->
+    List.iter
+      (fun (target, taken) ->
+        record
+          (Indirect_jump
+             { target = label_to_asm_label ~section:Text target; taken }))
+      targets
+
+let record_fdo_event fdo_function (pos, (instruction : Fdo_instruction.t)) =
+  let counters = Fdo_instruction.counters instruction in
+  if X86_proc.deleted pos
+  then Fdo_dropped_counters.register ~reason:Peephole_deleted counters
+  else (
+    Fdo_dropped_counters.record_emitted counters;
+    Option.iter
+      (fun fdo_function ->
+        record_fdo_metadata_event fdo_function pos instruction)
+      fdo_function)
+
+(* Must be called after peephole optimization on the function's code. *)
+let end_fdo_function fdo_function =
+  Option.iter
+    (fun fdo_function ->
+      List.sort_uniq
+        (fun a b -> String.compare (L.encode a) (L.encode b))
+        !fdo_handler_labels
+      |> List.iter (fun label ->
+          Fdo_metadata_encode.record_event fdo_function label Exception_handler))
+    fdo_function;
+  List.iter (record_fdo_event fdo_function) (List.rev !fdo_instructions);
+  Option.iter
+    (fun fdo_function ->
+      let finish =
+        L.create_int Text (Label.to_int (Label.new_dwarf_label ()))
+      in
+      D.define_label finish;
+      Fdo_metadata_encode.end_function fdo_function ~finish)
+    fdo_function;
+  fdo_instructions := [];
+  fdo_handler_labels := []
+
 let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
   (* A label that only delimits a DWARF range is not a branch target: aligning
@@ -2247,15 +2432,21 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Const_symbol s) ->
     add_used_symbol s.sym_name;
     load_symbol_addr s (res i 0)
-  | Lcall_op (Lcall_ind _) ->
+  | Lcall_op (Lcall_ind { callsite_counter }) ->
     I.call (arg i 0);
+    Option.iter (fun counter -> record_fdo_here (Call counter)) callsite_counter;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op (Lcall_imm { func; callsite_counter = _ }) ->
+  | Lcall_op (Lcall_imm { func; callsite_counter }) ->
     add_used_symbol func.sym_name;
     emit_call func;
+    Option.iter (fun counter -> record_fdo_here (Call counter)) callsite_counter;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op (Ltailcall_ind _) -> I.jmp (arg i 0)
-  | Lcall_op (Ltailcall_imm { func; callsite_counter = _ }) ->
+  | Lcall_op (Ltailcall_ind { callsite_counter }) ->
+    I.jmp (arg i 0);
+    Option.iter
+      (fun counter -> record_fdo_here (Tail_call counter))
+      callsite_counter
+  | Lcall_op (Ltailcall_imm { func; callsite_counter }) ->
     if String.equal func.sym_name !function_name
     then
       match !tailrec_entry_point with
@@ -2264,7 +2455,10 @@ let emit_instr ~first ~last ~fallthrough i =
         I.jmp (emit_label_arg ~section:Text tailrec_entry_point)
     else (
       add_used_symbol func.sym_name;
-      emit_jump func)
+      emit_jump func;
+      Option.iter
+        (fun counter -> record_fdo_here (Tail_call counter))
+        callsite_counter)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; ty_args; _ }) ->
     (* Fuse each fat-pointer argument, adding its offset register into its base
        register, as part of emitting the call itself, so no GC safepoint can
@@ -2662,7 +2856,7 @@ let emit_instr ~first ~last ~fallthrough i =
     let ifnot = i.arg.(len - 1) in
     assert (Reg.same_loc ifnot i.res.(0));
     let taken c = I.cmov c (reg ifso) (res i 0) in
-    emit_test i tst ~taken
+    emit_test i tst ~taken ~skipped:ignore
   | Lop (Specific Irdtsc) ->
     I.rdtsc ();
     emit_combine_edx_eax i.res.(0)
@@ -2766,22 +2960,26 @@ let emit_instr ~first ~last ~fallthrough i =
   | Llabel_for_dwarf label ->
     emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
-  | Lcondbranch { test = tst; taken; fallthrough_annotation = _ } ->
-    emit_test i tst ~taken:(fun c ->
-        I.j c (emit_label_arg ~section:Text taken.target))
-  | Lcondbranch3 { lt; eq; gt; fallthrough_annotation = _ } -> (
-    let target = Option.map (fun (s : Linear.successor) -> s.target) in
-    let lbl0 = target lt and lbl1 = target eq and lbl2 = target gt in
+  | Lcondbranch { test = tst; taken; fallthrough_annotation } ->
+    let jumps = Fdo_jumps.create () in
+    emit_test i tst
+      ~taken:(fun c ->
+        I.j c (emit_label_arg ~section:Text taken.target);
+        Fdo_jumps.add jumps ~taken:taken.fdo_annotation)
+      ~skipped:(fun () -> Fdo_jumps.add jumps ~taken:fallthrough_annotation);
+    Fdo_jumps.record jumps ~fallthrough:fallthrough_annotation
+  | Lcondbranch3 { lt; eq; gt; fallthrough_annotation } ->
     I.cmp (int 1) (arg i 0);
-    (match lbl0 with
-    | None -> ()
-    | Some lbl -> I.jb (emit_label_arg ~section:Text lbl));
-    (match lbl1 with
-    | None -> ()
-    | Some lbl -> I.je (emit_label_arg ~section:Text lbl));
-    match lbl2 with
-    | None -> ()
-    | Some lbl -> I.ja (emit_label_arg ~section:Text lbl))
+    let jumps = Fdo_jumps.create () in
+    let branch jcc =
+      Option.iter (fun ({ target; fdo_annotation } : Linear.successor) ->
+          jcc (emit_label_arg ~section:Text target);
+          Fdo_jumps.add jumps ~taken:fdo_annotation)
+    in
+    branch I.jb lt;
+    branch I.je eq;
+    branch I.ja gt;
+    Fdo_jumps.record jumps ~fallthrough:fallthrough_annotation
   | Lswitch jumptbl ->
     let lbl = L.create Text in
     (* rax and rdx are clobbered by the Lswitch, meaning that no variable that
@@ -2799,6 +2997,7 @@ let emit_instr ~first ~last ~fallthrough i =
       (reg tmp2);
     I.add (reg tmp2) (reg tmp1);
     I.jmp (reg tmp1);
+    record_fdo_jump_table jumptbl;
     let table =
       { table_lbl = lbl;
         elems = Array.map (fun (s : Linear.successor) -> s.target) jumptbl
@@ -2830,6 +3029,8 @@ let emit_instr ~first ~last ~fallthrough i =
     I.push (domain_field Domainstate.Domain_exn_handler);
     D.cfi_adjust_cfa_offset ~bytes:8;
     I.mov rsp (domain_field Domainstate.Domain_exn_handler);
+    if fdo_metadata_enabled ()
+    then fdo_handler_labels := lbl_handler :: !fdo_handler_labels;
     stack_offset := !stack_offset + 16
   | Lpoptrap _ ->
     emit_pop_trap_label ();
@@ -2953,6 +3154,10 @@ let fundecl fundecl =
          ...
   *)
   D.define_joint_label_and_symbol ~section:Text fundecl_sym;
+  let fdo_function =
+    begin_fdo_function fundecl
+      ~start:(L.create_label_for_local_symbol Text fundecl_sym)
+  in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
@@ -2969,6 +3174,7 @@ let fundecl fundecl =
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
+  end_fdo_function fdo_function;
   (* [record_for_expect_asm] runs after the trailing out-of-line code so the
      [%%expect_asm_full] variant can include it (e.g. the stack-realloc
      handler). For the plain variant the body still stops at [fun_body_end] and
@@ -3013,6 +3219,8 @@ let data l =
 
 let reset_all () =
   X86_proc.reset_asm_code ();
+  fdo_metadata
+    := Fdo_metadata_encode.create ~record_names:!Oxcaml_flags.fdo_names;
   Emitaux.reset ();
   reset_debug_info ();
   (* PR#5603 *)
@@ -3434,6 +3642,11 @@ let end_assembly () =
   D.size frametable_sym;
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
+  if fdo_metadata_enabled () && !Oxcaml_flags.fdo_dropped_counters
+  then
+    Fdo_metadata_encode.set_dropped !fdo_metadata
+      (Fdo_dropped_counters.registered ());
+  Fdo_metadata_encode.emit_section !fdo_metadata;
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)

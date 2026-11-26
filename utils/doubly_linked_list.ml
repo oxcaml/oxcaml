@@ -225,6 +225,16 @@ let remove t curr =
 
 let delete_curr cell = remove cell.t cell.node
 
+(* [remove] leaves the removed node's own links as they were, but not those of
+   its neighbours. *)
+let is_attached cell =
+  match cell.node with
+  | Empty ->
+    (* internal invariant: cell's nodes are not empty *)
+    assert false
+  | Node { prev = Empty; _ } -> cell.t.first == cell.node
+  | Node { prev = Node prev; _ } -> prev.next == cell.node
+
 let delete_before cell =
   match cell.node with
   | Empty ->

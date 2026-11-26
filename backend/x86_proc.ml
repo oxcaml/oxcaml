@@ -408,6 +408,22 @@ let next_pos pos =
 let output_range ~from_pos ~to_pos =
   DLL.range_to_list ~left_incl:(next_pos from_pos) ~right_excl:(next_pos to_pos)
 
+let output_cell (pos : output_pos) =
+  match pos with
+  | Some cell -> cell
+  | None -> Misc.fatal_error "X86_proc: no line at the beginning of the output"
+
+let deleted pos = not (DLL.is_attached (output_cell pos))
+
+let label_line label =
+  Directive (Asm_targets.Asm_directives.Directive.new_label label)
+
+let insert_label_before pos label =
+  DLL.insert_before (output_cell pos) (label_line label)
+
+let insert_label_after pos label =
+  DLL.insert_after (output_cell pos) (label_line label)
+
 let peephole_optimize_from pos =
   if !Oxcaml_flags.x86_peephole_optimize
   then

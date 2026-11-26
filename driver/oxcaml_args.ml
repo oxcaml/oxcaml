@@ -597,8 +597,25 @@ let mk_llvm_flags f =
 let mk_fdo_counters f =
   ( "-fdo-counters",
     Arg.Unit f,
-    " Attach FDO counters to function entries, branches, and call sites (no \
-     counters are attached in classic mode)" )
+    " Attach FDO counters to function entries, branches, and call sites (not \
+     in classic mode)" )
+
+let mk_fdo_metadata f =
+  ( "-fdo-metadata",
+    Arg.Unit f,
+    " Emit the FDO metadata section (amd64 only); implies -fdo-counters" )
+
+let mk_fdo_names f =
+  ( "-fdo-names",
+    Arg.Unit f,
+    " With -fdo-metadata, also record counter names in the FDO metadata section"
+  )
+
+let mk_fdo_dropped_counters f =
+  ( "-fdo-dropped-counters",
+    Arg.Unit f,
+    " With -fdo-metadata, also record dropped FDO counters and their reasons \
+     in the FDO metadata section" )
 
 let mk_dfdo_dropped_counters f =
   ( "-dfdo-dropped-counters",
@@ -1590,6 +1607,9 @@ module type Oxcaml_options = sig
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
   val fdo_counters : unit -> unit
+  val fdo_metadata : unit -> unit
+  val fdo_names : unit -> unit
+  val fdo_dropped_counters : unit -> unit
   val dfdo_dropped_counters : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
@@ -1819,6 +1839,9 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
       mk_fdo_counters F.fdo_counters;
+      mk_fdo_metadata F.fdo_metadata;
+      mk_fdo_names F.fdo_names;
+      mk_fdo_dropped_counters F.fdo_dropped_counters;
       mk_dfdo_dropped_counters F.dfdo_dropped_counters;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
@@ -2281,6 +2304,9 @@ module Oxcaml_options_impl = struct
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let fdo_counters = set' Oxcaml_flags.fdo_counters
+  let fdo_metadata = set' Oxcaml_flags.fdo_metadata
+  let fdo_names = set' Oxcaml_flags.fdo_names
+  let fdo_dropped_counters = set' Oxcaml_flags.fdo_dropped_counters
   let dfdo_dropped_counters = set' Oxcaml_flags.dump_fdo_dropped_counters
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
@@ -2864,6 +2890,9 @@ module Extra_params = struct
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
+    | "fdo-metadata" -> set' Oxcaml_flags.fdo_metadata
+    | "fdo-names" -> set' Oxcaml_flags.fdo_names
+    | "fdo-dropped-counters" -> set' Oxcaml_flags.fdo_dropped_counters
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=

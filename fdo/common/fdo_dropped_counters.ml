@@ -42,6 +42,7 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump
     | Linear_branch_to_jump
     | Linear_branch_relaxed
+    | Peephole_deleted
 
   let to_string = function
     | Inlined_call -> "inlined_call"
@@ -58,9 +59,47 @@ module Reason = struct
     | Ssa_self_tail_call_to_jump -> "ssa_self_tail_call_to_jump"
     | Linear_branch_to_jump -> "linear_branch_to_jump"
     | Linear_branch_relaxed -> "linear_branch_relaxed"
+    | Peephole_deleted -> "peephole_deleted"
+
+  let to_int = function
+    | Inlined_call -> 0
+    | Self_tail_call_to_jump -> 1
+    | Switch_to_single_arm -> 2
+    | Switch_with_identical_arms -> 3
+    | Switch_to_lookup_table -> 4
+    | Cmm_switch_collapsed -> 5
+    | Probe_handler_call -> 6
+    | Cfg_self_tail_call_to_jump -> 7
+    | Cfg_branch_to_jump -> 8
+    | Cfg_blocks_merged -> 9
+    | Linear_branch_to_jump -> 10
+    | Inlined_call_without_counter -> 11
+    | Ssa_self_tail_call_to_jump -> 12
+    | Linear_branch_relaxed -> 13
+    | Peephole_deleted -> 14
+
+  let all =
+    [ Inlined_call;
+      Inlined_call_without_counter;
+      Self_tail_call_to_jump;
+      Switch_to_single_arm;
+      Switch_with_identical_arms;
+      Switch_to_lookup_table;
+      Cmm_switch_collapsed;
+      Probe_handler_call;
+      Cfg_self_tail_call_to_jump;
+      Cfg_branch_to_jump;
+      Cfg_blocks_merged;
+      Ssa_self_tail_call_to_jump;
+      Linear_branch_to_jump;
+      Linear_branch_relaxed;
+      Peephole_deleted ]
+
+  let of_int n = List.find_opt (fun reason -> to_int reason = n) all
 end
 
 module Counter_map = Map.Make (Fdo_counter)
+module Counter_set = Set.Make (Fdo_counter)
 
 type t = Reason.t Counter_map.t
 
@@ -95,9 +134,23 @@ let register ~reason annotation =
 
 let register_all t = registered_in_unit := union !registered_in_unit t
 
-let registered () = !registered_in_unit
+let emitted_in_unit = ref Counter_set.empty
 
-let reset () = registered_in_unit := empty
+let record_emitted annotation =
+  emitted_in_unit
+    := List.fold_left
+         (fun emitted counter -> Counter_set.add counter emitted)
+         !emitted_in_unit
+         (Fdo_annotation.to_list annotation)
+
+let registered () =
+  Counter_map.filter
+    (fun counter _ -> not (Counter_set.mem counter !emitted_in_unit))
+    !registered_in_unit
+
+let reset () =
+  registered_in_unit := empty;
+  emitted_in_unit := Counter_set.empty
 
 let without_registering f =
   let saved = !registered_in_unit in

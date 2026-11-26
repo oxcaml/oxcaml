@@ -35,7 +35,9 @@
 
     The counters of code removed as unreachable (e.g. the edges of a test that
     are never taken, or blocks that dead code elimination removes) are not
-    dropped: they would never count.
+    dropped: they would never count. Nor is a counter that the emitted code
+    still has, e.g. on another edge of a branch whose predecessor jumps past it:
+    it still counts, though not all of its executions.
 
     Dropped counters are recorded with the reason they were dropped and
     registered per compilation unit for reporting. *)
@@ -64,9 +66,7 @@ module Reason : sig
     | Cfg_branch_to_jump
         (** The counters of the edges to its target of a branch that a jump
             replaces because its outcome is known, e.g. when all its edges go to
-            the same block. When the jump is that of a predecessor, the branch
-            keeps its counters if other code still reaches it, but they miss the
-            executions of that predecessor. *)
+            the same block. *)
     | Cfg_blocks_merged
         (** The counters of a block that is merged into an identical one. *)
     | Ssa_self_tail_call_to_jump
@@ -78,8 +78,16 @@ module Reason : sig
     | Linear_branch_relaxed
         (** The counters of a conditional branch too far from its target, which
             [Branch_relaxation] replaces by branches without counters. *)
+    | Peephole_deleted
+        (** The counters of an instruction deleted by peephole optimization. *)
 
   val to_string : t -> string
+
+  (** A stable code for the reason, as recorded in the FDO metadata section. *)
+  val to_int : t -> int
+
+  (** The reason of a code, if any. *)
+  val of_int : int -> t option
 end
 
 (* Simplify also loses some counts by conflating counters rather than dropping
@@ -142,6 +150,12 @@ val register : reason:Reason.t -> Fdo_annotation.t -> unit
 
 val register_all : t -> unit
 
+(** Records that the emitted code has these counters, so that {!registered}
+    leaves them out. Only the emitters that can write the FDO metadata call it,
+    whether or not they write it. *)
+val record_emitted : Fdo_annotation.t -> unit
+
+(** The registered counters, apart from those recorded as emitted. *)
 val registered : unit -> t
 
 (** To be called before compiling a unit. *)

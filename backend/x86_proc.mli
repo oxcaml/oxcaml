@@ -77,6 +77,15 @@ val current_output_pos : unit -> output_pos
 
 val output_range : from_pos:output_pos -> to_pos:output_pos -> asm_line list
 
+(** Whether peephole optimization has deleted the line at the position. *)
+val deleted : output_pos -> bool
+
+(** Defines the label just before the line at the position. *)
+val insert_label_before : output_pos -> Asm_targets.Asm_label.t -> unit
+
+(** Defines the label just after the line at the position. *)
+val insert_label_after : output_pos -> Asm_targets.Asm_label.t -> unit
+
 val peephole_optimize_from : output_pos -> unit
 
 (** Code emission *)
