@@ -69,6 +69,9 @@ module Reason : sig
             executions of that predecessor. *)
     | Cfg_blocks_merged
         (** The counters of a block that is merged into an identical one. *)
+    | Ssa_self_tail_call_to_jump
+        (** The counter of a self tail call that [Ssa_tail_call] turns into a
+            jump. *)
 
   val to_string : t -> string
 end

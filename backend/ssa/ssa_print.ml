@@ -75,12 +75,20 @@ let print_parameter ppf (var, typ) =
   Format.fprintf ppf "%a : %a" Backend_var.With_provenance.print var
     Printcmm.machtype typ
 
+(* As in Cmm dumps, when there are any. *)
+let print_fdo_entry_annotation ppf entry_annotation =
+  if not (Fdo_annotation.With_body_hash.is_empty entry_annotation)
+  then
+    Format.fprintf ppf " fdo_entry_annotation%a"
+      Fdo_annotation.With_body_hash.print entry_annotation
+
 let print ppf (g : Ssa.finished Ssa.graph) =
   let function_info = Ssa.function_info g in
-  Format.fprintf ppf "SSA for %s(%a) : %a@.@." function_info.sym_name
+  Format.fprintf ppf "SSA for %s(%a) : %a%a@.@." function_info.sym_name
     (Format.pp_print_list
        ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
        print_parameter)
-    function_info.parameters Printcmm.machtype function_info.ret_type;
+    function_info.parameters Printcmm.machtype function_info.ret_type
+    print_fdo_entry_annotation function_info.fdo_entry_annotation;
   List.iter (print_block ppf) (Ssa.blocks g);
   Format.fprintf ppf "@."

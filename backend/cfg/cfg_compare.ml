@@ -312,8 +312,26 @@ let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
   in
   loop (DLL.hd_cell old_body) (DLL.hd_cell new_body)
 
+(* The FDO counters take part in the comparison: both pipelines must carry the
+   same counters on the same edges and calls. *)
+let equal_func_call_operation old_op new_op =
+  Cfg.equal_func_call_operation old_op new_op
+  && Option.equal Fdo_counter.equal
+       (Cfg.callsite_counter old_op)
+       (Cfg.callsite_counter new_op)
+
 let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     (new_term : Cfg.terminator) =
+  (* Every successor is mapped, whether or not its counters match. *)
+  let map_successors pairs =
+    List.map
+      (fun ((old_successor : Cfg.successor), (new_successor : Cfg.successor)) ->
+        map_label old_successor.target new_successor.target;
+        Fdo_annotation.equal old_successor.fdo_annotation
+          new_successor.fdo_annotation)
+      pairs
+    |> List.for_all Fun.id
+  in
   match old_term, new_term with
   | Never, _ | _, Never ->
     Misc.fatal_error "Never is unexpected in finished graphs"
@@ -324,24 +342,19 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
       Parity_test { ifso = new_ifso; ifnot = new_ifnot } )
   | ( Truth_test { ifso = old_ifso; ifnot = old_ifnot },
       Truth_test { ifso = new_ifso; ifnot = new_ifnot } ) ->
-    map_label old_ifso.target new_ifso.target;
-    map_label old_ifnot.target new_ifnot.target;
-    true
+    map_successors [old_ifso, new_ifso; old_ifnot, new_ifnot]
   (* Truth_test ≈ Int_test against [0] when [lt = gt] (both miss-the-equality
      arms go to the same label, so only the equality bit matters). [is_signed]
-     is irrelevant when comparing to [0]. *)
+     is irrelevant when comparing to [0]. Both [lt] and [gt] are compared with
+     [ifso], so that the FDO counters of each are checked. *)
   | ( Int_test { lt; eq; gt; imm = Some 0; is_signed = _ },
       Truth_test { ifso; ifnot } )
     when Label.equal lt.target gt.target ->
-    map_label lt.target ifso.target;
-    map_label eq.target ifnot.target;
-    true
+    map_successors [lt, ifso; gt, ifso; eq, ifnot]
   | ( Truth_test { ifso; ifnot },
       Int_test { lt; eq; gt; imm = Some 0; is_signed = _ } )
     when Label.equal lt.target gt.target ->
-    map_label ifso.target lt.target;
-    map_label ifnot.target eq.target;
-    true
+    map_successors [ifso, lt; ifso, gt; ifnot, eq]
   | ( Int_test
         { lt = old_lt;
           eq = old_eq;
@@ -356,10 +369,8 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
           is_signed = new_is_signed;
           imm = new_imm
         } ) ->
-    map_label old_lt.target new_lt.target;
-    map_label old_eq.target new_eq.target;
-    map_label old_gt.target new_gt.target;
-    Scalar.Signedness.equal old_is_signed new_is_signed
+    map_successors [old_lt, new_lt; old_eq, new_eq; old_gt, new_gt]
+    && Scalar.Signedness.equal old_is_signed new_is_signed
     && Option.equal Int.equal old_imm new_imm
   | ( Float_test
         { width = old_width;
@@ -375,20 +386,13 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
           gt = new_gt;
           uo = new_uo
         } ) ->
-    map_label old_lt.target new_lt.target;
-    map_label old_eq.target new_eq.target;
-    map_label old_gt.target new_gt.target;
-    map_label old_uo.target new_uo.target;
-    Cmm.equal_float_width old_width new_width
+    map_successors
+      [old_lt, new_lt; old_eq, new_eq; old_gt, new_gt; old_uo, new_uo]
+    && Cmm.equal_float_width old_width new_width
   | Switch old_labels, Switch new_labels ->
-    if Array.length old_labels = Array.length new_labels
-    then (
-      Array.iter2
-        (fun (old_succ : Cfg.successor) (new_succ : Cfg.successor) ->
-          map_label old_succ.target new_succ.target)
-        old_labels new_labels;
-      true)
-    else false
+    Array.length old_labels = Array.length new_labels
+    && map_successors
+         (List.combine (Array.to_list old_labels) (Array.to_list new_labels))
   | Return, Return -> true
   | Raise old_raise_kind, Raise new_raise_kind ->
     Lambda.equal_raise_kind old_raise_kind new_raise_kind
@@ -398,13 +402,13 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     true
   | Tailcall_func old_op, Tailcall_func new_op
   | Call_no_return old_op, Call_no_return new_op ->
-    Cfg.equal_func_call_operation old_op new_op
+    equal_func_call_operation old_op new_op
   | External_call_no_return old_op, External_call_no_return new_op ->
     Cfg.equal_external_call_operation old_op new_op
   | ( Call { op = old_op; label_after = old_label_after },
       Call { op = new_op; label_after = new_label_after } ) ->
     map_label old_label_after new_label_after;
-    Cfg.equal_func_call_operation old_op new_op
+    equal_func_call_operation old_op new_op
   | ( Prim { op = old_op; label_after = old_label_after },
       Prim { op = new_op; label_after = new_label_after } ) ->
     map_label old_label_after new_label_after;
@@ -812,10 +816,7 @@ let compare ~old_cfg ~new_cfg ppf =
           fun_args = _ (* feed the entry block's instructions, phase 2 *);
           fun_codegen_options = old_fun_codegen_options;
           fun_dbg = old_fun_dbg;
-          (* CR-soon yusumez: [fun_fdo_entry_annotation] is always empty on the
-             new side, since SSA doesn't carry the FDO counters. We should
-             compare it once it does. *)
-          fun_fdo_entry_annotation = _;
+          fun_fdo_entry_annotation = old_fun_fdo_entry_annotation;
           entry_label = _;
           fun_contains_calls = old_fun_contains_calls;
           fun_num_stack_slots = _ (* not populated at this pipeline stage *);
@@ -837,6 +838,7 @@ let compare ~old_cfg ~new_cfg ppf =
           fun_name = new_fun_name;
           fun_codegen_options = new_fun_codegen_options;
           fun_dbg = new_fun_dbg;
+          fun_fdo_entry_annotation = new_fun_fdo_entry_annotation;
           fun_contains_calls = new_fun_contains_calls;
           fun_poll = new_fun_poll;
           fun_ret_type = new_fun_ret_type;
@@ -873,6 +875,11 @@ let compare ~old_cfg ~new_cfg ppf =
     then
       Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
         Debuginfo.print_compact old_fun_dbg Debuginfo.print_compact new_fun_dbg;
+    if
+      not
+        (Fdo_annotation.With_body_hash.equal old_fun_fdo_entry_annotation
+           new_fun_fdo_entry_annotation)
+    then Format.fprintf ppf_m "fun_fdo_entry_annotation mismatch@.";
     if Stdlib.( <> ) old_fun_poll new_fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
     if not (Cmm.equal_machtype old_fun_ret_type new_fun_ret_type)

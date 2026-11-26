@@ -173,8 +173,12 @@ module Context = struct
           args = map_args t args
         }
     | Switch { index; targets } ->
+      let map_successor ({ target; fdo_annotation } : _ Terminator.successor) :
+          _ Terminator.successor =
+        { target = map_block t target; fdo_annotation }
+      in
       Switch
-        { index = map_value t index; targets = Array.map (map_block t) targets }
+        { index = map_value t index; targets = Array.map map_successor targets }
     | Call { op; args; continuation; may_raise; nontail } ->
       Call
         { op;

@@ -106,12 +106,14 @@ module Tail_call_reducer : Reducer = struct
       | Some ret_ty -> (
         let dbg = Block.terminator_dbg block in
         match call_op with
-        | Direct func
+        | Direct { sym = func; callsite_counter }
           when String.equal func.sym_name
                  (Ssa.function_info (in_graph ctx)).sym_name ->
           (* A self-recursive tail call is a back-edge to the entry block. Build
              it over input values/blocks and let [map_terminator] translate
              it. *)
+          Fdo_dropped_counters.register ~reason:Ssa_self_tail_call_to_jump
+            (Fdo_annotation.of_list (Option.to_list callsite_counter));
           Reduce
             (fun _c ->
               ( dbg,
