@@ -37,6 +37,8 @@ type error =
   | Non_lowercase_delimiter of string
   | Capitalized_raw_identifier of string
   | Unknown_keyword of string
+  | Removed_legacy_local
+  | Removed_legacy_global
 
 exception Error of error * Location.t
 
@@ -73,7 +75,6 @@ let all_keywords =
     "fun", FUN, always;
     "function", FUNCTION, always;
     "functor", FUNCTOR, always;
-    "global_", GLOBAL, oxcaml;
     "if", IF, always;
     "implies_", IMPLIES, oxcaml;
     "in", IN, always;
@@ -86,7 +87,6 @@ let all_keywords =
     "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
-    "local_", LOCAL, oxcaml;
     "match", MATCH, always;
     "method", METHOD, v1_0;
     "mod", MOD, always;
@@ -627,6 +627,18 @@ let prepare_error loc = function
       "%a has been defined as an additional keyword.@ \
        This version of OCaml does not support this keyword."
       Style.inline_code name
+  | Removed_legacy_local ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "local_"
+        Style.inline_code "@ local"
+  | Removed_legacy_global ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "global_"
+        Style.inline_code "@@ global"
 
 let () =
   Location.register_error_of_exn
@@ -723,6 +735,12 @@ rule token = parse
         check_label_name ~raw_escape:(escape<>"") lexbuf name;
         OPTLABEL name
       }
+  (* The removed legacy mode syntax. These must come before the lowercase
+     identifier rules, which match the same text. *)
+  | "local_"
+      { error lexbuf Removed_legacy_local }
+  | "global_"
+      { error lexbuf Removed_legacy_global }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
