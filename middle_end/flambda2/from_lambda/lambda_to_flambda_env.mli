@@ -44,6 +44,18 @@ val current_unit : t -> Compilation_unit.t
     [None] if [-fdo-counters] is off. *)
 val fdo : t -> Fdo_from_lambda_env.t option
 
+(** The FDO counter of a call of the source program at the given location (see
+    [Fdo_instrumentation.call]). To be called once per call, on reaching it. *)
+val fdo_call_counter : t -> Lambda.scoped_location -> Fdo_counter.t option
+
+(** The FDO counters of the switches a [Lambda] switch translates to (see
+    [Fdo_instrumentation.switch]). To be called once per switch, on reaching it.
+*)
+val fdo_switch_counters :
+  t ->
+  Lambda.lambda_switch ->
+  Fdo_instrumentation.Lambda_switch_counters.t option
+
 val machine_width : t -> Target_system.Machine_width.t
 
 val ident_stamp_upon_starting : t -> int
