@@ -52,6 +52,8 @@ val fdo_annotation : t -> Fdo_annotation.t
 
 val with_fdo_annotation : t -> Fdo_annotation.t -> t
 
+val map_fdo_annotation : t -> f:(Fdo_annotation.t -> Fdo_annotation.t) -> t
+
 (** Annotations for a single branch that replaces the given branches, when they
     have been found to be identical and shared. *)
 val join_point : t list -> t

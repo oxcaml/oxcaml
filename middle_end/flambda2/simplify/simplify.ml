@@ -45,6 +45,7 @@ let run ~ppf_dump ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       ~return_arity:(Flambda_arity.create_singletons [K.With_subkind.any_value])
       ~exn_continuation
   in
+  Fdo_dropped_counters.register_all (UA.fdo_dropped_counters uacc);
   let name_occurrences = RE.free_names body in
   let body = Rebuilt_expr.to_expr body (UA.are_rebuilding_terms uacc) in
   (* Sometimes, a variable is unbound at toplevel mainly because a symbol (using

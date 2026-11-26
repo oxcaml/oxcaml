@@ -426,7 +426,12 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
   if Target_ocaml_int.Map.cardinal arms < 1
   then RE.create_invalid Zero_switch_arms, uacc
   else
-    let change_to_apply_cont action =
+    let change_to_apply_cont action ~(reason : Fdo_dropped_counters.Reason.t) =
+      (* The arms' edges become a single jump. *)
+      let uacc =
+        UA.add_dropped_fdo_counters uacc ~reason
+          (Fdo_term_counters.of_switch_arms arms)
+      in
       let is_cold =
         UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
       in
@@ -435,6 +440,7 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
     match Target_ocaml_int.Map.get_singleton arms with
     | Some (_discriminant, action) ->
       change_to_apply_cont (Switch_arm.action action)
+        ~reason:Switch_to_single_arm
     | None -> (
       (* At that point, we've already applied the apply cont rewrite to the
          action of the arms. *)
@@ -449,7 +455,7 @@ let create_switch uacc ~condition_dbg ~scrutinee ~arms =
         (* The resulting [Debuginfo] on the [Apply_cont] will be arbitrarily
            chosen from amongst the [Debuginfo] values on the arms, but this
            seems fine. *)
-        change_to_apply_cont action
+        change_to_apply_cont action ~reason:Switch_with_identical_arms
       | None ->
         let switch = Switch.create ~condition_dbg ~scrutinee ~arms in
         let is_cold =

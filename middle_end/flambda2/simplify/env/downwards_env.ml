@@ -55,6 +55,7 @@ type t =
     machine_width : Target_system.Machine_width.t;
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
+    fdo : Fdo_downwards_env.t;
     disable_inlining : Disable_inlining.t;
     disable_partial_application_stub_generation : bool;
     inlined_attribute_to_forward :
@@ -119,6 +120,7 @@ let print ppf
       machine_width;
       typing_env;
       inlined_debuginfo;
+      fdo = _;
       disable_inlining;
       disable_partial_application_stub_generation;
       inlined_attribute_to_forward;
@@ -250,6 +252,7 @@ let create ~ppf_dump ~round ~machine_width ~(resolver : resolver)
     machine_width;
     typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
+    fdo = Fdo_downwards_env.none;
     disable_inlining = Do_not_disable_inlining;
     disable_partial_application_stub_generation = false;
     inlined_attribute_to_forward = None;
@@ -348,7 +351,8 @@ let enter_set_of_closures
     { machine_width;
       round;
       typing_env;
-      inlined_debuginfo = _;
+      inlined_debuginfo;
+      fdo;
       disable_inlining;
       disable_partial_application_stub_generation;
       inlined_attribute_to_forward = _;
@@ -381,6 +385,7 @@ let enter_set_of_closures
     round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
+    fdo = Fdo_downwards_env.enter_set_of_closures fdo ~inlined_debuginfo;
     disable_inlining;
     disable_partial_application_stub_generation;
     inlined_attribute_to_forward = None;
@@ -677,10 +682,13 @@ let set_inlining_arguments arguments t =
    when mixing code compiled in classic and Simplify modes *)
 
 let set_inlined_debuginfo t ~from =
-  { t with inlined_debuginfo = from.inlined_debuginfo }
+  { t with inlined_debuginfo = from.inlined_debuginfo; fdo = from.fdo }
 
 let clear_inlined_debuginfo t =
-  { t with inlined_debuginfo = Inlined_debuginfo.none }
+  { t with
+    inlined_debuginfo = Inlined_debuginfo.none;
+    fdo = Fdo_downwards_env.clear_copy_context t.fdo
+  }
 
 let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
     ~inlined_attribute =
@@ -710,6 +718,18 @@ let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
 
 let add_inlined_debuginfo t dbg =
   Inlined_debuginfo.rewrite t.inlined_debuginfo dbg
+
+let rewrite_fdo_counter t counter =
+  Inlined_debuginfo.inline_fdo_counter t.inlined_debuginfo
+    (Fdo_downwards_env.specialize_fdo_counter t.fdo counter)
+
+let rewrite_fdo_annotation t annotation =
+  Fdo_annotation.map (rewrite_fdo_counter t) annotation
+
+let add_fdo_unspecialized_copy t code_id =
+  { t with fdo = Fdo_downwards_env.add_unspecialized_copy t.fdo code_id }
+
+let fdo_stub_callsite_counter t = Fdo_downwards_env.stub_callsite_counter t.fdo
 
 let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let arguments =
@@ -744,6 +764,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
+      ~apply_callsite_counter:(Apply.callsite_counter apply)
   in
   let inlined_attribute_to_forward =
     inlined_attribute_to_forward_through_inlined_apply t
@@ -752,6 +773,9 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   in
   { t with
     inlined_debuginfo;
+    fdo =
+      Fdo_downwards_env.enter_inlined_apply t.fdo ~called_code
+        ~callsite_counter:(Apply.callsite_counter apply);
     inlined_attribute_to_forward;
     inlining_state;
     inlining_history_tracker =
@@ -920,6 +944,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
   { (* denv *)
     machine_width = denv.machine_width;
     inlined_debuginfo = denv.inlined_debuginfo;
+    fdo = denv.fdo;
     disable_inlining = denv.disable_inlining;
     disable_partial_application_stub_generation =
       denv.disable_partial_application_stub_generation;
