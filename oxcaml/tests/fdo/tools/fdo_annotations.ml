@@ -16,7 +16,12 @@
    [-fdo-counters -dcmm]).
 
    - [dropped <dump>] prints the dropped counters of the dump (as written with
-   [-dfdo-dropped-counters]). *)
+   [-dfdo-dropped-counters]).
+
+   - [check <dump a> <dump b>] prints the counters of [dump a] that are neither
+   in [dump b] nor dropped in it, then those of [dump b] that are not in [dump
+   a]: both lists are empty when a compilation loses no counter, apart from
+   those of code removed as unreachable (see [Fdo_dropped_counters]). *)
 
 (* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
@@ -55,10 +60,18 @@ module Annotation = struct
     Kind.to_string kind ^ ": " ^ contents
 end
 
-(* The index just after the string literal starting at [i]. *)
+(* The index just after the string literal starting at [i]. Cmm dumps print the
+   string literals of data unescaped, so a literal also ends at the end of its
+   line, and of the dump. *)
 let end_of_string dump i =
   let rec go i =
-    match dump.[i] with '\\' -> go (i + 2) | '"' -> i + 1 | _ -> go (i + 1)
+    if i >= String.length dump
+    then String.length dump
+    else
+      match dump.[i] with
+      | '\\' -> go (i + 2)
+      | '"' | '\n' -> i + 1
+      | _ -> go (i + 1)
   in
   go (i + 1)
 
@@ -83,27 +96,16 @@ let normalize_spaces s =
   |> List.filter (fun s -> not (String.equal s ""))
   |> String.concat " "
 
-let rec skip_spaces dump i =
-  if
-    i < String.length dump
-    && (Char.equal dump.[i] ' ' || Char.equal dump.[i] '\n')
-  then skip_spaces dump (i + 1)
-  else i
-
-(* The annotation starting at [i], if any, with the index just after it. A line
-   break can separate the keyword from the parenthesis. *)
+(* The annotation starting at [i], if any, with the index just after it. *)
 let annotation_at dump i =
   List.find_map
     (fun kind ->
-      let keyword = Kind.keyword kind in
-      let after_keyword = i + String.length keyword in
-      let paren = skip_spaces dump after_keyword in
+      let prefix = Kind.keyword kind ^ "(" in
+      let start = i + String.length prefix in
       if
-        paren < String.length dump
-        && String.equal (String.sub dump i (String.length keyword)) keyword
-        && Char.equal dump.[paren] '('
+        start <= String.length dump
+        && String.equal (String.sub dump i (String.length prefix)) prefix
       then
-        let start = paren + 1 in
         let close = closing_paren dump start in
         let contents =
           normalize_spaces (String.sub dump start (close - start))
@@ -272,23 +274,37 @@ let counters file =
       counters_of_contents contents)
   |> List.sort_uniq String.compare
 
+let only_in l1 l2 = List.filter (fun c -> not (List.mem c l2)) l1
+
 let compare_sets a b =
   let ca = counters a and cb = counters b in
-  let only_in l1 l2 = List.filter (fun c -> not (List.mem c l2)) l1 in
   print_lines ("only in " ^ a ^ ":") (only_in ca cb);
   print_lines ("only in " ^ b ^ ":") (only_in cb ca)
 
-(* The dropped counters are the last thing a compilation dumps. *)
-let dropped file =
+(* The lines of the dropped counters, [<reason>: <counter>], which are the last
+   thing a compilation dumps. *)
+let dropped_lines file =
   let header = "*** FDO dropped counters" in
   let rec after_header = function
     | [] -> []
     | line :: lines ->
       if String.equal line header then lines else after_header lines
   in
-  In_channel.with_open_text file In_channel.input_lines
-  |> after_header
-  |> print_lines ("dropped in " ^ file ^ ":")
+  In_channel.with_open_text file In_channel.input_lines |> after_header
+
+let dropped file = dropped_lines file |> print_lines ("dropped in " ^ file ^ ":")
+
+let check a b =
+  let ca = counters a and cb = counters b in
+  let dropped =
+    dropped_lines b
+    |> List.filter_map (fun line ->
+        Option.map
+          (fun i -> String.sub line (i + 2) (String.length line - i - 2))
+          (String.index_opt line ':'))
+  in
+  print_lines ("lost from " ^ a ^ ":") (only_in (only_in ca cb) dropped);
+  print_lines ("added in " ^ b ^ ":") (only_in cb ca)
 
 let () =
   match Sys.argv with
@@ -297,7 +313,8 @@ let () =
   | [| _; "compare-entries"; a; b |] -> compare_entries a b
   | [| _; "compare-counters"; a; b |] -> compare_counters a b
   | [| _; "compare-sets"; a; b |] -> compare_sets a b
+  | [| _; "check"; a; b |] -> check a b
   | _ ->
     failwith
       "usage: fdo_annotations ((list | dropped) <dump> | (compare-entries | \
-       compare-counters | compare-sets) <dump a> <dump b>)"
+       compare-counters | compare-sets | check) <dump a> <dump b>)"

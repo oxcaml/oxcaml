@@ -1,0 +1,2 @@
+(executable
+ (name fdo_annotations))

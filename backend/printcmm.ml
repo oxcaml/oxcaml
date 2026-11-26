@@ -359,21 +359,9 @@ let operation d = function
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
-let callsite_counter ppf = function
-  | None -> ()
-  | Some counter ->
-    fprintf ppf "@ callsite_counter(%s)" (Fdo_counter.to_string counter)
-
 let fdo_annotation ppf annots =
-  let fdo_annotation = Branch_annotations.fdo_annotation annots in
-  if not (Fdo_annotation.is_empty fdo_annotation)
-  then fprintf ppf "fdo_annotation%a@ " Fdo_annotation.print fdo_annotation
-
-let fdo_entry_annotation ppf entry_annotation =
-  if not (Fdo_annotation.With_body_hash.is_empty entry_annotation)
-  then
-    fprintf ppf "@ fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print
-      entry_annotation
+  Fdo_annotation.print_edge_before ppf
+    (Branch_annotations.fdo_annotation annots)
 
 let probability ~uniform ~total ppf likelihood =
   match Likelihood.rescale ~total likelihood |> Likelihood.classify with
@@ -446,8 +434,8 @@ let rec expr ppf = function
     with_location_mapping ~label:"Cop" ~dbg ppf (fun () ->
         fprintf ppf "@[<2>(%s" (operation dbg op);
         (match[@warning "-4"] op with
-        | Capply { callsite_counter = counter; _ } ->
-          callsite_counter ppf counter
+        | Capply { callsite_counter; _ } ->
+          Fdo_annotation.print_callsite_counter ppf callsite_counter
         | _ -> ());
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
@@ -586,8 +574,9 @@ let fundecl ppf f =
       fprintf ppf
         "@[<1>(function%s%a@ %s%a@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name fdo_entry_annotation f.fun_fdo_entry_annotation
-        print_cases f.fun_args machtype f.fun_ret_type sequence f.fun_body)
+        f.fun_name.sym_name Fdo_annotation.With_body_hash.print_entry
+        f.fun_fdo_entry_annotation print_cases f.fun_args machtype
+        f.fun_ret_type sequence f.fun_body)
 
 let data_item ppf = function
   | Cdefine_symbol { sym_name; sym_global = Local; _ } ->

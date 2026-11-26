@@ -56,7 +56,28 @@ val map : (Fdo_counter.t -> Fdo_counter.t) -> t -> t
 (** Ignores order. *)
 val equal : t -> t -> bool
 
+(** [(counter ...)], on one line. *)
 val print : Format.formatter -> t -> unit
+
+(** {2 Dumps of the backend IRs}
+
+    Every IR prints its counters in the same way, so that tests can read them
+    from any dump: [keyword(counter ...)], on one line. Each of these printers
+    prints nothing when there are no counters, and a space before them
+    otherwise. *)
+
+(** The counters of an edge, as [fdo_annotation(...)]. *)
+val print_edge : Format.formatter -> t -> unit
+
+(** The same, for IRs that print them before the code of the edge: with a break
+    after them instead of a space before. *)
+val print_edge_before : Format.formatter -> t -> unit
+
+(** The same as [keyword(...)], for edges of another kind. *)
+val print_tagged : keyword:string -> Format.formatter -> t -> unit
+
+(** The counter of a call, as [callsite_counter(...)]. *)
+val print_callsite_counter : Format.formatter -> Fdo_counter.t option -> unit
 
 (** The counters bundled with a function body hash. Used for function entries.
 *)
@@ -82,5 +103,9 @@ module With_body_hash : sig
 
   val equal : t -> t -> bool
 
+  (** [(counter ... body_hash:hash)], on one line. *)
   val print : Format.formatter -> t -> unit
+
+  (** As [fdo_entry_annotation(...)], see {!print_edge}. *)
+  val print_entry : Format.formatter -> t -> unit
 end
