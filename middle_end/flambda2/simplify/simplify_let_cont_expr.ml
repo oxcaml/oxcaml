@@ -1349,8 +1349,9 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
       in
       k dacc simplified_handler cont_uses_env_in_handler)
 
-and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
-    ~invariant_params all_handlers_set denv_to_reset dacc cont
+and simplify_single_recursive_handler ~simplify_expr
+    ~lifted_constants_before_body cont_uses_env_so_far ~invariant_params
+    all_handlers_set denv_to_reset dacc cont
     ({ params; handler; is_cold } as original : One_recursive_handler.t) k =
   (* Here we perform the downwards traversal on a single handler.
 
@@ -1367,7 +1368,8 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
   in
   let is_cold = DE.is_cold handler_env in
   let handler_env =
-    DE.add_lifted_constant_state handler_env (DA.get_lifted_constants dacc)
+    DE.add_lifted_constant_state handler_env
+      (LCS.diff lifted_constants_before_body (DA.get_lifted_constants dacc))
   in
   let code_age_relation = TE.code_age_relation (DA.typing_env dacc) in
   let handler_env = DE.with_code_age_relation code_age_relation handler_env in
@@ -1445,6 +1447,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~simplified_body
       in
       let handler = Continuation.Lmap.find cont continuation_handlers in
       simplify_single_recursive_handler ~simplify_expr ~invariant_params
+        ~lifted_constants_before_body:data.lifted_constants_before_body
         cont_uses_env_so_far all_conts_set common_denv dacc cont handler
         (fun dacc rebuild cont_uses_env_so_far ->
           let simplified_handlers_set =
@@ -1619,7 +1622,9 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~simplified_body
     let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
       prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params:invariant_params
         ~lifted_params ~is_recursive:true ~replay:None
-        ~consts_lifted_after_fork:(DA.get_lifted_constants dacc)
+        ~consts_lifted_after_fork:
+          (LCS.diff data.lifted_constants_before_body
+             (DA.get_lifted_constants dacc))
         (Normal_or_exn : Continuation.Sort.t)
         None uses ~arg_types_by_use_id
     in
