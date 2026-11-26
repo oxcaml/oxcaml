@@ -646,9 +646,9 @@ apply_expr:
     inlining_state = option(inlining_state);
     func = func_name_with_optional_arities;
     args = simple_args;
-    MINUSGREATER
-    r = result_continuation e = exn_continuation
+    conts = apply_continuations
      { let (func, arities) = func in
+       let (r, e) = conts in
        let (call_kind, alloc_mode) = call_kind_and_alloc_mode in {
        func;
           continuation = r;
@@ -732,6 +732,18 @@ region:
 result_continuation:
   | c = continuation { Return c }
   | KWD_NEVER { Never_returns }
+;
+
+apply_continuations:
+  | MINUSGREATER; r = blank_or(result_continuation);
+    e = option(apply_exn_continuation)
+    { Option.value r ~default:(Return (Special Done)),
+      Option.value e ~default:(Special Error, []) }
+;
+
+apply_exn_continuation:
+  | STAR; BLANK { Special Error, [] }
+  | e = exn_continuation { e }
 ;
 
 apply_cont_expr:
