@@ -2,7 +2,7 @@
 
 type t = { x : int ref }
 
-let f : int ref -> local_ int ref = fun x -> x
+let f : int ref -> int ref @ local = fun x -> x
 
 let g x =
   let t = { x = f x } in
@@ -23,7 +23,7 @@ let f x =
             (* ^ *)
 ;;
 
-let f (local_ x) =
+let f (x @ local) =
   let z = Some x in
             (* ^ *)
 ;;
@@ -43,7 +43,7 @@ let f x =
   z
 ;;
 
-let f (local_ x) y =
+let f (x @ local) y =
   let z = [x, Some y] in
                 (* ^ *)
 ;;
@@ -53,7 +53,7 @@ let f x y =
                 (* ^ *)
 ;;
 
-let f (local_ x) y =
+let f (x @ local) y =
   let z = match Some 10 with
     | Some _ -> [x; Some y]
     | None -> [Some y]
@@ -78,7 +78,7 @@ let f x y =
   z
 ;;
 
-let f (local_ x) y =
+let f (x @ local) y =
   let z = in
   [x; Some y]
         (* ^ *)
@@ -121,6 +121,6 @@ let g x = global_function (Some x)
                              (* ^ *)
 
 let f x =
-  let local_ z = Some x in
-                   (* ^ *)
+  let z @ local = Some x in
+                    (* ^ *)
 ;;

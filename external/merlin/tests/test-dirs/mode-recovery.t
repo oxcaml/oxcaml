@@ -3,7 +3,7 @@ Test recovery from mode-related errors
 Error from an escape lock
   $ cat > escape.ml <<EOF
   > let () =
-  >   let x = local_ "" in
+  >   let x @ local = "" in
   >   let module M = struct
   >     class foo = object
   >       val y = x
@@ -59,7 +59,7 @@ Error from a closure lock
   >   let iter = failwith ""
   > end
   > let length xs =
-  >   let local_ count = ref 0 in
+  >   let count @ local = ref 0 in
   >   List.iter xs ~f:(fun () -> incr count);
   >   !count
   > EOF
@@ -75,7 +75,7 @@ The error is reported
 
 We can locate the value that was used incorrectly
   $ $MERLIN single locate -position 8:37 -filename closure1.ml < closure1.ml | jq .value.pos -c
-  {"line":7,"col":13}
+  {"line":7,"col":6}
 
 Error from closure lock
   $ cat > closure2.ml <<EOF
@@ -116,7 +116,7 @@ We can locate the values that were used incorrectly
 Error from exclave lock
   $ cat > exclave.ml <<EOF
   > let f () =
-  >   let x = local_ Some 10 in
+  >   let x = stack_ (Some 10) in
   >   exclave_ x
   > EOF
 

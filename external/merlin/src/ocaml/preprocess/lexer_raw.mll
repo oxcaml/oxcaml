@@ -496,7 +496,8 @@ let () = Lexer.is_keyword_ref := is_keyword
 
 let find_keyword lexbuf name default =
   match Hashtbl.find keyword_table name with
-<<<<<<< Merlin:cpascaru.no-local_
+  | Some LOCAL -> fail lexbuf Removed_legacy_local
+  | Some GLOBAL -> fail lexbuf Removed_legacy_global
   | Some x -> return x
   | None -> fail lexbuf (Unknown_keyword name)
   | exception Not_found -> return default
@@ -504,17 +505,6 @@ let find_keyword lexbuf name default =
 let find_keyword state lexbuf ~name ~default =
   try return @@ Hashtbl.find state.keywords name
   with Not_found -> find_keyword lexbuf name default
-||||||| Compiler:last-imported
-  | Some x -> x
-  | None -> error lexbuf (Unknown_keyword name)
-  | exception Not_found -> LIDENT name
-=======
-  | Some LOCAL -> error lexbuf Removed_legacy_local
-  | Some GLOBAL -> error lexbuf Removed_legacy_global
-  | Some x -> x
-  | None -> error lexbuf (Unknown_keyword name)
-  | exception Not_found -> LIDENT name
->>>>>>> Compiler:HEAD
 
 let check_label_name lexbuf name =
   if is_keyword name

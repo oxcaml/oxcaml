@@ -129,11 +129,11 @@ escape characters in string literals, so we use the revert-newlines script.
   
   "stack"
   
-  |  f (local_ Some x);
-  |                 ^
+  |  f (stack_ (Some x));
+  |                  ^
   
-  |  f (local_ Some x);
-  |    ^^^^^^^^^^^^^^^
+  |  f (stack_ (Some x));
+  |            ^^^^^^^^
   
   "stack"
   
@@ -240,11 +240,11 @@ escape characters in string literals, so we use the revert-newlines script.
   
   "stack"
   
-  |  f (local_ { z });
+  |  f (stack_ { z });
   |              ^
   
-  |  f (local_ { z });
-  |    ^^^^^^^^^^^^^^
+  |  f (stack_ { z });
+  |            ^^^^^
   
   "stack"
   
@@ -715,11 +715,11 @@ escape characters in string literals, so we use the revert-newlines script.
   
   "heap"
   
-  |  let local_ z = Some x in
-  |                      ^
+  |  let z @ local = Some x in
+  |                       ^
   
-  |  let local_ z = Some x in
-  |      ^^^^^^^^^^^^^^^^^
+  |  let z @ local = Some x in
+  |      ^^^^^^^^^^^^^^^^^^
   
   "stack"
   

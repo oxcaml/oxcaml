@@ -32,7 +32,7 @@ and h g x y =
   exclave_ Some (g z)
 ;;
 
-let ignore (local_ _) = ()
+let ignore (_ @ local) = ()
 
 let () =
   let f g x y =
