@@ -43,6 +43,7 @@ val translate : bool
 val style : Translate.style
 val compact : bool
 
+val dune : bool
 val no_ocamlsrcdir : bool
 val no_diff : bool
 val shell : bool

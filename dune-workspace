@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 3.0)
 ; This is the context for the 'boot' build, when compiling oxcaml with the system compiler
 ; We need to call the boot context "default" so that dune selects it for merlin
 (context (default

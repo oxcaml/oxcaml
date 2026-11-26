@@ -425,7 +425,7 @@
 
 (executable
  (name main_native)
- (modes native)
+ (modes native byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamlbytecomp ocamlfrontend)
@@ -877,7 +877,7 @@
 
 (executable
  (name boot_ocamlopt)
- (modes native)
+ (modes native byte)
  (instrumentation
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
@@ -891,6 +891,14 @@
   ocamloptcomp
   ocamlfrontend)
  (modules boot_ocamlopt))
+
+; To allow the boot compiler to be run in bytecode mode (for tests)
+(subdir boot_stublibs
+  (copy_files ../middle_end/flambda2/numbers/floats/dllflambda2_floats_stubs.so)
+  (copy_files ../middle_end/flambda2/algorithms/dllflambda2_algorithms_stubs.so)
+  (copy_files ../middle_end/flambda2/to_jsir/jsoo_imports/dlljsoo_imports_stubs.so)
+  (copy_files ../external/owee/dllcompiler_owee_stubs.so)
+  (copy_files ../external/gc-timings/dllgc_timings_stubs.so))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
 ; must be kept in sync with each other and in a topological order.

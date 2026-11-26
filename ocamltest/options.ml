@@ -72,6 +72,7 @@ let run_ocamlrunparam = ref ""
 let translate = ref false
 let style = ref Translate.Plain
 let compact = ref false
+let dune = ref false
 let no_ocamlsrcdir = ref false
 let no_diff = ref false
 let shell = ref false
@@ -129,6 +130,8 @@ let commandline_options =
    " If translating, preserve line numbers in the output.");
   ("-keep-chars", Arg.Unit (fun () -> style := Translate.Chars),
    " If translating, preserve char offsets in the output.");
+  ("-dune", Arg.Unit (fun () -> dune := true),
+   " Generate dune files instead of running tests");
   ("-no-ocamlsrcdir", Arg.Unit (fun () -> no_ocamlsrcdir := true),
    " Do not use OCAMLSRCDIR to find dependencies");
   ("-no-diff", Arg.Unit (fun () -> no_diff := true),
@@ -162,6 +165,7 @@ let run_ocamlrunparam = !run_ocamlrunparam
 let translate = !translate
 let style = !style
 let compact = !compact
+let dune = !dune
 let no_ocamlsrcdir = !no_ocamlsrcdir
 let no_diff = !no_diff
 let shell = !shell
