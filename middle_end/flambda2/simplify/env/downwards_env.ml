@@ -62,22 +62,10 @@ end
    lifted continuations can be used from the handlers of other continuations. *)
 
 type lifting_analysis =
-  { rev_variables_defined : Lifted_free_var.t list;
-        (* Variables defined in normal mode by the current continuation handler
-           (including its parameters), the most recent first. These are the
-           parameters that would have to be added to a continuation lifted out
-           of the current one. *)
-    rev_phantom_variables_defined : Bound_var.t list;
-        (* Variables defined by the current continuation handler that cannot be
-           used in normal mode (phantom variables), the most recent first. They
-           cannot be passed as arguments to a continuation lifted out of the
-           current one, and are instead bound as optimised out in its
-           handler. *)
-    num_variables_defined : int;
-        (* Number of variables defined so far in normal mode by the current
-           continuation handler (including its parameters): the number of
-           parameters that would have to be added to a let cont lifted out of
-           it. *)
+  { num_variables_defined : int;
+        (* Number of variables defined so far by the current continuation
+           handler (including its parameters): the number of parameters that
+           would have to be added to a let cont lifted out of it. *)
     cost_of_lifting : int
         (* The number of parameters that would have to be created if all the let
            conts seen so far in the current continuation's handler were lifted
@@ -145,12 +133,7 @@ and t =
            [Flambda_dump]. *)
   }
 
-let empty_lifting_analysis =
-  { rev_variables_defined = [];
-    rev_phantom_variables_defined = [];
-    num_variables_defined = 0;
-    cost_of_lifting = 0
-  }
+let empty_lifting_analysis = { num_variables_defined = 0; cost_of_lifting = 0 }
 
 let no_lifted_continuations =
   { continuations = Continuation.Map.empty; free_var_args = Variable.Map.empty }
@@ -180,12 +163,7 @@ let print ppf
       loopify_state;
       replay_history;
       specialization_cost;
-      lifting_analysis =
-        { rev_variables_defined;
-          rev_phantom_variables_defined = _;
-          num_variables_defined = _;
-          cost_of_lifting
-        };
+      lifting_analysis = { num_variables_defined; cost_of_lifting };
       lifted_continuations = _;
       has_seen_a_non_liftable_continuation;
       join_analysis;
@@ -227,10 +205,7 @@ let print ppf
       a "join_analysis" join_analysis
         (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
              Format.fprintf ppf "()"));
-      a "variables_defined_in_current_continuation"
-        (List.rev rev_variables_defined)
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
-           Lifted_free_var.print);
+      d "variables_defined_in_current_continuation" num_variables_defined;
       d "cost_of_lifting_continuations_out_of_current_one" cost_of_lifting;
       b "has_seen_a_non_liftable_continuation"
         has_seen_a_non_liftable_continuation;
@@ -249,22 +224,12 @@ let define_variable0 ~extra t var kind =
     else Replay_history.define_variable (Bound_var.var var) t.replay_history
   in
   let lifting_analysis =
-    if extra
+    (* Extra params, and variables that cannot be used in normal mode, are never
+       free variables of lifted continuations (see [Simplify_let_cont_expr]). *)
+    if extra || not (Name_mode.is_normal (Bound_var.name_mode var))
     then t.lifting_analysis
-    else if not (Name_mode.is_normal (Bound_var.name_mode var))
-    then
-      { t.lifting_analysis with
-        rev_phantom_variables_defined =
-          var :: t.lifting_analysis.rev_phantom_variables_defined
-      }
     else
       { t.lifting_analysis with
-        rev_variables_defined =
-          Lifted_free_var.create
-            (Bound_parameter.create (Bound_var.var var)
-               (Flambda_kind.With_subkind.anything kind)
-               (Bound_var.debug_uid var))
-          :: t.lifting_analysis.rev_variables_defined;
         num_variables_defined = t.lifting_analysis.num_variables_defined + 1
       }
   in
@@ -884,12 +849,6 @@ let add_lifted_constant_state ?maybe_already_defined denv lifted =
           else define_code denv ~code_id ~code)
         pieces_of_code denv)
 
-let variables_defined_in_current_continuation t =
-  List.rev t.lifting_analysis.rev_variables_defined
-
-let phantom_variables_defined_in_current_continuation t =
-  List.rev t.lifting_analysis.rev_phantom_variables_defined
-
 let add_lifted_continuation t cont ~free_vars ~is_exn_handler =
   let lifted = t.lifted_continuations in
   { t with
@@ -936,36 +895,8 @@ let enter_set_of_handlers t ~lifted_free_vars ~lifted_params =
     t lifted_free_vars
     (Bound_parameters.to_list lifted_params)
 
-let bind_lifted_free_vars_in_replay t lifted_cont =
-  match
-    Continuation.Map.find_opt lifted_cont t.lifted_continuations.continuations
-  with
-  | None -> t
-  | Some (free_vars, ~is_exn_handler:_) -> (
-    match Replay_history.replay_variable_mapping t.replay_history with
-    | Still_recording ->
-      Misc.fatal_errorf
-        "Lifted continuation %a should only be referred to in a replayed \
-         handler"
-        Continuation.print lifted_cont
-    | Replayed original_of_current ->
-      let current_of_original =
-        Variable.Map.fold
-          (fun current original acc -> Variable.Map.add original current acc)
-          original_of_current Variable.Map.empty
-      in
-      List.fold_left
-        (fun t free_var ->
-          match
-            Variable.Map.find_opt
-              (Lifted_free_var.var free_var)
-              current_of_original
-          with
-          | Some var -> bind_lifted_free_var t ~free_var (Simple.var var)
-          | None ->
-            Misc.fatal_errorf "Lifted param %a of %a has not been replayed"
-              Lifted_free_var.print free_var Continuation.print lifted_cont)
-        t free_vars)
+let forget_lifted_continuations t =
+  { t with lifted_continuations = no_lifted_continuations }
 
 let has_lifted_params t cont =
   Continuation.Map.mem cont t.lifted_continuations.continuations

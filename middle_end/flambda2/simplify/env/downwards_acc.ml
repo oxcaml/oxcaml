@@ -33,8 +33,6 @@ type t =
     slot_offsets : Slot_offsets.t Code_id.Map.t;
     debuginfo_rewrites : Debuginfo.t Simple.Map.t;
     are_lifting_conts : Are_lifting_conts.t;
-    lifted_continuations : (DE.t * Original_handlers.t) list;
-    (* head of the list is the outermost continuation being lifted *)
     continuation_lifting_budget : int;
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
@@ -42,16 +40,11 @@ type t =
     specialization_map : Continuation.t Continuation_callsite_map.t
   }
 
-let print_lifted_cont ppf (denv, original_handlers) =
-  Format.fprintf ppf
-    "@[<hov 1>(@[<hov 1>(denv %a)@]@ @[<hov 1>(original_handlers %a)@])@]"
-    DE.print denv Original_handlers.print original_handlers
-
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
-        are_lifting_conts; lifted_continuations; continuation_lifting_budget;
+        are_lifting_conts; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
@@ -67,7 +60,6 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(slot_offsets@ %a)@ \
       @[<hov 1>(debuginfo_rewrites@ %a)@]@ \
       @[<hov 1>(are_lifting_conts@ %a)@]@ \
-      @[<hov 1>(lifted_continuations@ %a)@]@ \
       @[<hov 1>(continuation_lifting_budget %d)@]@ \
       @[<hov 1>(continuations_to_specialize %a)@]@ \
       @[<hov 1>(specialization_map %a)@]\
@@ -85,8 +77,6 @@ let [@ocamlformat "disable"] print ppf
     (Code_id.Map.print Slot_offsets.print) slot_offsets
     (Simple.Map.print Debuginfo.print_compact) debuginfo_rewrites
     Are_lifting_conts.print are_lifting_conts
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-       print_lifted_cont) lifted_continuations
     continuation_lifting_budget
     Continuation.Set.print continuations_to_specialize
     (Continuation.Map.print (Apply_cont_rewrite_id.Map.print Continuation.print)) specialization_map
@@ -105,7 +95,6 @@ let create denv slot_offsets continuation_uses_env =
     code_ids_never_simplified = Code_id.Set.empty;
     debuginfo_rewrites = Simple.Map.empty;
     are_lifting_conts = Are_lifting_conts.no_lifting At_toplevel;
-    lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
     continuations_to_specialize = Continuation.Set.empty;
     specialization_map = Continuation.Map.empty
@@ -288,14 +277,6 @@ let merge_debuginfo_rewrite t ~bound_to dbg =
 let are_lifting_conts t = t.are_lifting_conts
 
 let with_are_lifting_conts t are_lifting_conts = { t with are_lifting_conts }
-
-let get_and_clear_lifted_continuations t =
-  { t with lifted_continuations = [] }, t.lifted_continuations
-
-let add_lifted_continuation denv original_handlers t =
-  { t with
-    lifted_continuations = (denv, original_handlers) :: t.lifted_continuations
-  }
 
 (* Invariant: budget < 0 means no limit on cont lifting *)
 let get_continuation_lifting_budget t =

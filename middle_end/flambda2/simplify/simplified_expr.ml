@@ -44,6 +44,7 @@ and simplified_lets_and_let_conts =
   | Simplified_let of simplified_defining_expr * simplified_lets_and_let_conts
   | Simplified_let_cont of
       simplified_let_cont_handlers * simplified_lets_and_let_conts
+  | Lifted_let_cont of lifted_let_cont * simplified_lets_and_let_conts
 
 and simplified_defining_expr =
   { bindings_to_place : Simplified_named.binding_to_place list;
@@ -78,6 +79,11 @@ and simplified_let_cont_handlers =
     handlers_from_the_outside_to_the_inside : simplified_handlers_group list;
     original_invariant_params : Bound_parameters.t;
     invariant_extra_params : Bound_parameters.t
+  }
+
+and lifted_let_cont =
+  { denv : Downwards_env.t;
+    handlers : Original_handlers.t
   }
 
 and simplified_apply =
@@ -164,6 +170,10 @@ and print_lets_and_let_conts ~ctx ppf = function
   | Simplified_let (let_expr, body) -> print_let_expr ~ctx ppf ~body let_expr
   | Simplified_let_cont (let_cont, body) ->
     print_let_cont ~ctx ppf ~body let_cont
+  | Lifted_let_cont ({ denv = _; handlers }, body) ->
+    Format.fprintf ppf "@[<hv 2>lifted_let_cont@ %a@]@\n"
+      Original_handlers.print handlers;
+    print_lets_and_let_conts ~ctx ppf body
 
 and print_let_expr ~ctx ~body ppf
     { bindings_to_place; removed_operations = _; rewrite_id } =
@@ -393,6 +403,12 @@ let simplified_let_cont simplified_handlers t =
   { t with
     simplified_lets_and_let_conts =
       Simplified_let_cont (simplified_handlers, t.simplified_lets_and_let_conts)
+  }
+
+let lifted_let_cont ~denv handlers t =
+  { t with
+    simplified_lets_and_let_conts =
+      Lifted_let_cont ({ denv; handlers }, t.simplified_lets_and_let_conts)
   }
 
 let simplified_terminator simplified_terminator =
