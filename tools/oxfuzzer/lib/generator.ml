@@ -305,6 +305,11 @@ let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
     bind_operand st rhs ~f:(fun rhs ->
         bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
 
+(* CR-someday xclerc: Consider deleting this binding and the normalization code.
+   The comparisons generated here already return -1, 0, or 1, although their
+   public contracts only specify the sign. *)
+let normalize_comparison_results = false
+
 (* Comparison APIs specify only the sign of the result. Normalize before using
    it in arithmetic so that different magnitudes do not cause false
    positives. *)
@@ -1008,11 +1013,12 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          ( 1,
            Gen.create (fun () ->
                let expr = gen_compare st env (gen_scalar_type st) in
-               Expr.Convert
-                 { expr = normalize_comparison st expr;
-                   from = NumberTy.boxed Int;
-                   to_ = nty
-                 }) );
+               let expr =
+                 if normalize_comparison_results
+                 then normalize_comparison st expr
+                 else expr
+               in
+               Expr.Convert { expr; from = NumberTy.boxed Int; to_ = nty }) );
          ( 1,
            Gen.create (fun () ->
                Expr.Convert
