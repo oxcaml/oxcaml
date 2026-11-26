@@ -22,6 +22,6 @@ value caml_native_pointer_to_value(intnat p)
 
 value remembered_set_size(value unit)
 {
-    struct caml_ref_table *tbl = &Caml_state->minor_tables->major_ref;
+    struct caml_ref_table *tbl = &Caml_state->minor_tables.major_ref;
     return Val_long(tbl->ptr - tbl->base);
 }

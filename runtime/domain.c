@@ -758,10 +758,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->young_ptr = NULL;
   domain_state->young_trigger = NULL;
 
-  domain_state->minor_tables = caml_alloc_minor_tables();
-  if(domain_state->minor_tables == NULL) {
-    goto fail_minor_tables;
-  }
+  caml_setup_minor_tables(&domain_state->minor_tables);
 
   d->state->shared_heap = caml_init_shared_heap();
   if(d->state->shared_heap == NULL) {
@@ -873,9 +870,7 @@ fail_major_gc:
   caml_orphan_shared_heap(domain_state->shared_heap);
   domain_state->shared_heap = NULL;
 fail_shared_heap:
-  caml_free_minor_tables(domain_state->minor_tables);
-  domain_state->minor_tables = NULL;
-fail_minor_tables:
+  caml_reset_minor_tables(&domain_state->minor_tables);
   caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 fail_dynamic:
@@ -2803,8 +2798,7 @@ void caml_domain_terminate(bool last)
 
   caml_free_shared_heap(domain_state->shared_heap);
   domain_state->shared_heap = NULL;
-  caml_free_minor_tables(domain_state->minor_tables);
-  domain_state->minor_tables = NULL;
+  caml_reset_minor_tables(&domain_state->minor_tables);
 
   /* At this point, the stats of the domain must be empty.
      - heap stats were orphaned by [caml_orphan_shared_heap]

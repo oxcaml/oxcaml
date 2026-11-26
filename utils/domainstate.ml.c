@@ -21,20 +21,20 @@ let stack_ctx_words = Stack_ctx_words
 let stack_guard_stride = Stack_guard_stride
 
 type t =
+#define MINOR_TABLES_FIELDS
 #define DOMAIN_STATE(type, name) | Domain_##name
 #include "domain_state.tbl"
-#undef DOMAIN_STATE
 
 let idx_of_field =
   let curr = 0 in
+#define MINOR_TABLES_FIELDS
 #define DOMAIN_STATE(type, name) \
   let idx__##name = curr in \
   let curr = curr + 1 in
 #include "domain_state.tbl"
-#undef DOMAIN_STATE
   let _ = curr in
   function
+#define MINOR_TABLES_FIELDS
 #define DOMAIN_STATE(type, name) \
   | Domain_##name -> idx__##name
 #include "domain_state.tbl"
-#undef DOMAIN_STATE

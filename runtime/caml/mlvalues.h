@@ -70,8 +70,6 @@ typedef volatile value * value_ptr;
 typedef int32_t opcode_t;
 typedef opcode_t * code_t;
 
-#include "domain_state.h"
-
 /* Or_null constructors. */
 
 #define Val_null ((value) 0)

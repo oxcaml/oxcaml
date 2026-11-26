@@ -22,6 +22,7 @@
 
 #include "misc.h"
 #include "mlvalues.h"
+#include "minor_gc_structs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,14 +36,13 @@ typedef value extra_params_area[NUM_EXTRA_PARAMS];
 typedef struct {
 #define DOMAIN_STATE(type, name) CAMLalign(8) type name;
 #include "domain_state.tbl"
-#undef DOMAIN_STATE
 } caml_domain_state;
 
 enum {
   Domain_state_num_fields =
 #define DOMAIN_STATE(type, name) + 1
+#define MINOR_TABLES_FIELDS
 #include "domain_state.tbl"
-#undef DOMAIN_STATE
 };
 
 #define LAST_DOMAIN_STATE_MEMBER extra_params
