@@ -115,7 +115,12 @@ apply direct(make_c_2_1 &toplevel)
               cont k
             where k =
               ((let Popaque = %opaque (20) in
-                let code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
+                let $`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6` =
+                  closure
+                    `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
+                    @`fn[recover_sources_from_usages_lib.ml:27,2--17]`
+                    &toplevel
+                and code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
                       `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
                         (param : imm tagged)
                         my_closure &my_alloc_region my_depth
@@ -127,11 +132,6 @@ apply direct(make_c_2_1 &toplevel)
                   in
                   let int_add = %int_barith.add (a, 7) in
                   cont k1 (int_add)
-                and $`camlRecover_sources_from_usages_lib__fn[recover_sources_from_usages_lib.ml:27,2--17]_6` =
-                  closure
-                    `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
-                    @`fn[recover_sources_from_usages_lib.ml:27,2--17]`
-                    &toplevel
                   with { a = Popaque; b = 7 }
                 in
                 let code loopify(never) size(6) newer_version_of(`fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`)
