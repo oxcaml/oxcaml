@@ -7,8 +7,7 @@ For generated programs, oxfuzzer assumes right-to-left evaluation of operands
 whose order OCaml leaves unspecified: function and operator arguments, tuple
 components, constructor payloads, record-construction fields, and array
 elements. Observable differences caused by a compiler departing from this order
-are treated as failures. This is a fuzzer assumption, not a guarantee of the
-OCaml language.
+are treated as failures.
 
 Record updates are different: the tested compilers evaluate the base record
 before replacement field expressions. These expressions are also left unbound.
