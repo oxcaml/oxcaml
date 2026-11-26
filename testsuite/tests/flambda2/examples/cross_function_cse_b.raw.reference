@@ -18,9 +18,9 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
    let a = %block.[`0`].my_alloc_region (x) in
    apply direct(some_0 &my_alloc_region)
      (some : _ -> [ 0 | 0 of val ]) (x) -> k3 * k2
-     where k3 (b : [ 0 | 0 of val ]) =
-       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+   where k3 (b : [ 0 | 0 of val ]) =
+     let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+     cont k1 (Pmakeblock)
  in
  let code size(19)
        g_2 (x)
@@ -31,10 +31,10 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
    let some = %project_value_slot.[g].[some_1] (my_closure) in
    apply direct(some_0 &my_alloc_region)
      (some : _ -> [ 0 | 0 of val ]) (x) -> k3 * k2
-     where k3 (a : [ 0 | 0 of val ]) =
-       let b = %block.[`0`].my_alloc_region (x) in
-       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+   where k3 (a : [ 0 | 0 of val ]) =
+     let b = %block.[`0`].my_alloc_region (x) in
+     let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+     cont k1 (Pmakeblock)
  in
  let code size(7)
        f_classic_3 (x)
@@ -66,13 +66,13 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
  let Pmakeblock = %block.[`0`].`toplevel` (some, f, g, f_classic, g_classic)
  in
  cont k (Pmakeblock))
-  where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
-    let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
-    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
-    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
-    let $camlCross_function_cse_b =
-      Block 0 (field_0, field_1, field_2, field_3, field_4)
-    in
-    cont done ($camlCross_function_cse_b)
+where k define_root_symbol (module_block) =
+  let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
+  let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
+  let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
+  let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
+  let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
+  let $camlCross_function_cse_b =
+    Block 0 (field_0, field_1, field_2, field_3, field_4)
+  in
+  cont done ($camlCross_function_cse_b)

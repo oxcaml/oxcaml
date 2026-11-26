@@ -24,9 +24,9 @@ and code loopify(never) size(5) newer_version_of(g_1)
         : val =
   apply direct(ignore_0_1 &my_alloc_region)
     ($camlSymbol_projections2__ignore_1 : _ -> imm tagged) (0) -> k2 * k1
-    where k2 (param_1 : imm tagged) =
-      cont k
-             ($`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_3`)
+  where k2 (param_1 : imm tagged) =
+    cont k
+           ($`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_3`)
 and set_of_closures
       $`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_3` =
       closure `fn[symbol_projections2.ml:21,8--17]_2_1`

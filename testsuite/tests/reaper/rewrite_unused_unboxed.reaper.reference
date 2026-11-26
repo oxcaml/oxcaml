@@ -22,8 +22,8 @@ let code inline(never) loopify(never) size(5) newer_version_of(consume_1)
     ($camlRewrite_unused_unboxed__print_int_1 : _ -> imm tagged)
       (Pfield)
       -> k2 * k1
-    where k2 (function_return : imm tagged) =
-      cont k
+  where k2 (function_return : imm tagged) =
+    cont k
 in
 let $camlRewrite_unused_unboxed__consume_2 =
   closure consume_1_1 @consume &toplevel
@@ -39,18 +39,18 @@ let code inline(never) loopify(never) size(6) newer_version_of(Make_2)
     ($camlRewrite_unused_unboxed__consume_2 : _ -> unit)
       (Pmakeblock_into_Pmakeblock_field_0)
       -> k2 * k1
-    where k2 =
-      cont k
+  where k2 =
+    cont k
 in
 let $camlRewrite_unused_unboxed__Make_3 = closure Make_2_1 @Make &toplevel in
 apply direct(Make_2_1 &toplevel)
   ($camlRewrite_unused_unboxed__Make_3 : _ -> unit)
     ($camlRewrite_unused_unboxed__Pmakeblock_0)
     -> k1 * error
-  where k1 =
-    cont k
-  where k =
-    let $camlRewrite_unused_unboxed =
-      Block 0 ($camlRewrite_unused_unboxed__print_int_1)
-    in
-    cont done ($camlRewrite_unused_unboxed)
+where k1 =
+  cont k
+where k =
+  let $camlRewrite_unused_unboxed =
+    Block 0 ($camlRewrite_unused_unboxed__print_int_1)
+  in
+  cont done ($camlRewrite_unused_unboxed)

@@ -27,10 +27,10 @@ apply direct(f_0_1 &toplevel)
   ($camlInlined_attribute_on_partial_application__f_1 : _ -> imm tagged)
     (0, 0)
     -> k * error
-  where k (h : imm tagged) =
-    let $camlInlined_attribute_on_partial_application =
-      Block 0 ($camlInlined_attribute_on_partial_application__f_1,
-               $camlInlined_attribute_on_partial_application__partial_f_2,
-               h)
-    in
-    cont done ($camlInlined_attribute_on_partial_application)
+where k (h : imm tagged) =
+  let $camlInlined_attribute_on_partial_application =
+    Block 0 ($camlInlined_attribute_on_partial_application__f_1,
+             $camlInlined_attribute_on_partial_application__partial_f_2,
+             h)
+  in
+  cont done ($camlInlined_attribute_on_partial_application)

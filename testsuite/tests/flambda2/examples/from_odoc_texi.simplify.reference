@@ -23,23 +23,23 @@ let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo &toplevel in
   switch untagged
     | 0 -> k (0)
     | 1 -> k1)
-   where k1 =
-     (apply direct(foo_1_1 &toplevel)
-        ($camlFrom_odoc_texi__foo_3 : _ -> val)
-          ($camlFrom_odoc_texi__immstring_0)
-          -> k1 * error
-        where k1 (apply_result : val) =
-          let Pmakeblock =
-            %block.[`0`].`toplevel`
-              (apply_result, $camlFrom_odoc_texi__immstring_1)
-          in
-          let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
-          cont k (Pmakeblock_1)))
-  where k (y : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
-    let $camlFrom_odoc_texi =
-      Block 0 ($`camlFrom_odoc_texi__!_2`,
-               esc_8bits,
-               $camlFrom_odoc_texi__foo_3,
-               y)
-    in
-    cont done ($camlFrom_odoc_texi)
+ where k1 =
+   (apply direct(foo_1_1 &toplevel)
+      ($camlFrom_odoc_texi__foo_3 : _ -> val)
+        ($camlFrom_odoc_texi__immstring_0)
+        -> k1 * error
+    where k1 (apply_result : val) =
+      let Pmakeblock =
+        %block.[`0`].`toplevel`
+          (apply_result, $camlFrom_odoc_texi__immstring_1)
+      in
+      let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
+      cont k (Pmakeblock_1)))
+where k (y : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
+  let $camlFrom_odoc_texi =
+    Block 0 ($`camlFrom_odoc_texi__!_2`,
+             esc_8bits,
+             $camlFrom_odoc_texi__foo_3,
+             y)
+  in
+  cont done ($camlFrom_odoc_texi)

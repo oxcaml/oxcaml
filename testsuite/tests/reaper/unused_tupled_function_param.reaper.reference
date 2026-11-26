@@ -38,24 +38,24 @@ in
    $camlUnused_tupled_function_param__id_5
      ($camlUnused_tupled_function_param__tupled_4)
      -> k1 * error
-   where k1 (func) =
-     (apply &toplevel
-        func ($camlUnused_tupled_function_param__const_block_0) -> k2 * error
-        where k2 (param : [ 0 |1 ]) =
-          let unboxed_field = %untag_imm (param) in
-          cont k1 (unboxed_field)
-        where k1 (unboxed_field : imm) =
-          let naked_immediate = unboxed_field in
-          let `unit` = %end_region (over_app_region) in
-          let unit_1 = %end_ghost_region (over_app_ghost_region) in
-          switch naked_immediate
-            | 0 ->
-              error
-                pop(regular error)
-                ($camlUnused_tupled_function_param__Pmakeblock_3)
-            | 1 -> k))
-  where k =
-    let $camlUnused_tupled_function_param =
-      Block 0 ($camlUnused_tupled_function_param__tupled_4)
-    in
-    cont done ($camlUnused_tupled_function_param)
+ where k1 (func) =
+   (apply &toplevel
+      func ($camlUnused_tupled_function_param__const_block_0) -> k2 * error
+    where k2 (param : [ 0 |1 ]) =
+      let unboxed_field = %untag_imm (param) in
+      cont k1 (unboxed_field)
+    where k1 (unboxed_field : imm) =
+      let naked_immediate = unboxed_field in
+      let `unit` = %end_region (over_app_region) in
+      let unit_1 = %end_ghost_region (over_app_ghost_region) in
+      switch naked_immediate
+        | 0 ->
+          error
+            pop(regular error)
+            ($camlUnused_tupled_function_param__Pmakeblock_3)
+        | 1 -> k))
+where k =
+  let $camlUnused_tupled_function_param =
+    Block 0 ($camlUnused_tupled_function_param__tupled_4)
+  in
+  cont done ($camlUnused_tupled_function_param)

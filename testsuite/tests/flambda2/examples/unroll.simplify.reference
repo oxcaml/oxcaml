@@ -10,25 +10,25 @@ and code rec loopify(never) size(23) newer_version_of(fact_0)
   switch prim
     | 0 -> k2
     | 1 -> k (1)
-    where k2 =
-      ((let int_sub = %int_barith.sub (n, 1) in
-        apply direct(fact_0_1 &my_alloc_region)
-          ($camlUnroll__fact_1 ~ depth my_depth -> succ my_depth
-           : _ -> imm tagged)
-            (int_sub)
-            -> k2 * k1)
-         where k2 (apply_result : imm tagged) =
-           let int_mul = %int_barith.mul (n, apply_result) in
-           cont k (int_mul))
+  where k2 =
+    ((let int_sub = %int_barith.sub (n, 1) in
+      apply direct(fact_0_1 &my_alloc_region)
+        ($camlUnroll__fact_1 ~ depth my_depth -> succ my_depth
+         : _ -> imm tagged)
+          (int_sub)
+          -> k2 * k1)
+     where k2 (apply_result : imm tagged) =
+       let int_mul = %int_barith.mul (n, apply_result) in
+       cont k (int_mul))
 in
 apply direct(fact_0_1 &toplevel) inlining_state(depth(40))
   ($camlUnroll__fact_1 ~ depth unroll 1 3 -> unroll 0 4 : _ -> imm tagged)
     (2)
     -> k * error
-  where k (apply_result : imm tagged) =
-    let int_mul = %int_barith.mul (3, apply_result) in
-    let int_mul_1 = %int_barith.mul (4, int_mul) in
-    let int_mul_2 = %int_barith.mul (5, int_mul_1) in
-    let int_mul_3 = %int_barith.mul (6, int_mul_2) in
-    let $camlUnroll = Block 0 ($camlUnroll__fact_1, int_mul_3, 720) in
-    cont done ($camlUnroll)
+where k (apply_result : imm tagged) =
+  let int_mul = %int_barith.mul (3, apply_result) in
+  let int_mul_1 = %int_barith.mul (4, int_mul) in
+  let int_mul_2 = %int_barith.mul (5, int_mul_1) in
+  let int_mul_3 = %int_barith.mul (6, int_mul_2) in
+  let $camlUnroll = Block 0 ($camlUnroll__fact_1, int_mul_3, 720) in
+  cont done ($camlUnroll)

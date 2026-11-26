@@ -18,15 +18,15 @@ let code loopify(never) size(32) newer_version_of(descr_0)
    switch prim
      | 0 -> k3
      | 1 -> k (0))
-    where k3 =
-      let prim = %get_tag (param) in
-      switch prim
-        | 0 -> k2
-        | 1 -> k (param)
-    where k2 =
-      let Pfield = %block_load.[`0`] (param) in
-      let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, 0) in
-      cont k (Pmakeblock)
+  where k3 =
+    let prim = %get_tag (param) in
+    switch prim
+      | 0 -> k2
+      | 1 -> k (param)
+  where k2 =
+    let Pfield = %block_load.[`0`] (param) in
+    let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, 0) in
+    cont k (Pmakeblock)
 in
 let $camlVariant_unboxing__descr_1 = closure descr_0_1 @descr &toplevel in
 let $camlVariant_unboxing__Pmakeblock_2 =
@@ -40,12 +40,12 @@ let code loopify(never) size(12) newer_version_of(is_empty_2)
   let Tree = %project_value_slot.[is_empty].[Tree] (my_closure) in
   (let Pfield = %block_load.[`0`] (Tree) in
    apply &my_alloc_region Pfield (t) -> k2 * k1)
-    where k2
-            (`*match*` :
-               [ 0 | 0 of imm tagged * val |1 of imm tagged * val * val ]) =
-      let prim = %is_int (`*match*`) in
-      let Pisint = %tag_imm (prim) in
-      cont k (Pisint)
+  where k2
+          (`*match*` :
+             [ 0 | 0 of imm tagged * val |1 of imm tagged * val * val ]) =
+    let prim = %is_int (`*match*`) in
+    let Pisint = %tag_imm (prim) in
+    cont k (Pisint)
 in
 let code inline(always) loopify(never) size(27) newer_version_of(Tree_operations_1)
       Tree_operations_1_1 (Tree : val)
@@ -68,9 +68,9 @@ let code loopify(never) size(5) newer_version_of(is_empty_2_1)
         : imm tagged =
   (let prim = %is_int (t) in
    cont k2 (prim))
-    where k2 (is_int : imm) =
-      let Pisint = %tag_imm (is_int) in
-      cont k (Pisint)
+  where k2 (is_int : imm) =
+    let Pisint = %tag_imm (is_int) in
+    cont k (Pisint)
 in
 let $camlVariant_unboxing__is_empty_4 =
   closure is_empty_2_2 @is_empty &toplevel

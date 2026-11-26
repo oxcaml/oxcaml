@@ -12,17 +12,17 @@ let code loopify(never) size(27) stub
    switch prim
      | 0 -> k3
      | 1 -> k4
-     where k4 =
-       apply &my_alloc_region
-         (`default` : imm tagged -> imm tagged) (0) -> k2 * k1
-     where k3 =
-       let Pfield = %block_load.[`0`] (`*opt*x`) in
-       cont k2 (Pfield))
-    where k2 (x : imm tagged) =
-      apply &my_alloc_region
-        (f_inner : imm tagged * imm tagged * imm tagged -> imm tagged)
-          (x, y, z)
-          -> k * k1
+   where k4 =
+     apply &my_alloc_region
+       (`default` : imm tagged -> imm tagged) (0) -> k2 * k1
+   where k3 =
+     let Pfield = %block_load.[`0`] (`*opt*x`) in
+     cont k2 (Pfield))
+  where k2 (x : imm tagged) =
+    apply &my_alloc_region
+      (f_inner : imm tagged * imm tagged * imm tagged -> imm tagged)
+        (x, y, z)
+        -> k * k1
 in
 let code loopify(never) size(5) stub
       partial_f_3 (param2 : imm tagged)
@@ -70,17 +70,17 @@ apply direct(default_0_1 &toplevel)
    : _ -> imm tagged)
     (0)
     -> k1 * error
-  where k1 (x : imm tagged) =
-    apply direct(f_inner_2_1 &toplevel)
-      ($camlInlined_attribute_on_erased_optional_application__f_inner_2
-       : _ -> imm tagged)
-        (x, 0, 0)
-        -> k * error
-  where k (h : imm tagged) =
-    let $camlInlined_attribute_on_erased_optional_application =
-      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1,
-               $camlInlined_attribute_on_erased_optional_application__f_3,
-               $camlInlined_attribute_on_erased_optional_application__partial_f_4,
-               h)
-    in
-    cont done ($camlInlined_attribute_on_erased_optional_application)
+where k1 (x : imm tagged) =
+  apply direct(f_inner_2_1 &toplevel)
+    ($camlInlined_attribute_on_erased_optional_application__f_inner_2
+     : _ -> imm tagged)
+      (x, 0, 0)
+      -> k * error
+where k (h : imm tagged) =
+  let $camlInlined_attribute_on_erased_optional_application =
+    Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1,
+             $camlInlined_attribute_on_erased_optional_application__f_3,
+             $camlInlined_attribute_on_erased_optional_application__partial_f_4,
+             h)
+  in
+  cont done ($camlInlined_attribute_on_erased_optional_application)

@@ -12,13 +12,12 @@ and code rec loopify(never) size(18) newer_version_of(g_1)
   switch prim
     | 0 -> k (7)
     | 1 -> k2
-    where k2 =
-      let int_sub = %int_barith.sub (y, 1) in
-      apply direct(f_0_1 &my_alloc_region)
-        ($camlTests5__f_1 ~ depth my_depth -> succ my_depth : _ -> imm tagged
-         )
-          (int_sub)
-          -> k * k1
+  where k2 =
+    let int_sub = %int_barith.sub (y, 1) in
+    apply direct(f_0_1 &my_alloc_region)
+      ($camlTests5__f_1 ~ depth my_depth -> succ my_depth : _ -> imm tagged)
+        (int_sub)
+        -> k * k1
 and code rec loopify(never) size(18) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -28,13 +27,12 @@ and code rec loopify(never) size(18) newer_version_of(f_0)
   switch prim
     | 0 -> k (42)
     | 1 -> k2
-    where k2 =
-      let int_sub = %int_barith.sub (x, 1) in
-      apply direct(g_1_1 &my_alloc_region)
-        ($camlTests5__g_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged
-         )
-          (int_sub)
-          -> k * k1
+  where k2 =
+    let int_sub = %int_barith.sub (x, 1) in
+    apply direct(g_1_1 &my_alloc_region)
+      ($camlTests5__g_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged)
+        (int_sub)
+        -> k * k1
 in
 let $camlTests5 = Block 0 ($camlTests5__f_1, $camlTests5__g_2) in
 cont done ($camlTests5)

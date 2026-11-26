@@ -16,9 +16,9 @@ and code rec loopify(never) size(10) newer_version_of(g_1)
       : _ -> imm tagged)
        (int_sub)
        -> k2 * k1)
-    where k2 (apply_result : imm tagged) =
-      let int_add = %int_barith.add (z_1, apply_result) in
-      cont k (int_add)
+  where k2 (apply_result : imm tagged) =
+    let int_add = %int_barith.add (z_1, apply_result) in
+    cont k (int_add)
 and code rec loopify(never) size(10) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -31,9 +31,9 @@ and code rec loopify(never) size(10) newer_version_of(f_0)
       : _ -> imm tagged)
        (int_add)
        -> k2 * k1)
-    where k2 (apply_result : imm tagged) =
-      let int_add = %int_barith.add (z_1, apply_result) in
-      cont k (int_add)
+  where k2 (apply_result : imm tagged) =
+    let int_add = %int_barith.add (z_1, apply_result) in
+    cont k (int_add)
   with { z = z }
 in
 let $camlToplevel_rec =

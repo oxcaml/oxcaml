@@ -43,13 +43,13 @@ let code loopify(never) size(53) newer_version_of(foobar_0)
    switch untagged
      | 0 -> k3
      | 1 -> k4)
-    where k4 =
-      apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (3) -> k2 * k1
-    where k3 =
-      apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (42) -> k2 * k1
-    where k2 (f : val) =
-      let `unit` = %end_region (`region`) in
-      apply &my_alloc_region f (x) -> k * k1
+  where k4 =
+    apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (3) -> k2 * k1
+  where k3 =
+    apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (42) -> k2 * k1
+  where k2 (f : val) =
+    let `unit` = %end_region (`region`) in
+    apply &my_alloc_region f (x) -> k * k1
 in
 let $camlUnbox_closure__foobar_1 = closure foobar_0_1 @foobar &toplevel in
 let $camlUnbox_closure = Block 0 ($camlUnbox_closure__foobar_1) in
