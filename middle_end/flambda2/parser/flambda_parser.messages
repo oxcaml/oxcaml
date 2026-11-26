@@ -3544,18 +3544,6 @@ flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT RPAREN AMP TILDE
-##
-## Ends in an error in state: 534.
-##
-## call_kind -> KWD_MCALL LPAREN method_kind simple RPAREN AMP . region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
-##
-## The known suffix of the stack is as follows:
-## KWD_MCALL LPAREN method_kind simple RPAREN AMP
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 flambda_unit: KWD_APPLY KWD_DIRECT TILDE
 ##
 ## Ends in an error in state: 536.
@@ -3704,18 +3692,6 @@ flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CCALL boption(KWD_NOALLOC)
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_APPLY KWD_CCALL AMP TILDE
-##
-## Ends in an error in state: 551.
-##
-## call_kind -> KWD_CCALL boption(KWD_NOALLOC) AMP . region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
-##
-## The known suffix of the stack is as follows:
-## KWD_CCALL boption(KWD_NOALLOC) AMP
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>

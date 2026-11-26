@@ -678,16 +678,12 @@ call_kind:
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC);
-    fat_ptr_arg_starts = loption(fat_ptr_arg_starts); AMP;
-    alloc_region = region
-    { (C_call { alloc = not noalloc; fat_ptr_arg_starts },
-      (Not_alloc_stack { alloc_region }
-        : region alloc_mode_for_applications)) }
+    fat_ptr_arg_starts = loption(fat_ptr_arg_starts);
+    alloc = alloc_mode_for_applications
+    { (C_call { alloc = not noalloc; fat_ptr_arg_starts }, alloc) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
-      AMP; alloc_region = region
-    { (Method { kind; obj },
-        (Not_alloc_stack { alloc_region }
-          : region alloc_mode_for_applications)) }
+      alloc = alloc_mode_for_applications
+    { (Method { kind; obj }, alloc) }
 ;
 
 inline:

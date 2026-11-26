@@ -4,7 +4,7 @@ let code f3_2 deleted in
 let code f4_3 deleted in
 let $camlLocal_exns_to_jumps__immstring_1 = "Local_exns_to_jumps.Exit2" in
 let $camlLocal_exns_to_jumps__immstring_0 = "Local_exns_to_jumps.Exit" in
-apply ccall noalloc
+apply ccall noalloc &toplevel
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
     let $camlLocal_exns_to_jumps__Exit_2 =
@@ -145,7 +145,7 @@ apply ccall noalloc
           cont k (42)
     in
     let $camlLocal_exns_to_jumps__f3_5 = closure f3_2_1 @f3 &toplevel in
-    (apply ccall noalloc
+    (apply ccall noalloc &toplevel
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
          let $camlLocal_exns_to_jumps__Exit2_6 =
