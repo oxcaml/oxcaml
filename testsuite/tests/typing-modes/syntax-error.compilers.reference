@@ -156,4 +156,34 @@ Line 2, characters 10-32:
 2 | let foo = ("bar" :> int @ local);;
               ^^^^^^^^^^^^^^^^^^^^^^
 Error: Syntax error: mode annotations not expected.
+Line 3, characters 4-10:
+3 | let local_ x = "hello";;
+        ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 7-13:
+2 | let f (local_ x) = x;;
+           ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 10-16:
+2 | let f x = local_ x;;
+              ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 9-15:
+2 | type t = local_ int -> int;;
+             ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 11-18:
+2 | type r = { global_ x : int };;
+               ^^^^^^^
+Error: Syntax error: the global_ syntax has been removed.
+Hint: Use @@ global instead.
+Line 2, characters 16-23:
+2 | type v = Foo of global_ int;;
+                    ^^^^^^^
+Error: Syntax error: the global_ syntax has been removed.
+Hint: Use @@ global instead.
 

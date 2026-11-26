@@ -105,3 +105,16 @@ module type S = sig
 end;;
 
 let foo = ("bar" :> int @ local);;
+
+(* Removed legacy local_ and global_ syntax *)
+let local_ x = "hello";;
+
+let f (local_ x) = x;;
+
+let f x = local_ x;;
+
+type t = local_ int -> int;;
+
+type r = { global_ x : int };;
+
+type v = Foo of global_ int;;

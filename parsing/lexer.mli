@@ -41,6 +41,8 @@ type error =
   | Non_lowercase_delimiter of string
   | Capitalized_raw_identifier of string
   | Unknown_keyword of string
+  | Removed_legacy_local
+  | Removed_legacy_global
 
 exception Error of error * Location.t
 
