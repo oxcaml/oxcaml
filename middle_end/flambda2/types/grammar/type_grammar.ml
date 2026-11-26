@@ -4392,9 +4392,8 @@ let nullable t : t =
         "Cannot represent alias-or-null types: [nullable] must be called on a \
          concrete type, but got %a"
         print t
-    | Unknown | Bottom | Ok (No_alias { non_null = _; is_null = Maybe_null _ })
-      ->
-      t
+    | Unknown | Ok (No_alias { non_null = _; is_null = Maybe_null _ }) -> t
+    | Bottom -> null
     | Ok (No_alias { non_null; is_null = Not_null }) ->
       Value (TD.create { non_null; is_null = Maybe_null { is_null = None } }))
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
