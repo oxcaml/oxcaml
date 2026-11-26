@@ -37,6 +37,8 @@ type error =
   | Non_lowercase_delimiter of string
   | Capitalized_raw_identifier of string
   | Unknown_keyword of string
+  | Removed_legacy_local
+  | Removed_legacy_global
 
 exception Error of error * Location.t
 
@@ -73,7 +75,6 @@ let all_keywords =
     "fun", FUN, always;
     "function", FUNCTION, always;
     "functor", FUNCTOR, always;
-    "global_", GLOBAL, oxcaml;
     "if", IF, always;
     "implies_", IMPLIES, oxcaml;
     "in", IN, always;
@@ -86,7 +87,6 @@ let all_keywords =
     "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;
-    "local_", LOCAL, oxcaml;
     "match", MATCH, always;
     "method", METHOD, v1_0;
     "mod", MOD, always;
@@ -126,6 +126,18 @@ let all_keywords =
     "asr", INFIXOP4("asr"), always
 ]
 
+(* Keywords of the removed legacy mode syntax. They stay reserved, so that they
+   cannot be used as identifiers or labels and are printed escaped, but lexing
+   one is an error that points to the new syntax. *)
+let removed_keywords =
+  [ "global_", Removed_legacy_global;
+    "local_", Removed_legacy_local ]
+
+type keyword =
+  | Token of Parser.token
+  | Unknown (* Requested with [-keywords], but not supported *)
+  | Removed of error
+
 
 let keyword_table = Hashtbl.create 149
 
@@ -138,13 +150,17 @@ let populate_keywords (version,keywords) =
   let tbl = keyword_table in
   Hashtbl.clear tbl;
   let add_keyword (name, token, since) =
-    if greater version since then Hashtbl.replace tbl name (Some token)
+    if greater version since then Hashtbl.replace tbl name (Token token)
   in
   List.iter add_keyword all_keywords;
+  List.iter (fun (name, err) -> Hashtbl.replace tbl name (Removed err))
+    removed_keywords;
   List.iter (fun name ->
     match List.find (fun (n,_,_) -> n = name) all_keywords with
-    | (_,tok,_) -> Hashtbl.replace tbl name (Some tok)
-    | exception Not_found -> Hashtbl.replace tbl name None
+    | (_,tok,_) -> Hashtbl.replace tbl name (Token tok)
+    | exception Not_found ->
+        if not (List.mem_assoc name removed_keywords) then
+          Hashtbl.replace tbl name Unknown
     ) keywords
 
 
@@ -486,8 +502,9 @@ let is_keyword name =
 
 let find_keyword lexbuf name =
   match Hashtbl.find keyword_table name with
-  | Some x -> x
-  | None -> error lexbuf (Unknown_keyword name)
+  | Token x -> x
+  | Unknown -> error lexbuf (Unknown_keyword name)
+  | Removed err -> error lexbuf err
   | exception Not_found -> LIDENT name
 
 let check_label_name ?(raw_escape=false) lexbuf name =
@@ -627,6 +644,18 @@ let prepare_error loc = function
       "%a has been defined as an additional keyword.@ \
        This version of OCaml does not support this keyword."
       Style.inline_code name
+  | Removed_legacy_local ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "local_"
+        Style.inline_code "@ local"
+  | Removed_legacy_global ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "global_"
+        Style.inline_code "@@ global"
 
 let () =
   Location.register_error_of_exn
