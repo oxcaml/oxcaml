@@ -500,6 +500,14 @@ type primitive =
   | Pset_ext_ptr of layout * modify_mode
   | Pbox of layout * locality_mode
   | Punbox of layout
+  (* The definition of a template: allocates its environment like
+     [Pmakeblock (0, Immutable, Shape shape, mode)]. The template's
+     instantiations ([Lcode]) are only ever passed environments created here. *)
+  | Ptemplate_env of
+      { template : Template_id.t;
+        shape : mixed_block_shape;
+        mode : locality_mode
+      }
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away.
@@ -1080,6 +1088,9 @@ type lambda =
   | Ltemplate of lfunction
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
+  (* [Lcode] should only exist after slambda evaluation, at the top of the
+     unit. *)
+  | Lcode of lcode * lambda
 
 and rec_binding = {
   id : Ident.t;
@@ -1106,6 +1117,17 @@ and lfunction = private
         effect (it neither closes over nor is passed any yielding value).
         Only set precisely by [Translcore]; other construction sites
         conservatively default to [May_yield]. *)
+  }
+
+(** [Lcode (code, body)] binds [code_name] in [body] to the code of an
+    instantiation of a template, created by slambda evaluation. Its only
+    free variables are the names of other instantiations' code. The names bound
+    by this may only occur as the function of an [Lapply]. *)
+and lcode =
+  { code_name : Ident.t;
+    code_debug_uid : debug_uid;
+    code_template : Template_id.t;
+    code_fun : lfunction
   }
 
 and lkindtemplate =

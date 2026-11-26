@@ -807,6 +807,10 @@ let rec choice ctx t =
     | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ ->
       fatal_error_invalid_constructor t
+    | Lcode _ ->
+      (* [choice] only sees the bodies of functions, and the code of
+         instantiations is only bound at the top of the unit. *)
+      Misc.fatal_error "Tmc.choice: [Lcode] inside a function"
 
   and choice_apply ctx ~tail ~region_depth apply =
     let exception No_tmc in
@@ -1116,6 +1120,7 @@ let rec choice ctx t =
 
     | Pobj_dup
     | Pobj_magic _
+    | Ptemplate_env _
     | Pprobe_is_enabled _
 
     (* Lazy blocks should never contain a recursive call directly:

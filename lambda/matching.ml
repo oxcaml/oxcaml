@@ -4765,6 +4765,7 @@ let rec map_return f = function
   | Lmutlet (k, id, duid, l1, l2) ->
     Lmutlet (k, id, duid, l1, map_return f l2)
   | Lletrec (l1, l2) -> Lletrec (l1, map_return f l2)
+  | Lcode _ as l -> Lambda.fatal_error_invalid_constructor l
   | Lifthenelse (lcond, lthen, lelse, k) ->
       Lifthenelse (lcond, map_return f lthen, map_return f lelse, k)
   | Lsequence (l1, l2) -> Lsequence (l1, map_return f l2)

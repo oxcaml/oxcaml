@@ -86,7 +86,9 @@ module Leading_tokens = struct
       | Lapply _ | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lifthenelse _
       | Lsequence _ | Lwhile _ | Lsend _ | Levent _ | Lregion _ | Lexclave _
       | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
-        ());
+        ()
+      | Lcode _ ->
+        Misc.fatal_error "Fdo_function_naming: [Lcode] inside a function");
       L.iter_head_constructor term lam
     in
     (try

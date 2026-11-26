@@ -107,6 +107,8 @@ let rec eliminate_ref id = function
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
+  | Lcode _ ->
+      Misc.fatal_error "Simplif.eliminate_ref: [Lcode] inside a [let]"
 
 (* Simplification of exits *)
 
@@ -145,6 +147,9 @@ let simplify_exits lam =
       count ~try_depth l2; count ~try_depth l1
   | Lletrec(bindings, body) ->
       List.iter (fun { def = { body } } -> count ~try_depth body) bindings;
+      count ~try_depth body
+  | Lcode ({ code_fun = { body = code_body } }, body) ->
+      count ~try_depth code_body;
       count ~try_depth body
   | Lprim(_p, ll, _) -> List.iter (count ~try_depth) ll
   | Lswitch(l, sw, _loc, _kind) ->
@@ -253,6 +258,11 @@ let simplify_exits lam =
                      ap_args = List.map (simplif ~layout:None ~try_depth) ap.ap_args}
   | Lfunction lfun ->
       Lfunction (map_lfunction (simplif ~layout:None ~try_depth) lfun)
+  | Lcode (code, body) ->
+      let code_fun =
+        map_lfunction (simplif ~layout:None ~try_depth) code.code_fun
+      in
+      Lcode ({ code with code_fun }, simplif ~layout ~try_depth body)
   | Llet(str, kind, v, duid, l1, l2) ->
       Llet(str, kind, v, duid, simplif ~layout:None ~try_depth l1,
            simplif ~layout ~try_depth l2)
@@ -511,6 +521,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   | Lletrec(bindings, body) ->
       List.iter (fun { def } -> count_lfunction def) bindings;
       count bv body
+  | Lcode ({ code_fun }, body) ->
+      count_lfunction code_fun;
+      count bv body
   | Lprim(_p, ll, _) -> List.iter (count bv) ll
   | Lswitch(l, sw, _loc, _kind) ->
       count_default bv sw ;
@@ -728,6 +741,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       if count_var v > 0 then simplif l else lambda_unit
   | Lregion (l, layout) -> Lregion (simplif l, layout)
   | Lexclave l -> Lexclave (simplif l)
+  | Lcode (code, body) ->
+      Lcode ({ code with code_fun = map_lfunction simplif code.code_fun },
+             simplif body)
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as l ->
     fatal_error_invalid_constructor l
@@ -769,6 +785,9 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos is_tail body
   | Lletrec (bindings, body) ->
       List.iter (fun { def } -> emit_tail_infos_lfunction is_tail def) bindings;
+      emit_tail_infos is_tail body
+  | Lcode ({ code_fun }, body) ->
+      emit_tail_infos_lfunction is_tail code_fun;
       emit_tail_infos is_tail body
   | Lprim ((Pbytes_to_string | Pbytes_of_string |
             Parray_to_iarray | Parray_of_iarray),
@@ -1107,6 +1126,9 @@ let simplify_local_functions lam =
     | Lfunction lf ->
         check_static lf;
         function_definition lf
+    | Lcode ({ code_fun }, body) ->
+        function_definition code_fun;
+        tail body
     | Lregion (lam, _) -> region lam
     | Lexclave lam -> exclave lam
     | lam ->

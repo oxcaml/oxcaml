@@ -10,6 +10,8 @@ mixed_product_bytes.ml
 mixed_product_bytes.mli
 slambda.ml
 slambda.mli
+template_id.ml
+template_id.mli
 transl_array_comprehension.ml
 transl_array_comprehension.mli
 transl_comprehension_utils.ml
