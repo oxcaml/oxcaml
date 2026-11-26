@@ -4387,9 +4387,13 @@ let nullable t : t =
   match t with
   | Value descr -> (
     match TD.descr descr with
-    | Unknown | Bottom
-    | Ok (Equals _)
-    | Ok (No_alias { non_null = _; is_null = Maybe_null _ }) ->
+    | Ok (Equals _) ->
+      Misc.fatal_errorf
+        "Cannot represent alias-or-null types: [nullable] must be called on a \
+         concrete type, but got %a"
+        print t
+    | Unknown | Bottom | Ok (No_alias { non_null = _; is_null = Maybe_null _ })
+      ->
       t
     | Ok (No_alias { non_null; is_null = Not_null }) ->
       Value (TD.create { non_null; is_null = Maybe_null { is_null = None } }))
