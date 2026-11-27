@@ -419,7 +419,7 @@ jobs:
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           # Trying GC settings for the compilers ocamltest runs
-          TOOL_RUNPARAM: b=0,o=200,Xsmall_heap_limit=128M,s=256k
+          TOOL_RUNPARAM: b=0,o=200,s=256k
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Check installed library metadata
