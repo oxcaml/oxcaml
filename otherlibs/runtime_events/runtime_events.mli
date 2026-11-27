@@ -185,14 +185,14 @@ resumption (value: bytes copied).
 (**
 Direct allocations to the major heap of this Domain in {b words}, since the
 last major slice. This excludes words promoted from the minor heap, which are
-counted in EV_C_MAJOR_ALLOCATED_WORDS.
+counted in EV_C_MAJOR_SLICE_ALLOC_WORDS.
 @since 5.6
 *)
 | EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS
 (**
 Allocations of this Domain in {b words} that were suspended during a GC
 ramp-up phase, since the last major slice. The major slice paces against
-EV_C_MAJOR_ALLOCATED_WORDS less this counter plus
+EV_C_MAJOR_SLICE_ALLOC_WORDS less this counter plus
 EV_C_MAJOR_RESUMED_ALLOCATED_WORDS. Zero outside a ramp-up phase.
 @since 5.6
 *)

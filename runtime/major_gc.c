@@ -983,7 +983,8 @@ static uintnat gc_slice_work(uintnat allocated_words,
 /* Values for the event counters describing a slice's inputs, computed by
    [update_major_slice_work] and logged by [slice_events_begin]. */
 struct slice_counters {
-  uintnat alloc_words, dependent_words, new_work, total_work, budget;
+  uintnat alloc_words, direct_words, suspended_words, resumed_words;
+  uintnat dependent_words, new_work, total_work, budget;
 };
 
 /* Updates the work accounting at the start of a slice, filling [counters]
@@ -1066,8 +1067,10 @@ update_major_slice_work(intnat howmuch,
                   dom_st->slice_budget);
 
   counters->alloc_words = my_alloc_count;
+  counters->direct_words = my_alloc_direct_count;
+  counters->suspended_words = my_suspended_count;
+  counters->resumed_words = my_resumed_count;
   counters->dependent_words = my_dependent_count;
-  /* TODO: add counters for direct, suspended, resumed allocs. */
   counters->new_work = new_work;
   counters->total_work = (uintnat)diffmod(atomic_load(&total_work_incurred),
                                           atomic_load(&total_work_completed));
@@ -2230,6 +2233,11 @@ static void slice_events_begin(collection_slice_mode mode,
   *events_begun = true;
   CAML_EV_BEGIN(EV_MAJOR_SLICE);
   CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_WORDS, counters->alloc_words);
+  CAML_EV_COUNTER(EV_C_MAJOR_DIRECT_ALLOCATED_WORDS, counters->direct_words);
+  CAML_EV_COUNTER(EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS,
+                  counters->suspended_words);
+  CAML_EV_COUNTER(EV_C_MAJOR_RESUMED_ALLOCATED_WORDS,
+                  counters->resumed_words);
   CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
                   counters->dependent_words);
   CAML_EV_COUNTER(EV_C_MAJOR_SLICE_NEW_WORK, counters->new_work);
