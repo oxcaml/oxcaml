@@ -94,12 +94,7 @@ let at1 () : (at1, _) idx_atomic = (.at)
 [%%expect{|
 type at1 = { mutable at : string [@atomic]; }
 type at2 = { mutable at : string [@atomic]; }
-Line 3, characters 35-40:
-3 | let at1 () : (at1, _) idx_atomic = (.at)
-                                       ^^^^^
-Error: This expression has type "(at2, string) idx_atomic"
-       but an expression was expected of type "(at1, 'a) idx_atomic"
-       Type "at2" is not compatible with type "at1"
+val at1 : unit -> (at1, string) idx_atomic = <fun>
 |}]
 
 (* Block access disambiguates the unboxed access *)
@@ -564,7 +559,7 @@ Line 1, characters 31-37:
 1 | let invalidImm2 = (.idx_atomic((.imm)))
                                    ^^^^^^
 Error: This expression has type "(t, int) idx_imm"
-       but an expression was expected of type "('a, 'b) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_atomic"
 |}]
 
 let invalidMut1 = (.idx_imm((.mut)))
@@ -587,7 +582,7 @@ Line 1, characters 31-37:
 1 | let invalidMut2 = (.idx_atomic((.mut)))
                                    ^^^^^^
 Error: This expression has type "(t, int) idx_mut"
-       but an expression was expected of type "('a, 'b) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_atomic"
 |}]
 
 let invalidAtomic1 = (.idx_imm((.atomic)))
