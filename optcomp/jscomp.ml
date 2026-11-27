@@ -90,6 +90,27 @@ let effects_args ~target ~(phase : Clflags.Jsoo_phase.t) passthrough_args =
     then []
     else ["--effects=" ^ Clflags.Jsoo_effects.to_string effects]
 
+(* The libraries of the compiler distribution record a source as
+   [/oxcaml/stdlib/] followed by its path below the standard library directory
+   (see stdlib/dune_rules/gen.ml). While they are compiled, with [-directory]
+   below [/oxcaml/stdlib/], their sources are in the current directory. *)
+let with_distribution_sources cmdline =
+  let root = "/oxcaml/stdlib/" in
+  let entry target source =
+    Build_path_prefix_map.encode_pair
+      { target = Filename.concat target ""; source = Filename.concat source "" }
+  in
+  let installed = entry root Config.standard_library in
+  let env = Option.to_list (Sys.getenv_opt "BUILD_PATH_PREFIX_MAP") in
+  let compiled =
+    match !Clflags.directory with
+    | Some dir when String.starts_with ~prefix:root (Filename.concat dir "") ->
+      [entry dir (Sys.getcwd ())]
+    | Some _ | None -> []
+  in
+  let map = String.concat ":" ((installed :: env) @ compiled) in
+  "BUILD_PATH_PREFIX_MAP=" ^ Filename.quote map ^ " " ^ cmdline
+
 let run ?input_left_in ~target ~(phase : Clflags.Jsoo_phase.t) subcommand args =
   let passthrough_args =
     List.rev !(Clflags.jsoo_opts All) @ List.rev !(Clflags.jsoo_opts phase)
@@ -100,7 +121,9 @@ let run ?input_left_in ~target ~(phase : Clflags.Jsoo_phase.t) subcommand args =
     @ passthrough_args
   in
   let program = program target in
-  let cmdline = Filename.quote_command program args in
+  let cmdline =
+    with_distribution_sources (Filename.quote_command program args)
+  in
   match Ccomp.command cmdline with
   | 0 -> ()
   | exit_code ->

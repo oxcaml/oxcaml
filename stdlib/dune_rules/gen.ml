@@ -60,10 +60,11 @@ let rec trans_closure ~dst ~src s =
      StrTbl.add dst s deps;
      deps
 
-let stdlib_flags =
-  "-nopervasives -directory stdlib -strict-sequence -g -absname \
+let stdlib_flags ~directory =
+  sprintf "-nopervasives -directory %s -strict-sequence -g -absname \
    -extension runtime_metaprogramming -nostdlib -safe-string -strict-formats \
    -no-alias-deps -w +a-4-9-40-41-42-44-45-48-66-67-70 -w -221 -principal"
+    directory
 
 let pp_flags ~awk_dir ~target =
   if target = "stdlib"
@@ -78,6 +79,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
     | ".cmx" -> `Cmx, false
     | s -> failwith ("Unexpected extension " ^ s)
   in
+  let stdlib_flags = stdlib_flags ~directory:"stdlib" in
   let flags =
     if annot then
       stdlib_flags ^ " -bin-annot -bin-annot-occurrences -bin-annot-cms"
@@ -226,6 +228,10 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
     sprintf "(setenv %s %%{bin:%s} (run %%{ocamlopt} -target %s %s))"
       jsir_target.env_var jsir_target.program jsir_target.program args
   in
+  (* The libraries of the distribution record a source as [/oxcaml/stdlib/]
+     followed by its path below the installed standard library directory, where
+     [ocamlopt] has js_of_ocaml find it (see optcomp/jscomp.ml). *)
+  let source_dir = "/oxcaml/stdlib/" in
   let installed file = sprintf "%%{ocaml_where}/%s" file in
   let table = module_deps_table Sys.argv.(3) in
   iter_module_deps table (fun ~tgt_file ~base ~deps ->
@@ -245,11 +251,15 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
       (* -S keeps the JSIR of the unit (.cm-jsir-js or .cm-jsir-wasm), with
          which it can also be linked with -link-jsir. *)
       let action =
-        run_ocamlopt
-          (sprintf
-             "%s%s -S -I %%{ocaml_where} -cmi-file %s -o %s.%s -c %%{src}"
-             stdlib_flags (pp_flags ~awk_dir:stdlib_dir ~target)
-             (installed (target ^ ".cmi")) target (ext "cmx"))
+        sprintf "(chdir %s %s)" src_dir
+          (run_ocamlopt
+             (sprintf
+                "%s%s -S -jsoo-opt-compile --source-map-inline \
+                 -I ../build -I %%{ocaml_where} -cmi-file %s \
+                 -o ../build/%s.%s -c %%{src}"
+                (stdlib_flags ~directory:source_dir)
+                (pp_flags ~awk_dir:stdlib_dir ~target)
+                (installed (target ^ ".cmi")) target (ext "cmx")))
       in
       rule ~ppf ~target ~exts:[ext "cmx"; ext "cmo"; ext "cm-jsir"] ~src ~deps
         ~action
@@ -267,7 +277,8 @@ let write_stdlib_jsir_dune_for_target ppf jsir_target =
       |> sprintf "-g -nostdlib%s -a -o stdlib.%s %s" flags (ext "cmxa")
       |> run_ocamlopt
     in
-    sprintf "(progn %s %s)" (archive "") (archive " -link-jsir")
+    sprintf "(progn %s %s)"
+      (archive " -jsoo-opt-archive --source-map-inline") (archive " -link-jsir")
   in
   rule ~ppf ~target:"stdlib" ~exts:[ext "cmxa"; ext "cma"; ext "cma-jsir"]
     ~src:(sprintf "%s/stdlib.ml" src_dir)
