@@ -296,24 +296,24 @@ runtest: check-codegen-variant compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(tested_codegen_variant),poll),true,false) $(dune) build $(tested_codegen_variant_workspace) $(runtest_targets)
 
 # The LLVM backend requires frame pointers and rejects stack checks and
-# AddressSanitizer whatever the configure default (see
-# validate_llvm_backend in driver/oxcaml_flags.ml), and these tests
-# compile, link and run against the main context's library tree, which is
-# the default variant's. They therefore need a configure whose default
-# variant has frame pointers and neither stack checks nor AddressSanitizer;
-# fail early, rather than on the first test's driver diagnostic, on any
-# other configure.
-runtest-llvmize: compiler
-ifeq ($(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),fp),)
-	@echo "runtest-llvmize: the LLVM backend requires frame pointers, but this build's default codegen variant is '$(CODEGEN_DEFAULT_VARIANT)'; configure with --enable-frame-pointers" >&2; exit 1
-endif
-ifneq ($(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),sc),)
-	@echo "runtest-llvmize: the LLVM backend does not support stack checks, but this build's default codegen variant is '$(CODEGEN_DEFAULT_VARIANT)'; configure without --enable-stack-checks" >&2; exit 1
-endif
-ifneq ($(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),asan),)
-	@echo "runtest-llvmize: the LLVM backend does not support AddressSanitizer, but this build's default codegen variant is '$(CODEGEN_DEFAULT_VARIANT)'; configure without --enable-address-sanitizer" >&2; exit 1
-endif
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
+# AddressSanitizer (see validate_llvm_backend in driver/oxcaml_flags.ml),
+# and these tests compile, link and run against the library tree of their
+# build context. They therefore run in the context of the fp variant, which
+# this tree has to build: fail before anything is built, rather than on a
+# missing workspace file, when it does not.
+.PHONY: check-llvmize-variant
+check-llvmize-variant:
+	@test -n "$(filter fp,$(built_codegen_variants))" || { \
+	  echo "error: runtest-llvmize runs in the build context of the" \
+	    "codegen variant fp (the LLVM backend requires frame pointers)," \
+	    "which this tree does not build" >&2; \
+	  echo "  it builds: $(CODEGEN_DEFAULT_VARIANT) (the default)" \
+	    "$(codegen_variant_names)" >&2; \
+	  echo "  configure with --enable-frame-pointers" >&2; \
+	  exit 1; }
+
+runtest-llvmize: check-llvmize-variant compiler
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(call codegen_variant_workspace,fp)
 
 runtest-dwarf: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)

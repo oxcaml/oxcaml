@@ -137,7 +137,9 @@ minimizer there. In the context of a variant:
   `ocamlrun` that the build installs, as in the main context.
 - The AddressSanitizer backend tests check instrumented code in the context
   of a variant with AddressSanitizer (`make runtest CODEGEN_VARIANT=asan-fp`)
-  and reduce to one line of output in the others.
+  and reduce to one line of output in the others. The tests of the LLVM
+  backend, `make runtest-llvmize`, always run in the context of `fp`, which
+  the build has to include.
 
 Two things remain that no pass covers: the installed compiler executables and
 the bytecode runtime (`ocamlrun`, and what `-custom` links) are always built

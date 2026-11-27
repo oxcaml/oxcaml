@@ -239,6 +239,9 @@ _compare/config.status: ocaml/config.status
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
 	(cd _compare && ./configure $(CONFIGURE_ARGS) --prefix=$$(pwd)/_install)
 
+# Applies the promotions that the last dune build recorded, in whichever
+# build context its tests ran: that of a codegen variant included (see
+# runtest and runtest-llvmize in Makefile.common-ox).
 .PHONY: promote
 promote:
 	$(dune) promotion apply $(ws_main)
