@@ -81,6 +81,19 @@ val define_variable : t -> Bound_var.t -> Flambda_kind.t -> t
 
 val define_extra_variable : t -> Bound_var.t -> Flambda_kind.t -> t
 
+(** The variables defined between [begin_extra_definitions] and
+    [end_extra_definitions], whose [before] is the environment that was given to
+    [begin_extra_definitions], are extra variables as with
+    [define_extra_variable], even though they are defined with
+    [define_variable]: they are not part of the replay history, and they do not
+    become parameters of the continuations lifted out of the current one.
+
+    This is for the bindings that [Simplify] introduces itself, whose variables
+    are defined by the code that simplifies their defining expression. *)
+val begin_extra_definitions : t -> t
+
+val end_extra_definitions : t -> before:t -> t
+
 val add_name : t -> Bound_name.t -> Flambda2_types.t -> t
 
 val add_variable : t -> Bound_var.t -> Flambda2_types.t -> t

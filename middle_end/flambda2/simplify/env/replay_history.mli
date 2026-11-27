@@ -45,7 +45,14 @@
     that we want to inline everything while replaying the handler downwards
     pass. For other more complex uses, inlining decisions could be stored
     alongside the bound variables and continuations, so that they can be
-    replayed, either as is, or within some notion of compatibility. *)
+    replayed, either as is, or within some notion of compatibility.
+
+    The hypothesis is about the binders of the term being simplified. Simplify
+    can also bind fresh variables of its own when it rewrites a primitive (see
+    [Simplified_named.or_rewritten]), and whether it does so depends on the
+    types of the arguments of the primitive, which usually are more precise in a
+    subsequent pass. These variables are therefore not part of the history: see
+    [Downwards_env.begin_extra_definitions]. *)
 
 (** The type of a replay history, used both when recording during the first
     downwards pass **and** when replaying during a subsequent downwards pass on

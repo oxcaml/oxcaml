@@ -797,13 +797,11 @@ let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
       let contents_var =
         Variable.create "obj_dup_contents" (T.kind contents_ty)
       in
-      let contents_var_duid = Flambda_debug_uid.none in
+      let contents_bound_var =
+        Bound_var.create contents_var Flambda_debug_uid.none NM.normal
+      in
       let unbox_expr =
         Named.create_prim (Unary (Unbox_number boxable_number, arg)) dbg
-      in
-      let contents_pat =
-        Bound_pattern.singleton
-          (Bound_var.create contents_var contents_var_duid NM.normal)
       in
       let contents_simple = Simple.var contents_var in
       let box_expr =
@@ -814,16 +812,9 @@ let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
                contents_simple ))
           dbg
       in
-      let result_pat = Bound_pattern.singleton result_var in
-      let wrap ~body =
-        Expr.create_let
-          (Let.create contents_pat unbox_expr ~free_names_of_body:Unknown
-             ~body:
-               (Expr.create_let
-                  (Let.create result_pat box_expr ~free_names_of_body:Unknown
-                     ~body)))
-      in
-      SPR.create_rewritten wrap
+      SPR.create_rewritten
+        ~temporaries:[contents_bound_var, unbox_expr]
+        box_expr
     | contents ->
       let boxer =
         match boxable_number with

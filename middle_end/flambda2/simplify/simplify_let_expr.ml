@@ -373,21 +373,40 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
     ~init:data_flow
     ~f:(record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id)
 
-let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
-    ~down_to_up bound_pattern ~body =
-  let module L = Flambda.Let in
+(* [simplify_body] simplifies the body of the [Let]. If [extra] holds, the bound
+   variables are defined as extra variables: see
+   [DE.begin_extra_definitions]. *)
+let rec simplify_let0 ~simplify_function_body ~extra dacc bound_pattern
+    defining_expr ~down_to_up ~simplify_body =
   let original_dacc = dacc in
   (* Remember then clear the lifted constants memory in [DA] so we can easily
      find out which constants are generated during simplification of the
-     defining expression and the [body]. *)
+     defining expression and the body. *)
   let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
+  let dacc =
+    if extra then DA.map_denv dacc ~f:DE.begin_extra_definitions else dacc
+  in
   (* Simplify the defining expression. *)
-  let defining_expr = L.defining_expr let_expr in
   match
     Simplify_named.simplify_named dacc bound_pattern defining_expr
       ~simplify_function_body
   with
-  | Rewritten f -> simplify_expr original_dacc (f ~body) ~down_to_up
+  | Rewritten { temporaries; defining_expr } ->
+    (* Simplify the bindings of the temporaries, then the new binding of
+       [bound_pattern], then the body. The temporaries are defined as extra
+       variables: see [Simplified_named.or_rewritten]. *)
+    let rec simplify_temporaries temporaries dacc ~down_to_up =
+      match temporaries with
+      | [] ->
+        simplify_let0 ~simplify_function_body ~extra dacc bound_pattern
+          defining_expr ~down_to_up ~simplify_body
+      | (temporary, defining_expr) :: temporaries ->
+        simplify_let0 ~simplify_function_body ~extra:true dacc
+          (Bound_pattern.singleton temporary)
+          defining_expr ~down_to_up
+          ~simplify_body:(simplify_temporaries temporaries)
+    in
+    simplify_temporaries temporaries original_dacc ~down_to_up
   | Simplified (simplify_named_result, removed_operations) -> (
     (* We must make sure that if [Invalid] is going to be produced, [uacc]
        doesn't contain any extraneous data for e.g. lifted constants that will
@@ -401,6 +420,13 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
               (Defining_expr_of_let (bound_pattern, defining_expr))))
     | Ok simplify_named_result ->
       let dacc = Simplify_named_result.dacc simplify_named_result in
+      let dacc =
+        if extra
+        then
+          DA.map_denv dacc
+            ~f:(DE.end_extra_definitions ~before:(DA.denv original_dacc))
+        else dacc
+      in
       (* First accumulate variable, symbol and code ID usage information. *)
       (* CR-someday gbury/pchambart : in the case of an invalid, we currently
          over-approximate the uses. In case of an invalid, we might want to
@@ -449,12 +475,13 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
              ~removed_operations ~lifted_constants_from_defining_expr
              ~at_unit_toplevel ~closure_info ~rewrite_id simplified_body)
       in
-      simplify_expr dacc body ~down_to_up)
+      simplify_body dacc ~down_to_up)
 
 let simplify_let ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up =
   let module L = Flambda.Let in
-  L.pattern_match let_expr
-    ~f:
-      (simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
-         ~down_to_up)
+  L.pattern_match let_expr ~f:(fun bound_pattern ~body ->
+      simplify_let0 ~simplify_function_body ~extra:false dacc bound_pattern
+        (L.defining_expr let_expr) ~down_to_up
+        ~simplify_body:(fun dacc ~down_to_up ->
+          simplify_expr dacc body ~down_to_up))

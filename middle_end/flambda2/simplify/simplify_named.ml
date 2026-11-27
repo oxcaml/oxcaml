@@ -134,7 +134,8 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
         Simplify_primitive.simplify_primitive dacc prim dbg
           ~result_var:bound_var
       with
-      | Rewritten f -> Simplified_named.Rewritten f
+      | Rewritten { temporaries; defining_expr } ->
+        Simplified_named.Rewritten { temporaries; defining_expr }
       | Simplified { simplified_named; try_reify; dacc } -> (
         match simplified_named with
         | Invalid -> invalid
@@ -317,7 +318,8 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
 let simplify_named dacc bound_pattern named ~simplify_function_body :
     _ Simplified_named.or_rewritten =
   match simplify_named0 ~simplify_function_body dacc bound_pattern named with
-  | Rewritten f -> Rewritten f
+  | Rewritten { temporaries; defining_expr } ->
+    Rewritten { temporaries; defining_expr }
   | Simplified result ->
     let min_name_mode = Bound_pattern.name_mode bound_pattern in
     Simplified
