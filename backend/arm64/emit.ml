@@ -69,7 +69,8 @@ type local_realloc_call =
 type stack_realloc =
   { sc_label : L.t; (* Label of the reallocation code. *)
     sc_return : L.t; (* Label to return to after reallocation. *)
-    sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
+    sc_max_frame_size_in_bytes : int; (* Size for reallocation. *)
+    sc_cfa_offset : int (* Offset of the CFA from sp at the stack check. *)
   }
 
 module Env : sig
@@ -84,6 +85,7 @@ module Env : sig
     contains_calls:bool ->
     function_name:string ->
     tailrec_entry_point:L.t option ->
+    frame_at_stack_check:bool ->
     t
 
   val copy : t -> t
@@ -97,6 +99,8 @@ module Env : sig
   val prologue_required : t -> bool
 
   val contains_calls : t -> bool
+
+  val frame_at_stack_check : t -> bool
 
   val call_gc_sites : t -> gc_call list
 
@@ -143,6 +147,8 @@ end = struct
       num_stack_slots : int Stack_class.Tbl.t;
       prologue_required : bool;
       contains_calls : bool;
+      (* Whether the frame is allocated when the stack check runs. *)
+      frame_at_stack_check : bool;
       mutable call_gc_sites : gc_call list;
       mutable local_realloc_sites : local_realloc_call list;
       mutable stack_realloc : stack_realloc option;
@@ -154,12 +160,13 @@ end = struct
     }
 
   let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
-      ~function_name ~tailrec_entry_point =
+      ~function_name ~tailrec_entry_point ~frame_at_stack_check =
     { fastcode_flag;
       stack_offset = 0;
       num_stack_slots = Stack_class.Tbl.copy num_stack_slots;
       prologue_required;
       contains_calls;
+      frame_at_stack_check;
       call_gc_sites = [];
       local_realloc_sites = [];
       stack_realloc = None;
@@ -187,6 +194,8 @@ end = struct
   let prologue_required t = t.prologue_required
 
   let contains_calls t = t.contains_calls
+
+  let frame_at_stack_check t = t.frame_at_stack_check
 
   let call_gc_sites t = t.call_gc_sites
 
@@ -869,8 +878,20 @@ let emit_intconst dst n =
 let emit_stack_realloc env =
   match Env.stack_realloc env with
   | None -> ()
-  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
+  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes; sc_cfa_offset } ->
+    let lr = R.gp_encoding R.lr in
+    let lr_saved = Env.frame_at_stack_check env && Env.contains_calls env in
     D.define_label sc_label;
+    (* This code runs with the stack as it is at the stack check, which the CFI
+       state left by the code emitted before it need not describe: start again
+       from the state at the start of the function, which [fundecl]
+       remembers. *)
+    D.cfi_restore_state ();
+    (* Needed even when the offset is 0: LLVM's assembler computes a later
+       [.cfi_adjust_cfa_offset] from the offset in force before
+       [.cfi_restore_state]. *)
+    D.cfi_def_cfa_offset ~bytes:sc_cfa_offset;
+    if lr_saved then D.cfi_offset ~reg:lr ~offset:(-8);
     (* Pass the desired stack space, measured in words, on the stack, since all
        of the argument-passing registers may be in use. It can exceed the 16-bit
        immediate of a single MOVZ, so use [emit_intconst] which decomposes it
@@ -878,9 +899,16 @@ let emit_stack_realloc env =
     emit_intconst reg_x_tmp1
       (Nativeint.of_int
          (Config.stack_threshold + (sc_max_frame_size_in_bytes / 8)));
+    (* Unless the prologue has saved it in the frame, the return address is in
+       the link register. From the push to the pop, it is in the second word
+       pushed instead. *)
+    D.cfi_remember_state ();
     A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    D.cfi_adjust_cfa_offset ~bytes:16;
+    if not lr_saved then D.cfi_offset ~reg:lr ~offset:(-(sc_cfa_offset + 8));
     A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
     A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+    D.cfi_restore_state ();
     A.ins1 B (local_label sc_return)
 
 (* Recognize float constants appropriate for FMOV dst, #fpimm instruction: "a
@@ -1308,8 +1336,17 @@ let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
     let sc_label, sc_return =
       assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
     in
+    let sc_cfa_offset =
+      if Env.frame_at_stack_check env
+      then Env.frame_size env
+      else Env.stack_offset env
+    in
     Env.set_stack_realloc env
-      { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
+      { sc_label;
+        sc_return;
+        sc_max_frame_size_in_bytes = max_frame_size_bytes;
+        sc_cfa_offset
+      }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -2285,6 +2322,77 @@ let rec emit_all env i =
     emit_instr env i;
     emit_all env i.next)
 
+(* Whether [op] is a stack check that branch relaxation has rewritten. *)
+let[@warning "-fragile-match"] is_far_stack_check : Operation.t -> bool =
+  function
+  | Specific (Ifar_stackcheck _) -> true
+  | _ -> false
+
+(* Whether [i] or an instruction after it is a stack check. *)
+let[@warning "-fragile-match"] rec has_stack_check (i : Linear.instruction) =
+  match i.desc with
+  | Lend -> false
+  | Lstackcheck _ -> true
+  | Lop op when is_far_stack_check op -> true
+  | _ -> has_stack_check i.next
+
+(* Whether control can get from [body], the start of a function, to a stack
+   check without running a prologue. If it can, the frame is not allocated at
+   the check, and if it cannot, it is: [Cfg_prologue] places prologues so that
+   all the paths to an instruction that needs the frame run one, and only one,
+   and [Cfg_stack_checks] puts the check before such instructions. The order in
+   which the blocks are laid out plays no part in this.
+
+   The search does not go past a call. A call that returns needs the frame, and
+   one that does not return, a tail call included, is followed by unrelated
+   code. A tail call to the function itself goes to the tail-recursion entry
+   point, which the start of the function reaches as well. Nor does the search
+   enter trap handlers: [Cfg_prologue.validate], which is on by default, checks
+   that they are entered with the frame allocated. *)
+let stack_check_before_prologue (body : Linear.instruction) =
+  let blocks =
+    lazy
+      (let blocks = Label.Tbl.create 16 in
+       let[@warning "-fragile-match"] rec add (i : Linear.instruction) =
+         match i.desc with
+         | Lend -> blocks
+         | Llabel_for_jump_target lbl ->
+           Label.Tbl.replace blocks lbl i.next;
+           add i.next
+         | _ -> add i.next
+       in
+       add body)
+  in
+  (* [todo] has the labels of blocks reached without running a prologue. *)
+  let rec walk (i : Linear.instruction) todo =
+    match i.desc with
+    | Lstackcheck _ -> true
+    | Lop op -> is_far_stack_check op || walk i.next todo
+    | Lprologue | Lcall_op _ | Lreturn | Lraise _ | Lend -> next todo
+    | Lbranch lbl | Llabel_for_jump_target lbl -> next (lbl :: todo)
+    | Lswitch lbls -> next (Array.fold_right List.cons lbls todo)
+    | Lcondbranch (_, lbl) -> walk i.next (lbl :: todo)
+    | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+      let lbls = List.filter_map Fun.id [lbl0; lbl1; lbl2] in
+      (* With three targets, one of them is taken. *)
+      if List.length lbls = 3
+      then next (lbls @ todo)
+      else walk i.next (lbls @ todo)
+    | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Llabel_for_dwarf _
+    | Lentertrap | Ladjust_stack_offset _ | Lpushtrap _ | Lpoptrap _ ->
+      walk i.next todo
+  and next = function
+    | [] -> false
+    | lbl :: todo -> (
+      let blocks = Lazy.force blocks in
+      match Label.Tbl.find_opt blocks lbl with
+      | None -> next todo
+      | Some i ->
+        Label.Tbl.remove blocks lbl;
+        walk i todo)
+  in
+  walk body []
+
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
@@ -2293,6 +2401,16 @@ let fundecl fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
     | Some { fun_end_label; fundecl } -> Some fun_end_label, fundecl
+  in
+  (* Only CFI directives depend on these. *)
+  let stack_check =
+    Config.asm_cfi_supported
+    && (not Config.no_stack_checks)
+    && has_stack_check fundecl.fun_body
+  in
+  let frame_at_stack_check =
+    stack_check && fundecl.fun_prologue_required
+    && not (stack_check_before_prologue fundecl.fun_body)
   in
   let env =
     Env.create ~fastcode_flag:fundecl.fun_fast
@@ -2303,6 +2421,7 @@ let fundecl fundecl =
         (Option.map
            (label_to_asm_label ~section:Text)
            fundecl.fun_tailrec_entry_point_label)
+      ~frame_at_stack_check
   in
   emit_named_text_section (Env.function_name env);
   let fun_sym = S.create_global fundecl.fun_name in
@@ -2315,6 +2434,8 @@ let fundecl fundecl =
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
+  (* [emit_stack_realloc] starts again from this state. *)
+  if stack_check then D.cfi_remember_state ();
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
   emit_all env fundecl.fun_body;
   List.iter emit_call_gc (Env.call_gc_sites env);
