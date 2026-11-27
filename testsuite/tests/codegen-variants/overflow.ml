@@ -1,5 +1,7 @@
 (* TEST
  ocamlrunparam += ",l=200000";
+ script = "sh ${test_source_directory}/overflow_growable.sh";
+ config_script;
  {
    codegen_variant = "-sc";
    variant_available;
@@ -42,7 +44,11 @@
      RLIMIT_STACK for any sane rlimit (>= the first [deep]'s needs).
 
    Both modes therefore raise an asynchronous Stack_overflow, catchable
-   only inside Sys.with_async_exns; both blocks check the same output. *)
+   only inside Sys.with_async_exns; both blocks check the same output.
+
+   Neither mode is there in a runtime configured with
+   --enable-mmap-map-stack, whose stacks have a fixed size and no guard
+   page: overflow_growable.sh skips the test there. *)
 
 let[@inline never] rec deep n =
   (* [a] and [b] live across the recursive call, forcing a real frame per

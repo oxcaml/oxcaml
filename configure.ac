@@ -876,7 +876,8 @@ AC_ARG_ENABLE([function-sections],
 
 AC_ARG_ENABLE([mmap-map-stack],
   [AS_HELP_STRING([--enable-mmap-map-stack],
-    [use mmap to allocate stacks instead of malloc])])
+    [use mmap to allocate stacks instead of malloc; stacks then have a
+     fixed size, with or without stack checks])])
 
 AC_ARG_WITH([afl],
   [AS_HELP_STRING([--with-afl],
