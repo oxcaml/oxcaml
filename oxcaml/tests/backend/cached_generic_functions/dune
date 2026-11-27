@@ -1,0 +1,12 @@
+; Two runs of the generator of the generic functions cache must give archives
+; with the same members and leave nothing in the temporary directory.
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run
+   sh
+   %{dep:reproducible.sh}
+   %{dep:../../../../tools/generate_cached_generic_functions.exe})))

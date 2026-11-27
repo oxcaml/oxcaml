@@ -81,18 +81,30 @@ let main filename =
   let file_prefix = Filename.remove_extension filename ^ ext_lib in
   let genfns_partitions = Generic_fns.Cache.all () in
   let objects = ref [] in
+  (* The members of the archive are named after the object files: these get
+     names that depend only on the partition, in a directory of their own, so
+     that two runs give the same archive. *)
+  let temp_dir = mk_temp_dir "cached-generated-" "" in
   Fun.protect
-    ~finally:(fun () -> List.iter remove_file !objects)
+    ~finally:(fun () ->
+      List.iter remove_file !objects;
+      (* The directory stays if the assembler failed and left its input. *)
+      remove_dir temp_dir)
     (fun () ->
        Hashtbl.iter (fun name partition ->
-         let output_name = Filename.temp_file ("cached-generated-" ^ Generic_fns.Partition.to_string name) "" in
+         let output_name =
+           Filename.concat temp_dir
+             ("cached-generated-" ^ Generic_fns.Partition.to_string name)
+         in
          let obj =
            cached_generic_functions
              unix ~ppf_dump:Format.std_formatter ~id:name output_name partition
          in
          objects := obj :: !objects
        ) genfns_partitions;
-       ignore (Ccomp.create_archive file_prefix !objects : int))
+       (* Sorted, as the order of the hash table can vary. *)
+       let objects = List.sort String.compare !objects in
+       ignore (Ccomp.create_archive file_prefix objects : int))
 
 let arg_usage =
   Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
