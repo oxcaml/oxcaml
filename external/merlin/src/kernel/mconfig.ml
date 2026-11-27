@@ -861,6 +861,7 @@ let ocaml_ignored_parametrized_flags =
     "-color";
     "-dflambda-let";
     "-dllib";
+    "-dllib-suffixed";
     "-dllpath";
     "-for-pack";
     "-impl";
@@ -878,9 +879,11 @@ let ocaml_ignored_parametrized_flags =
     "-intf";
     "-intf_suffix";
     "-intf-suffix";
+    "-launch-method";
     "-keywords";
     "-o";
     "-rounds";
+    "-runtime-search";
     "-runtime-variant";
     "-ocamlrunparam";
     "-set-runtime-default";

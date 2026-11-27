@@ -2392,7 +2392,6 @@ module Magic_number = struct
            | Error err -> Error (Unexpected_error err)
            | Ok () -> Ok info
 end
-*)
 
 module RuntimeID = struct
   type t = {
@@ -2562,6 +2561,7 @@ module RuntimeID = struct
                name =
     Printf.sprintf "%s-%s-%s" name host (to_string runtime_id)
 end
+*)
 
 module Le_result = struct
   type t =

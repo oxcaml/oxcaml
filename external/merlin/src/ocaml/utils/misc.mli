@@ -1273,6 +1273,7 @@ module Utf8_lexeme: sig
       are not checked. *)
 end
 
+(*
 module RuntimeID : sig
   (** Manipulation of the Runtime ID values used to mangle the filenames of
       shared libraries and the bytecode interpreters.
@@ -1391,6 +1392,7 @@ module RuntimeID : sig
            build on a 64-bit system with shared library support and compressed
            marshalling. *)
 end
+*)
 
 (** {1 Miscellaneous type aliases} *)
 
