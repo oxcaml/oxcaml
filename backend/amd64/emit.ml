@@ -647,6 +647,26 @@ let record_frame live dbg =
   let lbl = record_frame_label live dbg in
   D.define_label lbl
 
+(* Out-of-line code is emitted after the body of the function, in the CFI state
+   that the body ends with, but runs with the stack of the instruction that
+   branches to it: inside a [try], say, that frame is larger. [f] emits such
+   code at [label], for a site where the frame had the given size. When the CFA
+   changes right after the body, a [nop] keeps the address of the code apart
+   from the return address of a call that ends the body, which an unwinder may
+   look up as it is. *)
+let emit_out_of_line ~label ~frame_size:site_frame_size ~after_body f =
+  let end_of_body_frame_size = frame_size () in
+  if site_frame_size = end_of_body_frame_size || not Config.asm_cfi_supported
+  then (
+    D.define_label label;
+    f ())
+  else (
+    if after_body then I.nop ();
+    D.define_label label;
+    D.cfi_def_cfa_offset ~bytes:site_frame_size;
+    f ();
+    D.cfi_def_cfa_offset ~bytes:end_of_body_frame_size)
+
 (* Record calls to the GC -- we've moved them out of the way *)
 
 type gc_call =
@@ -671,34 +691,37 @@ let call_gc_local_sym ~simd : Cmm.symbol =
   Cmm.local_symbol ~ty:Cmm.typ_code_pointer
     (Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd))
 
-let emit_call_gc gc =
-  D.define_label gc.gc_lbl;
-  emit_debug_info gc.gc_dbg;
-  emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
-  (* Record the frame descriptor here, where its return-address label is about
-     to be defined, so that frame descriptors are recorded (and hence emitted)
-     in increasing return-address order. *)
-  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
-    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
-  D.define_label (label_to_asm_label ~section:Text gc.gc_frame_lbl);
-  I.jmp (emit_asm_label_arg gc.gc_return_lbl)
+let emit_call_gc ~after_body gc =
+  emit_out_of_line ~label:gc.gc_lbl ~frame_size:gc.gc_frame_size ~after_body
+    (fun () ->
+      emit_debug_info gc.gc_dbg;
+      emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
+      (* Record the frame descriptor here, where its return-address label is
+         about to be defined, so that frame descriptors are recorded (and hence
+         emitted) in increasing return-address order. *)
+      record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+        ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+      D.define_label (label_to_asm_label ~section:Text gc.gc_frame_lbl);
+      I.jmp (emit_asm_label_arg gc.gc_return_lbl))
 
 (* Record calls to local stack reallocation *)
 
 type local_realloc_call =
   { lr_lbl : L.t;
     lr_return_lbl : L.t;
+    lr_frame_size : int;
     lr_dbg : Debuginfo.t;
     lr_save_simd : Regs.Save_simd_regs.t
   }
 
 let local_realloc_sites = ref ([] : local_realloc_call list)
 
-let emit_local_realloc lr =
-  D.define_label lr.lr_lbl;
-  emit_debug_info lr.lr_dbg;
-  emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
-  I.jmp (emit_asm_label_arg lr.lr_return_lbl)
+let emit_local_realloc ~after_body lr =
+  emit_out_of_line ~label:lr.lr_lbl ~frame_size:lr.lr_frame_size ~after_body
+    (fun () ->
+      emit_debug_info lr.lr_dbg;
+      emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
+      I.jmp (emit_asm_label_arg lr.lr_return_lbl))
 
 (* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
    -g mode we maintain one call per bound check site. Without -g, we can share a
@@ -2468,6 +2491,7 @@ let emit_instr ~first ~last ~fallthrough i =
       := { lr_lbl = lbl_call;
            lr_dbg = i.dbg;
            lr_return_lbl = lbl_after_alloc;
+           lr_frame_size = frame_size ();
            lr_save_simd = must_save_simd_regs i.live
          }
          :: !local_realloc_sites
@@ -2964,8 +2988,11 @@ let fundecl fundecl =
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
   let fun_body_end = current_output_pos () in
-  List.iter emit_call_gc !call_gc_sites;
-  List.iter emit_local_realloc !local_realloc_sites;
+  List.iteri (fun i gc -> emit_call_gc ~after_body:(i = 0) gc) !call_gc_sites;
+  List.iteri
+    (fun i lr ->
+      emit_local_realloc ~after_body:(i = 0 && List.is_empty !call_gc_sites) lr)
+    !local_realloc_sites;
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
