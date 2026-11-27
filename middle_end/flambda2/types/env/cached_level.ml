@@ -94,11 +94,6 @@ let clean_for_export t ~reachable_names =
              (Name.compilation_unit name)
              current_compilation_unit
       then (
-        let binding_time_and_mode =
-          if Name.is_var name
-          then Binding_time.With_name_mode.imported_variables
-          else binding_time_and_mode
-        in
         (match Type_grammar.get_alias_opt ty with
         | None -> ()
         | Some alias ->
