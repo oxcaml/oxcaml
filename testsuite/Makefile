@@ -127,8 +127,17 @@ else
 endif
 
 # TOOL_RUNPARAM likewise passes extra OCAMLRUNPARAM components to the
-# compilers and other tools, not to the test programs.
-TOOL_RUNPARAM ?=
+# compilers and other tools that ocamltest runs, and to the code that
+# these run themselves (toplevels, expect tests, debuggers), but not to
+# the test programs that ocamltest launches. By default, the major GC of
+# the tools does no marking until it has 128M words of work, which most
+# compilations never reach; not with USE_RUNTIME, where the tools' major
+# GC is part of what is tested. Set TOOL_RUNPARAM= to disable this.
+ifeq "$(USE_RUNTIME)" ""
+  TOOL_RUNPARAM ?= Xsmall_heap_limit=128M
+else
+  TOOL_RUNPARAM ?=
+endif
 ifeq "$(TOOL_RUNPARAM)" ""
   OCAMLTEST_TOOL_RUNPARAM_FLAG =
 else

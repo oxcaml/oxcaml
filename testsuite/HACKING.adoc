@@ -115,6 +115,13 @@ then this will run all the tests in those three directories.
   The compilers and other tools are unaffected, unlike with
   `OCAMLRUNPARAM` itself, which reaches every program ocamltest starts.
 
+`TOOL_RUNPARAM=v=0x400`::
+  Likewise, but for the compilers and other tools that ocamltest runs, and
+  not for the compiled test programs. Code that a tool runs itself (in a
+  toplevel, an expect test or a debugger) gets the components too. The
+  default is `Xsmall_heap_limit=128M`, which delays the major GC's marking
+  in the tools, except with `USE_RUNTIME`. `TOOL_RUNPARAM=` disables it.
+
 `KEEP_TEST_DIR_ON_SUCCESS=1`::
   Keeps temporary output files from a test run. This is handy to validate the
   content of temporary output files, run a produced executable by hand, etc.

@@ -145,7 +145,7 @@ let append_ocamlrunparam extra env =
 
 let run_cmd
     ~full_environment
-    ~ocamlrunparam
+    ~extra_ocamlrunparam
     ?(environment=[||])
     ?(stdin_variable=Builtin_variables.stdin)
     ?(stdout_variable=Builtin_variables.stdout)
@@ -156,7 +156,7 @@ let run_cmd
     ~what
     log env original_cmd
   =
-  let env = append_ocamlrunparam ocamlrunparam env in
+  let env = append_ocamlrunparam extra_ocamlrunparam env in
   let log_redirection std filename =
     if filename<>"" then
     begin
@@ -285,15 +285,16 @@ let run
       exit_status_of_variable env Builtin_variables.exit_status, Result.pass
     in
     let exits = Option.value exits ~default:[expected_exit_status] in
-    run_cmd ~full_environment ~ocamlrunparam:"" ?stdout_variable
+    run_cmd ~full_environment ~extra_ocamlrunparam:"" ?stdout_variable
       ?stderr_variable ~exits ~what log env commandline, env
 
 (* The compilers and other tools get the OCAMLRUNPARAM components given by
-   -tool-ocamlrunparam; test programs and scripts, run by [run], don't.
-   Tools that run test code themselves (the toplevels, the debuggers) pass
-   the components on to it. *)
+   -tool-ocamlrunparam; the test programs and scripts that [run] launches
+   don't. Code that a tool runs itself (a toplevel, an expect test, a
+   debugger, a ppx) gets them too. *)
 let run_cmd =
-  run_cmd ~full_environment:false ~ocamlrunparam:Options.tool_ocamlrunparam
+  run_cmd ~full_environment:false
+    ~extra_ocamlrunparam:Options.tool_ocamlrunparam
 
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
