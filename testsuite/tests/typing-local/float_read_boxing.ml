@@ -1,4 +1,5 @@
 (* TEST
+   flat-float-array;
    flags = "-dlambda -dcanonical-ids";
    expect;
 *)
