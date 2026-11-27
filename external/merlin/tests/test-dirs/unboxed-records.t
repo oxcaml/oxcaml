@@ -7,13 +7,9 @@ Complete a label
   > let f (x : t) = x.#fo
   > EOF
 
-TODO (unboxed records): support completion of unboxed record labels
   $ $MERLIN single complete-prefix -position 2:21 -prefix "fo" -filename test.ml < test.ml \
   >   | revert-newlines | jq .value.entries[].name -r
-  format_of_string
-  format
-  format4
-  format6
+  foo
 
 
 Get type of a label in an expression
