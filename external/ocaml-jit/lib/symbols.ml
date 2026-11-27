@@ -37,6 +37,12 @@ let is_gen_fun symbol_name =
   || String.starts_with ~prefix:"caml_send" symbol_name
   || String.starts_with ~prefix:"caml_tuplify" symbol_name
 
+(* Identifies the symbols that every unit using probes defines, as weak
+   symbols: the base of the probe notes and the semaphores of the probes.
+   Each phrase uses its own. *)
+let is_probe_symbol symbol_name =
+  String.equal symbol_name "_.stapsdt.base"
+  || String.starts_with ~prefix:"caml_probes_semaphore_" symbol_name
 
 let aggregate ~current ~new_symbols =
   (* TODO: We should most likely handle local symbols properly.
@@ -47,6 +53,7 @@ let aggregate ~current ~new_symbols =
      which will cause older definitions to be ignored. *)
   String.Map.union current new_symbols ~f:(fun symbol_name _old new_ ->
     if is_gen_fun symbol_name
+       || is_probe_symbol symbol_name
        || String.equal symbol_name ".Lcaml_call_gc_"
        || String.equal symbol_name ".Lcaml_call_gc_sse_"
        || String.equal symbol_name ".Lcaml_call_gc_avx_"
