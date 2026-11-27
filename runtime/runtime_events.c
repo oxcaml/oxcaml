@@ -85,7 +85,7 @@ typedef enum { EV_RUNTIME, EV_USER } ev_category;
 
 /* These store state for the current ring buffers open for writing */
 static struct runtime_events_metadata_header *current_metadata = NULL;
-static int current_ring_total_size;
+static size_t current_ring_total_size;
 static char_os *runtime_events_path;
 static char_os *current_ring_loc = NULL;
 
@@ -94,9 +94,9 @@ static HANDLE ring_file_handle;
 static HANDLE ring_handle;
 #endif
 
-/* This comes from OCAMLRUNPARAMs and is initialised in
-   caml_runtime_events_init */
-static int ring_size_words;
+/* This comes from OCAMLRUNPARAMs and is initialised when the ring buffers
+   are created */
+static uint64_t ring_size_words;
 
 /* This is set if the OCAML_RUNTIME_EVENTS_PRESERVE environment
   variable is present and determines whether the ring buffer is
@@ -139,8 +139,6 @@ void caml_runtime_events_init(void) {
     /* caml_secure_getenv's return shouldn't be cached */
     runtime_events_path = caml_stat_strdup_os(runtime_events_path);
   }
-
-  ring_size_words = 1 << caml_params->runtime_events_log_wsize;
 
   preserve_ring =
             caml_secure_getenv(T("OCAML_RUNTIME_EVENTS_PRESERVE")) ? 1 : 0;
@@ -235,7 +233,10 @@ void caml_runtime_events_destroy(void) {
 static void runtime_events_create_from_stw_single(void) {
   /* Don't initialise runtime_events twice */
   if (!atomic_load_acquire(&runtime_events_enabled)) {
-    int ring_headers_length, ring_data_length;
+    uintnat max_domains = caml_params->max_domains;
+    uintnat log_wsize = caml_params->runtime_events_log_wsize;
+    uintnat ring_size_bytes, ring_headers_length, ring_data_length;
+    uintnat total_size;
 #ifdef _WIN32
     DWORD pid = GetCurrentProcessId();
 #else
@@ -253,12 +254,29 @@ static void runtime_events_create_from_stw_single(void) {
                   T("%ld.events"), pid);
     }
 
-    current_ring_total_size =
-        RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
-          sizeof(struct runtime_events_custom_event) +
-        caml_params->max_domains * (ring_size_words * sizeof(uint64_t) +
-                        sizeof(struct runtime_events_buffer_header)) +
-        sizeof(struct runtime_events_metadata_header);
+    /* The file is mapped whole, so its size must be a valid object size,
+       which also makes it fit the offset type of the file. */
+    ring_headers_length =
+        max_domains * sizeof(struct runtime_events_buffer_header);
+    if (log_wsize >= CHAR_BIT * sizeof(uintnat)
+        || caml_umul_overflow((uintnat)1 << log_wsize, sizeof(uint64_t),
+                              &ring_size_bytes)
+        || caml_umul_overflow(max_domains, ring_size_bytes,
+                              &ring_data_length)
+        || caml_uadd_overflow(ring_data_length,
+                              sizeof(struct runtime_events_metadata_header) +
+                              ring_headers_length +
+                              RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
+                                sizeof(struct runtime_events_custom_event),
+                              &total_size)
+        || total_size > PTRDIFF_MAX) {
+      caml_fatal_error("Ring buffers too large: OCAMLRUNPARAM "
+                       "e=%" ARCH_INTNAT_PRINTF_FORMAT "u, "
+                       "d=%" ARCH_INTNAT_PRINTF_FORMAT "u",
+                       log_wsize, max_domains);
+    }
+    ring_size_words = (uint64_t)1 << log_wsize;
+    current_ring_total_size = total_size;
 
 #ifdef _WIN32
     ring_file_handle = CreateFile(
@@ -286,8 +304,8 @@ static void runtime_events_create_from_stw_single(void) {
       ring_file_handle,
       NULL,
       PAGE_READWRITE,
-      0,
-      current_ring_total_size,
+      (DWORD)((uint64_t)current_ring_total_size >> 32),
+      (DWORD)current_ring_total_size,
       NULL
     );
 
@@ -318,7 +336,9 @@ static void runtime_events_create_from_stw_single(void) {
     ret = ftruncate(ring_fd, current_ring_total_size);
 
     if (ret < 0) {
-      caml_fatal_error("Can't resize ring buffer");
+      caml_fatal_error("Can't resize ring buffer to %"
+                       ARCH_SIZET_PRINTF_FORMAT "u bytes",
+                       current_ring_total_size);
     }
 
     /* This cast is necessary for compatibility with Illumos' non-POSIX
@@ -327,23 +347,20 @@ static void runtime_events_create_from_stw_single(void) {
                         mmap(NULL, current_ring_total_size,
                             PROT_READ | PROT_WRITE, MAP_SHARED, ring_fd, 0);
 
-    if (current_metadata == NULL) {
-      caml_fatal_error("Unable to mmap ring buffer");
+    if (current_metadata == MAP_FAILED) {
+      unlink(current_ring_loc);
+      caml_fatal_error("Unable to mmap ring buffer of %"
+                       ARCH_SIZET_PRINTF_FORMAT "u bytes",
+                       current_ring_total_size);
     }
 
     close(ring_fd);
 #endif
-    ring_headers_length =
-        caml_params->max_domains * sizeof(struct runtime_events_buffer_header);
-    ring_data_length =
-        caml_params->max_domains * ring_size_words * sizeof(uint64_t);
-
     current_metadata->version = RUNTIME_EVENTS_VERSION;
-    current_metadata->max_domains = caml_params->max_domains;
+    current_metadata->max_domains = max_domains;
     current_metadata->ring_header_size_bytes =
         sizeof(struct runtime_events_buffer_header);
-    current_metadata->ring_size_bytes =
-        ring_size_words * sizeof(uint64_t);
+    current_metadata->ring_size_bytes = ring_size_bytes;
     current_metadata->ring_size_elements = ring_size_words;
     current_metadata->headers_offset =
         sizeof(struct runtime_events_metadata_header);
