@@ -40,11 +40,15 @@ let flags_variant () =
     stack_checks = !Clflags.stack_checks
   }
 
+(* The base variant: what every installation compiles for when no flag
+   and no OCAMLPARAM setting selects another, and what its library root
+   holds.  It is not configurable; see the default values of the axis
+   flags in [Clflags], which this must agree with. *)
 let default =
-  { address_sanitizer = Config.with_address_sanitizer;
-    frame_pointers = Config.with_frame_pointers;
-    poll_insertion = Config.poll_insertion;
-    stack_checks = not Config.no_stack_checks
+  { address_sanitizer = false;
+    frame_pointers = false;
+    poll_insertion = false;
+    stack_checks = false
   }
 
 (* The axes describe native code generation only.  A JSIR compilation
@@ -97,12 +101,11 @@ let runtime_archive_suffix t =
 
 let runtime_guard_symbol t = Codegen_variant_name.runtime_guard_symbol (name t)
 
-(* The target checks mirror the cases of configure.ac that decide the
-   default of each axis: "## Frame pointers", the stack-checks case (checks
-   are forced on everywhere but amd64 and arm64) and "## Address Sanitizer"
-   (Clang-only: the runtime's report wrappers rely on Clang-only
-   attributes, see runtime/memory.c).  The [Config] values of the axes only
-   provide the defaults of the flags. *)
+(* The target checks mirror the cases of configure.ac that decide which
+   variants can be built: frame pointers need the amd64 backend, the C
+   runtime's stack checks are mandatory everywhere but on amd64 and arm64,
+   and AddressSanitizer is Clang-only (the runtime's report wrappers rely
+   on Clang-only attributes, see runtime/memory.c). *)
 let check_supported t =
   let frame_pointers_supported =
     match Config.architecture, Config.system with

@@ -53,7 +53,9 @@ val current : unit -> t
     the variant of a program that compiles native code for itself. *)
 val flags_variant : unit -> t
 
-(** The variant baked in at configure time. *)
+(** The base variant, with every axis off: what is compiled for when no
+    flag and no OCAMLPARAM setting selects another, and what the library
+    root holds, on every installation. *)
 val default : t
 
 val equal : t -> t -> bool

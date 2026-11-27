@@ -226,40 +226,35 @@ let mk_no_omit_leaf_frame_pointers f =
   )
 
 let mk_frame_pointers f =
-  ( "-frame-pointers",
-    Arg.Unit f,
-    " Maintain frame pointers in generated code (default: the setting the \
-     compiler was configured with)" )
+  ("-frame-pointers", Arg.Unit f, " Maintain frame pointers in generated code")
 
 let mk_no_frame_pointers f =
   ( "-no-frame-pointers",
     Arg.Unit f,
-    " Do not maintain frame pointers in generated code (default: the setting \
-     the compiler was configured with)" )
+    " Do not maintain frame pointers in generated code (default)" )
 
 let mk_stack_checks f =
   ( "-stack-checks",
     Arg.Unit f,
-    " Generate explicit stack-limit checks instead of relying on guard pages \
-     (default: the setting the compiler was configured with)" )
+    " Generate explicit stack-limit checks instead of relying on guard pages" )
 
 let mk_no_stack_checks f =
   ( "-no-stack-checks",
     Arg.Unit f,
     " Rely on stack guard pages instead of explicit stack-limit checks \
-     (default: the setting the compiler was configured with)" )
+     (default)" )
 
 let mk_asan f =
   ( "-asan",
     Arg.Unit f,
     " Expose native OCaml memory operations to AddressSanitizer; requires \
-     frame pointers (default: the setting the compiler was configured with)" )
+     frame pointers" )
 
 let mk_no_asan f =
   ( "-no-asan",
     Arg.Unit f,
     " Do not expose native OCaml memory operations to AddressSanitizer \
-     (default: the setting the compiler was configured with)" )
+     (default)" )
 
 let mk_cfg_merge_blocks f =
   ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
@@ -456,15 +451,13 @@ let mk_disable_poll_insertion f =
   ( "-disable-poll-insertion",
     Arg.Unit f,
     " Do not insert poll points in the unit being compiled; when linking, use \
-     the libraries without poll points if they are installed (default: the \
-     setting the compiler was configured with)" )
+     the libraries without poll points if they are installed (default)" )
 
 let mk_enable_poll_insertion f =
   ( "-enable-poll-insertion",
     Arg.Unit f,
     " Insert poll points in the unit being compiled; when linking, use the \
-     libraries with poll points if they are installed (default: the setting \
-     the compiler was configured with)" )
+     libraries with poll points if they are installed" )
 
 let mk_long_frames f =
   ("-long-frames", Arg.Unit f, " Allow stack frames longer than 2^16 bytes")

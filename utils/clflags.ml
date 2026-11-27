@@ -422,29 +422,31 @@ let pic_code = ref (match Config.architecture with (* -fPIC *)
                      | "amd64" | "s390x" -> true
                      | _                 -> false)
 
+(* The four axes of the codegen variants are off by default, on every
+   installation: with no flag, the compiler targets the base variant
+   ([Codegen_variant.default], which these values must agree with). *)
+
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Translprim], which cannot depend on the driver libraries. *)
-let frame_pointers = ref Config.with_frame_pointers
+let frame_pointers = ref false
                                         (* -[no-]frame-pointers *)
 
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Codegen_variant] (in utils, which cannot depend on the driver
-   libraries).  [Config.no_stack_checks] only provides the default. *)
-let stack_checks = ref (not Config.no_stack_checks)
+   libraries). *)
+let stack_checks = ref false
                                         (* -[no-]stack-checks *)
 
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Codegen_variant] and [Ccomp] (in utils, which cannot depend on the
-   driver libraries).  [Config.with_address_sanitizer] only provides the
-   default. *)
-let address_sanitizer = ref Config.with_address_sanitizer
+   driver libraries). *)
+let address_sanitizer = ref false
                                         (* -[no-]asan *)
 
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Lambda.primitive_may_allocate] and [Cmm_helpers] (the [Pcpu_relax]
-   lowering), which cannot depend on the driver libraries.
-   [Config.poll_insertion] only provides the default. *)
-let poll_insertion = ref Config.poll_insertion
+   lowering), which cannot depend on the driver libraries. *)
+let poll_insertion = ref false
                                         (* -{enable,disable}-poll-insertion *)
 
 let runtime_variant = ref ""
