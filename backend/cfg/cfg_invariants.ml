@@ -249,21 +249,22 @@ end = struct
       (* Self tailcalls reuse the current function's parameter passing
          convention, hence the arity must match [fun_args]. *)
       check ~expected_args:[Array.length t.cfg.fun_args] ~expected_res:[0]
-    | Tailcall_func (Indirect _) ->
+    | Tailcall_func { desc = Indirect _; _ } ->
       (* The first argument is the callee; we cannot check the rest without the
          callee's type, but the array must be non-empty and there are no results
          for tailcalls. *)
       if Array.length args = 0
       then report t "%a: Indirect tailcall with no arguments" Label.print label;
       check ~expected_args:[] ~expected_res:[0]
-    | Call_no_return (Indirect _) ->
+    | Call_no_return { desc = Indirect _; _ } ->
       (* Similar to an indirect tailcall. *)
       if Array.length args = 0
       then
         report t "%a: Indirect nonreturning call with no arguments" Label.print
           label;
       check ~expected_args:[] ~expected_res:[0]
-    | Tailcall_func (Direct _) | Call_no_return (Direct _) ->
+    | Tailcall_func { desc = Direct _; _ }
+    | Call_no_return { desc = Direct _; _ } ->
       (* No result registers are produced by a tailcall or a nonreturning
          call. *)
       check ~expected_args:[] ~expected_res:[0]
@@ -424,7 +425,7 @@ end = struct
   let check_tailrec t _label block =
     (* check all Tailrec Self agree on the successor label *)
     match block.Cfg.terminator.desc with
-    | Tailcall_self { destination } -> (
+    | Tailcall_self { destination; _ } -> (
       match t.tailrec_entry_label with
       | None -> t.tailrec_entry_label <- Some destination
       | Some l ->

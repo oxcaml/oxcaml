@@ -141,7 +141,10 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
             terminator =
               { id = make_id ();
                 desc =
-                  Call { op = Indirect None; label_after = move_tmp_res_label };
+                  Call
+                    { op = { desc = Indirect None; known_arguments = [] };
+                      label_after = move_tmp_res_label
+                    };
                 arg = arg_locs;
                 res = tmp_result_locs
               }

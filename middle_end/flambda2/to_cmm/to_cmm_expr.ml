@@ -73,6 +73,17 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
       (Debuginfo.to_location dbg_with_inlined)
       (Warnings.Inlining_impossible reason)
 
+let check_known_argument env res : Simple.t -> Cmm.callee option =
+  Simple.pattern_match
+    ~const:(fun _ -> None)
+    ~name:(fun name ~coercion:_ ->
+      Name.pattern_match name
+        ~var:(fun var ->
+          Env.argument_index_by_name env var
+          |> Option.map (fun argument_index -> Cmm.Argument { argument_index }))
+        ~symbol:(fun symbol ->
+          Some (Cmm.Symbol (To_cmm_result.symbol res symbol))))
+
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
@@ -130,10 +141,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   let arguments_possibly_being_called =
-    let bind f = function None -> None | Some x -> f x in
-    callee_simple |> bind Simple.must_be_var
-    |> bind (fun (var, _) -> Env.argument_index_by_name env var)
-    |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
+    check_known_argument env res
+    |> Option.bind callee_simple |> Option.map List.singleton
   in
   let returns = Apply.returns apply in
   match Apply.call_kind apply with
@@ -142,20 +151,29 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let params_arity = Code_metadata.params_arity code_metadata in
     if not (C.check_arity params_arity args)
     then Misc.fatal_errorf "Wrong arity for direct call";
-    let args =
+    let arguments =
+      List.map2
+        (fun expression simple ->
+          { Cmm.expression; callee = check_known_argument env res simple })
+        args (Apply.args apply)
+    in
+    let arguments =
       if Code_metadata.is_my_closure_used code_metadata
       then
         let callee =
           match callee with
-          | Some callee -> callee
+          | Some callee ->
+            { Cmm.expression = callee;
+              callee = Option.bind callee_simple (check_known_argument env res)
+            }
           | None ->
             Misc.fatal_errorf
               "Need callee to compile call to@ %a@ but application expression \
                did not supply one:@ %a"
               Code_metadata.print code_metadata Apply.print apply
         in
-        args @ [callee]
-      else args
+        arguments @ [callee]
+      else arguments
     in
     let code_sym =
       To_cmm_result.symbol_of_code_id res code_id
@@ -165,7 +183,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     | None ->
       ( C.direct_call ~dbg ~returns
           (C.Extended_machtype.to_machtype return_ty)
-          pos code_sym args,
+          pos code_sym arguments,
         free_vars,
         env,
         res,

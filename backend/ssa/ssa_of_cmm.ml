@@ -361,12 +361,13 @@ and emit_invalid env c message symbol =
 and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     result =
   let may_raise = Cfg.can_raise_terminator new_op in
-  let call_returning_to op (ty : Cmm.machtype) : result =
+  let call_returning_to op ~known_arguments (ty : Cmm.machtype) : result =
     let cont_block = new_block env ~params:ty ~entry_dbg:Debuginfo.none in
     finish_block env c ~dbg
       (Call
          { op;
            args = arg_instrs;
+           known_arguments;
            continuation = Goto cont_block;
            may_raise;
            nontail
@@ -374,11 +375,12 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Cursor.move c ~new_pos:cont_block;
     Ok (Block.params cont_block)
   in
-  let call_no_return op : result =
+  let call_no_return op ~known_arguments : result =
     finish_block env c ~dbg
       (Call
          { op;
            args = arg_instrs;
+           known_arguments;
            continuation = Unreachable;
            may_raise;
            nontail
@@ -386,16 +388,22 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Never_returns
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
-    call_returning_to (Indirect candidates) ty
+  | Call { op = { desc = Direct sym; known_arguments }; _ } ->
+    call_returning_to (Direct sym) ~known_arguments ty
+  | Call { op = { desc = Indirect candidates; known_arguments }; _ } ->
+    call_returning_to (Indirect candidates) ~known_arguments ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
-    call_returning_to (External ext_call) ty_res
+    call_returning_to (External ext_call) ~known_arguments:[] ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
-    call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return (Direct sym) -> call_no_return (Direct sym)
-  | Call_no_return (Indirect candidates) -> call_no_return (Indirect candidates)
-  | External_call_no_return ext_call -> call_no_return (External ext_call)
+    call_returning_to
+      (Probe { name; handler_code_sym; enabled_at_init })
+      ~known_arguments:[] ty
+  | Call_no_return { desc = Direct sym; known_arguments } ->
+    call_no_return (Direct sym) ~known_arguments
+  | Call_no_return { desc = Indirect candidates; known_arguments } ->
+    call_no_return (Indirect candidates) ~known_arguments
+  | External_call_no_return ext_call ->
+    call_no_return (External ext_call) ~known_arguments:[]
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
   | Invalid _ ->

@@ -268,7 +268,10 @@ let () =
                 terminator =
                   { id = make_id ();
                     desc =
-                      Call { op = Indirect None; label_after = new_label 1 };
+                      Call
+                        { op = { desc = Indirect None; known_arguments = [] };
+                          label_after = new_label 1
+                        };
                     arg = [||];
                     res = [||]
                   }

@@ -191,6 +191,7 @@ and 'g terminator =
   | Call of
       { op : call_op;
         args : 'g value array;
+        known_arguments : Cmm.callee option list;
         continuation : 'g continuation;
         may_raise : bool;
         nontail : bool
@@ -592,6 +593,7 @@ module Terminator = struct
     | Call of
         { op : call_op;
           args : 'g value array;
+          known_arguments : Cmm.callee option list;
           continuation : 'g continuation;
           may_raise : bool;
           nontail : bool
@@ -633,7 +635,8 @@ module Terminator = struct
       Array.iteri
         (fun i block -> Format.fprintf ppf " | %i -> %a" i Block.print_id block)
         targets
-    | Call { op; args; continuation; may_raise; nontail } -> (
+    | Call { op; args; continuation; may_raise; nontail; known_arguments = _ }
+      -> (
       let kind =
         match continuation with
         | Return -> "tailcall"

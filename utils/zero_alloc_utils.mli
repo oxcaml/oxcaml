@@ -136,6 +136,8 @@ module Allocation_source : sig
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
+  val bind : f:('a -> 'b t) -> 'a t -> 'b t
+
   val compare :
     compare_args:('args -> 'args -> int) -> 'args t -> 'args t -> int
 

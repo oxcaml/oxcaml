@@ -257,6 +257,8 @@ type callee =
 
 val equal_callee : callee -> callee -> bool
 
+val compare_callee : callee -> callee -> int
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -471,7 +473,10 @@ type operation =
         region : Lambda.region_close;
         callees : callee list option;
             (* List of possible callees, or [None] if not known. The actual
-               callee might be a re-optimized versions of one these callees. *)
+               callee might be a re-optimized version of one these callees. *)
+        known_arguments : callee option list;
+            (* Statically known arguments passed here, for the [zero_alloc]
+               backend to analyze as callbacks that may allocate. *)
         returns : bool (* [true] is the conservative default. *)
       }
   | Cextcall of
@@ -641,6 +646,11 @@ and expression =
       { message : string;
         symbol : symbol
       }
+
+type argument =
+  { expression : expression;
+    callee : callee option
+  }
 
 type codegen_option =
   | Reduce_code_size

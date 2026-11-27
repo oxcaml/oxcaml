@@ -96,6 +96,7 @@ module Tail_call_reducer : Reducer = struct
     | Call
         ({ op = (Direct _ | Indirect _) as call_op;
            args;
+           known_arguments = _;
            continuation;
            may_raise = _;
            nontail = false

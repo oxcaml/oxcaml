@@ -2677,6 +2677,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode)
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
@@ -3757,6 +3758,8 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
           { result_type = ty;
             region = pos;
             callees = Some [Symbol sym];
+            (* CR wsturgeon for wsturgeon: propagate known arguments *)
+            known_arguments = [];
             returns
           },
         cargs,
@@ -3790,6 +3793,9 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
                       { result_type = ty;
                         region = pos;
                         callees = None;
+                        (* CR wsturgeon for wsturgeon: propagate known
+                           arguments *)
+                        known_arguments = [];
                         returns
                       },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
@@ -3828,6 +3834,8 @@ let apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
                 callees;
+                (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                known_arguments = [];
                 returns
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
@@ -4058,6 +4066,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
               { result_type = result;
                 region = Rc_normal;
                 callees = None;
+                (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                known_arguments = [];
                 returns = true
               },
             (* The code pointer and closure info of a closure are write-once;
@@ -4085,6 +4095,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 { result_type = typ_val;
                   region = Rc_normal;
                   callees = None;
+                  (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                  known_arguments = [];
                   returns = true
                 },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
@@ -4122,6 +4134,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 { result_type = result;
                   region = Rc_normal;
                   callees = None;
+                  (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                  known_arguments = [];
                   returns = true
                 },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
@@ -4265,6 +4279,7 @@ let tuplify_function arity return =
               { result_type = return;
                 region = Rc_normal;
                 callees = None;
+                known_arguments = [];
                 returns = true
               },
             (* The closure code pointer is write-once; see
@@ -4435,6 +4450,7 @@ let rec make_curry_apply result narity args_type args clos n =
           { result_type = result;
             region = Rc_normal;
             callees = None;
+            known_arguments = [];
             returns = true
           },
         (* Code pointer and chain links of a partial-application closure are
@@ -4961,6 +4977,7 @@ let entry_point namelist =
               { result_type = typ_void;
                 region = Rc_normal;
                 callees = None;
+                known_arguments = [];
                 returns = true
               },
             [Cop (mk_load_immut Word_code_pointer, [f], dbg ())],
@@ -5509,9 +5526,11 @@ let direct_call ~dbg ~returns ty pos f_code_sym args =
         { result_type = ty;
           region = pos;
           callees = Some [Symbol f_code_sym];
+          known_arguments = List.map (fun { callee; _ } -> callee) args;
           returns
         },
-      Cconst_symbol (f_code_sym, dbg) :: args,
+      Cconst_symbol (f_code_sym, dbg)
+      :: List.map (fun { expression; _ } -> expression) args,
       dbg )
 
 let indirect_call ~dbg ~returns ty pos alloc_mode f args_type args ~callees =
@@ -5540,6 +5559,8 @@ let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
              { result_type = Extended_machtype.to_machtype ty;
                region = pos;
                callees;
+               (* CR wsturgeon for wsturgeon: propagate known arguments *)
+               known_arguments = [];
                returns
              },
            (fun_ptr :: args) @ [Cvar v],
@@ -5919,6 +5940,7 @@ let perform ~dbg ~returns eff =
         { result_type = typ_val;
           region = Rc_nontail;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [Cconst_symbol (sym, dbg); eff; cont],
@@ -5931,6 +5953,7 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [ Cconst_symbol
@@ -5960,6 +5983,7 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [ Cconst_symbol
@@ -5993,6 +6017,7 @@ let continue ~dbg ~cont ~value ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [Cconst_symbol (sym, dbg); cont; value],
@@ -6005,6 +6030,7 @@ let discontinue ~dbg ~cont ~exn ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [Cconst_symbol (sym, dbg); cont; exn],
@@ -6019,6 +6045,7 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
@@ -6033,6 +6060,7 @@ let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
         { result_type = typ_val;
           region = Rc_normal;
           callees = Some [Symbol sym];
+          known_arguments = [];
           returns
         },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],

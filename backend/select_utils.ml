@@ -842,7 +842,7 @@ let insert_move_args env sub_cfg arg loc stacksize =
 
 let call_arg_locations (call : Cfg.func_call_operation) args =
   let rarg =
-    match call with
+    match call.desc with
     | Indirect _ -> Array.sub args 1 (Array.length args - 1)
     | Direct _ -> args
   in
@@ -850,7 +850,7 @@ let call_arg_locations (call : Cfg.func_call_operation) args =
   rarg, loc_arg, stack_ofs
 
 let call_arg_for_terminator (call : Cfg.func_call_operation) args loc_arg =
-  match call with
+  match call.desc with
   | Indirect _ -> Array.append [| args.(0) |] loc_arg
   | Direct _ -> loc_arg
 

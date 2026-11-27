@@ -239,6 +239,7 @@ expr:
                         result_type = $6;
                         region = Lambda.Rc_normal;
                         callees = None;
+                        known_arguments = [];
                         returns = true
                       },
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }

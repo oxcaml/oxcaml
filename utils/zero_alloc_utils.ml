@@ -236,6 +236,11 @@ module Allocation_source = struct
     | No_allocation_other_than_calling_arguments args ->
       No_allocation_other_than_calling_arguments (f args)
 
+  let bind ~f = function
+    | Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments args -> f args
+
   let compare ~compare_args t1 t2 =
     match t1, t2 with
     | ( Allocation_other_than_calling_arguments,
