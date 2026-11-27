@@ -411,6 +411,7 @@ let is_absolute_symbol_reference state ~all_sections ~current_section
          - For local labels/file-scope symbols: the assembler finds the nearest
          global symbol before the target and creates a relocation to that
          symbol. The data contains (target_offset - symbol_offset + addend).
+         This is not done for the JIT, which is given the target itself.
 
          - On Linux RELA: addend in relocation, emit 0 in data *)
       if is_same_section
@@ -424,15 +425,20 @@ let is_absolute_symbol_reference state ~all_sections ~current_section
             SS.add_relocation_at_current_offset state
               ~reloc_kind:(R_AARCH64_ABS64 { target; addend = 0 });
             Some 0L)
-          else if is_global
+          else if is_global || for_jit
           then (
-            (* Global symbol on macOS: emit addend, relocation to symbol *)
+            (* Global symbol on macOS: emit addend, relocation to symbol. The
+               JIT gets the same for a local label or a file-scope symbol: it
+               knows their addresses, and it stores the address of the target of
+               a relocation without adding what the data holds, so the target
+               must not be replaced by a nearby global symbol. *)
             SS.add_relocation_at_current_offset state
               ~reloc_kind:(R_AARCH64_ABS64 { target; addend = 0 });
             Some addend)
           else
-            (* Local label or file-scope symbol on macOS: find global symbol at
-               or before target and emit offset relative to it *)
+            (* Local label or file-scope symbol on macOS, in an object file:
+               find global symbol at or before target and emit offset relative
+               to it *)
             match SS.find_global_symbol_at_or_before state target_offset with
             | Some (nearest_sym, nearest_sym_offset) ->
               let data_value =
