@@ -19,8 +19,7 @@
 # Environment:
 #   COLLECT_METRICS   if "true", append flags to BUILD_OCAMLPARAM and
 #                     OCAMLPARAM so the compiler writes per-file profiling
-#                     CSVs into $GITHUB_WORKSPACE/_profile_csv, and run
-#                     the testsuite's compilers with the default GC settings
+#                     CSVs into $GITHUB_WORKSPACE/_profile_csv
 #   BUILD_OCAMLPARAM, OCAMLPARAM, OCAMLRUNPARAM, USE_RUNTIME
 #                     passed through to make
 
@@ -35,8 +34,6 @@ if [ "${COLLECT_METRICS:-}" = "true" ]; then
   profile_flags="dump-dir=$profile_dir,dump-into-csv=1,profile=1"
   export BUILD_OCAMLPARAM="${BUILD_OCAMLPARAM:-},$profile_flags"
   export OCAMLPARAM="${OCAMLPARAM:-},$profile_flags"
-  # Keep the profiles of the testsuite's compilations comparable
-  export TOOL_RUNPARAM=
 fi
 
 ulimit -c unlimited
