@@ -10,6 +10,7 @@
 #include <caml/gc.h>
 #include <caml/memory.h>
 #include <caml/callback.h>
+#include <caml/fail.h>
 #include <caml/threads.h>
 
 void *create_root(value v)
@@ -49,7 +50,8 @@ value spawn_thread(value clos)
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  pthread_create(&thr, &attr, thread_func, root);
+  if (pthread_create(&thr, &attr, thread_func, root) != 0)
+    caml_failwith("spawn_thread: pthread_create failed");
 #endif
   return Val_unit;
 }
