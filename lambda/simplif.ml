@@ -1000,7 +1000,7 @@ module LamTbl = Hashtbl.Make(struct
   end)
 
 (* The layout of the result of a term, when the term is annotated with it. *)
-let rec annotated_result_layout = function
+let annotated_result_layout ~recurse = function
   | Lapply { ap_result_layout = layout; _ }
   | Lswitch (_, _, _, layout)
   | Lstringswitch (_, _, _, _, layout)
@@ -1017,7 +1017,7 @@ let rec annotated_result_layout = function
   | Levent (body, _)
   | Lifused (_, body)
   | Lexclave body ->
-      annotated_result_layout body
+      recurse body
   | Lprim ((Psequand | Psequor), _, _) ->
       (* The second argument of [&&] and [||] is in tail position (see
          [Lambda.shallow_iter]), but the result is always a boolean. *)
@@ -1172,6 +1172,15 @@ let simplify_local_functions lam =
     current_region_scope := old_tail_scope
   in
   tail lam;
+  let layouts = LamTbl.create 16 in
+  let rec result_layout lam =
+    match LamTbl.find_opt layouts lam with
+    | Some result -> result
+    | None ->
+      let result = annotated_result_layout ~recurse:result_layout lam in
+      LamTbl.add layouts lam result;
+      result
+  in
   let rec rewrite lam0 =
     let lam =
       match lam0 with
@@ -1199,7 +1208,7 @@ let simplify_local_functions lam =
        [lam0] while other tail branches of [lam0] return values that
        [lf.return] does not allow (e.g. [Null] or a block). *)
     let layout lf =
-      Option.value (annotated_result_layout lam0) ~default:lf.return
+      Option.value (result_layout lam0) ~default:lf.return
     in
     List.fold_right
       (fun (st, lf, exclave) lam ->
