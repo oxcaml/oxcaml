@@ -213,18 +213,22 @@ its variant, so that `configure` fails if it cannot build it.
 ### Checks that test the codegen variants of one build
 
 One install serves several codegen variants, selected each time the compiler
-runs. Two builds check that, each with every variant that its C compiler can
-build: one with the system's C compiler, one with clang, which the
-AddressSanitizer variants need. Each builds its compiler once and ships one
-install tree: its other checks then use that one build, on a machine each.
-The build assembles the install tree twice, first for its check of a staged
-install. The `variant` checks install `gdb`, as above, and GNU parallel,
-without which the suite runs one test at a time.
+runs. Three builds on Linux check that, each with every variant that its
+platform and C compiler can build: on x86_64, one with the system's C
+compiler and one with clang, which the AddressSanitizer variants need; on
+arm64, which has neither frame pointers nor AddressSanitizer, one with the
+system's C compiler. Each builds its compiler once and ships one install
+tree: its other checks then use that one build, on a machine each. The build
+assembles the install tree twice, first for its check of a staged install.
+The `variant` checks install `gdb`, as above, and GNU parallel, without which
+the suite runs one test at a time.
 
 | Build | Its checks |
 |---|---|
-| `./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc` | `codegen variants build (x86_64-linux)`, `variant <variant> (x86_64-linux)`, `variant <variant> debug (x86_64-linux)`, `installed consumers (x86_64-linux)` |
-| `CC=clang ./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc,asan-fp,asan-fp-poll` | `codegen variants build clang (x86_64-linux)`, `variant <variant> clang (x86_64-linux)`, `variant <variant> clang debug (x86_64-linux)`, `installed consumers clang (x86_64-linux)` |
+| x86_64 Linux: `./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc` | `codegen variants build (x86_64-linux)`, `variant <variant> (x86_64-linux)`, `variant <variant> debug (x86_64-linux)`, `installed consumers (x86_64-linux)` |
+| x86_64 Linux: `CC=clang ./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc,asan-fp,asan-fp-poll` | `codegen variants build clang (x86_64-linux)`, `variant <variant> clang (x86_64-linux)`, `variant <variant> clang debug (x86_64-linux)`, `installed consumers clang (x86_64-linux)` |
+| arm64 Linux: `./configure --prefix="$PWD/_install" --with-codegen-variants=base,poll,poll-sc,sc` | `codegen variants build (aarch64-linux)`, `variant <variant> (aarch64-linux)`, `variant <variant> debug (aarch64-linux)`, `installed consumers (aarch64-linux)` |
+| arm64 macOS: the same line as arm64 Linux | `codegen variants (aarch64-darwin)`, one check that does all of the above on one machine |
 
 One tree, configured with the line of a build (after `autoconf`), reproduces
 all the checks of that build:
@@ -237,12 +241,19 @@ all the checks of that build:
 | `installed consumers ...` | `make install check-installed` |
 
 A `variant` check runs the whole upstream testsuite for one variant and one
-runtime. `base` is the default variant of these builds, so
-`CODEGEN_VARIANT=base` can be left out. `make test-one` and
-`make test-no-rebuild` take the same variables, and `make test-variants` runs
-the first command for every variant of the build. An `installed consumers`
-check builds and runs findlib and dune projects against the installed
-compiler, for every variant.
+runtime. Leaving `CODEGEN_VARIANT` out is the same as `CODEGEN_VARIANT=base`.
+`make test-one` and `make test-no-rebuild` take the same variables, and
+`make test-variants` runs the first command for every variant of the build.
+An `installed consumers` check builds and runs findlib and dune projects
+against the installed compiler, for every variant.
+
+`codegen variants (aarch64-darwin)` runs these commands in one tree, in this
+order: `make compiler`, `bash tools/ci/actions/check-staged-install.sh`,
+`make install_for_test`, `make check-installed`, then for each variant
+`make test-no-rebuild CODEGEN_VARIANT=<variant> TEST_ID=<variant>` and
+`make test-no-rebuild CODEGEN_VARIANT=<variant> TEST_ID=<variant>-debug
+USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1`. `TEST_ID` keeps the passes apart in the
+one test tree: each has its own log, `_runtest/testsuite/_log.<TEST_ID>`.
 
 ## Running tests with coverage analysis
 

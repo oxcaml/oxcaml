@@ -26,8 +26,9 @@ permissions: {}
 # (`--enable-stack-checks` for `sc`), which makes configure fail unless it
 # can build that variant; `make` fails too when the variant is not built.
 #
-# The `variants-*` jobs test every variant of one install, with the system's
-# C compiler (gcc) and with clang, which the AddressSanitizer variants need:
+# The `variants-*` jobs test every variant of one install, on x86_64 Linux
+# with the system's C compiler (gcc) and with clang, which the
+# AddressSanitizer variants need, and on arm64 Linux:
 # - `variants-build` builds, with each C compiler, a compiler that serves
 #   every variant that C compiler supports, and ships the installed compiler
 #   and the test tree;
@@ -36,12 +37,14 @@ permissions: {}
 #   when the tests run;
 # - `variants-consumers` builds findlib and dune projects against a shipped
 #   build, for every variant.
-# A job of the last two that finds no build from its C compiler fails, so
-# that every check reports a result; the jobs of the other build still run.
-# `needs` names the whole build matrix, so the jobs of both C compilers start
-# when the slower of the two builds has ended. That wait is the price of
-# defining each job once: a `needs` chain per C compiler would take a copy
-# of the three jobs for each.
+# A job of the last two that finds no build from its platform and C compiler
+# fails, so that every check reports a result; the jobs of the other builds
+# still run. `needs` names the whole build matrix, so the jobs of every
+# build start when the slowest of the builds has ended. That wait is the
+# price of defining each job once: a `needs` chain per build would take a
+# copy of the three jobs for each.
+# `variants-macos` does the same on arm64 macOS in one job: nothing is
+# shipped, since the scripts that ship a build need GNU tools.
 #
 # A build is shipped twice, as one file. A job that uses a build first asks
 # for the result that the job which makes it has in this attempt of the run:
@@ -56,8 +59,8 @@ permissions: {}
 # of jobs restore it at the same time in seconds, where they take minutes
 # each to download the artifact. A job downloads the artifact when the cache
 # has no entry of exactly that key or cannot be reached. So a job only ever
-# uses the build that the build job of its C compiler last made, and only if
-# that job succeeded.
+# uses the build that the build job of its platform and C compiler last
+# made, and only if that job succeeded.
 #
 # A job that is re-run on its own uses the build of the earlier attempt for
 # as long as the artifact is kept, 3 days: from the cache if the entry is
@@ -716,8 +719,8 @@ jobs:
           path: /Users/runner/Library/Logs/DiagnosticReports
 
   variants-build:
-    name: codegen variants build${{ matrix.name_part }} (x86_64-linux)
-    runs-on: warp-ubuntu-latest-x64-32x
+    name: codegen variants build${{ matrix.name_part }} (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -726,19 +729,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `variants` is what `variants-test` tests for the toolchain: keep
-          # the two in step. `base` is the default of a plain configure,
-          # which ignores it in this list.
-          - toolchain: gcc
+          # `variants` is what `variants-test` tests for the platform and
+          # the toolchain: keep the two in step. `base` is the variant of
+          # the compiler's default library root: every build has it, and
+          # configure ignores it in this list. arm64 has no frame pointers
+          # and no AddressSanitizer.
+          - platform: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
+            toolchain: gcc
             variants: base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc
-          - toolchain: clang
+          - platform: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
+            toolchain: clang
             cc: clang
             name_part: ' clang'
             variants: base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc,asan-fp,asan-fp-poll
+          - platform: aarch64-linux
+            os: warp-ubuntu-latest-arm64-32x
+            toolchain: gcc
+            variants: base,poll,poll-sc,sc
 
     env:
       # This job's `name`, for artifact names.
-      JOB_NAME: codegen variants build${{ matrix.name_part }} (x86_64-linux)
+      JOB_NAME: codegen variants build${{ matrix.name_part }} (${{ matrix.platform }})
       # Empty for the system's C compiler.
       VARIANTS_CC: ${{ matrix.cc }}
       # The packages of the jobs that use the build: gdb for the tests, and
@@ -747,7 +760,7 @@ jobs:
       VARIANTS: ${{ matrix.variants }}
       # The file that carries the build to the jobs that use it. It is
       # uploaded as it is, so it gives the artifact its name.
-      TEST_BUILD: oxcaml-test-build-x86_64-linux-${{ matrix.toolchain }}.tar.zst
+      TEST_BUILD: oxcaml-test-build-${{ matrix.platform }}-${{ matrix.toolchain }}.tar.zst
 
     steps:
       - name: Checkout the OxCaml repo
@@ -873,11 +886,11 @@ jobs:
           path: /cores
 
   variants-test:
-    name: variant ${{ matrix.variant }}${{ matrix.name_part }}${{ matrix.suffix }} (x86_64-linux)
+    name: variant ${{ matrix.variant }}${{ matrix.name_part }}${{ matrix.suffix }} (${{ matrix.platform }})
     needs: variants-build
     # Also when a build failed: see the top of this file.
     if: ${{ !cancelled() }}
-    runs-on: warp-ubuntu-latest-x64-32x
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -886,6 +899,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        platform: [x86_64-linux, aarch64-linux]
         toolchain: [gcc, clang]
         variant: [base, fp, fp-poll, fp-poll-sc, fp-sc, poll, poll-sc, sc, asan-fp, asan-fp-poll]
         runtime: [release, debug]
@@ -895,7 +909,24 @@ jobs:
             variant: asan-fp
           - toolchain: gcc
             variant: asan-fp-poll
+          # arm64 is built with the system's C compiler only, and has no
+          # frame pointers: what is left is base, poll, poll-sc and sc.
+          - platform: aarch64-linux
+            toolchain: clang
+          - platform: aarch64-linux
+            variant: fp
+          - platform: aarch64-linux
+            variant: fp-poll
+          - platform: aarch64-linux
+            variant: fp-poll-sc
+          - platform: aarch64-linux
+            variant: fp-sc
         include:
+          # Added to every combination that has the `platform`.
+          - platform: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
+          - platform: aarch64-linux
+            os: warp-ubuntu-latest-arm64-32x
           # Added to every combination that has `toolchain: clang`.
           - toolchain: clang
             cc: clang
@@ -908,9 +939,9 @@ jobs:
 
     env:
       # This job's `name`, for the summary and for artifact names.
-      JOB_NAME: variant ${{ matrix.variant }}${{ matrix.name_part }}${{ matrix.suffix }} (x86_64-linux)
+      JOB_NAME: variant ${{ matrix.variant }}${{ matrix.name_part }}${{ matrix.suffix }} (${{ matrix.platform }})
       # The job that builds what this job uses.
-      BUILD_NAME: codegen variants build${{ matrix.name_part }} (x86_64-linux)
+      BUILD_NAME: codegen variants build${{ matrix.name_part }} (${{ matrix.platform }})
       # Empty for the system's C compiler.
       VARIANTS_CC: ${{ matrix.cc }}
       # gdb for the tests, GNU parallel to run them at once, and the C
@@ -918,7 +949,7 @@ jobs:
       SYSDEPS: gdb parallel ${{ matrix.cc }}
       # The file that carries the build to the jobs that use it. It is
       # uploaded as it is, so it gives the artifact its name.
-      TEST_BUILD: oxcaml-test-build-x86_64-linux-${{ matrix.toolchain }}.tar.zst
+      TEST_BUILD: oxcaml-test-build-${{ matrix.platform }}-${{ matrix.toolchain }}.tar.zst
       # What `make test-no-rebuild` reads, for every step that runs tests.
       CODEGEN_VARIANT: ${{ matrix.variant }}
       USE_RUNTIME: ${{ matrix.use_runtime }}
@@ -1048,11 +1079,11 @@ jobs:
           path: /cores
 
   variants-consumers:
-    name: installed consumers${{ matrix.name_part }} (x86_64-linux)
+    name: installed consumers${{ matrix.name_part }} (${{ matrix.platform }})
     needs: variants-build
     # Also when a build failed: see the top of this file.
     if: ${{ !cancelled() }}
-    runs-on: warp-ubuntu-latest-x64-32x
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -1061,8 +1092,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        platform: [x86_64-linux, aarch64-linux]
         toolchain: [gcc, clang]
+        exclude:
+          # arm64 is built with the system's C compiler only.
+          - platform: aarch64-linux
+            toolchain: clang
         include:
+          # Added to every combination that has the `platform`.
+          - platform: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
+          - platform: aarch64-linux
+            os: warp-ubuntu-latest-arm64-32x
           # Added to every combination that has `toolchain: clang`.
           - toolchain: clang
             cc: clang
@@ -1070,16 +1111,16 @@ jobs:
 
     env:
       # This job's `name`, for the summary and for artifact names.
-      JOB_NAME: installed consumers${{ matrix.name_part }} (x86_64-linux)
+      JOB_NAME: installed consumers${{ matrix.name_part }} (${{ matrix.platform }})
       # The job that builds what this job uses.
-      BUILD_NAME: codegen variants build${{ matrix.name_part }} (x86_64-linux)
+      BUILD_NAME: codegen variants build${{ matrix.name_part }} (${{ matrix.platform }})
       # Empty for the system's C compiler.
       VARIANTS_CC: ${{ matrix.cc }}
       # gdb for the tests, and the C compiler when it is not the system's.
       SYSDEPS: gdb ${{ matrix.cc }}
       # The file that carries the build to the jobs that use it. It is
       # uploaded as it is, so it gives the artifact its name.
-      TEST_BUILD: oxcaml-test-build-x86_64-linux-${{ matrix.toolchain }}.tar.zst
+      TEST_BUILD: oxcaml-test-build-${{ matrix.platform }}-${{ matrix.toolchain }}.tar.zst
 
     steps:
       - name: Checkout the OxCaml repo
@@ -1215,6 +1256,225 @@ jobs:
         with:
           name: cores-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.JOB_NAME }}
           path: /cores
+
+  # The checks of `variants-build`, `variants-test` and `variants-consumers`
+  # on arm64 macOS, in one job and with the system's own tools: the build,
+  # the check of a staged install, the installed consumers, and the upstream
+  # testsuite for every variant and both runtimes, a step each. A step runs
+  # whenever the steps that make what it needs have succeeded, whatever the
+  # other steps did: one failure does not hide the next.
+  variants-macos:
+    name: codegen variants (aarch64-darwin)
+    runs-on: warp-macos-15-arm64-12x
+    timeout-minutes: 180
+    permissions:
+      contents: read
+
+    env:
+      # This job's `name`, for the summary and for artifact names.
+      JOB_NAME: codegen variants (aarch64-darwin)
+      # Every variant that arm64 has: the test steps below name each of them.
+      VARIANTS: base,poll,poll-sc,sc
+
+    steps:
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install autoconf and bash and parallel
+        run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash parallel
+        # bash >=4 is needed for tools/gen_ocamlj_rules.sh
+
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@93303b622b2522e4411e295f9e77411a24912ac7 # v3.9.0
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
+
+      - name: Set up Opam environment
+        # this command adds the opam environment to the PATH.
+        run: |
+          set -euo pipefail
+          opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
+
+      # What the steps below run with: their first failures are likely to
+      # come from a tool that differs from its GNU namesake.
+      - name: Show the tools of the system
+        run: |
+          sw_vers
+          for tool in bash make diff find rsync tar xargs awk sed cc; do
+            echo "== $tool: $(command -v "$tool")"
+            "$tool" --version 2>&1 | head -n 2 || true
+          done
+
+      - name: Configure OxCaml
+        id: configure
+        run: |
+          set -euo pipefail
+          autoconf
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/_install" \
+            --with-codegen-variants="$VARIANTS"
+          grep '^CODEGEN_VARIANTS=' Makefile.config
+
+      - name: Setup for saving core files
+        run: |
+          sudo chmod 1777 /cores
+          sudo sysctl kern.coredump=1
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.get-task-allow bool true" /tmp/core.entitlements
+          # Find opam's OCaml installation
+          OCAML_BIN=$(opam var bin)
+          codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
+          codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
+
+      - name: Build OxCaml
+        id: build
+        run: bash tools/ci/actions/run-make-target.sh compiler
+
+      # See the step of the same name in `variants-build`. Every `make
+      # install` assembles _install anew, and so does the next step.
+      - name: Check that a staged install leaves the prefix itself alone
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: bash tools/ci/actions/check-staged-install.sh
+
+      - name: Assemble the install and test trees
+        id: trees
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh install_for_test
+
+      - name: Check the installed compiler with findlib and dune projects
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh check-installed
+
+      # One pass of the suite per step. The passes share the test tree and
+      # are kept apart by TEST_ID, which also names the log of each.
+      - name: Run upstream testsuite for base
+        id: test-base
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: base
+          TEST_ID: base
+          SHOW_TIMINGS: 1
+
+      - name: Run upstream testsuite for poll
+        id: test-poll
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: poll
+          TEST_ID: poll
+          SHOW_TIMINGS: 1
+
+      - name: Run upstream testsuite for poll-sc
+        id: test-poll-sc
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: poll-sc
+          TEST_ID: poll-sc
+          SHOW_TIMINGS: 1
+
+      - name: Run upstream testsuite for sc
+        id: test-sc
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: sc
+          TEST_ID: sc
+          SHOW_TIMINGS: 1
+
+      - name: Run upstream testsuite for base with the debug runtime
+        id: test-base-debug
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: base
+          TEST_ID: base-debug
+          SHOW_TIMINGS: 1
+          USE_RUNTIME: d
+          OCAMLRUNPARAM: "v=0,V=1"
+
+      - name: Run upstream testsuite for poll with the debug runtime
+        id: test-poll-debug
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: poll
+          TEST_ID: poll-debug
+          SHOW_TIMINGS: 1
+          USE_RUNTIME: d
+          OCAMLRUNPARAM: "v=0,V=1"
+
+      - name: Run upstream testsuite for poll-sc with the debug runtime
+        id: test-poll-sc-debug
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: poll-sc
+          TEST_ID: poll-sc-debug
+          SHOW_TIMINGS: 1
+          USE_RUNTIME: d
+          OCAMLRUNPARAM: "v=0,V=1"
+
+      - name: Run upstream testsuite for sc with the debug runtime
+        id: test-sc-debug
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        run: bash tools/ci/actions/run-make-target.sh test-no-rebuild
+        env:
+          CODEGEN_VARIANT: sc
+          TEST_ID: sc-debug
+          SHOW_TIMINGS: 1
+          USE_RUNTIME: d
+          OCAMLRUNPARAM: "v=0,V=1"
+
+      - name: Summarize the upstream testsuite
+        if: ${{ !cancelled() && steps.trees.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          OUTCOMES: >-
+            base=${{ steps.test-base.outcome }}
+            poll=${{ steps.test-poll.outcome }}
+            poll-sc=${{ steps.test-poll-sc.outcome }}
+            sc=${{ steps.test-sc.outcome }}
+            base-debug=${{ steps.test-base-debug.outcome }}
+            poll-debug=${{ steps.test-poll-debug.outcome }}
+            poll-sc-debug=${{ steps.test-poll-sc-debug.outcome }}
+            sc-debug=${{ steps.test-sc-debug.outcome }}
+        run: |
+          set -euo pipefail
+          job=$JOB_NAME
+          for pass in $OUTCOMES; do
+            id=${pass%%=*}
+            export CODEGEN_VARIANT=${id%-debug} TEST_OUTCOME=${pass#*=}
+            export JOB_NAME="$job: $id"
+            if [ "$id" = "$CODEGEN_VARIANT" ]; then
+              unset USE_RUNTIME OCAMLRUNPARAM
+            else
+              export USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1
+            fi
+            SHARED_BUILD=true bash tools/ci/actions/summarize-ocamltest.sh \
+              "_runtest/testsuite/_log.$id" || true
+          done
+
+      - name: Upload core dumps
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
+        with:
+          name: cores-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.JOB_NAME }}
+          path: /cores
+
+      - name: Upload DiagnosticReports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
+        with:
+          name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.JOB_NAME }}
+          path: /Users/runner/Library/Logs/DiagnosticReports
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
