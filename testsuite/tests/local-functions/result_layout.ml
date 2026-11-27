@@ -64,3 +64,12 @@ let[@inline never] f (n : int) =
        This (h (if Sys.opaque_identity (Int64.to_int x.d <= 0) then 0 else 1)))
 
 let () = assert (f 1 = 5)
+
+(* A call in the second argument of [&&], whose result is always a boolean *)
+let[@inline never] under_sequand (b : bool) (c : bool) =
+  let h (x : int) = x = 0 in
+  not (b && (if c then h 0 else h 5))
+
+let () =
+  let b = Sys.opaque_identity true and c = Sys.opaque_identity false in
+  assert (under_sequand b c)
