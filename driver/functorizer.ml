@@ -92,7 +92,7 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
     imp_raw_sign = swg;
     _;
   } =
-    Env.find_import ~chain (CU.Name.of_head_of_global gm)
+    Env.find_import ~chain gm.GM.head
   in
   assert (Option.is_some imp_impl);
   let tracked_set =
@@ -113,7 +113,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     imp_raw_sign = swg;
     _;
   } =
-    Env.find_import ~chain (CU.Name.of_head_of_global gm)
+    Env.find_import ~chain gm.GM.head
   in
   assert (Option.is_some imp_impl);
   let param_set args =
@@ -225,9 +225,7 @@ let analyze (src_names : CU.Name.Set.t) : result =
                "Invalid -functorize input: '%s' is not a parameterised module"
                (CU.Name.to_string cu_name))
       | { imp_impl = Some _; imp_params = cmi_params; imp_raw_sign = swg; _ } ->
-          let gm =
-            GM.create_exn (CU.Name.to_string cu_name) [] ~hidden_args:cmi_params
-          in
+          let gm = GM.create_exn cu_name [] ~hidden_args:cmi_params in
           maybe_insert_module_exact ~chain gm swg state)
     src_names;
   let id_map =

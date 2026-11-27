@@ -30,96 +30,20 @@ type error =
 
 exception Error of error
 
-module Name : sig
-  type t
+module Name = Compilation_unit_intf
 
-  include Identifiable.S with type t := t
+let isupper chr = Char.equal (Char.uppercase_ascii chr) chr
 
-  val dummy : t
-
-  val predef_exn : t
-
-  val of_string : string -> t
-
-  val to_string : t -> string
-
-  val of_head_of_global_name : Global_module.Name.t -> t
-
-  val of_head_of_global : Global_module.t -> t
-
-  val of_parameter_name : Global_module.Parameter_name.t -> t
-
-  val to_global_name : t -> Global_module.Name.t
-
-  val to_parameter_name : t -> Global_module.Parameter_name.t
-
-  val check_as_path_component : t -> unit
-
-  val print_as_inline_code : Fmt.formatter -> t -> unit
-
-  val print : Fmt.formatter -> t -> unit
-end = struct
-  (* Be VERY careful changing this. Anything not equivalent to [string] will
-     require bumping magic numbers due to changes in file formats, in addition
-     to breaking the (somewhat horrifying) invariant on
-     [Cmm_helpers.globals_map]. Furthermore there are uses of polymorphic
-     compare hidden in [List.mem], [List.assoc] etc. *)
-  type t = string
-
-  let doc_print = Fmt.pp_print_string
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = String.compare
-
-    let equal = String.equal
-
-    let hash = Hashtbl.hash
-
-    let print ppf x = Fmt.compat doc_print ppf x
-
-    let output = Misc.output_of_doc_print doc_print
-  end)
-
-  let print = doc_print
-
-  let isupper chr = Char.equal (Char.uppercase_ascii chr) chr
-
-  let of_string str =
-    if String.equal str ""
-    then raise (Error (Bad_compilation_unit_name str))
-    else str
-
-  let of_head_of_global_name (name : Global_module.Name.t) = of_string name.head
-
-  let of_head_of_global (glob : Global_module.t) = of_string glob.head
-
-  let of_parameter_name (name : Global_module.Parameter_name.t) =
-    of_string (Global_module.Parameter_name.to_string name)
-
-  let to_global_name t = Global_module.Name.create_no_args t
-
-  let to_parameter_name t = Global_module.Parameter_name.of_string t
-
-  (* This is so called (and separate from [of_string]) because we only want to
-     check a name if it has a prefix. In particular, this allows single-module
-     executables to have names like ".cinaps" that aren't valid module names. *)
-  let check_as_path_component t =
-    if
-      String.length t < 1
-      || (not (isupper (String.get t 0)))
-      || String.contains t '.'
-    then raise (Error (Bad_compilation_unit_name t))
-
-  let dummy = "*dummy*"
-
-  let predef_exn = "*predef*"
-
-  let to_string t = t
-
-  let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)
-end
+(* This is separate from [Name.of_string] because we only want to check a name
+   if it has a prefix. In particular, this allows single-module executables to
+   have names like ".cinaps" that aren't valid module names. *)
+let check_name_as_path_component name =
+  let t = Name.to_string name in
+  if
+    String.length t < 1
+    || (not (isupper (String.get t 0)))
+    || String.contains t '.'
+  then raise (Error (Bad_compilation_unit_name t))
 
 module Prefix : sig
   type t
@@ -270,13 +194,13 @@ end = struct
 
   let of_global_name (glob : Global_module.Name.t) =
     match glob with
-    | { head; args = [] } -> of_plain_name (Name.of_string head)
+    | { head; args = [] } -> of_plain_name head
     | _ -> of_full (Global glob)
 
   let convert_arguments l =
     ListLabels.map
       ~f:(fun ({ param; value } : Global_module.Name.argument) ->
-        { param = Name.of_parameter_name param; value = of_global_name value })
+        { param; value = of_global_name value })
       l
 
   let descr t =
@@ -294,9 +218,8 @@ end = struct
       | With_prefix { name; for_pack_prefix } ->
         { name; for_pack_prefix; arguments = [] }
       | Global { head; args } ->
-        let name = Name.of_string head in
         let arguments = convert_arguments args in
-        { name; arguments; for_pack_prefix = Prefix.empty }
+        { name = head; arguments; for_pack_prefix = Prefix.empty }
 
   let name t =
     let tag = Obj.tag t in
@@ -307,7 +230,7 @@ end = struct
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
       | With_prefix { name; _ } -> name
-      | Global { head; _ } -> Name.of_string head
+      | Global { head; _ } -> head
 
   let for_pack_prefix t =
     let tag = Obj.tag t in
@@ -365,7 +288,7 @@ end = struct
     if is_plain_name t
     then
       let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
+      Global_module.Name.create_no_args name
     else
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
@@ -378,7 +301,7 @@ end = struct
 
   let of_global_name (name : Global_module.Name.t) =
     match name with
-    | { head; args = [] } -> of_plain_name (head |> Name.of_string)
+    | { head; args = [] } -> of_plain_name head
     | _ -> of_full (Global name)
 
   let create_full for_pack_prefix name arguments =
@@ -393,8 +316,8 @@ end = struct
              for better output but it doesn't seem worth moving both [error] and
              [print] to before this point *)
           raise (Error (Packed_instance { name = name |> Name.to_string }));
-        Name.check_as_path_component name;
-        ListLabels.iter ~f:Name.check_as_path_component
+        check_name_as_path_component name;
+        ListLabels.iter ~f:check_name_as_path_component
           (for_pack_prefix |> Prefix.to_list))
     in
     let arguments = ListLabels.sort arguments ~cmp:compare_argument_by_name in
@@ -402,16 +325,13 @@ end = struct
     then of_plain_name name
     else if empty_prefix
     then
-      let head = Name.to_string name in
       let arguments =
         ListLabels.map
           ~f:(fun { param; value } : Global_module.Name.argument ->
-            { param = Name.to_parameter_name param;
-              value = to_global_name_exn value
-            })
+            { param; value = to_global_name_exn value })
           arguments
       in
-      of_full (Global (Global_module.Name.create_exn head arguments))
+      of_full (Global (Global_module.Name.create_exn name arguments))
     else of_full (With_prefix { for_pack_prefix; name })
 end
 
@@ -434,7 +354,7 @@ let create_child parent name_ = create (to_prefix parent) name_
 
 let of_string str =
   let for_pack_prefix, name =
-    (* Also see [Name.check_as_path_component] *)
+    (* Also see [check_name_as_path_component] *)
     if String.equal str ".cinaps" || String.equal str "(.cinaps)"
     then Prefix.empty, Name.of_string str
     else
