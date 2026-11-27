@@ -561,10 +561,9 @@ let destroyed_at_large_memory_op =
     (* We need a scratch register [r11] to preform the address sanitizer check,
        and [rdi] might be destroyed in the event we need to call the ASAN error
        reporting function, since it's a C function accepting a single argument.
-       No other registers are destroyed because the ASAN report wrappers use a
-       special calling convention via the C attribute [__attribute__((preserve_all))]
-       such that all registers except for [r11] are callee-saved, in order to minimize
-       the amount of spilling we need to do. *)
+       No other registers are destroyed because the ASAN report wrappers
+       (in the runtime's amd64.S) preserve all registers except for [r11], in
+       order to minimize the amount of spilling we need to do. *)
     [| rdi; r11 |]
   else
     [||]

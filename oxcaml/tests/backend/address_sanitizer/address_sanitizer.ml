@@ -937,6 +937,65 @@ module Test_out_of_bounds_accesses = struct
     run_test __FUNCTION__ ~test
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
 
+  (* A report returns, the access is made and the program goes on: the report
+     must preserve the vector that the access stores, and the vectors that are
+     live across the access. *)
+
+  external bigstring_get_int64 : Bigstring.t -> int -> int64 = "%caml_bigstring_get64u"
+  external bigstring_get_int32 : Bigstring.t -> int -> int32 = "%caml_bigstring_get32u"
+
+  let assert_printed_line expected test_output =
+    let line = Str.regexp ("^" ^ Str.quote expected ^ "$") in
+    ignore (Str.search_forward line test_output 0)
+  ;;
+
+  (* [x] is not used after the store. *)
+  let[@inline never] set_vec256 t ~byte x = Vec256_bigarray.unsafe_unaligned_set t ~byte x
+
+  let write_vec256_bigarray_then_read_back () =
+    let test () =
+      let t = Bigstring.create 36 in
+      (* The last four bytes of the store are out of bounds. *)
+      set_vec256 t ~byte:8 (Vec256_bigarray.create_elem #1L #2L #3L #4L);
+      Printf.printf
+        "stored: %Ld %Ld %Ld %ld\n"
+        (bigstring_get_int64 t 8)
+        (bigstring_get_int64 t 16)
+        (bigstring_get_int64 t 24)
+        (bigstring_get_int32 t 32)
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      (* The report does not say what kind of error this is: the first invalid
+         byte is too far into the access. *)
+      ignore (Str.search_forward (Str.regexp "^WRITE of size 32 ") test_output 0);
+      assert_printed_line "stored: 1 2 3 4" test_output)
+  ;;
+
+  (* [x] is live across the read. *)
+  let[@inline never] read_keeping_vec256 t ~byte x =
+    let _ = Sys.opaque_identity (bigstring_get_int64 t byte) in
+    x
+  ;;
+
+  let read_int64_bigarray_keeping_vec256 () =
+    let test () =
+      let t = Bigstring.create 32 in
+      let x = Vec256_bigarray.create_elem #1L #2L #3L #4L in
+      (* This read is out of bounds. *)
+      let x = read_keeping_vec256 t ~byte:32 x in
+      Vec256_bigarray.unsafe_unaligned_set t ~byte:0 x;
+      Printf.printf
+        "kept: %Ld %Ld %Ld %Ld\n"
+        (bigstring_get_int64 t 0)
+        (bigstring_get_int64 t 8)
+        (bigstring_get_int64 t 16)
+        (bigstring_get_int64 t 24)
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      assert_asan_detected_out_of_bounds_read test_output;
+      assert_printed_line "kept: 1 2 3 4" test_output)
+  ;;
+
   external bigstring_fetch_and_add_int
     :  Bigstring.t
     -> pos:(int[@untagged])
@@ -1533,6 +1592,8 @@ let () =
       write_vec256_bigarray_aligned ();
       read_vec256_bigarray_unaligned ();
       write_vec256_bigarray_unaligned ();
+      write_vec256_bigarray_then_read_back ();
+      read_int64_bigarray_keeping_vec256 ();
       atomic_fetch_and_add_bigstring ()
     in
     ())

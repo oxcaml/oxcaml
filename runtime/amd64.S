@@ -1906,6 +1906,79 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_assert_stack_invariants)
 
+#ifdef WITH_ADDRESS_SANITIZER
+
+/******************************************************************************/
+/* AddressSanitizer reports */
+/******************************************************************************/
+
+/* OCaml code calls [caml_asan_report_<access><size>_noabort<suffix>] with the
+   address of an invalid access in %rdi, and goes on with the access when the
+   report returns. These functions preserve all the general-purpose registers
+   except %r11, and the vector and mask registers that the suffix names: xmm
+   without a suffix, ymm for [_avx], zmm and the masks for [_avx512]. They
+   align the stack themselves. */
+
+#define ASAN_REPORT_SAVE_AREA_XMM (SIMD_REGS_OFFSET + 16*16)
+#define ASAN_REPORT_SAVE_AREA_YMM (SIMD_REGS_OFFSET + 16*32)
+#define ASAN_REPORT_SAVE_AREA_ZMM (K_REGS_OFFSET + 7*8)
+
+#define Make_asan_report(access, size, suffix, simd)                 \
+    FUNCTION(caml_asan_report_##access##size##_noabort##suffix);     \
+    CFI_STARTPROC;                                                   \
+        pushq   %rbp; CFI_ADJUST(8); CFI_OFFSET(rbp, -16);           \
+        movq    %rsp, %rbp; CFI_DEF_CFA_REGISTER(rbp);               \
+        pushq   %rax;                                                \
+        pushq   %rcx;                                                \
+        pushq   %rdx;                                                \
+        pushq   %rsi;                                                \
+        pushq   %rdi;                                                \
+        pushq   %r8;                                                 \
+        pushq   %r9;                                                 \
+        pushq   %r10;                                                \
+        pushq   %r15; CFI_OFFSET(r15, -88);                          \
+        subq    $ASAN_REPORT_SAVE_AREA_##simd, %rsp;                 \
+        andq    $-16, %rsp;                                          \
+    /* The macros that save the vector registers are relative to %r15 */ \
+        movq    %rsp, %r15;                                          \
+        SAVE_##simd##_REGS                                           \
+        movq    $size, %rsi;                                         \
+        call    GCALL(__asan_report_##access##_n_noabort);           \
+        RESTORE_##simd##_REGS                                        \
+        leaq    -9*8(%rbp), %rsp;                                    \
+        popq    %r15; CFI_SAME_VALUE(r15);                           \
+        popq    %r10;                                                \
+        popq    %r9;                                                 \
+        popq    %r8;                                                 \
+        popq    %rdi;                                                \
+        popq    %rsi;                                                \
+        popq    %rdx;                                                \
+        popq    %rcx;                                                \
+        popq    %rax;                                                \
+        popq    %rbp; CFI_DEF_CFA_REGISTER(rsp); CFI_ADJUST(-8);     \
+        CFI_SAME_VALUE(rbp);                                         \
+        ret;                                                         \
+    CFI_ENDPROC;                                                     \
+    END_FUNCTION(caml_asan_report_##access##size##_noabort##suffix)
+
+#define Make_asan_reports(size)                  \
+    Make_asan_report(load, size, , XMM);         \
+    Make_asan_report(load, size, _avx, YMM);     \
+    Make_asan_report(load, size, _avx512, ZMM);  \
+    Make_asan_report(store, size, , XMM);        \
+    Make_asan_report(store, size, _avx, YMM);    \
+    Make_asan_report(store, size, _avx512, ZMM)
+
+Make_asan_reports(1)
+Make_asan_reports(2)
+Make_asan_reports(4)
+Make_asan_reports(8)
+Make_asan_reports(16)
+Make_asan_reports(32)
+Make_asan_reports(64)
+
+#endif /* WITH_ADDRESS_SANITIZER */
+
         TEXT_SECTION(caml_system__code_end)
         .globl  G(caml_system__code_end)
 G(caml_system__code_end):
