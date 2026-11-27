@@ -29,7 +29,8 @@ let fork () =
       Thread.delay 1.0;
       exit 0
   | pid ->
-      Thread.delay 4.0;
+      (* The child prints the test's output: do not exit before it has. *)
+      ignore (Unix.waitpid [] pid);
       exit 0
 
 let main () =

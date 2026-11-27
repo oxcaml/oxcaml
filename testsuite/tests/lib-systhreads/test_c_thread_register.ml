@@ -22,5 +22,10 @@ let passed () =
   Printf.printf "passed\n"
 
 let _ =
-  spawn_thread (passed);
-  Thread.delay 0.5
+  let finished = Atomic.make false in
+  spawn_thread (fun () ->
+      passed ();
+      Atomic.set finished true);
+  while not (Atomic.get finished) do
+    Thread.yield ()
+  done
