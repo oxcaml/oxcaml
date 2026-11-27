@@ -90,6 +90,54 @@ let create () =
     missing_globals = Hashtbl.create 17
   }
 
+let copy
+    { crc_interfaces;
+      crc_implementations;
+      implementations;
+      cmx_required;
+      interfaces;
+      implementations_defined;
+      quoted_cmi;
+      quoted_cmx;
+      lib_ccobjs;
+      lib_ccopts;
+      missing_globals
+    } =
+  (* Every name with a CRC in [crc_interfaces] is in [interfaces], and every
+     unit with a CRC in [crc_implementations] is in [implementations]. *)
+  let crc_interfaces_copy = Cmi_consistbl.create () in
+  CU.Name.Tbl.iter
+    (fun name () ->
+      match Cmi_consistbl.find crc_interfaces name with
+      | None -> ()
+      | Some (kind, crc) ->
+        Cmi_consistbl.check crc_interfaces_copy name kind crc
+          (Cmi_consistbl.source crc_interfaces name))
+    interfaces;
+  let crc_implementations_copy = Cmx_consistbl.create () in
+  CU.Set.iter
+    (fun name ->
+      match Cmx_consistbl.find crc_implementations name with
+      | None -> ()
+      | Some ((), crc) ->
+        Cmx_consistbl.check crc_implementations_copy name () crc
+          (Cmx_consistbl.source crc_implementations name))
+    implementations;
+  let missing_globals = Hashtbl.copy missing_globals in
+  Hashtbl.filter_map_inplace (fun _ rq -> Some (ref !rq)) missing_globals;
+  { crc_interfaces = crc_interfaces_copy;
+    crc_implementations = crc_implementations_copy;
+    implementations;
+    cmx_required;
+    interfaces = CU.Name.Tbl.copy interfaces;
+    implementations_defined = CU.Tbl.copy implementations_defined;
+    quoted_cmi;
+    quoted_cmx;
+    lib_ccobjs;
+    lib_ccopts;
+    missing_globals
+  }
+
 (* Globals for quotations *)
 
 let add_quoted_cmi t cus =

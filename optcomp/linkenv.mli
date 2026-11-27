@@ -53,6 +53,10 @@ type t
 
 val create : unit -> t
 
+(** [copy t] is a link environment with the contents of [t] that shares no
+    mutable state with it. *)
+val copy : t -> t
+
 val extract_crc_interfaces : t -> Import_info.t list
 
 val extract_crc_implementations : t -> Import_info.t list
