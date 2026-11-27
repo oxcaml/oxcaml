@@ -122,40 +122,37 @@ val add_symbol_alias_of_var_exn :
   alias_of:Variable.t ->
   t * To_jsir_result.t
 
-type code_id =
+type closure =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
-    closure : Jsir.Var.t;
-    closure_bound_with_code : bool;
-        (** If [true], [closure] is bound to a closure for this code where the
-            code itself is defined, and every [Set_of_closures] containing this
-            code reuses it. Otherwise, [closure] is bound when translating a
-            [Set_of_closures] containing this code. *)
+    var : Jsir.Var.t;
     hint : Optimization_hint.closure_hint option;
-        (** The optimisation hint to attach to closures of this code. *)
     loc : Parse_info.t option
-        (** The source location to attach to closures of this code. *)
   }
 
-(** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, the JSIR varible corresponding to its closure, and the hint and
-    location for its closures. *)
-val add_code_id :
-  t ->
-  Code_id.t ->
-  addr:Jsir.Addr.t ->
-  params:Jsir.Var.t list ->
-  closure:Jsir.Var.t ->
-  closure_bound_with_code:bool ->
-  hint:Optimization_hint.closure_hint option ->
-  loc:Parse_info.t option ->
-  t
+type code =
+  | Shared of
+      { closure : closure;
+        code : Code.t
+      }
+      (** Translated once with a single closure reused across all
+          [Set_of_closures]. The code does not use its closure, but it can
+          project from other closures, such as the closure symbols of its
+          [Set_of_closures]. *)
+  | Instantiated of Code.t
+      (** Translated afresh with a new closure for each [Set_of_closures]
+          containing it. *)
 
-(** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
-val add_function_slot : t -> Function_slot.t -> Jsir.Var.t -> t
+val add_code : t -> Code_id.t -> code -> t
 
-(** Map a Flambda2 value slot to the corresponding JSIR closure variable. *)
-val add_value_slot : t -> Value_slot.t -> Jsir.Var.t -> t
+type slots =
+  { function_slots : Jsir.Var.t Function_slot.Map.t;
+    value_slots : Jsir.Var.t Value_slot.Map.t
+  }
+
+(** Associate [closure] with the slots of its set of closures so that slot
+    projections from [closure] can be resolved. *)
+val add_closure_slots : t -> closure:Jsir.Var.t -> slots -> t
 
 (** Return the block address for the given continuation. Raises if given an
     unbound continuation. *)
@@ -184,31 +181,12 @@ val get_symbol :
 val get_symbol_exn :
   t -> res:To_jsir_result.t -> Symbol.t -> Jsir.Var.t * To_jsir_result.t
 
-(** Return the block address, parameter variables and closure variable
-    corresponding to the given [Code_id.t]. Raises if the code ID is not in the
-    environment. *)
-val get_code_id_exn : t -> Code_id.t -> code_id
+val get_code_exn : t -> Code_id.t -> code
 
-(** Return the variable corresponding to a function slot. *)
-val get_function_slot : t -> Function_slot.t -> Jsir.Var.t option
+(** Look up a slot in the set of closures associated with [closure]. Raises if
+    [closure] was not registered via [add_closure_slots] or does not contain the
+    slot. *)
+val get_function_slot_exn :
+  t -> closure:Jsir.Var.t -> Function_slot.t -> Jsir.Var.t
 
-val get_function_slot_exn : t -> Function_slot.t -> Jsir.Var.t
-
-(** Return the variable corresponding to a value slot. *)
-val get_value_slot : t -> Value_slot.t -> Jsir.Var.t option
-
-val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
-
-(** These functions first check whether the given item exists in the
-    environment. If it exists, the environment is unchanged. Otherwise, we
-    create a fresh variable, and add the mapping to the environment. *)
-
-val add_function_slot_if_not_found : t -> Function_slot.t -> t
-
-val add_value_slot_if_not_found : t -> Value_slot.t -> t
-
-(** Keep track of the [my_closure] of the current code block being translated,
-    and maintain a mapping to its JSIR equivalent. *)
-val set_my_closure : t -> Variable.t -> Jsir.Var.t -> t
-
-val is_my_closure : t -> Variable.t -> bool
+val get_value_slot_exn : t -> closure:Jsir.Var.t -> Value_slot.t -> Jsir.Var.t

@@ -28,33 +28,57 @@
 
 open! Jsoo_imports.Import
 
-(** Translate a dynamically allocated [Set_of_closures.t] into a JSIR [Closure].
-*)
+type translate_body :=
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  Flambda.expr ->
+  To_jsir_env.t * To_jsir_result.t
+
+(** Translate a dynamically allocated [Set_of_closures.t]. *)
 val dynamic_set_of_closures :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
+  translate_body:translate_body ->
   bound_vars:Bound_var.t list ->
   Set_of_closures.t ->
   To_jsir_env.t * To_jsir_result.t
 
-type initialisation = private
-  { value_slot_bindings : To_jsir_result.var_binding list;
-        (** Bind value-slot variables to the values captured by the closures. *)
-    closures : To_jsir_shared.expr_binding list;
-        (** Bind function variables to their corresponding [Jsir.Closure]
-            expressions. *)
+type instance
+
+type static = private
+  { instances : instance list;
+        (** Closure instances to translate and bind, excluding shared closures.
+        *)
     aliases : To_jsir_result.var_binding list
-        (** Bind symbol and function-slot variables to their corresponding
-            function variables. *)
+        (** Aliases mapping each closure symbol's variable to its closure
+            variable. *)
   }
 
-(** Prepare a static set of closures without emitting its bindings. *)
+(** Reserve closures for a static set of closures and record its slots in the
+    environment without translating code. The caller must subsequently run
+    [translate_instances] and [bind_instances] on [instances] and register
+    [aliases]. *)
 val prepare_static_set_of_closures :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
   closure_symbols:Symbol.t Function_slot.Lmap.t ->
   Set_of_closures.t ->
-  To_jsir_result.t * initialisation
+  To_jsir_env.t * To_jsir_result.t * static
+
+val translate_instances :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  translate_body:translate_body ->
+  instance list ->
+  To_jsir_result.t
+
+(** Emit [Jsir.Closure] bindings for the given instances. Mutually recursive
+    closures must be bound consecutively, as required by JSOO. *)
+val bind_instances : res:To_jsir_result.t -> instance list -> To_jsir_result.t
+
+(** Value slots projected by the set's code. *)
+val used_value_slots :
+  env:To_jsir_env.t -> Set_of_closures.t -> Value_slot.Set.t
 
 (** The locations of the closures of a statically allocated [Set_of_closures.t],
     for its closure symbols. Closures without a location are left out. *)

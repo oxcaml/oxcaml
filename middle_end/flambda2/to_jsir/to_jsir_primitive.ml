@@ -405,26 +405,17 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
       } ->
     raise Primitive_not_supported
 
-let check_my_closure ~env x =
-  (* It is not possible to project values out of other functions' closures in
-     Jsoo, but certain inlining simplifications in Flambda may cause this. For
-     now we disable inlining so this case should never occur. *)
+(* JSOO has no general closure-slot projection. We can only project from
+   closures whose set of closures is in scope and recorded in the environment,
+   where each slot maps directly to a JSIR variable.
+
+   This always holds for projections from a function's own closure. Flambda
+   inlining could introduce projections from other closures, so is currently
+   restricted. *)
+let closure_to_project_from ~env ~res x =
   Simple.pattern_match' x
-    ~var:(fun name ~coercion:_ ->
-      if not (To_jsir_env.is_my_closure env name)
-      then
-        Misc.fatal_error
-          "Trying to project from a closure that doesn't belong to the body of \
-           the function being translated")
-    ~symbol:(fun _symbol ~coercion:_ ->
-      (* CR selee: We should check here that this is indeed the correct closure
-         symbol for the current function being translated, but we don't yet keep
-         track of this. We plan to refactor the handling of closures and pieces
-         of code so that we only translate the code once we see the
-         corresponding closure (treating each closure as a new instance of the
-         code), which should make this check much easier. For now, we assume
-         that we have the correct symbol. *)
-      ())
+    ~var:(fun _ ~coercion:_ -> To_jsir_shared.simple ~env ~res x)
+    ~symbol:(fun _ ~coercion:_ -> To_jsir_shared.simple ~env ~res x)
     ~const:(fun const ->
       Misc.fatal_errorf
         "Trying to project from a closure, but found a constant %a (must be a \
@@ -644,11 +635,11 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     (* everything is untagged and "unboxed" in JS: see README *)
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
-    check_my_closure ~env x;
-    Some (To_jsir_env.get_function_slot_exn env move_to), env, res
+    let closure, res = closure_to_project_from ~env ~res x in
+    Some (To_jsir_env.get_function_slot_exn env ~closure move_to), env, res
   | Project_value_slot { project_from = _; value_slot } ->
-    check_my_closure ~env x;
-    Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
+    let closure, res = closure_to_project_from ~env ~res x in
+    Some (To_jsir_env.get_value_slot_exn env ~closure value_slot), env, res
   | Is_boxed_float -> (
     match Clflags.jsir_target_exn () with
     | Js ->

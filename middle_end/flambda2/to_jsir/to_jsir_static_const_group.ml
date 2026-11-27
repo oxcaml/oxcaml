@@ -31,57 +31,64 @@ open! Jsoo_imports.Import
 module CIS = Code_id_or_symbol
 module SCC = Strongly_connected_components.Make (Numbers.Int)
 
-(** Definitions to emit after code bodies have been translated.
+(** Static definitions to emit in dependency order after [Shared] code bodies
+    are translated.
 
-    [Code] creates a JSIR function value for code that does not need a
-    set-specific closure environment. This is needed even when Flambda has
-    removed the set of closures and retained only direct calls to the code, as
-    JSIR calls still require a function value.
+    [Code] binds a JSIR closure for [Shared] code. This is still needed when
+    Flambda removes the [Set_of_closures] and keeps only direct calls, because
+    JSIR calls always take a closure value.
 
-    [Closure] supplies captured values and creates the closures that need them.
-    Functions already created by [Code] are reused. This also binds the set's
-    symbols and function slots to their closures. *)
+    [Closure] translates and binds the [Instantiated] code of a set of closures,
+    reusing any closures already created by [Code], and aliases the set's
+    symbols to their closures. *)
 type definition =
-  | Code of Code_id.t * Code.t
-  | Closure of Symbol.t Function_slot.Lmap.t * Set_of_closures.t
+  | Code of Code_id.t * Code.t * To_jsir_env.closure
+  | Closure of
+      Symbol.t Function_slot.Lmap.t
+      * Set_of_closures.t
+      * To_jsir_set_of_closures.static
   | Block of Symbol.t * Static_const.t
 
-let definitions ~env consts bound_static =
-  Static_const_group.match_against_bound_static consts bound_static ~init:[]
-    ~code:(fun acc code_id code ->
-      if (To_jsir_env.get_code_id_exn env code_id).closure_bound_with_code
-      then Code (code_id, code) :: acc
-      else acc)
-    ~deleted_code:(fun acc _ -> acc)
-    ~set_of_closures:(fun acc ~closure_symbols soc ->
-      Closure (closure_symbols, soc) :: acc)
-    ~block_like:(fun acc symbol const -> Block (symbol, const) :: acc)
-  |> List.rev |> Array.of_list
+(* Precondition: all code in the group must have been added to [env].
 
-(* Map each symbol or code ID to the index of the definition supplying its
-   value. A code ID maps to its [Code] node if its closure is created
-   separately, or to the [Closure] node that creates it otherwise. *)
-let build_indices ~env definitions =
+   Registering the slot for every set here ensures they are available before any
+   code in the group is translated, since code may project from any closure
+   symbol in the group. *)
+let definitions ~env ~res consts bound_static =
+  let env, res, definitions =
+    Static_const_group.match_against_bound_static consts bound_static
+      ~init:(env, res, [])
+      ~code:(fun (env, res, acc) code_id code ->
+        match To_jsir_env.get_code_exn env code_id with
+        | Shared { closure; code = _ } ->
+          env, res, Code (code_id, code, closure) :: acc
+        | Instantiated _ -> env, res, acc)
+      ~deleted_code:(fun acc _ -> acc)
+      ~set_of_closures:(fun (env, res, acc) ~closure_symbols soc ->
+        let env, res, static =
+          To_jsir_set_of_closures.prepare_static_set_of_closures ~env ~res
+            ~closure_symbols soc
+        in
+        env, res, Closure (closure_symbols, soc, static) :: acc)
+      ~block_like:(fun (env, res, acc) symbol const ->
+        env, res, Block (symbol, const) :: acc)
+  in
+  env, res, List.rev definitions |> Array.of_list
+
+(* Map each defined symbol or [Shared] code ID to its definition index.
+   [Instantiated] code has no definition of its own: it is translated at each
+   closure site, so its dependencies are collected transitively below. *)
+let build_indices definitions =
   let indices = ref CIS.Map.empty in
   let add name index = indices := CIS.Map.add name index !indices in
-  let add_closure_code_id index _slot = function
-    | Function_declarations.Deleted _ -> ()
-    | Function_declarations.Code_id { code_id; only_full_applications = _ } ->
-      if not (To_jsir_env.get_code_id_exn env code_id).closure_bound_with_code
-      then add (CIS.create_code_id code_id) index
-  in
   Array.iteri
     (fun index -> function
-      | Code (code_id, _) -> add (CIS.create_code_id code_id) index
+      | Code (code_id, _, _) -> add (CIS.create_code_id code_id) index
       | Block (symbol, _) -> add (CIS.create_symbol symbol) index
-      | Closure (symbols, soc) ->
+      | Closure (symbols, _, _) ->
         Function_slot.Lmap.iter
           (fun _ symbol -> add (CIS.create_symbol symbol) index)
-          symbols;
-        Function_slot.Lmap.iter
-          (add_closure_code_id index)
-          (Function_declarations.funs_in_order
-             (Set_of_closures.function_decls soc)))
+          symbols)
     definitions;
   !indices
 
@@ -90,9 +97,10 @@ let add_dependency ~indices name deps =
   | None -> deps
   | Some index -> Numbers.Int.Set.add index deps
 
-(* Collect dependencies from free symbols and code IDs. We recursively inspect
-   the body of any nested code, since its free symbols are also captured by the
-   enclosing closure. *)
+(* Collect dependencies from free symbols and code IDs. For any code ID without
+   a [Code] node, recurse into its body: that code is translated where its
+   closures are created, so its free symbols become dependencies of the
+   enclosing definition. *)
 let collect_dependencies_from_free_names ~indices ~code_by_id free_names deps =
   let rec visit_free_names free_names (visited, deps) =
     let deps =
@@ -119,40 +127,34 @@ let collect_dependencies_from_free_names ~indices ~code_by_id free_names deps =
   in
   visit_free_names free_names (Code_id.Set.empty, deps) |> snd
 
-let collect_dependencies_from_value_slots ~env ~indices ~code_by_id value_slots
-    deps =
+let collect_dependencies_from_value_slots ~env ~indices ~code_by_id soc deps =
+  let used_value_slots = To_jsir_set_of_closures.used_value_slots ~env soc in
   Value_slot.Map.fold
     (fun slot simple deps ->
-      match To_jsir_env.get_value_slot env slot with
-      | None -> deps (* not used *)
-      | Some _ ->
+      if Value_slot.Set.mem slot used_value_slots
+      then
         collect_dependencies_from_free_names ~indices ~code_by_id
-          (Simple.free_names simple) deps)
-    value_slots deps
+          (Simple.free_names simple) deps
+      else deps)
+    (Set_of_closures.value_slots soc)
+    deps
 
-let collect_dependencies_from_function_decl ~env ~indices ~code_by_id decl deps
-    =
+let collect_dependencies_from_function_decl ~indices ~code_by_id decl deps =
   match decl with
   | Function_declarations.Deleted _ -> deps
-  | Function_declarations.Code_id { code_id; only_full_applications = _ } -> (
-    if (To_jsir_env.get_code_id_exn env code_id).closure_bound_with_code
-    then add_dependency ~indices (CIS.create_code_id code_id) deps
-    else
-      match Code_id.Map.find_opt code_id code_by_id with
-      | None -> deps (* outside this group *)
-      | Some code ->
-        collect_dependencies_from_free_names ~indices ~code_by_id
-          (Code0.free_names_of_params_and_body code)
-          deps)
+  | Function_declarations.Code_id { code_id; only_full_applications = _ } ->
+    collect_dependencies_from_free_names ~indices ~code_by_id
+      (Name_occurrences.singleton_code_id code_id Name_mode.normal)
+      deps
 
 (* Build edges from each definition to the definitions it depends on. *)
 let dependency_graph ~env ~code_by_id definitions =
-  let indices = build_indices ~env definitions in
+  let indices = build_indices definitions in
   Array.mapi
     (fun index definition ->
       let deps =
         match definition with
-        | Code (_, code) ->
+        | Code (_, code, _) ->
           collect_dependencies_from_free_names ~indices ~code_by_id
             (Code0.free_names_of_params_and_body code)
             Numbers.Int.Set.empty
@@ -160,16 +162,15 @@ let dependency_graph ~env ~code_by_id definitions =
           collect_dependencies_from_free_names ~indices ~code_by_id
             (Static_const.free_names const)
             Numbers.Int.Set.empty
-        | Closure (_, soc) ->
+        | Closure (_, soc, _) ->
           let deps =
-            collect_dependencies_from_value_slots ~env ~indices ~code_by_id
-              (Set_of_closures.value_slots soc)
+            collect_dependencies_from_value_slots ~env ~indices ~code_by_id soc
               Numbers.Int.Set.empty
           in
           Function_slot.Lmap.fold
             (fun _slot decl deps ->
-              collect_dependencies_from_function_decl ~env ~indices ~code_by_id
-                decl deps)
+              collect_dependencies_from_function_decl ~indices ~code_by_id decl
+                deps)
             (Function_declarations.funs_in_order
                (Set_of_closures.function_decls soc))
             deps
@@ -184,7 +185,7 @@ let symbols_defined_by definitions indices =
       match definitions.(index) with
       | Code _ -> symbols
       | Block (symbol, _) -> Symbol.Set.add symbol symbols
-      | Closure (closure_symbols, _) ->
+      | Closure (closure_symbols, _, _) ->
         Function_slot.Lmap.fold
           (fun _ symbol symbols -> Symbol.Set.add symbol symbols)
           closure_symbols symbols)
@@ -224,49 +225,46 @@ let with_allocated_blocks ~env ~res ~defer_initialise definitions indices ~f =
       res blocks
   else res
 
-let emit_closures ~env definitions indices res =
-  let res, inits =
+let emit_closures ~env ~translate_body definitions indices res =
+  let res =
     List.fold_left
-      (fun (res, inits) index ->
+      (fun res index ->
         match definitions.(index) with
-        | Code _ | Block _ -> res, inits
-        | Closure (closure_symbols, soc) ->
-          let res, init =
-            To_jsir_set_of_closures.prepare_static_set_of_closures ~env ~res
-              ~closure_symbols soc
-          in
-          res, Numbers.Int.Map.add index init inits)
-      (res, Numbers.Int.Map.empty)
-      indices
+        | Code _ | Block _ -> res
+        | Closure (_, _, static) ->
+          To_jsir_set_of_closures.translate_instances ~env ~res ~translate_body
+            static.instances)
+      res indices
   in
   let res =
     List.fold_left
       (fun res index ->
         match definitions.(index) with
         | Block _ -> res
-        | Code (code_id, _) ->
-          To_jsir_static_const.code_closure ~env ~res code_id
-        | Closure _ ->
-          List.fold_left
-            (fun res { To_jsir_shared.bound_var; defining_expr } ->
-              To_jsir_result.add_instr_exn res (Let (bound_var, defining_expr)))
-            res (Numbers.Int.Map.find index inits).closures)
+        | Code (_, _, closure) ->
+          To_jsir_result.add_instr_exn res
+            (Let (closure.var, To_jsir_static_const.closure_expr closure))
+        | Closure (_, _, static) ->
+          To_jsir_set_of_closures.bind_instances ~res static.instances)
       res indices
   in
-  Numbers.Int.Map.fold
-    (fun _ (init : To_jsir_set_of_closures.initialisation) res ->
-      To_jsir_result.add_var_aliases_exn res
-        (init.aliases @ init.value_slot_bindings))
-    inits res
+  List.fold_left
+    (fun res index ->
+      match definitions.(index) with
+      | Code _ | Block _ -> res
+      | Closure (_, _, static) ->
+        To_jsir_result.add_var_aliases_exn res static.aliases)
+    res indices
 
-let emit_definitions_for_component ~env ~res definitions component =
+let emit_definitions_for_component ~env ~res ~translate_body definitions
+    component =
   let cyclic, indices =
     match component with
     | SCC.No_loop index -> false, [index]
     | SCC.Has_loop indices -> true, List.sort Int.compare indices
   in
   with_allocated_blocks ~env ~res ~defer_initialise:cyclic definitions indices
-    ~f:(emit_closures ~env definitions indices)
+    ~f:(emit_closures ~env ~translate_body definitions indices)
 
 let translate ~env ~res ~translate_body bound_static consts =
   (* Reserve all symbols before translating bodies, since static definitions may
@@ -288,16 +286,16 @@ let translate ~env ~res ~translate_body bound_static consts =
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
       ~block_like:(fun acc _ _ -> acc)
   in
-  let env, res =
-    Static_const_group.match_against_bound_static consts bound_static
-      ~init:(env, res)
-      ~code:(fun (env, res) code_id code ->
-        To_jsir_static_const.code ~env ~res ~translate_body ~code_id code)
-      ~deleted_code:(fun acc _ -> acc)
-      ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
-      ~block_like:(fun acc _ _ -> acc)
+  let env, res, definitions = definitions ~env ~res consts bound_static in
+  let res =
+    Array.fold_left
+      (fun res definition ->
+        match definition with
+        | Code (_, code, closure) ->
+          To_jsir_static_const.code ~env ~res ~translate_body ~closure code
+        | Closure _ | Block _ -> res)
+      res definitions
   in
-  let definitions = definitions ~env consts bound_static in
   let components =
     dependency_graph ~env
       ~code_by_id:(Static_const_group.pieces_of_code consts)
@@ -308,7 +306,8 @@ let translate ~env ~res ~translate_body bound_static consts =
   let res =
     Array.fold_right
       (fun component res ->
-        emit_definitions_for_component ~env ~res definitions component)
+        emit_definitions_for_component ~env ~res ~translate_body definitions
+          component)
       components res
   in
   (* The registration of a closure symbol is given the location of its
