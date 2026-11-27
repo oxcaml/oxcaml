@@ -2375,8 +2375,7 @@ Error: Signature mismatch:
          val foo : float @ local -> string
        The type "float -> string" is not compatible with the type
          "float @ local -> string"
-       The argument mode was expected to be "global"
-       because it crosses with something but is "local"
+       The argument mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : float -> local_ string end) : sig
@@ -2418,8 +2417,7 @@ Error: Signature mismatch:
          val foo : float -> float -> string
        The type "float @ local -> float -> string"
        is not compatible with the type "float -> float -> string"
-       The return mode was expected to be "global"
-       because it crosses with something but is "local"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module F (X : sig val foo : local_ float -> float -> string end) : sig
@@ -2895,8 +2893,7 @@ Error: Signature mismatch:
        The type
          "string -> (string -> string @ local) @ local forkable unyielding"
        is not compatible with the type "string -> string -> string @ local"
-       The return mode was expected to be "global"
-       because it crosses with something but is "local"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 (* Escaping uncurried functions *)

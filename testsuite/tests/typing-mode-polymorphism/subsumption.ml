@@ -331,8 +331,7 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
-       The argument mode was expected to be "global"
-       because it crosses with something but is "local"
+       The argument mode was expected to be "global" but is "local"
 |}]
 
 module Fail_less_polymorphic_portable : module type of Base = struct
@@ -429,8 +428,7 @@ Error: Signature mismatch:
          "'a @ [< 'm > local aliased nonportable unforkable yielding stateful dynamic] ->
          'a @ [> 'm | local aliased nonportable unforkable yielding stateful dynamic]"
        is not compatible with the type "'a @ local -> 'a"
-       The return mode was expected to be "global"
-       because it crosses with something but is "local"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module Fail_arg_needs_portable : sig
