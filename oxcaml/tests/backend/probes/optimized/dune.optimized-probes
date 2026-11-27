@@ -76,6 +76,40 @@
 (rule
  (enabled_if
   (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (targets vec128.exe vec128_reaper.exe)
+ (deps vec128.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt}  %{deps} -o vec128.exe)
+   (run %{bin:ocamlopt.opt}  -O3 -flambda2-reaper %{deps} -o vec128_reaper.exe))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (target vec128.output)
+ (deps vec128.exe vec128_reaper.exe)
+ (action
+  (with-outputs-to %{target}
+   (progn
+    (run ./vec128.exe)
+    (run ./vec128_reaper.exe)))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (deps vec128.expected vec128.output)
+ (action (diff vec128.expected vec128.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
        (= %{system} "linux")))
  (target f1.exe)
  (deps f1.ml)
