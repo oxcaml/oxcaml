@@ -878,6 +878,14 @@ module Rewriter = struct
         | Known_result
             (current_function_slot, alloc_mode, closures_entry, _function_type)
           ->
+          (* If the original type was nullable, preserve it. CR ncourant: if we
+             were [Single_source], maybe we could erase nullability because we
+             knew the result was never null? *)
+          let maybe_null expr =
+            match Flambda2_types.prove_is_null typing_env flambda_type with
+            | Proved false -> expr
+            | Proved true | Unknown -> Expr.nullable expr
+          in
           let value_slot_types =
             Flambda2_types.Closures_entry.value_slot_types closures_entry
           in
@@ -1151,7 +1159,7 @@ module Rewriter = struct
                   ~at_least_these_function_slots ~at_least_these_closure_types
                   ~at_least_these_value_slots alloc_mode
               in
-              Rule.rewrite (Pattern.closure !all_patterns) expr
+              Rule.rewrite (Pattern.closure !all_patterns) (maybe_null expr)
           end
           else if
             List.compare_length_with local_sets_of_closures 1 > 0
@@ -1256,9 +1264,10 @@ module Rewriter = struct
               Function_slot.Map.find current_function_slot function_slots_reprs
             in
             Rule.rewrite pat
-              (Expr.exactly_this_closure new_function_slot
-                 ~all_function_slots_in_set ~all_closure_types_in_set
-                 ~all_value_slots_in_set alloc_mode)))
+              (maybe_null
+                 (Expr.exactly_this_closure new_function_slot
+                    ~all_function_slots_in_set ~all_closure_types_in_set
+                    ~all_value_slots_in_set alloc_mode))))
 
   let block_slot ?tag:_ (context, t) index _typing_env flambda_type =
     let r =

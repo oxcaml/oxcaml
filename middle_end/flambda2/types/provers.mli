@@ -164,7 +164,7 @@ val meet_is_int_variant_only :
 val prove_get_tag :
   Typing_env.t -> Type_grammar.t -> Tag.Set.t proof_of_property
 
-val meet_is_null : Typing_env.t -> Type_grammar.t -> bool meet_shortcut
+val prove_is_null : Typing_env.t -> Type_grammar.t -> bool proof_of_property
 
 val prove_unique_fully_constructed_immutable_heap_block :
   Typing_env.t ->

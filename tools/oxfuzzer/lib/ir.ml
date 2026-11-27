@@ -137,21 +137,43 @@ module Number = struct
     | Float | Float32 ->
       Misc.fatal_errorf "Number.of_integral_bits: expected an integral type"
 
-  let to_code = function
+  let to_code ~unboxed number =
+    let constant desc = Ast_helper.Exp.constant (Ast_helper.Const.mk desc) in
+    let integer value suffix =
+      constant
+        (if unboxed
+         then Pconst_unboxed_integer (value, suffix)
+         else Pconst_integer (value, if suffix = 'm' then None else Some suffix))
+    in
+    let floating_point ~value ~suffix ~unbox boxed =
+      if not unboxed
+      then boxed
+      else if Float.is_finite value
+      then
+        (* Hexadecimal literals preserve every finite value, including signed
+           zero and subnormals. NaNs and infinities have no literal spelling. *)
+        constant (Pconst_unboxed_float (Printf.sprintf "%h" value, suffix))
+      else apply unbox [boxed]
+    in
+    match number with
     | Float bits ->
-      apply
-        (qualified_ident "Int64" "float_of_bits")
-        [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)]
+      floating_point ~value:(Int64.float_of_bits bits) ~suffix:None
+        ~unbox:(qualified_ident "Float_u" "of_float")
+        (apply
+           (qualified_ident "Int64" "float_of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)])
     | Float32 bits ->
-      apply
-        (qualified_ident "Float32" "of_bits")
-        [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)]
-    | Int n -> Ast_helper.Exp.constant (Ast_helper.Const.int n)
-    | Nativeint n -> Ast_helper.Exp.constant (Ast_helper.Const.nativeint n)
-    | Int64 n -> Ast_helper.Exp.constant (Ast_helper.Const.int64 n)
-    | Int32 n -> Ast_helper.Exp.constant (Ast_helper.Const.int32 n)
-    | Int16 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'S' n)
-    | Int8 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'s' n)
+      floating_point ~value:(Int32.float_of_bits bits) ~suffix:(Some 's')
+        ~unbox:(qualified_ident "Float32_u" "of_float32")
+        (apply
+           (qualified_ident "Float32" "of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)])
+    | Int n -> integer (Int.to_string n) 'm'
+    | Nativeint n -> integer (Nativeint.to_string n) 'n'
+    | Int64 n -> integer (Int64.to_string n) 'L'
+    | Int32 n -> integer (Int32.to_string n) 'l'
+    | Int16 n -> integer (Int.to_string n) 'S'
+    | Int8 n -> integer (Int.to_string n) 's'
 end
 
 module Ty = struct
@@ -335,6 +357,99 @@ module Exn = struct
                  (loc (name t)))))
 end
 
+module Eff = struct
+  type t =
+    { id : int;
+      payload : Ty.t;
+      result : Ty.t
+    }
+
+  let equal left right = Int.equal left.id right.id
+
+  let constructor_name { id; _ } = Format.sprintf "Eff_%d" id
+
+  let handler_name { id; _ } = Format.sprintf "handle_%d" id
+
+  let effect_lid = ldot "Effect" "t"
+
+  (* [Effect.Deep.name] *)
+  let deep name = loc (Longident.Ldot (ldot "Effect" "Deep", loc name))
+
+  (* [type _ Effect.t += Eff_i : payload -> result Effect.t] *)
+  let declaration ({ payload; result; _ } as t) =
+    Ast_helper.Str.type_extension
+      (Ast_helper.Te.mk
+         ~params:[Ast_helper.Typ.any None, (NoVariance, NoInjectivity)]
+         effect_lid
+         [ Ast_helper.Te.decl
+             ~args:
+               (Parsetree.Pcstr_tuple
+                  [Ast_helper.Type.constructor_arg (Ty.to_code payload)])
+             ~res:(Ast_helper.Typ.constr effect_lid [Ty.to_code result])
+             (loc (constructor_name t)) ])
+
+  (* [let handle_i f (resume : payload -> result) = Effect.Deep.try_with f () {
+     effc }], where [effc] resumes the continuation of [Eff_i v] with [resume
+     v]. The annotation keeps [result] from escaping the scope of the locally
+     abstract type of [effc]. *)
+  let handler ({ payload; result; _ } as t) =
+    let a = Ast_helper.Typ.constr (lid "a") [] in
+    let continuation =
+      Ast_helper.Typ.constr (deep "continuation") [a; Ast_helper.Typ.any None]
+    in
+    let resume =
+      function_
+        [ value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "k"))
+               (Some continuation) []) ]
+        (apply
+           (Ast_helper.Exp.ident (deep "continue"))
+           [ident "k"; apply (ident "resume") [ident "v"]])
+    in
+    let effc =
+      Ast_helper.Exp.function_
+        [ { pparam_loc = Location.none;
+            pparam_desc = Pparam_newtype (loc "a", None)
+          };
+          value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "eff"))
+               (Some (Ast_helper.Typ.constr effect_lid [a]))
+               []) ]
+        { mode_annotations = [];
+          ret_mode_annotations = [];
+          ret_type_constraint = None
+        }
+        (Pfunction_body
+           (Ast_helper.Exp.match_ (ident "eff")
+              [ Ast_helper.Exp.case
+                  (Ast_helper.Pat.construct
+                     (lid (constructor_name t))
+                     (Some ([], Ast_helper.Pat.var (loc "v"))))
+                  (Ast_helper.Exp.construct (lid "Some") (Some resume));
+                Ast_helper.Exp.case (Ast_helper.Pat.any ())
+                  (Ast_helper.Exp.construct (lid "None") None) ]))
+    in
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.var (loc (handler_name t)))
+          (function_
+             [ value_param (Ast_helper.Pat.var (loc "f"));
+               value_param
+                 (Ast_helper.Pat.constraint_
+                    (Ast_helper.Pat.var (loc "resume"))
+                    (Some (Ty.to_code (Ty.Arrow (payload, result))))
+                    []) ]
+             (apply
+                (Ast_helper.Exp.ident (deep "try_with"))
+                [ ident "f";
+                  unit_;
+                  Ast_helper.Exp.record [deep "effc", effc] None ])) ]
+
+  let to_code t = [declaration t; handler t]
+end
+
 module Handler = struct
   type pattern =
     | Exn of
@@ -343,9 +458,15 @@ module Handler = struct
         }
     | Catch_all
 
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
   type 'body t =
     { pattern : pattern;
-      body : 'body
+      body : 'body;
+      reraise : reraise option
     }
 
   let pattern_to_code = function
@@ -370,8 +491,20 @@ module Handler = struct
       in
       Ast_helper.Pat.construct (lid (Exn.name exn)) payload
 
-  let to_case body_to_code { pattern; body } =
-    Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+  let to_case body_to_code { pattern; body; reraise } =
+    match reraise, pattern with
+    | None, _ ->
+      Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+    | Some { name; notrace }, Exn _ ->
+      let name = Name.to_string name in
+      Ast_helper.Exp.case
+        (Ast_helper.Pat.alias (pattern_to_code pattern) (loc name))
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [Ast_helper.Vb.mk (Ast_helper.Pat.any ()) (body_to_code body)]
+           (apply
+              (ident (if notrace then "raise_notrace" else "raise"))
+              [ident name]))
+    | Some _, Catch_all -> Misc.fatal_errorf "Handler: reraise from catch-all"
 end
 
 module Un_op = struct
@@ -437,6 +570,8 @@ module Bin_op = struct
     | Max
     | Min_num
     | Max_num
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -444,10 +579,13 @@ module Bin_op = struct
     | Shift_right
     | Shift_right_logical
     | Eq
+    | Ne
     | Lt
     | Le
     | Gt
     | Ge
+    | Compare
+    | Unsigned_compare
     | And
     | Or
 
@@ -459,9 +597,16 @@ module Bin_op = struct
 
   let integral_binops =
     num_binops
-    @ [Bit_and; Bit_or; Bit_xor; Shift_left; Shift_right; Shift_right_logical]
+    @ [ Unsigned_div;
+        Unsigned_rem;
+        Bit_and;
+        Bit_or;
+        Bit_xor;
+        Shift_left;
+        Shift_right;
+        Shift_right_logical ]
 
-  let ops_for_ty (ty : Ty.t) =
+  let numeric_ops_for_ty (ty : Ty.t) =
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty
@@ -469,7 +614,17 @@ module Bin_op = struct
       else integral_binops
     | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
     | Or_null _ | Arrow _ ->
-      Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
+      Misc.fatal_errorf "Bin_op.numeric_ops_for_ty: expected a numeric type"
+
+  let compare_ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      if NumberTy.is_floating_point nty
+      then [Compare]
+      else [Compare; Unsigned_compare]
+    | Bool | String -> [Compare]
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ | Arrow _ ->
+      Misc.fatal_errorf "Bin_op.compare_ops_for_ty: expected a scalar type"
 
   let to_code ty binop ~lhs ~rhs =
     let module_name =
@@ -492,6 +647,8 @@ module Bin_op = struct
     | Max -> call "max"
     | Min_num -> call "min_num"
     | Max_num -> call "max_num"
+    | Unsigned_div -> call "unsigned_div"
+    | Unsigned_rem -> call "unsigned_rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
@@ -499,11 +656,24 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
-    (* CR-someday xclerc: Sometimes emit compare x y = 0 instead. *)
+    | Ne -> apply (qualified_ident "Bool" "not") [call "equal"]
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
     | Ge -> op ">=" [call "compare"; int 0]
+    | Compare -> call "compare"
+    | Unsigned_compare -> (
+      match ty with
+      | Ty.Number { base = Int; unboxed = false } ->
+        (* [Int] has no [unsigned_compare]. Flipping the sign bit maps unsigned
+           order to signed order without changing the operand width. *)
+        let flip_sign expr =
+          apply
+            (qualified_ident "Int" "logxor")
+            [expr; qualified_ident "Int" "min_int"]
+        in
+        apply (qualified_ident "Int" "compare") [flip_sign lhs; flip_sign rhs]
+      | _ -> call "unsigned_compare")
     | And -> op "&&" [lhs; rhs]
     | Or -> op "||" [lhs; rhs]
 end
@@ -537,7 +707,10 @@ module Expr = struct
      mistake, as we can create for example a [Bin_op] with invalid types. To
      mitigate, we should make [t] private and add smart constructors. *)
   type t =
-    | Const of Number.t
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
     | Bool_const of bool
     | String_const of string
     | String_length of t
@@ -565,7 +738,7 @@ module Expr = struct
           init_name : Name.t;
           init : t
         }
-    | Unboxed_tuple of (Name.t * t) list
+    | Unboxed_tuple of t list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -577,7 +750,7 @@ module Expr = struct
     | Construct of
         { sum : Sum.t;
           constructor : Ty.constructor;
-          args : (Name.t * t) list
+          args : t list
         }
     | Match of
         { sum : Sum.t;
@@ -624,6 +797,25 @@ module Expr = struct
     | Let_rec of
         { functions : (Name.t * t) list;
           body : t
+        }
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;
+          body : t;
+          resume : t
+        }
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
         }
 
   and raise =
@@ -687,7 +879,7 @@ module Expr = struct
     constrain (Ty.Record record) (make fields source)
 
   let rec to_code : t -> Parsetree.expression = function
-    | Const n -> Number.to_code n
+    | Const { number; unboxed } -> Number.to_code ~unboxed number
     | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
     | String_const s -> Ast_helper.Exp.constant (Ast_helper.Const.string s)
     | String_length expr ->
@@ -728,18 +920,8 @@ module Expr = struct
           in
           make dimensions)
     | Unboxed_tuple components ->
-      let body =
-        Ast_helper.Exp.unboxed_tuple
-          (List.map
-             (fun (name, _) -> None, ident (Name.to_string name))
-             components)
-      in
-      (* CR-soon xclerc for xclerc: here to, we may want to not let-bind. *)
-      (* As with constructor payloads, sequence effectful components
-         explicitly. *)
-      List.fold_right
-        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
-        components body
+      Ast_helper.Exp.unboxed_tuple
+        (List.map (fun expr -> None, to_code expr) components)
     | Record (record, values) ->
       if List.length record.fields <> List.length values
       then Misc.fatal_errorf "Record: incorrect number of fields";
@@ -768,9 +950,7 @@ module Expr = struct
     | Construct { sum; constructor; args } ->
       if List.length args <> List.length constructor.args
       then Misc.fatal_errorf "Constructor: incorrect number of arguments";
-      let values =
-        List.map (fun (name, _) -> ident (Name.to_string name)) args
-      in
+      let values = List.map to_code args in
       let arg =
         match values with
         | [] -> None
@@ -779,17 +959,7 @@ module Expr = struct
           Some
             (Ast_helper.Exp.tuple (List.map (fun value -> None, value) values))
       in
-      let body =
-        Ast_helper.Exp.construct
-          (lid (Sum.constructor_name sum constructor))
-          arg
-      in
-      (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
-      (* Payload expressions can have effects: explicitly sequence their
-         evaluation. *)
-      List.fold_right
-        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
-        args body
+      Ast_helper.Exp.construct (lid (Sum.constructor_name sum constructor)) arg
     | Match { sum; scrutinee; cases } ->
       Ast_helper.Exp.match_
         (constrain (Sum.ty sum) (to_code scrutinee))
@@ -841,6 +1011,36 @@ module Expr = struct
       Ast_helper.Exp.let_ Immutable Recursive
         (List.map binding functions)
         (to_code body)
+    | Perform { eff; arg } ->
+      apply
+        (qualified_ident "Effect" "perform")
+        [ Ast_helper.Exp.construct
+            (lid (Eff.constructor_name eff))
+            (Some (to_code arg)) ]
+    | Handle { eff; ty; body; resume } ->
+      constrain ty
+        (apply
+           (ident (Eff.handler_name eff))
+           [ function_
+               [value_param (Ast_helper.Pat.construct (lid "()") None)]
+               (constrain ty (to_code body));
+             to_code resume ])
+    | Let_stack_function { name; lambda; body } -> (
+      match lambda with
+      | Lambda _ ->
+        bind name
+          (Ast_helper.Exp.stack (to_code lambda))
+          (fun _ -> to_code body)
+      | _ -> Misc.fatal_errorf "Let_stack_function: expected a function")
+    | Apply_stack_function { name; args } ->
+      if List.is_empty args
+      then Misc.fatal_errorf "Apply_stack_function: no arguments";
+      let application =
+        apply (ident (Name.to_string name)) (List.map to_code args)
+      in
+      { application with
+        pexp_attributes = [Ast_helper.Attr.mk (loc "nontail") (PStr [])]
+      }
 
   and raise_to_code { exn; payload; notrace } =
     let payload =
