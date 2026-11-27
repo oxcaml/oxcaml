@@ -386,11 +386,13 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
         run: bash tools/ci/actions/run-make-target.sh compiler
+        # No OCAMLRUNPARAM here: only the upstream testsuite runs on the
+        # debug runtime, and the checks behind V=1 are assertions that
+        # only the debug runtime compiles in.
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
-          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Check that `make hacking` builds
@@ -430,7 +432,6 @@ jobs:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
-          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
         # Install the compiler for metrics_collection configuration to populate _install directory
@@ -441,7 +442,6 @@ jobs:
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
-          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Promote failed tests and capture diffs
