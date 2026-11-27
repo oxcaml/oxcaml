@@ -72,6 +72,9 @@ val make_globals_map :
 
 val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
 
+(** Forget the C objects and options recorded by [add_ccobjs]. *)
+val clear_ccobjs : t -> unit
+
 val is_required : t -> Compilation_unit.t -> bool
 
 val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
