@@ -190,6 +190,8 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
+  | Addressable el ->
+    fprintf ppf "addressable %a" (mixed_block_element print_value_kind) el
   | Splice_variable id -> fprintf ppf "$%a" Layout_ident.print id
 
 let constructor_shape print_value_kind ppf shape =
@@ -258,6 +260,7 @@ let rec layout ppf lay_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
+  | Paddressable l -> fprintf ppf "addressable %a" layout l
   | Psplicevar id -> fprintf ppf "$%a" Layout_ident.print id
 
 let layout_annotation ppf lay_ =
@@ -302,7 +305,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
   | Punboxed_vector bv -> fprintf ppf ": %s@ " (unboxed_vector bv)
   | Punboxed_mask -> fprintf ppf ": unboxed_mask@ "
-  | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
+  | Punboxed_product _ | Paddressable _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
   | Pvoid -> fprintf ppf ": void@ "
@@ -369,6 +372,8 @@ let rec mixed_block_element
   | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
+  | Addressable elt ->
+    fprintf ppf "addressable %a" (mixed_block_element print_mode) elt
   | Splice_variable id -> fprintf ppf "$%a" Layout_ident.print id
 
 and mixed_block_shape

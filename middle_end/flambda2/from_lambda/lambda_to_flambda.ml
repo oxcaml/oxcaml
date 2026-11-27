@@ -590,6 +590,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (* This case avoids extraneous continuations. *)
     let body acc ccenv = cps acc env ccenv body k k_exn in
     let kind =
+      (* CR zeisbach: think about if we want to strip away the addressability
+         from the layout here somehow? *)
       Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
         layout ~machine_width:(Acc.machine_width acc)
     in

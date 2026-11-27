@@ -2615,6 +2615,7 @@ module Extended_machtype = struct
     | Pvalue _ -> typ_val
     | Pvoid -> [||]
     | Punboxed_product fields -> Array.concat (List.map of_layout fields)
+    | Paddressable layout -> of_layout layout
 end
 
 let machtype_of_layout layout =

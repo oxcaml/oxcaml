@@ -894,6 +894,12 @@ and value_kind_mixed_block_field
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
+  | Addressable elem ->
+    let num_nodes_visited, elem =
+      value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
+        elem ty
+    in
+    num_nodes_visited, Addressable elem
   | ( Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
     | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
     | Splice_variable _ ) as field ->

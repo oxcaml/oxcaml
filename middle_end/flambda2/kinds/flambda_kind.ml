@@ -1172,7 +1172,7 @@ module With_subkind = struct
     in
     create value value_subkind nullable
 
-  let from_lambda_values_and_unboxed_numbers_only (layout : Lambda.layout)
+  let rec from_lambda_values_and_unboxed_numbers_only (layout : Lambda.layout)
       ~machine_width =
     match layout with
     | Pvalue vk -> from_lambda_value_kind vk ~machine_width
@@ -1188,6 +1188,10 @@ module With_subkind = struct
     | Punboxed_vector Unboxed_vec256 -> naked_vec256
     | Punboxed_vector Unboxed_vec512 -> naked_vec512
     | Punboxed_mask -> naked_mask
+    | Paddressable layout ->
+      (* CR zeisbach: consider making this a fatal error and change callers?
+         this is similar to the CC.t idea that has a type without addressable *)
+      from_lambda_values_and_unboxed_numbers_only layout ~machine_width
     | Pvoid | Punboxed_product _ | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
