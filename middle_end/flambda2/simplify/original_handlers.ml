@@ -18,8 +18,7 @@ type t =
       { invariant_params : Bound_parameters.t;
         lifted_params : Bound_parameters.t;
         lifted_free_vars : Lifted_free_var.t list;
-        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t;
-        can_be_lifted : bool
+        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t
       }
   | Non_recursive of Non_recursive_handler.t
 
@@ -29,15 +28,13 @@ let[@ocamlformat "disable"] print ppf t =
     Non_recursive_handler.print ppf non_rec_handler
   | Recursive
       { invariant_params; lifted_params; lifted_free_vars;
-        continuation_handlers; can_be_lifted; } ->
-    Format.fprintf ppf "@[<hov 1>(
-        @[<hv 1>(can_be_lifted@ %b)@]@ \
+        continuation_handlers; } ->
+    Format.fprintf ppf "@[<hov 1>(\
         @[<hv 1>(invariant params@ %a)@]@ \
         @[<hv 1>(lifted_params@ %a)@]@ \
         @[<hv 1>(lifted_free_vars@ %a)@]@ \
         @[<hv 1>(continuation handlers@ %a)@]\
       )@]"
-      can_be_lifted
       Bound_parameters.print invariant_params Bound_parameters.print
       lifted_params
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -47,25 +44,11 @@ let[@ocamlformat "disable"] print ppf t =
       continuation_handlers
 
 let create_recursive ~invariant_params ~lifted_params ~lifted_free_vars
-    ~continuation_handlers ~can_be_lifted =
+    ~continuation_handlers =
   Recursive
-    { invariant_params;
-      lifted_params;
-      lifted_free_vars;
-      continuation_handlers;
-      can_be_lifted
-    }
+    { invariant_params; lifted_params; lifted_free_vars; continuation_handlers }
 
 let create_non_recursive non_rec_handler = Non_recursive non_rec_handler
-
-let bound_continuations = function
-  | Non_recursive non_rec_handler -> [non_rec_handler.cont]
-  | Recursive { continuation_handlers; _ } ->
-    Continuation.Lmap.keys continuation_handlers
-
-let can_be_lifted = function
-  | Non_recursive { can_be_lifted; _ } -> can_be_lifted
-  | Recursive { can_be_lifted; _ } -> can_be_lifted
 
 let bind_phantom_vars phantom_vars handler =
   List.fold_right
@@ -107,11 +90,11 @@ let add_params_to_lift t (lifted_free_vars : Lifted_free_var.t list)
   in
   match t with
   | Recursive
-      ({ invariant_params;
-         lifted_free_vars = old_free_vars;
-         continuation_handlers;
-         _
-       } as recursive) ->
+      { invariant_params;
+        lifted_params = _;
+        lifted_free_vars = old_free_vars;
+        continuation_handlers
+      } ->
     if not (List.is_empty old_free_vars) then fail ();
     let continuation_handlers =
       Continuation.Lmap.map
@@ -120,8 +103,7 @@ let add_params_to_lift t (lifted_free_vars : Lifted_free_var.t list)
         continuation_handlers
     in
     Recursive
-      { recursive with
-        invariant_params =
+      { invariant_params =
           add_lifted_params ~is_exn_handler:false invariant_params;
         lifted_params;
         lifted_free_vars;
@@ -134,7 +116,6 @@ let add_params_to_lift t (lifted_free_vars : Lifted_free_var.t list)
         lifted_free_vars = old_free_vars;
         handler;
         is_exn_handler;
-        can_be_lifted;
         is_cold
       } ->
     if not (List.is_empty old_free_vars) then fail ();
@@ -142,4 +123,4 @@ let add_params_to_lift t (lifted_free_vars : Lifted_free_var.t list)
       (Non_recursive_handler.create ~cont
          ~params:(add_lifted_params ~is_exn_handler params)
          ~lifted_params ~lifted_free_vars ~handler:(lift handler)
-         ~is_exn_handler ~can_be_lifted ~is_cold)
+         ~is_exn_handler ~is_cold)

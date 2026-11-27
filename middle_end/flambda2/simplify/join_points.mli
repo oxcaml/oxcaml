@@ -26,7 +26,6 @@ type result = private
   }
 
 val compute_handler_env :
-  ?replay:Replay_history.t * bool ->
   ?cut_after:Scope.t ->
   One_continuation_use.t list ->
   is_recursive:bool ->

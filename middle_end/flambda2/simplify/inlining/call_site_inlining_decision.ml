@@ -277,9 +277,8 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
         | Never_inlined_attribute
         | Forward_inlined_attribute_but_nothing_to_forward | Attribute_always
-        | Replay_history_says_must_inline _ | Begin_unrolling _
-        | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
-          ->
+        | Begin_unrolling _ | Continue_unrolling | Definition_says_inline _
+        | Jsir_inlining_disabled ->
           (* These can't be returned by the speculative inlining cases below. *)
           if Flambda_features.check_light_invariants ()
           then
@@ -325,31 +324,16 @@ let get_rec_info dacc ~function_type =
 
 let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
-  let must_inline = DE.must_inline (DA.denv dacc) in
-  let fail_if_must_inline () =
-    if must_inline
-    then
-      Misc.fatal_errorf
-        "Deciding not to inline an [Apply], but the replay_history says we \
-         should inline.@ Replay_history: %a"
-        Replay_history.print
-        (DE.replay_history (DA.denv dacc))
-  in
-  let[@local] do_not_inline (decision : Call_site_inlining_decision_type.t) =
-    fail_if_must_inline ();
-    decision
-  in
   let rec_info = get_rec_info dacc ~function_type in
   let inlined = Apply.inlined apply in
   match inlined with
-  | Never_inlined -> do_not_inline Never_inlined_attribute
-  | Forward_inlined ->
-    do_not_inline Forward_inlined_attribute_but_nothing_to_forward
+  | Never_inlined -> Never_inlined_attribute
+  | Forward_inlined -> Forward_inlined_attribute_but_nothing_to_forward
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
     match
       DE.find_code_metadata_exn (DA.denv dacc) (FT.code_id function_type)
     with
-    | exception Not_found -> do_not_inline Missing_code
+    | exception Not_found -> Missing_code
     | code_metadata -> (
       let code_present () =
         match
@@ -363,8 +347,9 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
             Code_id.print
             (Code_metadata.code_id code_metadata)
       in
-      let[@local] inline_if_code_present decision =
-        if code_present () then decision else do_not_inline Missing_code
+      let[@local] inline_if_code_present decision :
+          Call_site_inlining_decision_type.t =
+        if code_present () then decision else Missing_code
       in
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
@@ -384,7 +369,7 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
         Simplify_rec_info_expr.known_remaining_unrolling_depth dacc rec_info
       in
       match unrolling_depth with
-      | Some 0 -> do_not_inline Unrolling_depth_exceeded
+      | Some 0 -> Unrolling_depth_exceeded
       | Some _ -> inline_if_code_present Continue_unrolling
       | None -> (
         (* lmaurer: This seems semantically dodgy: If we really think of a free
@@ -403,7 +388,7 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
         let apply_inlining_state = Apply.inlining_state apply in
         let recursive = Code_metadata.recursive code_metadata in
         if Inlining_state.is_depth_exceeded apply_inlining_state
-        then do_not_inline Max_inlining_depth_exceeded
+        then Max_inlining_depth_exceeded
         else
           let policy =
             match inlined with
@@ -429,27 +414,7 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
             if
               Simplify_rec_info_expr.depth_may_exceed dacc rec_info
                 max_rec_depth
-            then do_not_inline Recursion_depth_exceeded
-            else if must_inline
-            then
-              match
-                Replay_history.replay_inlining_decision
-                  (DE.replay_history (DA.denv dacc))
-              with
-              | Still_recording ->
-                Misc.fatal_errorf
-                  "Internal assumption broken: DE.says must_inline\n\
-                  \                  (presumably because of the replay \
-                   history), but the replay history is still recoding."
-              | Replayed decision ->
-                if code_present ()
-                then Replay_history_says_must_inline decision
-                else
-                  Misc.fatal_errorf
-                    "Replay history says we should inline %a, but its code is \
-                     not present"
-                    Code_id.print
-                    (Code_metadata.code_id code_metadata)
+            then Recursion_depth_exceeded
             else
               might_inline dacc ~apply ~code_metadata ~function_type
                 ~simplify_expr ~rebuild_expr ~return_arity
@@ -460,7 +425,7 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
                  [Inlining_transforms] for how [unroll_to] is ultimately
                  handled. *)
               inline_if_code_present (Begin_unrolling unroll_to)
-            else do_not_inline Unrolling_depth_exceeded
+            else Unrolling_depth_exceeded
           | `Always -> inline_if_code_present Attribute_always)))
 
 let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply

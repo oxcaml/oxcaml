@@ -108,8 +108,6 @@ and t =
     all_code : Code.t Code_id.Map.t;
     inlining_history_tracker : Inlining_history.Tracker.t;
     loopify_state : Loopify_state.t;
-    replay_history : Replay_history.t;
-        (* Replay history for the current continuation handler (or toplevel) *)
     specialization_cost : Specialization_cost.t;
     (* Accumulator to record whether the handler of the current continuation can
        be specialized, or whether there are reasons why it could not (or rather
@@ -118,13 +116,6 @@ and t =
     (* Analysis from the latest join point. *)
     lifting_analysis : lifting_analysis;
     lifted_continuations : lifted_continuations;
-    has_seen_a_non_liftable_continuation : bool;
-        (* This flag is used to mark as non-liftable any continuation that is
-           bound after a non-liftable continuation, since any continuation bound
-           after a non-liftable continuation may refer to it.
-
-           CR gbury: we may not need to do this if we had free_names on handlers
-           that we have not explored yet. *)
     is_cold : bool;
         (* This flag is used to mark cold contexts, i.e. the body of cold
            functions and continuations. *)
@@ -161,11 +152,9 @@ let print ppf
       get_imported_code = _;
       inlining_history_tracker = _;
       loopify_state;
-      replay_history;
       specialization_cost;
       lifting_analysis = { num_variables_defined; cost_of_lifting };
       lifted_continuations = _;
-      has_seen_a_non_liftable_continuation;
       join_analysis;
       is_cold;
       ppf_dump = _
@@ -200,29 +189,15 @@ let print ppf
       a "closure_info" closure_info Closure_info.print;
       a "all_code" all_code (Code_id.Map.print Code.print);
       a "loopify_state" loopify_state Loopify_state.print;
-      a "replay_history" replay_history Replay_history.print;
       a "specialization_cost" specialization_cost Specialization_cost.print;
       a "join_analysis" join_analysis
         (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
              Format.fprintf ppf "()"));
       d "variables_defined_in_current_continuation" num_variables_defined;
       d "cost_of_lifting_continuations_out_of_current_one" cost_of_lifting;
-      b "has_seen_a_non_liftable_continuation"
-        has_seen_a_non_liftable_continuation;
       b "is_cold" is_cold ]
 
-let define_continuations ~can_be_lifted t conts =
-  let replay_history =
-    Replay_history.define_continuations ~can_be_lifted conts t.replay_history
-  in
-  { t with replay_history }
-
 let define_variable0 ~extra t var kind =
-  let replay_history =
-    if extra
-    then t.replay_history
-    else Replay_history.define_variable (Bound_var.var var) t.replay_history
-  in
   let lifting_analysis =
     (* Extra params, and variables that cannot be used in normal mode, are never
        free variables of lifted continuations (see [Simplify_let_cont_expr]). *)
@@ -242,12 +217,7 @@ let define_variable0 ~extra t var kind =
     then Variable.Set.add (Bound_var.var var) t.variables_defined_at_toplevel
     else t.variables_defined_at_toplevel
   in
-  { t with
-    typing_env;
-    replay_history;
-    variables_defined_at_toplevel;
-    lifting_analysis
-  }
+  { t with typing_env; variables_defined_at_toplevel; lifting_analysis }
 
 let define_variable t var kind =
   (define_variable0 [@inlined hint]) ~extra:false t var kind
@@ -283,11 +253,9 @@ let create ~ppf_dump ~round ~machine_width ~(resolver : resolver)
     inlining_history_tracker =
       Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
     loopify_state = Loopify_state.do_not_loopify;
-    replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     lifting_analysis = empty_lifting_analysis;
     lifted_continuations = no_lifted_continuations;
-    has_seen_a_non_liftable_continuation = false;
     join_analysis = None;
     is_cold = false;
     ppf_dump
@@ -378,11 +346,9 @@ let enter_set_of_closures
       all_code;
       inlining_history_tracker;
       loopify_state = _;
-      replay_history = _;
       specialization_cost = _;
       lifting_analysis = _;
       lifted_continuations = _;
-      has_seen_a_non_liftable_continuation = _;
       join_analysis = _;
       is_cold = _;
       ppf_dump
@@ -409,12 +375,10 @@ let enter_set_of_closures
     all_code;
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
-    replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     join_analysis = None;
     lifting_analysis = empty_lifting_analysis;
     lifted_continuations = no_lifted_continuations;
-    has_seen_a_non_liftable_continuation = false;
     is_cold = false;
     ppf_dump
   }
@@ -788,17 +752,6 @@ let with_join_analysis join_analysis t = { t with join_analysis }
 
 let join_analysis t = t.join_analysis
 
-let with_replay_history replay t =
-  (* CR gbury: should we try and have a "dummy" replay history for the temporary
-     envs created during join points ? *)
-  let replay_history =
-    match replay with
-    | None -> Replay_history.first_pass
-    | Some (previous_history, always_inline) ->
-      Replay_history.replay ~always_inline previous_history
-  in
-  { t with replay_history }
-
 let add_lifted_constant_state ?maybe_already_defined denv lifted =
   let initial_denv = denv in
   let maybe_already_defined =
@@ -864,36 +817,22 @@ let add_lifted_continuation t cont ~free_vars ~is_exn_handler =
 let inherit_lifted_continuations ~from t =
   { t with lifted_continuations = from.lifted_continuations }
 
-let bind_lifted_free_var t ~free_var arg =
-  let lifted = t.lifted_continuations in
-  { t with
-    lifted_continuations =
-      { lifted with
-        free_var_args =
-          Variable.Map.add
-            (Lifted_free_var.var free_var)
-            arg lifted.free_var_args
-      }
-  }
-
 let enter_set_of_handlers t ~lifted_free_vars ~lifted_params =
-  let t =
-    { t with
-      lifting_analysis = empty_lifting_analysis;
-      (* we only do shallow lifting : thus the question of whether a
-         continuation k' can be lifted out of the handler of a continuation k,
-         does not depend on whether k has been lifted or not (or was liftable or
-         not). Therefore we reset the `has_seen_a_non_liftable_continuation`
-         when we enter a new continuation handler *)
-      has_seen_a_non_liftable_continuation = false;
-      specialization_cost = Specialization_cost.can_specialize ()
-    }
+  let free_var_args =
+    List.fold_left2
+      (fun free_var_args free_var param ->
+        Variable.Map.add
+          (Lifted_free_var.var free_var)
+          (Bound_parameter.simple param)
+          free_var_args)
+      t.lifted_continuations.free_var_args lifted_free_vars
+      (Bound_parameters.to_list lifted_params)
   in
-  List.fold_left2
-    (fun t free_var param ->
-      bind_lifted_free_var t ~free_var (Bound_parameter.simple param))
-    t lifted_free_vars
-    (Bound_parameters.to_list lifted_params)
+  { t with
+    lifting_analysis = empty_lifting_analysis;
+    specialization_cost = Specialization_cost.can_specialize ();
+    lifted_continuations = { t.lifted_continuations with free_var_args }
+  }
 
 let forget_lifted_continuations t =
   { t with lifted_continuations = no_lifted_continuations }
@@ -1009,27 +948,9 @@ let add_liftable_let_cont t =
 let cost_of_lifting_continuations_out_of_current_one t =
   t.lifting_analysis.cost_of_lifting
 
-let has_seen_a_non_liftable_continuation t =
-  t.has_seen_a_non_liftable_continuation
-
-let set_has_seen_a_non_liftable_continuation t =
-  if t.has_seen_a_non_liftable_continuation
-  then t
-  else { t with has_seen_a_non_liftable_continuation = true }
-
 let is_cold t = t.is_cold
 
 let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
-
-let must_inline t = Replay_history.must_inline t.replay_history
-
-let replay_history t = t.replay_history
-
-let record_inlining_decision ~apply decision t =
-  { t with
-    replay_history =
-      Replay_history.record_inlining_decision ~apply decision t.replay_history
-  }
 
 let map_specialization_cost ~f t =
   let specialization_cost = f t.specialization_cost in
@@ -1063,12 +984,9 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     variables_defined_at_toplevel = denv_for_join.variables_defined_at_toplevel;
     cse = denv_for_join.cse;
     comparison_results = denv_for_join.comparison_results;
-    replay_history = denv_for_join.replay_history;
     specialization_cost = denv_for_join.specialization_cost;
     join_analysis = denv_for_join.join_analysis;
     lifting_analysis = denv_for_join.lifting_analysis;
-    has_seen_a_non_liftable_continuation =
-      denv_for_join.has_seen_a_non_liftable_continuation;
     is_cold = denv_for_join.is_cold;
     (* For the following fields, both denvs should have the same value of these
        fields *)

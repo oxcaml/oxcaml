@@ -106,7 +106,7 @@ type rebuild_let_cont_data =
 
 (* Helpers *)
 
-let split_non_recursive_let_cont ~can_be_lifted handler =
+let split_non_recursive_let_cont handler =
   let cont, body =
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         cont, body)
@@ -120,7 +120,7 @@ let split_non_recursive_let_cont ~can_be_lifted handler =
   ( body,
     Non_recursive_handler.create ~cont ~params ~handler
       ~lifted_params:Bound_parameters.empty ~lifted_free_vars:[] ~is_exn_handler
-      ~can_be_lifted ~is_cold )
+      ~is_cold )
 
 let split_recursive_let_cont handlers =
   let invariant_params, body, rec_handlers =
@@ -1628,8 +1628,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~simplified_body
         lifted_free_vars;
         handler;
         is_exn_handler;
-        is_cold;
-        can_be_lifted = _
+        is_cold
       } -> (
     match
       Continuation_uses_env.get_continuation_uses body_continuation_uses_env
@@ -1721,8 +1720,7 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~simplified_body
       { continuation_handlers;
         invariant_params;
         lifted_params;
-        lifted_free_vars;
-        can_be_lifted = _
+        lifted_free_vars
       } ->
     (* CR gbury: we currently do not lift any continuation out of a recursive
      * continuation. For instance it would be useful on the following example:
@@ -1853,15 +1851,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
      can also perform their join at level `n + 1`. *)
   let denv_for_join = DE.increment_continuation_scope denv_before_body in
   let denv_for_body =
-    let bound_continuations =
-      Original_handlers.bound_continuations data.handlers
-    in
-    let denv_for_body =
-      DE.define_continuations ~can_be_lifted:true
-        (DE.increment_continuation_scope denv_for_join)
-        bound_continuations
-    in
-    DE.add_liftable_let_cont denv_for_body
+    DE.add_liftable_let_cont (DE.increment_continuation_scope denv_for_join)
   in
   let handlers = data.handlers in
   let dacc = DA.with_denv dacc denv_for_body in
@@ -1884,10 +1874,8 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
      call [simplify_let_cont_stage1]. *)
   let body, handlers =
     match (let_cont : Let_cont.t) with
-    | Non_recursive { handler; can_be_lifted; _ } ->
-      let body, non_rec_handler =
-        split_non_recursive_let_cont ~can_be_lifted handler
-      in
+    | Non_recursive { handler; _ } ->
+      let body, non_rec_handler = split_non_recursive_let_cont handler in
       let original_handlers =
         Original_handlers.create_non_recursive non_rec_handler
       in
@@ -1899,7 +1887,7 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
       let original_handlers =
         Original_handlers.create_recursive ~invariant_params
           ~lifted_params:Bound_parameters.empty ~lifted_free_vars:[]
-          ~continuation_handlers ~can_be_lifted:true
+          ~continuation_handlers
       in
       body, original_handlers
   in
@@ -1925,7 +1913,7 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
         Original_handlers.create_recursive
           ~invariant_params:Bound_parameters.empty
           ~lifted_params:Bound_parameters.empty ~lifted_free_vars:[]
-          ~continuation_handlers ~can_be_lifted:true
+          ~continuation_handlers
     }
   in
   simplify_let_cont0 ~simplify_expr dacc data ~down_to_up

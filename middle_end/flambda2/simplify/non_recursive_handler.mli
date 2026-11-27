@@ -26,7 +26,6 @@ type t = private
             order. *)
     handler : Flambda.Expr.t;
     is_exn_handler : bool;
-    can_be_lifted : bool;
     is_cold : bool
   }
 
@@ -37,14 +36,7 @@ val create :
   lifted_free_vars:Lifted_free_var.t list ->
   handler:Flambda.Expr.t ->
   is_exn_handler:bool ->
-  can_be_lifted:bool ->
   is_cold:bool ->
   t
 
 val print : Format.formatter -> t -> unit
-
-val with_handler : Flambda.Expr.t -> t -> t
-
-val rename_params : t -> t
-
-val with_can_be_lifted : bool -> t -> t
