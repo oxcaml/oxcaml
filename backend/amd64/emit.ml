@@ -224,6 +224,12 @@ let emit_debug_info_linear i =
 
 let fp = Config.with_frame_pointers
 
+(* The frame-pointer prologue saves the caller's [%rbp] just below the return
+   address. The rule is left in place after the epilogue has popped it, as C
+   compilers do: the slot below the stack pointer still holds the value. *)
+let cfi_rbp_saved () =
+  D.cfi_offset ~reg:(Regs.dwarf_reg_number Int (P RBP)) ~offset:(-16)
+
 (* Tradeoff between code size and code speed *)
 
 let fastcode_flag = ref true
@@ -2134,6 +2140,7 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.push rbp;
       D.cfi_adjust_cfa_offset ~bytes:8;
+      cfi_rbp_saved ();
       I.mov rsp rbp);
     if !frame_required
     then
@@ -3215,6 +3222,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   if fp
   then (
     push rbp;
+    cfi_rbp_saved ();
     I.mov rsp rbp);
   (*= Prepare to call the handler: calculate and allocate stack space.
      Compute the size of stack slots for all live hard registers. *)
