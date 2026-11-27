@@ -105,10 +105,7 @@ module Components = struct
     f Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f NormalReturn nor;
-      exn = f Exception exn;
-      div = f Diverge div
-    }
+    { nor = f NormalReturn nor; exn = f Exception exn; div = f Diverge div }
 
   let map2 ~f lhs rhs =
     { nor = f NormalReturn lhs.nor rhs.nor;
