@@ -49,7 +49,10 @@ val least_modalities :
 val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
 (** Get the default modalities implied by the mutability of a field. *)
-val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
+val default_mutable_modalities : Types.mutability -> Mode.Modality.Const.t
+
+(** The implied modalities on the elements of a particular flavour of array. *)
+val array_implied_modalities : Types.array_flavor -> Mode.Modality.Const.t
 
 (** The modalities of the contents of an address of the given mutability. *)
 val address_modalities : Types.mutability -> Mode.Modality.Const.t

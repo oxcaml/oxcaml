@@ -329,7 +329,8 @@ let untransl_modality =
       See [https://github.com/oxcaml/oxcaml/pull/4415#discussion_r2250801078].
    3. legacy modalities for all monadic axes. This will stay in the future.
 
-   Implied modalities can be overriden. *)
+   Implied modalities can be overriden. [local_array] drops the implied
+   modalities from [1] and [2] (see [array_implied_modalities]). *)
 (* CR zqian: remove [1] and [2] *)
 let[@warning "-18"] mutable_implied_modalities ~include_comonadic mut =
   let comonadic : Modality.atom list =
@@ -367,6 +368,12 @@ let address_modalities mut =
 
 let mutable_implied_modalities ~include_comonadic mut =
   modality_of_atoms (mutable_implied_modalities ~include_comonadic mut)
+
+let array_implied_modalities : Types.array_flavor -> Modality.Const.t = function
+  | `Array | `Floatarray ->
+    mutable_implied_modalities ~include_comonadic:true true
+  | `Local_array -> mutable_implied_modalities ~include_comonadic:false true
+  | `Iarray -> mutable_implied_modalities ~include_comonadic:true false
 
 let block_path_expected_modalities mutability =
   (* There are two design constraints on what modalities we allow a block
@@ -544,11 +551,11 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
-let mutable_modalities mut =
+let default_mutable_modalities mut =
   mutable_implied_modalities (Types.is_mutable mut) ~include_comonadic:true
 
 let transl_modalities ~maturity mut annots =
-  let default = mutable_modalities mut in
+  let default = default_mutable_modalities mut in
   transl_modalities_with_default ~maturity ~default annots
 
 let let_mutable_modalities =

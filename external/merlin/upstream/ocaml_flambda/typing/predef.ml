@@ -40,14 +40,11 @@ type abstract_type_constr = [
   | `Bytes
   | `Float
   | `Continuation
-  | `Array
   | `Nativeint
   | `Int32
   | `Int64
   | `Lazy_t
   | `Extension_constructor
-  | `Floatarray
-  | `Iarray
   | `Atomic_loc
   | `Lexing_position
   | `Expr
@@ -56,6 +53,7 @@ type abstract_type_constr = [
   | `Float32
   | `Int8
   | `Int16
+  | Types.array_flavor
 ]
 type abstract_non_value_type_constr = [
   | `Nativeint_u
@@ -121,6 +119,7 @@ let base_type_constrs : type_constr list = [
   `Exn;
   `Eff;
   `Continuation;
+  `Local_array;
   `Array;
   `List;
   `Option;
@@ -208,6 +207,7 @@ and ident_unit = ident_create "unit"
 and ident_exn = ident_create "exn"
 and ident_eff = ident_create "eff"
 and ident_continuation = ident_create "continuation"
+and ident_local_array = ident_create "local_array"
 and ident_array = ident_create "array"
 and ident_list = ident_create "list"
 and ident_option = ident_create "option"
@@ -277,6 +277,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Exn -> ident_exn
   | `Eff -> ident_eff
   | `Continuation -> ident_continuation
+  | `Local_array -> ident_local_array
   | `Array -> ident_array
   | `List -> ident_list
   | `Option -> ident_option
@@ -343,6 +344,7 @@ and path_unit = Pident ident_unit
 and path_exn = Pident ident_exn
 and path_eff = Pident ident_eff
 and path_continuation = Pident ident_continuation
+and path_local_array = Pident ident_local_array
 and path_array = Pident ident_array
 and path_list = Pident ident_list
 and path_option = Pident ident_option
@@ -448,6 +450,7 @@ and type_unit = tconstr path_unit []
 and type_exn = tconstr path_exn []
 and type_eff t = tconstr path_eff [t]
 and type_continuation t1 t2 = tconstr path_continuation [t1; t2]
+and type_local_array t = tconstr path_local_array [t]
 and type_array t = tconstr path_array [t]
 and type_list t = tconstr path_list [t]
 and type_option t = tconstr path_option [t]
@@ -876,6 +879,14 @@ let decl_of_type_constr type_constr =
     let variance = Variance.(contravariant, covariant) in
     decl2 ~variance ~param_jkinds:value_params_jkind_2
       ~jkind:(builtin2 Jkind.Const.Builtin.value) ()
+  | `Local_array ->
+    decl1 ~variance:Variance.full ~param_jkind:Jkind.for_array_argument
+       ~unboxed_jkind:Jkind.Const.Builtin.any
+       ~jkind:(fun param ->
+         Jkind.Builtin.mutable_data ~why:(Primitive ident_local_array) |>
+         Jkind.add_with_bounds
+           ~modality:Mode.Modality.Const.id
+           ~type_expr:param) ()
   | `Array ->
     decl1 ~variance:Variance.full ~param_jkind:Jkind.for_array_argument
        ~unboxed_jkind:Jkind.Const.Builtin.any

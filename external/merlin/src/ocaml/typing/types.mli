@@ -40,6 +40,10 @@ type mutability =
       ; atomic : atomic
       }
 
+(** The flavours of predefined array: ['a local_array], ['a array],
+    ['a iarray] and [floatarray]. *)
+type array_flavor = [ `Local_array | `Array | `Iarray | `Floatarray ]
+
 (** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
     if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool

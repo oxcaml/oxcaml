@@ -137,7 +137,10 @@ module Type_shape = struct
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
-      | p when Path.same p Predef.path_array -> Some Array
+      | p
+        when Path.same p Predef.path_local_array
+             || Path.same p Predef.path_array ->
+        Some Array
       | p when Path.same p Predef.path_bytes -> Some Bytes
       | p when Path.same p Predef.path_char -> Some Char
       | p when Path.same p Predef.path_extension_constructor ->
