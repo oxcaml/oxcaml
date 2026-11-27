@@ -53,6 +53,10 @@ type t
 
 val create : unit -> t
 
+(** [copy t] is a link environment with the contents of [t] that shares no
+    mutable state with it. *)
+val copy : t -> t
+
 val extract_crc_interfaces : t -> Import_info.t list
 
 val extract_crc_implementations : t -> Import_info.t list
@@ -67,6 +71,9 @@ val make_globals_map :
   (CU.t * Digest.t option * Digest.t option * Symbol.t list) list
 
 val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
+
+(** Forget the C objects and options recorded by [add_ccobjs]. *)
+val clear_ccobjs : t -> unit
 
 val is_required : t -> Compilation_unit.t -> bool
 

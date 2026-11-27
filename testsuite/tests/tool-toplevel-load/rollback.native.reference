@@ -1,0 +1,14 @@
+A loaded
+File "caml_startup", line 1:
+Error: Files refused.cmxa and a.cmx both define a module named A
+B loaded
+File "caml_startup", line 1:
+Error: Error during linking (exit code 1)
+C loaded
+File "caml_startup", line 1:
+Error: Files a.cmx and a.cmx both define a module named A
+File "caml_startup", line 1:
+Error: Files other_a/uses_a.cmx and a.cmx
+       make inconsistent assumptions over interface A
+- : string list = []
+

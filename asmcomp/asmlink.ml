@@ -263,12 +263,13 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
           make_shared_startup_file unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink));
-  call_linker_shared (startup_obj :: objfiles) output_name;
+  Misc.try_finally
+    (fun () -> call_linker_shared (startup_obj :: objfiles) output_name)
+    ~always:(fun () -> remove_file startup_obj);
   if !Oxcaml_flags.internal_assembler
   then
     (* CR gyorsh: restore after workaround. *)
-    Emitaux.binary_backend_available := true;
-  remove_file startup_obj
+    Emitaux.binary_backend_available := true
 
 let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
   Profile.record_call "link_shared" (fun () ->

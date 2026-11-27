@@ -904,7 +904,24 @@ module Compiler = (val Optcompile.native
 
 (* Load in-core a .cmxs file *)
 
-let linkenv = Linkenv.create ()
+let linkenv = ref (Linkenv.create ())
+
+(* Link [name] into a temporary shared library and return its name. If that
+   fails, nothing of [name] is kept: neither in the link environment of the
+   session, nor in the C objects and options passed to later links. *)
+let link_shared ppf name =
+  let saved_linkenv = Linkenv.copy !linkenv in
+  let ccobjs = !Clflags.ccobjs and all_ccopts = !Clflags.all_ccopts in
+  let cmxs = Filename.temp_file "caml" ".cmxs" in
+  Misc.try_finally
+    (fun () ->
+      Compiler.link_shared ~ppf_dump:ppf !linkenv [name] cmxs;
+      cmxs)
+    ~exceptionally:(fun () ->
+      linkenv := saved_linkenv;
+      Clflags.ccobjs := ccobjs;
+      Clflags.all_ccopts := all_ccopts;
+      Misc.remove_file cmxs)
 
 let load_file ppf name0 =
   let name =
@@ -918,9 +935,7 @@ let load_file ppf name0 =
       if Filename.check_suffix name Compiler.ext_flambda_obj
          || Filename.check_suffix name Compiler.ext_flambda_lib
       then
-        let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
-        cmxs,true
+        link_shared ppf name,true
       else
         name,false
     in
