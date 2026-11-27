@@ -17,9 +17,17 @@ permissions: {}
 # own: options of configure, a C compiler, an OCAMLPARAM for building the
 # compiler itself, and the variables that its tests run under.
 #
-# One install also serves several codegen variants, selected each time the
-# compiler runs. The `variants-*` jobs test that with the system's C compiler
-# (gcc) and with clang, which the AddressSanitizer variants need:
+# One build serves several codegen variants, selected each time the compiler
+# runs: the compiler itself is always the `base` variant. An entry of the
+# `build` matrix with `codegen_variant` runs its tests for that variant
+# (`CODEGEN_VARIANT`): the dune tests in the variant's build context, the
+# upstream testsuite with the variant as the default of every native
+# compilation. Its configure options name the axes of the variant
+# (`--enable-stack-checks` for `sc`), which makes configure fail unless it
+# can build that variant; `make` fails too when the variant is not built.
+#
+# The `variants-*` jobs test every variant of one install, with the system's
+# C compiler (gcc) and with clang, which the AddressSanitizer variants need:
 # - `variants-build` builds, with each C compiler, a compiler that serves
 #   every variant that C compiler supports, and ships the installed compiler
 #   and the test tree;
@@ -89,16 +97,19 @@ jobs:
 
           - name: stack-checks (x86_64-linux)
             config: --enable-stack-checks
+            codegen_variant: sc
             os: warp-ubuntu-latest-x64-32x
             sysdeps: gdb
 
           - name: poll-insertion (x86_64-linux)
             config: --enable-poll-insertion
+            codegen_variant: poll
             os: warp-ubuntu-latest-x64-32x
             sysdeps: gdb
 
           - name: poll-insertion sc (x86_64-linux)
             config: --enable-stack-checks --enable-poll-insertion
+            codegen_variant: poll-sc
             os: warp-ubuntu-latest-x64-32x
             sysdeps: gdb
 
@@ -117,6 +128,7 @@ jobs:
 
           - name: debug stack-checks (x86_64-linux)
             config: --enable-stack-checks --enable-keyword-edition=5.4
+            codegen_variant: sc
             os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             use_runtime: d
@@ -145,6 +157,7 @@ jobs:
 
           - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+            codegen_variant: fp-poll
             os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
@@ -182,16 +195,21 @@ jobs:
             # GNU parallel for "Run register allocation on artifacts".
             sysdeps: gdb parallel
 
+          # `regalloc_options` is what selects the IR of `codegen_variant`
+          # for the register allocation tool: keep the two in step.
           - name: regalloc poll-insertion (aarch64-linux)
             config: --enable-poll-insertion --disable-warn-error
+            codegen_variant: poll
             os: warp-ubuntu-latest-arm64-32x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
+            regalloc_options: -enable-poll-insertion
             sysdeps: gdb parallel
 
           - name: frame-pointers irc (x86_64-linux)
             config: --enable-frame-pointers
+            codegen_variant: fp
             os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
@@ -233,20 +251,22 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
-          # A plain configure with clang. Among the variants that it builds
-          # by default is asan-fp, in whose build context `make runtest` runs
-          # the AddressSanitizer dune tests. Such a configure leaves that
-          # variant out, and goes on, when the C compiler cannot link
-          # AddressSanitizer executables: `needs_variants` makes the job fail
-          # then, instead of passing without those tests.
+          # A plain configure with clang, whose tests run for the base
+          # variant.
           - name: clang (x86_64-linux)
             os: warp-ubuntu-latest-x64-32x
             cc: clang
             sysdeps: clang gdb
-            needs_variants: asan-fp
 
+          # The tests run for asan-fp, AddressSanitizer with the frame
+          # pointers that it needs: the AddressSanitizer dune tests among
+          # them, which check instrumented code. A plain configure leaves
+          # that variant out, and goes on, when the C compiler cannot link
+          # AddressSanitizer executables; with --enable-address-sanitizer
+          # it fails instead, so this job cannot pass without those tests.
           - name: address-sanitizer (x86_64-linux)
             config: --enable-address-sanitizer
+            codegen_variant: asan-fp
             os: warp-ubuntu-latest-x64-32x
             cc: clang
             sysdeps: clang
@@ -266,6 +286,9 @@ jobs:
             oxcaml_llvm_source_branch: oxcaml-llvm-plugin
             sysdeps: gdb
 
+          # `make runtest-llvmize` runs in the build context of the fp
+          # variant, whatever `codegen_variant` is: the LLVM backend needs
+          # frame pointers.
           - name: frame-pointers llvmize-tests (x86_64-linux)
             config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-32x
@@ -425,26 +448,6 @@ jobs:
             $MATRIX_CONFIG \
             $dissector_config
 
-      - name: Check that configure selected the codegen variants to test
-        if: matrix.needs_variants != ''
-        env:
-          NEEDS_VARIANTS: ${{ matrix.needs_variants }}
-        run: |
-          set -euo pipefail
-          selected=$(sed -n 's/^CODEGEN_VARIANTS=//p' Makefile.config)
-          # $NEEDS_VARIANTS is deliberately unquoted: word-splitting is
-          # intended (it is a whitespace-separated list of variants).
-          for variant in $NEEDS_VARIANTS; do
-            case " $selected " in
-              *" $variant "*) ;;
-              *)
-                echo "::error::configure did not select the codegen variant" \
-                  "\`$variant\`, whose tests this job is there to run: it" \
-                  "selected [$selected]. See the output of configure."
-                exit 1 ;;
-            esac
-          done
-
       - name: Setup for saving core files (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -487,6 +490,7 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: bash tools/ci/actions/run-make-target.sh runtest
         env:
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -498,6 +502,7 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: bash tools/ci/actions/run-make-target.sh runtest-upstream
         env:
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -514,6 +519,7 @@ jobs:
           SYSDEPS: ${{ matrix.sysdeps }}
           MATRIX_CC: ${{ matrix.cc }}
           DISABLE_TESTCASES: ${{ matrix.disable_testcases }}
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -526,10 +532,12 @@ jobs:
           make install
           make check-installed
 
+      # Builds the minimizer; for the job's codegen variant, if it has one.
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: bash tools/ci/actions/run-make-target.sh minimizer
         env:
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -618,14 +626,25 @@ jobs:
 
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
+        env:
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
+          REGALLOC_OPTIONS: ${{ matrix.regalloc_options }}
         run: |
           set -euo pipefail
-          # The tool only reads the IR that the build saved in _build, so
-          # its runs are independent: GNU parallel runs each line below as
-          # one command and stops at the first failure. A run with irc needs
-          # several times the memory of the others (about 3 GB), hence the
-          # limit on the runs at once and the order that spreads them out.
-          regalloc="./_build/main/tools/regalloc/regalloc.exe _build -validate"
+          # The build saved IR for every codegen variant that it builds,
+          # each in the build context of its variant, and the tests saved
+          # more next to it. A run of the tool processes the IR of one
+          # configuration, which its options select (the base variant's
+          # without any), reports what it skips of the others, and fails
+          # when it finds none of its own. For a job with a codegen
+          # variant, that is the IR in the build context of the variant.
+          ir=_build${CODEGEN_VARIANT:+/main-$CODEGEN_VARIANT}
+          # The tool only reads that IR, so its runs are independent: GNU
+          # parallel runs each line below as one command and stops at the
+          # first failure. A run with irc needs several times the memory
+          # of the others (about 3 GB), hence the limit on the runs at
+          # once and the order that spreads them out.
+          regalloc="./_build/main/tools/regalloc/regalloc.exe $ir -validate $REGALLOC_OPTIONS"
           {
             for options in "-summary" "-insert-prologue" \
                 "-param SPLIT_AROUND_LOOPS:on" "-param AFFINITY:on"; do

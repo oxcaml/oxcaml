@@ -172,31 +172,39 @@ where it is missing, the tests that use it are skipped, they do not fail.
 The Notes name the other packages, and the tools that a check sets up in its
 steps before `Configure OxCaml`.
 
+`CODEGEN_VARIANT=<variant>` makes `make runtest`, `make test` and
+`make minimizer` run for that codegen variant of the build instead of `base`:
+the dune tests and the minimizer in the build context of the variant, the
+upstream testsuite with the variant as the default of every native
+compilation (see "Testing other codegen variants and runtimes" in
+`HACKING.ox.adoc`). The `configure` options of such a check name the axes of
+its variant, so that `configure` fails if it cannot build it.
+
 | Check | `configure` options | Variables | Notes |
 |---|---|---|---|
 | `default (x86_64-linux)` | | | also `make ast-dependent-libs-build-boot` (before the build), `make check-hacking`, `make install check-installed` and `make debug` |
 | `dissector-assembler (x86_64-linux)` | `--enable-assembler-suitable-for-dissector=<llvm-mc>` | | `llvm-mc` of the OxCaml LLVM release named in the workflow |
-| `stack-checks (x86_64-linux)` | `--enable-stack-checks` | | |
-| `poll-insertion (x86_64-linux)` | `--enable-poll-insertion` | | |
-| `poll-insertion sc (x86_64-linux)` | `--enable-stack-checks --enable-poll-insertion` | | |
+| `stack-checks (x86_64-linux)` | `--enable-stack-checks` | `CODEGEN_VARIANT=sc` | |
+| `poll-insertion (x86_64-linux)` | `--enable-poll-insertion` | `CODEGEN_VARIANT=poll` | |
+| `poll-insertion sc (x86_64-linux)` | `--enable-stack-checks --enable-poll-insertion` | `CODEGEN_VARIANT=poll-sc` | |
 | `no-flat-float-array (x86_64-linux)` | `--disable-flat-float-array` | | |
 | `dev (x86_64-linux)` | `--enable-dev --enable-keyword-edition=5.2` | | with `--prefix="$PWD/_custom_install"` |
-| `debug stack-checks (x86_64-linux)` | `--enable-stack-checks --enable-keyword-edition=5.4` | `USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | |
+| `debug stack-checks (x86_64-linux)` | `--enable-stack-checks --enable-keyword-edition=5.4` | `CODEGEN_VARIANT=sc USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | |
 | `debug (x86_64-linux)` | `--enable-keyword-edition=5.2+effect` | `USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | |
 | `O3 metrics (x86_64-linux)` | | `BUILD_OCAMLPARAM=_ OCAMLPARAM=_,O3=1`; `COLLECT_METRICS=true GITHUB_WORKSPACE="$PWD"` | with `bash tools/ci/actions/run-make-target.sh <target>` in place of each `make <target>`: under `COLLECT_METRICS` that script, which the workflow runs, makes every compilation of the main build context and of the tests write its profile to `_profile_csv` |
-| `Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)` | `--enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants` | `OCAMLPARAM=_,Oclassic=1` | |
-| `regalloc (aarch64-darwin)`, `regalloc (aarch64-linux)` | `--disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1` | then the `regalloc.exe` runs of the workflow, which need GNU parallel |
+| `Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)` | `--enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants` | `CODEGEN_VARIANT=fp-poll OCAMLPARAM=_,Oclassic=1` | |
+| `regalloc (aarch64-darwin)`, `regalloc (aarch64-linux)` | `--disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1` | then the `regalloc.exe` runs of the workflow, which need GNU parallel: on all of `_build`, where they process the IR of the base variant |
 | `debug regalloc (aarch64-darwin)` | `--disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation`; `USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | then `regalloc.exe` |
-| `regalloc poll-insertion (aarch64-linux)` | `--enable-poll-insertion --disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation` | then `regalloc.exe` |
-| `frame-pointers irc (x86_64-linux)` | `--enable-frame-pointers` | both: `_,w=-46,regalloc=irc` | also `make check_all_arches` |
+| `regalloc poll-insertion (aarch64-linux)` | `--enable-poll-insertion --disable-warn-error` | `CODEGEN_VARIANT=poll`; both: `_,w=-46,save-ir-before=register_allocation` | then `regalloc.exe`, on the IR of the variant: on `_build/main-poll` in place of `_build`, with `-enable-poll-insertion` |
+| `frame-pointers irc (x86_64-linux)` | `--enable-frame-pointers` | `CODEGEN_VARIANT=fp`; both: `_,w=-46,regalloc=irc` | also `make check_all_arches` |
 | `cfg-invariants (x86_64-linux)`, `cfg-invariants (aarch64-linux)` | | both: `_,w=-46,regalloc=cfg,cfg-invariants=1` | also `make check_all_arches` |
 | `vectorizer (x86_64-linux)` | | both: `_,w=-46,regalloc=cfg,vectorize=1` | also `make check_all_arches` |
 | `x86-peephole (x86_64-linux)` | | both: `_,w=-46,x86-peephole-optimize=1` | also `make check_all_arches` |
 | `experimental-optimizations (x86_64-linux)` | | both: `_,w=-46,experimental-optimizations-optimize=1` | also `make check_all_arches` |
-| `clang (x86_64-linux)` | | | `CC=clang`; `make runtest` also runs the AddressSanitizer dune tests, in the build context of the `asan-fp` variant, which the check requires `configure` to select |
-| `address-sanitizer (x86_64-linux)` | `--enable-address-sanitizer` | | `CC=clang` |
+| `clang (x86_64-linux)` | | | `CC=clang` |
+| `address-sanitizer (x86_64-linux)` | `--enable-address-sanitizer` | `CODEGEN_VARIANT=asan-fp` | `CC=clang`; the only check in which the AddressSanitizer dune tests check instrumented code |
 | `dwarf-tests (x86_64-linux)` | `--enable-function-sections` | | only `OXCAML_LLDB=<lldb> make runtest-dwarf` and `OXCAML_CLANG=<clang> make runtest-sancov` |
-| `frame-pointers llvmize-tests (x86_64-linux)` | `--enable-frame-pointers` | | only `OXCAML_CLANG=<clang> make runtest-llvmize` |
+| `frame-pointers llvmize-tests (x86_64-linux)` | `--enable-frame-pointers` | | only `OXCAML_CLANG=<clang> make runtest-llvmize`, which runs in the build context of the `fp` variant |
 | `musl (x86_64-linux)` | | | `CC=musl-gcc`, from the packages `musl` and `musl-tools`; before `configure`, `export C_INCLUDE_PATH=<headers>/x86/include` for the kernel headers that the workflow's step `Install system dependencies (Linux)` downloads for musl |
 | `reaper` | | both: `reaper=1,_` | |
 | `reaper with local value slots` | | both: `reaper=1,reaper-local-fields=1,_` | |
