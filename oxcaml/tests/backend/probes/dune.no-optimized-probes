@@ -31,6 +31,30 @@
  (deps t2.exe)
  (action (with-outputs-to %{target} (run %{deps}))))
 
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target unboxed_args.exe)
+ (deps unboxed_args.ml)
+ (action (run %{bin:ocamlopt.opt} -no-probes-optimized -O3 -flambda2-reaper %{deps} -o unboxed_args.exe)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target unboxed_args.output)
+ (deps unboxed_args.exe)
+ (action (with-outputs-to %{target} (run %{deps}))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps unboxed_args.expected unboxed_args.output)
+ (action (diff unboxed_args.expected unboxed_args.output)))
+
 
 (rule
  (enabled_if
