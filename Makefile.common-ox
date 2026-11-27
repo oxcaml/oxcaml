@@ -553,7 +553,10 @@ ifneq ($(codegen_variant_names),)
 #   variant's builds or from the base root, must be the base root's file
 #   byte for byte. This holds for the interfaces in particular: the
 #   variant's .cmx files were compiled against them, and their users will
-#   read the base root's.
+#   read the base root's. diff exits with status 1 when files differ and
+#   also when one tree has a file that the other lacks, which is expected
+#   here: only its "Files ... differ" lines count. A status above 1 means
+#   that diff itself failed, which is an error and not agreement.
 # - Each of those files, and every other file of the base root, is then a
 #   link to the base root's.
 # - No native file of the base root may be left without a build of it for
@@ -575,9 +578,16 @@ ifneq ($(codegen_variant_names),)
 	    done | $(group_by_directory) \
 	    | while read -r files; do $(cpl) -f $$files; done; \
 	  find $$v -type f \( $(variant_absent_files) \) -delete; \
-	  if LC_ALL=C diff -rq -x variants -x m.h -x 'libasmrun*' -x '*.cmx' \
-	      -x '*.cmxa' -x '*.cmxs' -x '*.a' -x '*.o' . $$v | grep '^Files '; \
-	  then \
+	  status=0; \
+	  compared=`LC_ALL=C diff -rq -x variants -x m.h -x 'libasmrun*' \
+	      -x '*.cmx' -x '*.cmxa' -x '*.cmxs' -x '*.a' -x '*.o' . $$v` \
+	    || status=$$?; \
+	  if [ $$status -gt 1 ]; then \
+	    echo "error: codegen variant $$name: diff could not compare its" \
+	      "tree with the base library root (status $$status)" >&2; \
+	    exit 1; \
+	  fi; \
+	  if echo "$$compared" | grep '^Files '; then \
 	    echo "error: codegen variant $$name: these files should be" \
 	      "the base library root's" >&2; \
 	    exit 1; \
