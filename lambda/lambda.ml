@@ -2373,10 +2373,7 @@ let rec transl_mixed_product_element (element : Types.mixed_block_element)
   | Untagged_immediate -> Untagged_immediate
   | Void -> Void
   | Product shape -> Product (transl_mixed_product_shape shape)
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    transl_mixed_product_element elt
+  | Addressable elt -> Addressable (transl_mixed_product_element elt)
 
 and transl_mixed_product_shape shape =
   Array.map transl_mixed_product_element shape
@@ -2435,7 +2432,7 @@ let rec transl_layout (layout : Jkind_types.Layout.Const.t)
   | Genvar (var, _axes) -> Splice_variable (Layout_ident.of_sort_var var)
   | Product layouts ->
       Product (Array.of_list (List.map transl_layout layouts))
-  | Addressable layout -> transl_layout layout
+  | Addressable layout -> Addressable (transl_layout layout)
   | Base (base, axes) ->
       Types.mixed_block_element_of_base base axes
       |> transl_mixed_product_element
@@ -3554,6 +3551,8 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Addressable sort ->
+    (* CR zeisbach: look at use sites and determine if we should keep?
+       Also watch out for incompatibility with [Typeopt.layout] *)
     (* Addressability does not affect the non-boxed representation *)
     layout_of_const_sort sort
   | Univar _ ->
@@ -4054,6 +4053,7 @@ let primitive_result_layout (p : primitive) =
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
   | Pbox (_layout, _) ->
+    (* CR zeisbach: do this *)
     (* CR box: Once we box some things as tagged immediates, we should compute
        a more precise layout here. For instance, a [bits8 box] could get
        [layout_int]. If we add mutability tracking (depending on when

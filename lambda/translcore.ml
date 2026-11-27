@@ -653,6 +653,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         List.map (fun (l, e, s) ->
             (l, e, Jkind.Sort.default_for_transl_and_get s)) el
       in
+      (* CR zeisbach: component layouts lack the addressability the tuple's
+         sort gives them *)
       let shape = List.map (fun (_, e, s) -> layout_exp s e) el in
       let ll = List.map (fun (_, e, s) ->
         let layout = layout_exp s e in
@@ -999,12 +1001,16 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              is good enough *)
           layout_of_sort l.lbl_loc sort
       in
+      (* CR zeisbach: field layouts lack the addressability the record's sort
+         gives them *)
       let layouts = Array.map lbl_layout lbl.lbl_all |> Array.to_list in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let arg_layout = layout_exp arg_sort arg in
       let targ = transl_exp ~scopes arg_layout arg in
       if Array.length lbl.lbl_all == 1 then
         (* erase singleton unboxed records before lambda *)
+        (* CR zeisbach: [targ] has layout [Paddressable l] but the field has
+           layout [l] *)
         targ
       else
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
@@ -2835,6 +2841,8 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
            init_expr, layout_exp init_expr_sort init_expr)
         opt_init_expr
     in
+    (* CR zeisbach: field layouts lack the addressability the record's sort
+       gives them *)
     let shape =
       Array.map
         (fun (lbl, lbl_sort, definition) ->
@@ -2867,6 +2875,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
         fields
       |> Array.to_list
     in
+    (* CR zeisbach: [l] has the field's layout, not [Paddressable] of it *)
     let lam = match ll with
       | [l] -> l (* erase singleton unboxed records before lambda *)
       | _ -> Lprim(Pmake_unboxed_product shape, ll, of_location ~scopes loc)

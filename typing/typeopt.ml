@@ -1310,9 +1310,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
   | Addressable const ->
-    (* CR box: This may have to be updated once addressability affects boxed
-       representations *)
-    layout_of_const_sort_generic ~value_kind ~error const
+    Lambda.Paddressable (layout_of_const_sort_generic ~value_kind ~error const)
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
       | Product _) as const) ->

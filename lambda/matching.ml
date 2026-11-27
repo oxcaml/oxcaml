@@ -2561,6 +2561,8 @@ let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
     ) shape
   in
   let read, binding_kind =
+    (* CR zeisbach: for unboxed tuples, component layouts lack the
+       addressability the tuple's sort gives them *)
     let layouts = List.map (fun (_, layout) -> layout) shape in
     if is_unboxed
     then (fun pos -> Punboxed_product_field (pos, layouts)), Alias
@@ -2714,6 +2716,8 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
     | _ ->
       assert false
   in
+  (* CR zeisbach: field layouts lack the addressability the record's sort
+     gives them *)
   let lbl_layouts =
     Array.map (fun lbl ->
       Typeopt.layout_of_sort lbl.lbl_loc
@@ -2727,6 +2731,8 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
       rem
     else
       let lbl = all_labels.(pos) in
+      (* CR zeisbach: for singletons, [arg] has layout [Paddressable l] but
+         the field has layout [l] *)
       let access = if Array.length all_labels = 1 then
         arg (* erase singleton unboxed records before lambda *)
       else
