@@ -437,6 +437,11 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
 let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
     (program : Lambda.program) : Optcomp_intf.jsir_program =
   let run () =
+    (* The JSIR translation does not support classic mode, so -Oclassic is
+       ignored: the unit is compiled as if no optimisation flag was given. *)
+    (match !Oxcaml_flags.opt_level with
+    | Set Oclassic -> Oxcaml_flags.reset_opt_level ()
+    | Default | Set (O2 | O3 | O4) -> ());
     let { flambda; all_code; offsets; reachable_names } =
       lambda_to_flambda ~ppf_dump ~prefixname
         ~machine_width:(Flambda2_to_jsir.To_jsir_target.machine_width ())
