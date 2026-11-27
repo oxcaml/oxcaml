@@ -85,7 +85,7 @@ typedef enum { EV_RUNTIME, EV_USER } ev_category;
 
 /* These store state for the current ring buffers open for writing */
 static struct runtime_events_metadata_header *current_metadata = NULL;
-static int current_ring_total_size;
+static size_t current_ring_total_size;
 static char_os *runtime_events_path;
 static char_os *current_ring_loc = NULL;
 
@@ -94,9 +94,9 @@ static HANDLE ring_file_handle;
 static HANDLE ring_handle;
 #endif
 
-/* This comes from OCAMLRUNPARAMs and is initialised in
-   caml_runtime_events_init */
-static int ring_size_words;
+/* This comes from OCAMLRUNPARAMs and is initialised when the ring buffers
+   are created */
+static uint64_t ring_size_words;
 
 /* This is set if the OCAML_RUNTIME_EVENTS_PRESERVE environment
   variable is present and determines whether the ring buffer is
@@ -139,8 +139,6 @@ void caml_runtime_events_init(void) {
     /* caml_secure_getenv's return shouldn't be cached */
     runtime_events_path = caml_stat_strdup_os(runtime_events_path);
   }
-
-  ring_size_words = 1 << caml_params->runtime_events_log_wsize;
 
   preserve_ring =
             caml_secure_getenv(T("OCAML_RUNTIME_EVENTS_PRESERVE")) ? 1 : 0;
@@ -235,7 +233,10 @@ void caml_runtime_events_destroy(void) {
 static void runtime_events_create_from_stw_single(void) {
   /* Don't initialise runtime_events twice */
   if (!atomic_load_acquire(&runtime_events_enabled)) {
-    int ring_headers_length, ring_data_length;
+    uintnat max_domains = caml_params->max_domains;
+    uintnat log_wsize = caml_params->runtime_events_log_wsize;
+    uintnat ring_size_bytes, ring_headers_length, ring_data_length;
+    uintnat total_size;
 #ifdef _WIN32
     DWORD pid = GetCurrentProcessId();
 #else
@@ -253,12 +254,29 @@ static void runtime_events_create_from_stw_single(void) {
                   T("%ld.events"), pid);
     }
 
-    current_ring_total_size =
-        RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
-          sizeof(struct runtime_events_custom_event) +
-        caml_params->max_domains * (ring_size_words * sizeof(uint64_t) +
-                        sizeof(struct runtime_events_buffer_header)) +
-        sizeof(struct runtime_events_metadata_header);
+    /* The file is mapped whole, so its size must be a valid object size,
+       which also makes it fit the offset type of the file. */
+    ring_headers_length =
+        max_domains * sizeof(struct runtime_events_buffer_header);
+    if (log_wsize >= CHAR_BIT * sizeof(uintnat)
+        || caml_umul_overflow((uintnat)1 << log_wsize, sizeof(uint64_t),
+                              &ring_size_bytes)
+        || caml_umul_overflow(max_domains, ring_size_bytes,
+                              &ring_data_length)
+        || caml_uadd_overflow(ring_data_length,
+                              sizeof(struct runtime_events_metadata_header) +
+                              ring_headers_length +
+                              RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
+                                sizeof(struct runtime_events_custom_event),
+                              &total_size)
+        || total_size > PTRDIFF_MAX) {
+      caml_fatal_error("Ring buffers too large: OCAMLRUNPARAM "
+                       "e=%" ARCH_INTNAT_PRINTF_FORMAT "u, "
+                       "d=%" ARCH_INTNAT_PRINTF_FORMAT "u",
+                       log_wsize, max_domains);
+    }
+    ring_size_words = (uint64_t)1 << log_wsize;
+    current_ring_total_size = total_size;
 
 #ifdef _WIN32
     ring_file_handle = CreateFile(
@@ -286,8 +304,8 @@ static void runtime_events_create_from_stw_single(void) {
       ring_file_handle,
       NULL,
       PAGE_READWRITE,
-      0,
-      current_ring_total_size,
+      (DWORD)((uint64_t)current_ring_total_size >> 32),
+      (DWORD)current_ring_total_size,
       NULL
     );
 
@@ -318,7 +336,9 @@ static void runtime_events_create_from_stw_single(void) {
     ret = ftruncate(ring_fd, current_ring_total_size);
 
     if (ret < 0) {
-      caml_fatal_error("Can't resize ring buffer");
+      caml_fatal_error("Can't resize ring buffer to %"
+                       ARCH_SIZET_PRINTF_FORMAT "u bytes",
+                       current_ring_total_size);
     }
 
     /* This cast is necessary for compatibility with Illumos' non-POSIX
@@ -327,23 +347,20 @@ static void runtime_events_create_from_stw_single(void) {
                         mmap(NULL, current_ring_total_size,
                             PROT_READ | PROT_WRITE, MAP_SHARED, ring_fd, 0);
 
-    if (current_metadata == NULL) {
-      caml_fatal_error("Unable to mmap ring buffer");
+    if (current_metadata == MAP_FAILED) {
+      unlink(current_ring_loc);
+      caml_fatal_error("Unable to mmap ring buffer of %"
+                       ARCH_SIZET_PRINTF_FORMAT "u bytes",
+                       current_ring_total_size);
     }
 
     close(ring_fd);
 #endif
-    ring_headers_length =
-        caml_params->max_domains * sizeof(struct runtime_events_buffer_header);
-    ring_data_length =
-        caml_params->max_domains * ring_size_words * sizeof(uint64_t);
-
     current_metadata->version = RUNTIME_EVENTS_VERSION;
-    current_metadata->max_domains = caml_params->max_domains;
+    current_metadata->max_domains = max_domains;
     current_metadata->ring_header_size_bytes =
         sizeof(struct runtime_events_buffer_header);
-    current_metadata->ring_size_bytes =
-        ring_size_words * sizeof(uint64_t);
+    current_metadata->ring_size_bytes = ring_size_bytes;
     current_metadata->ring_size_elements = ring_size_words;
     current_metadata->headers_offset =
         sizeof(struct runtime_events_metadata_header);
@@ -510,6 +527,39 @@ static struct runtime_events_buffer_header *get_ring_buffer_by_domain_id
                                 current_metadata->ring_header_size_bytes);
 }
 
+/* Advance the head of a ring over its oldest events, until [length] words
+   can be written at [ring_tail]. [length] must be less than the size of the
+   ring. Returns the new head. */
+static uint64_t make_room_in_ring(
+  struct runtime_events_buffer_header *domain_ring_header,
+  const uint64_t *ring_ptr, uint64_t ring_mask, uint64_t ring_head,
+  uint64_t ring_tail, uint64_t length) {
+  int head_advanced = 0;
+  while ((ring_tail + length) - ring_head >= ring_size_words) {
+    /* The write would over-write some old bit of data. Need to advance the
+      head. */
+    uint64_t head_header = ring_ptr[ring_head & ring_mask];
+
+    ring_head += RUNTIME_EVENTS_ITEM_LENGTH(head_header);
+
+    // advance the ring head
+    atomic_store_release(&domain_ring_header->ring_head, ring_head);
+    head_advanced = 1;
+  }
+
+  if (head_advanced) {
+    /* The head advance must become visible before the stores that overwrite
+       the slots it released. atomic_store_release orders accesses before the
+       store, not after it, so without this fence a consumer can observe the
+       overwriting stores while the old ring_head is still visible. It then
+       reads overwritten data and cannot tell, because the head it re-reads
+       says the slot was never released. */
+    atomic_thread_fence(memory_order_release);
+  }
+
+  return ring_head;
+}
+
 static void write_to_ring(ev_category category, ev_message_type type,
                           int event_id, int event_length, uint64_t *content,
                           int word_offset) {
@@ -540,10 +590,6 @@ static void write_to_ring(ev_category category, ev_message_type type,
   /* we avoid writing events that straddle the end of the ring buffer */
   uint64_t ring_distance_to_end =
       current_metadata->ring_size_elements - ring_tail_offset;
-  /* when we might write an event that is bigger than the physical size
-    remaining we add a padding event instead and then write the actual
-    event to the start of the ring buffer */
-  uint64_t padding_required = 0;
 
   uint64_t timestamp = caml_time_counter();
 
@@ -553,37 +599,19 @@ static void write_to_ring(ev_category category, ev_message_type type,
   CAMLassert(
     !(category == EV_RUNTIME && type.runtime == EV_INTERNAL && event_id == 0));
 
-  /* work out if padding is required */
+  /* An event at least as long as the ring can never be written. */
+  if (length_with_header_ts >= ring_size_words) {
+    return;
+  }
+
+  /* when we might write an event that is bigger than the physical size
+    remaining we add a padding event instead and then write the actual
+    event to the start of the ring buffer. The padding is written first, so
+    that making room for the event can release it again. */
   if (ring_distance_to_end < length_with_header_ts) {
-    padding_required = ring_distance_to_end;
-  }
+    ring_head = make_room_in_ring(domain_ring_header, ring_ptr, ring_mask,
+                                  ring_head, ring_tail, ring_distance_to_end);
 
-  /* First we check if a write would take us over the head */
-  int head_advanced = 0;
-  while ((ring_tail + length_with_header_ts + padding_required) - ring_head >=
-         ring_size_words) {
-    /* The write would over-write some old bit of data. Need to advance the
-      head. */
-    uint64_t head_header = ring_ptr[ring_head & ring_mask];
-
-    ring_head += RUNTIME_EVENTS_ITEM_LENGTH(head_header);
-
-    // advance the ring head
-    atomic_store_release(&domain_ring_header->ring_head, ring_head);
-    head_advanced = 1;
-  }
-
-  if (head_advanced) {
-    /* The head advance must become visible before the stores that overwrite
-       the slots it released. atomic_store_release orders accesses before the
-       store, not after it, so without this fence a consumer can observe the
-       overwriting stores while the old ring_head is still visible. It then
-       reads overwritten data and cannot tell, because the head it re-reads
-       says the slot was never released. */
-    atomic_thread_fence(memory_order_release);
-  }
-
-  if (padding_required > 0) {
     ring_ptr[ring_tail_offset] =
         (ring_distance_to_end
          << 54); /* Padding header with size ring_distance_to_end
@@ -596,6 +624,9 @@ static void write_to_ring(ev_category category, ev_message_type type,
 
     ring_tail_offset = 0;
   }
+
+  make_room_in_ring(domain_ring_header, ring_ptr, ring_mask, ring_head,
+                    ring_tail, length_with_header_ts);
 
   /* Below we write the header. See runtime_events.h for the layout structure
      of event headers.
