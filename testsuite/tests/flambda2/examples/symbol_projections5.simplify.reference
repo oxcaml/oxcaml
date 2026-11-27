@@ -6,7 +6,7 @@ let $camlSymbol_projections5__immstring_0 = "FOO" in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k2 push(k1)
    where k2 =
-     (apply ccall
+     (apply ccall &toplevel
         ($`*extern*`.caml_sys_getenv : val -> val)
           ($camlSymbol_projections5__immstring_0)
           -> k3 * k1

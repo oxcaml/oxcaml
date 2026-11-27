@@ -44,6 +44,13 @@ module Extension : sig
     | AES
     | AVX512_BF16
     | VPCLMULQDQ
+    | AVX512_VBMI
+    | AVX512_VBMI2
+    | VAES
+    | AVX512_BITALG
+    | AVX512_VPOPCNTDQ
+    | AVX512_IFMA
+    | GFNI
 
   val name : t -> string
 

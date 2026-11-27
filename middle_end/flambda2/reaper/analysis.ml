@@ -278,6 +278,36 @@ let get_changed_representation (solution : _ Solution.t) cn =
 let has_use (solution : _ Solution.t) v =
   Code_id_or_name.Map.mem v solution.has_usage
 
+type decision =
+  | Keep
+  | Delete
+  | Unbox of Unboxing_analysis.unboxed
+
+let get_decision solution name =
+  let is_used =
+    Name.pattern_match name
+      ~symbol:(fun _ -> has_use solution (Code_id_or_name.name name))
+      ~var:(fun var ->
+        match Variable.kind var with
+        (* CR ncourant: we should probably properly track regions *)
+        | Region | Rec_info -> true
+        | Value | Naked_number _ -> has_use solution (Code_id_or_name.name name))
+  in
+  (* CR bclement: it would be nice to handle fixed arity continuations here as
+     well *)
+  if not is_used
+  then Delete
+  else
+    match get_unboxed_fields solution (Code_id_or_name.name name) with
+    | Some fields -> Unbox fields
+    | None -> Keep
+
+let code_id_has_use (solution : _ Solution.t) code_id =
+  (* code_ids from outside the analysis scope can have been used arbitrarily
+     outside the scope *)
+  has_use solution (Code_id_or_name.code_id code_id)
+  || not (Analysis_scope.contains_code_id solution.analysis_scope code_id)
+
 let field_used (solution : _ Solution.t) v f =
   match
     Code_id_or_name.Map.find_opt v solution.field_of_constructor_is_used

@@ -1,10 +1,14 @@
 All-float# record
-1.0 2.0
-3.0 4.0
+allocate, read using idx: 1.0 2.0
+write using idx, read using record: 3.0 4.0
+write using record, read using idx: 5.0 6.0
+write using idx, read using idx: 7.0 8.0
 float# array
-1.0
-2.0
-3.0
+allocate literal, read using idx: 1.0 2.0 3.0
+allocate dynamically, read using idx: 4.0 4.0 4.0
+write using idx, read using array: 5.0 6.0 7.0
+write using array, read using idx: 8.0 9.0 10.0
+write using idx, read using idx: 11.0 12.0 13.0
 Mixed record
 foo 1.0
 foo 2.0

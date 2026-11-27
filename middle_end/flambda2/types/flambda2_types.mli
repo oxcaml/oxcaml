@@ -808,6 +808,8 @@ val prove_unique_fully_constructed_immutable_heap_block :
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
 
+val prove_is_null : Typing_env.t -> t -> bool proof_of_property
+
 (* Either a tagged integer or a null poitner. *)
 val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
 
@@ -1065,6 +1067,8 @@ module Rewriter : sig
     val unknown : Flambda_kind.t -> 'a t
 
     val tag_immediate : 'a t -> 'a t
+
+    val nullable : 'a t -> 'a t
 
     val immutable_block :
       is_unique:bool ->

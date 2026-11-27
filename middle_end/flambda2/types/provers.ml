@@ -232,8 +232,6 @@ let prove_is_null_generic env t : _ generic_proof =
 
 let prove_is_null env t = as_property (prove_is_null_generic env t)
 
-let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
-
 let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
     =
   let machine_width = TE.machine_width env in

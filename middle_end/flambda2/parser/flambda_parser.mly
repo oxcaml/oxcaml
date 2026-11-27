@@ -161,12 +161,14 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_MASK [@symbol "mask"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
+%token KWD_NEEDED_BY_PHANTOM_LET [@symbol "needed_by_phantom_let"]
 %token KWD_NEVER  [@symbol "never"]
 %token KWD_NEWER_VERSION_OF [@symbol "newer_version_of"]
 %token KWD_NOALLOC [@symbol "noalloc"]
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
+%token KWD_PHANTOM [@symbol "phantom"]
 %token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PRODUCT   [@symbol "product"]
@@ -582,7 +584,8 @@ atomic_expr:
 ;
 
 let_(body):
-  | bindings = separated_nonempty_list(KWD_AND, let_binding);
+  | is_phantom = boption(KWD_PHANTOM);
+    bindings = separated_nonempty_list(KWD_AND, let_binding);
 (*  CR lwhite: I think this closure elements stuff is a bit of a hangover from
     when closures definitions contained the code as well. I imagine the closures
     used to look like:
@@ -605,12 +608,13 @@ let_(body):
  *)
     value_slots = with_value_slots_opt;
     KWD_IN body = body;
-    { ({ bindings; value_slots; body } : let_) }
+    { ({ bindings; value_slots; body; is_phantom } : let_) }
 ;
 
 let_binding:
-  | var = variable EQUAL defining_expr = named
-    { { var; defining_expr } }
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
+    var = variable EQUAL defining_expr = named
+    { { var; defining_expr; needed_by_phantom_let } }
 ;
 
 with_value_slots_opt:
@@ -674,16 +678,12 @@ call_kind:
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC);
-    fat_ptr_arg_starts = loption(fat_ptr_arg_starts); AMP;
-    alloc_region = region
-    { (C_call { alloc = not noalloc; fat_ptr_arg_starts },
-      (Not_alloc_stack { alloc_region }
-        : region alloc_mode_for_applications)) }
+    fat_ptr_arg_starts = loption(fat_ptr_arg_starts);
+    alloc = alloc_mode_for_applications
+    { (C_call { alloc = not noalloc; fat_ptr_arg_starts }, alloc) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
-      AMP; alloc_region = region
-    { (Method { kind; obj },
-        (Not_alloc_stack { alloc_region }
-          : region alloc_mode_for_applications)) }
+      alloc = alloc_mode_for_applications
+    { (Method { kind; obj }, alloc) }
 ;
 
 inline:
@@ -922,7 +922,9 @@ field_of_block:
 ;
 
 kinded_variable:
-  | param = variable; kind = kind_with_subkind_opt { { param; kind } }
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
+    param = variable; kind = kind_with_subkind_opt
+    { { param; kind; needed_by_phantom_let } }
 ;
 
 kind_with_subkind_opt:

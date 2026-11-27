@@ -654,9 +654,8 @@ let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
-  (* The [add_int_addr] case is only used for string access, and it seems
-     unlikely that the more complicated optimizations done for [add_int] will
-     apply.
+  (* It seems unlikely that the more complicated optimizations done for
+     [add_int] will apply in the [add_int_addr] case.
 
      For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
   if ptr_out_of_heap

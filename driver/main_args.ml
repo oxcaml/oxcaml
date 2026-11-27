@@ -666,8 +666,9 @@ let mk_dprofile f =
 let mk_dprofile_level f =
   "-dprofile-level", Arg.Int f,
   "<n>  Set the level of detail of -dprofile, -dtimings and -dcounters: \
-   0 disables them, 1 records the main passes (default), 2 also records the \
-   passes run for each function or continuation"
+   0 disables them, 1 records the main passes, 2 also records the passes \
+   run for each function or continuation. By default, all passes are \
+   recorded"
 
 let mk_dgranularity f =
   "-dgranularity",

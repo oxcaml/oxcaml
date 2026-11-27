@@ -549,6 +549,7 @@ type 'a expr =
   | Identity of 'a
   | Unknown of K.With_subkind.t
   | Tag_imm of 'a expr
+  | Nullable of 'a expr
   | Block of
       { is_unique : bool;
         tag : Tag.t;
@@ -575,6 +576,8 @@ module Expr = struct
       Format.fprintf ppf "@[<hv 1>(unknown@ %a)@]" K.With_subkind.print kind
     | Tag_imm expr ->
       Format.fprintf ppf "@[<hv 1>(tag_imm@ %a)@]" (print pp) expr
+    | Nullable expr ->
+      Format.fprintf ppf "@[<hv 1>(nullable@ %a)@]" (print pp) expr
     | Block _ -> Format.fprintf ppf "@[<hv 1>(block)@]"
     | Closure
         { exact = true;
@@ -638,6 +641,8 @@ module Expr = struct
   let unknown_with_subkind kind = Unknown kind
 
   let tag_immediate naked = Tag_imm naked
+
+  let nullable value = Nullable value
 
   let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
     Block { is_unique; tag; shape; alloc_mode; fields }
@@ -851,6 +856,7 @@ struct
     | Unknown kind -> MTC.unknown_with_subkind ~machine_width kind
     | Tag_imm field ->
       TG.tag_immediate (rewrite_expr ~machine_width sigma field)
+    | Nullable field -> TG.nullable (rewrite_expr ~machine_width sigma field)
     | Block { is_unique; tag; shape; alloc_mode; fields } ->
       let fields = List.map (rewrite_expr ~machine_width sigma) fields in
       MTC.immutable_block ~machine_width ~is_unique tag ~shape alloc_mode
