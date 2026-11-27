@@ -292,7 +292,9 @@ let set_debug () =
   | None | Some _ -> Globals.debug := false
 
 let need_symbol sym =
-  match Symbols.find !Globals.symbols sym with
+  (* The symbols of the phrases loaded so far are recorded under their
+     assembly names. *)
+  match Symbols.find !Globals.symbols (symbol_prefix () ^ sym) with
   | Some _ -> false
   | None -> not (ndl_existssym sym)
 
