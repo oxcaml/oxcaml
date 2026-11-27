@@ -69,6 +69,8 @@ let show_timings = ref false
 
 let run_ocamlrunparam = ref ""
 
+let tool_ocamlrunparam = ref ""
+
 let translate = ref false
 let style = ref Translate.Plain
 let compact = ref false
@@ -121,6 +123,9 @@ let commandline_options =
    " Exit 0 even if a test fails (as long as it runs)");
   ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
    "<params> Append <params> to OCAMLRUNPARAM when running test programs.");
+  ("-tool-ocamlrunparam", Arg.Set_string tool_ocamlrunparam,
+   "<params> Append <params> to OCAMLRUNPARAM when running the compilers \
+    and other tools.");
   ("-translate", Arg.Set translate,
    " Translate the test script from old to new syntax");
   ("-compact", Arg.Set compact,
@@ -159,6 +164,7 @@ let keep_test_dir_on_success = !keep_test_dir_on_success
 let exit_0_on_failure = !exit_0_on_failure
 let show_timings = !show_timings
 let run_ocamlrunparam = !run_ocamlrunparam
+let tool_ocamlrunparam = !tool_ocamlrunparam
 let translate = !translate
 let style = !style
 let compact = !compact

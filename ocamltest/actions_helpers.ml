@@ -135,8 +135,17 @@ let setup_simple_build_env add_testfile additional_files log env =
     (test_build_directory_prefix env) env in
   setup_build_env add_testfile additional_files log build_env
 
+let append_ocamlrunparam extra env =
+  if extra = "" then env
+  else begin
+    let existing = Environments.safe_lookup Ocaml_variables.ocamlrunparam env in
+    let value = if existing = "" then extra else existing ^ "," ^ extra in
+    Environments.add Ocaml_variables.ocamlrunparam value env
+  end
+
 let run_cmd
     ~full_environment
+    ~ocamlrunparam
     ?(environment=[||])
     ?(stdin_variable=Builtin_variables.stdin)
     ?(stdout_variable=Builtin_variables.stdout)
@@ -147,6 +156,7 @@ let run_cmd
     ~what
     log env original_cmd
   =
+  let env = append_ocamlrunparam ocamlrunparam env in
   let log_redirection std filename =
     if filename<>"" then
     begin
@@ -275,26 +285,19 @@ let run
       exit_status_of_variable env Builtin_variables.exit_status, Result.pass
     in
     let exits = Option.value exits ~default:[expected_exit_status] in
-    run_cmd ~full_environment ?stdout_variable ?stderr_variable
-      ~exits ~what log env commandline, env
+    run_cmd ~full_environment ~ocamlrunparam:"" ?stdout_variable
+      ?stderr_variable ~exits ~what log env commandline, env
 
-let run_cmd = run_cmd ~full_environment:false
+(* The compilers and other tools get the OCAMLRUNPARAM components given by
+   -tool-ocamlrunparam; test programs and scripts, run by [run], don't. *)
+let run_cmd =
+  run_cmd ~full_environment:false ~ocamlrunparam:Options.tool_ocamlrunparam
 
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
    the compilers and other tools run without them. *)
 let run_program' interpreter log env =
-  let env =
-    if Options.run_ocamlrunparam = "" then env
-    else begin
-      let existing =
-        Environments.safe_lookup Ocaml_variables.ocamlrunparam env in
-      let value =
-        if existing = "" then Options.run_ocamlrunparam
-        else existing ^ "," ^ Options.run_ocamlrunparam in
-      Environments.add Ocaml_variables.ocamlrunparam value env
-    end
-  in
+  let env = append_ocamlrunparam Options.run_ocamlrunparam env in
   run
     ~full_environment:false
     ?interpreter

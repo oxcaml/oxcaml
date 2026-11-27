@@ -126,13 +126,23 @@ else
   OCAMLTEST_RUNPARAM_FLAG = -run-ocamlrunparam '$(RUNPARAM)'
 endif
 
+# TOOL_RUNPARAM likewise passes extra OCAMLRUNPARAM components to the
+# compilers and other tools, not to the test programs.
+TOOL_RUNPARAM ?=
+ifeq "$(TOOL_RUNPARAM)" ""
+  OCAMLTEST_TOOL_RUNPARAM_FLAG =
+else
+  OCAMLTEST_TOOL_RUNPARAM_FLAG = -tool-ocamlrunparam '$(TOOL_RUNPARAM)'
+endif
+
 OCAMLTESTFLAGS = \
   -exit-0-on-failure \
   -timeout $(TIMEOUT) \
   $(OCAMLTEST_PROMOTE_FLAG) \
   $(OCAMLTEST_KEEP_TEST_DIR_ON_SUCCESS_FLAG) \
   $(OCAMLTEST_SHOW_TIMINGS_FLAG) \
-  $(OCAMLTEST_RUNPARAM_FLAG)
+  $(OCAMLTEST_RUNPARAM_FLAG) \
+  $(OCAMLTEST_TOOL_RUNPARAM_FLAG)
 
 # Make sure USE_RUNTIME is defined
 USE_RUNTIME ?=

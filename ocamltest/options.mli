@@ -39,6 +39,8 @@ val show_timings : bool
 
 val run_ocamlrunparam : string
 
+val tool_ocamlrunparam : string
+
 val translate : bool
 val style : Translate.style
 val compact : bool
