@@ -527,6 +527,39 @@ static struct runtime_events_buffer_header *get_ring_buffer_by_domain_id
                                 current_metadata->ring_header_size_bytes);
 }
 
+/* Advance the head of a ring over its oldest events, until [length] words
+   can be written at [ring_tail]. [length] must be less than the size of the
+   ring. Returns the new head. */
+static uint64_t make_room_in_ring(
+  struct runtime_events_buffer_header *domain_ring_header,
+  const uint64_t *ring_ptr, uint64_t ring_mask, uint64_t ring_head,
+  uint64_t ring_tail, uint64_t length) {
+  int head_advanced = 0;
+  while ((ring_tail + length) - ring_head >= ring_size_words) {
+    /* The write would over-write some old bit of data. Need to advance the
+      head. */
+    uint64_t head_header = ring_ptr[ring_head & ring_mask];
+
+    ring_head += RUNTIME_EVENTS_ITEM_LENGTH(head_header);
+
+    // advance the ring head
+    atomic_store_release(&domain_ring_header->ring_head, ring_head);
+    head_advanced = 1;
+  }
+
+  if (head_advanced) {
+    /* The head advance must become visible before the stores that overwrite
+       the slots it released. atomic_store_release orders accesses before the
+       store, not after it, so without this fence a consumer can observe the
+       overwriting stores while the old ring_head is still visible. It then
+       reads overwritten data and cannot tell, because the head it re-reads
+       says the slot was never released. */
+    atomic_thread_fence(memory_order_release);
+  }
+
+  return ring_head;
+}
+
 static void write_to_ring(ev_category category, ev_message_type type,
                           int event_id, int event_length, uint64_t *content,
                           int word_offset) {
@@ -557,10 +590,6 @@ static void write_to_ring(ev_category category, ev_message_type type,
   /* we avoid writing events that straddle the end of the ring buffer */
   uint64_t ring_distance_to_end =
       current_metadata->ring_size_elements - ring_tail_offset;
-  /* when we might write an event that is bigger than the physical size
-    remaining we add a padding event instead and then write the actual
-    event to the start of the ring buffer */
-  uint64_t padding_required = 0;
 
   uint64_t timestamp = caml_time_counter();
 
@@ -570,37 +599,19 @@ static void write_to_ring(ev_category category, ev_message_type type,
   CAMLassert(
     !(category == EV_RUNTIME && type.runtime == EV_INTERNAL && event_id == 0));
 
-  /* work out if padding is required */
+  /* An event at least as long as the ring can never be written. */
+  if (length_with_header_ts >= ring_size_words) {
+    return;
+  }
+
+  /* when we might write an event that is bigger than the physical size
+    remaining we add a padding event instead and then write the actual
+    event to the start of the ring buffer. The padding is written first, so
+    that making room for the event can release it again. */
   if (ring_distance_to_end < length_with_header_ts) {
-    padding_required = ring_distance_to_end;
-  }
+    ring_head = make_room_in_ring(domain_ring_header, ring_ptr, ring_mask,
+                                  ring_head, ring_tail, ring_distance_to_end);
 
-  /* First we check if a write would take us over the head */
-  int head_advanced = 0;
-  while ((ring_tail + length_with_header_ts + padding_required) - ring_head >=
-         ring_size_words) {
-    /* The write would over-write some old bit of data. Need to advance the
-      head. */
-    uint64_t head_header = ring_ptr[ring_head & ring_mask];
-
-    ring_head += RUNTIME_EVENTS_ITEM_LENGTH(head_header);
-
-    // advance the ring head
-    atomic_store_release(&domain_ring_header->ring_head, ring_head);
-    head_advanced = 1;
-  }
-
-  if (head_advanced) {
-    /* The head advance must become visible before the stores that overwrite
-       the slots it released. atomic_store_release orders accesses before the
-       store, not after it, so without this fence a consumer can observe the
-       overwriting stores while the old ring_head is still visible. It then
-       reads overwritten data and cannot tell, because the head it re-reads
-       says the slot was never released. */
-    atomic_thread_fence(memory_order_release);
-  }
-
-  if (padding_required > 0) {
     ring_ptr[ring_tail_offset] =
         (ring_distance_to_end
          << 54); /* Padding header with size ring_distance_to_end
@@ -613,6 +624,9 @@ static void write_to_ring(ev_category category, ev_message_type type,
 
     ring_tail_offset = 0;
   }
+
+  make_room_in_ring(domain_ring_header, ring_ptr, ring_mask, ring_head,
+                    ring_tail, length_with_header_ts);
 
   /* Below we write the header. See runtime_events.h for the layout structure
      of event headers.
