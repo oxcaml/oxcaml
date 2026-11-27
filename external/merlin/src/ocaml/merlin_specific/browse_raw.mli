@@ -91,7 +91,7 @@ type node =
   | Open_declaration of open_declaration
   | Method_call of expression * meth * Location.t
   | Record_field :
-      [ `Expression of expression | `Pattern of pattern ]
+      [ `Expression of expression | `Pattern of pattern | `Block_index ]
       * 'rep Data_types.gen_label_description
       * 'rep Data_types.record_form
       * Longident.t Location.loc
