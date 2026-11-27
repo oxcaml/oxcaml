@@ -104,7 +104,12 @@ let main filename =
        ) genfns_partitions;
        (* Sorted, as the order of the hash table can vary. *)
        let objects = List.sort String.compare !objects in
-       ignore (Ccomp.create_archive file_prefix objects : int))
+       Ccomp.create_archive file_prefix objects)
+  |> function
+  | 0 -> ()
+  | status ->
+    Printf.eprintf "Error while creating the archive %s\n" file_prefix;
+    exit status
 
 let arg_usage =
   Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
