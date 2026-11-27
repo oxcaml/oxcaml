@@ -4,7 +4,7 @@
  set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
  ocamlrunparam += ",c=1";
  hasunix;
- not target-windows;
+ not-target-windows;
  {
    bytecode;
  }{

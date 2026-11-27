@@ -915,7 +915,7 @@ CAMLexport void caml_reset_domain_lock(void)
        and child. */
   caml_plat_mutex_init(&self->backup_thread_lock);
   caml_plat_cond_init(&self->backup_thread_cond);
-  caml_plat_mutex_init(&self->default_domain_lock);
+  caml_plat_mutex_reinit(&self->default_domain_lock);
 
   return;
 }
@@ -2718,7 +2718,7 @@ void caml_domain_terminate(bool last)
          [fresh_domain_unique_id] gives [unique_id] 0. The main domain is
          not created by [domain_thread_func], so it emits no
          [EV_DOMAIN_SPAWN] and needs no closing [EV_DOMAIN_TERMINATE]. */
-      CAMLassert(domain_self->interruptor.unique_id == 0);
+      CAMLassert(domain_self->unique_id == 0);
       break;
     }
 
@@ -2770,8 +2770,9 @@ void caml_domain_terminate(bool last)
        have finished emitting, and this domain is still a STW participant,
        which [caml_runtime_events_destroy] requires in order to run its own
        STW section. The domain is still a participant because the [last]
-       branch of the loop breaks out above, before [stop_active_domain]. */
-    CAMLassert(s->running);
+       branch of the loop breaks out above, before
+       [remove_from_stw_domains]. */
+    CAMLassert(domain_self->running);
     CAML_RUNTIME_EVENTS_DESTROY();
   } else {
     caml_assert_shared_heap_is_empty(domain_state->shared_heap);
