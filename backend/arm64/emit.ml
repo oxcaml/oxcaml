@@ -871,11 +871,13 @@ let emit_stack_realloc env =
   | None -> ()
   | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
     D.define_label sc_label;
-    (* Pass the desired frame size on the stack, since all of the
-       argument-passing registers may be in use. The frame size can exceed the
-       16-bit immediate of a single MOVZ, so use [emit_intconst] which
-       decomposes it into MOVZ/MOVK fragments as needed. *)
-    emit_intconst reg_x_tmp1 (Nativeint.of_int sc_max_frame_size_in_bytes);
+    (* Pass the desired stack space, measured in words, on the stack, since all
+       of the argument-passing registers may be in use. It can exceed the 16-bit
+       immediate of a single MOVZ, so use [emit_intconst] which decomposes it
+       into MOVZ/MOVK fragments as needed. *)
+    emit_intconst reg_x_tmp1
+      (Nativeint.of_int
+         (Config.stack_threshold + (sc_max_frame_size_in_bytes / 8)));
     A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
     A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
     A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
