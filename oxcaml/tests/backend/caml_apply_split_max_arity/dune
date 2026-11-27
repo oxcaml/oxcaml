@@ -15,7 +15,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets t.output stack.output)
  (deps t.exe stack.exe)
  (action
@@ -31,7 +31,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (action
   (progn
    (diff t.expected t.output)

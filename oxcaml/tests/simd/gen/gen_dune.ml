@@ -1,8 +1,8 @@
-let enabled_if_main = {|(enabled_if (= %{context_name} "main"))|}
+let enabled_if_main = {|(enabled_if (<> %{context_name} "default"))|}
 
 let enabled_if_main_amd64_not_macos =
   {|(enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))|}
 

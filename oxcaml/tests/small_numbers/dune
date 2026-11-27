@@ -13,7 +13,7 @@
  (targets flags.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -24,7 +24,7 @@
  (targets flags.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -41,7 +41,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets float32_builtin.out float32_lib.out float32_u_lib.out)
  (deps float32_builtin.exe float32_lib.exe float32_u_lib.exe)
  (action
@@ -60,7 +60,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")))
+   (<> %{context_name} "default")))
  (action
   (progn
    (diff empty.expected float32_builtin.out)
@@ -104,7 +104,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets
   float32_builtin_bytecode.out
   float32_lib_bytecode.out
@@ -129,7 +129,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")))
+   (<> %{context_name} "default")))
  (action
   (progn
    (diff empty.expected float32_builtin_bytecode.out)
@@ -166,7 +166,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets
   float32_builtin_nodynlink.out
   float32_lib_nodynlink.out
@@ -191,7 +191,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")))
+   (<> %{context_name} "default")))
  (action
   (progn
    (diff empty.expected float32_builtin_nodynlink.out)
@@ -228,7 +228,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{system} macosx)))
  (targets
   float32_builtin_internal.out
@@ -254,7 +254,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action

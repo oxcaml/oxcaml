@@ -289,7 +289,7 @@
  (name int128)
  (modules int128)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -300,7 +300,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -311,7 +311,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -320,7 +320,7 @@
 (executable
  (name basic)
  (modules basic)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -328,7 +328,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic.out
@@ -336,14 +336,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic.out)))
 
 (executable
  (name basic_u)
  (modules basic_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -351,7 +351,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic_u.out
@@ -359,14 +359,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic_u.out)))
 
 (executable
  (name basic256)
  (modules basic256)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -374,7 +374,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic256.out
@@ -382,14 +382,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic256.out)))
 
 (executable
  (name basic256_u)
  (modules basic256_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -397,7 +397,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic256_u.out
@@ -405,7 +405,7 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic256_u.out)))
 
@@ -413,7 +413,7 @@
  (name load_store)
  (modules load_store)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -424,7 +424,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -435,7 +435,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -444,7 +444,7 @@
 (executable
  (name let_mutable)
  (modules let_mutable)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -452,7 +452,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    let_mutable.out
@@ -460,14 +460,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected let_mutable.out)))
 
 (executable
  (name let_mutable_u)
  (modules let_mutable_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -475,7 +475,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    let_mutable_u.out
@@ -483,14 +483,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected let_mutable_u.out)))
 
 (executable
  (name mixed_modules)
  (modules mixed_modules)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -498,7 +498,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    mixed_modules.out
@@ -506,14 +506,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected mixed_modules.out)))
 
 (executable
  (name ops_float32x4)
  (modules ops_float32x4)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -521,7 +521,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float32x4.out
@@ -529,14 +529,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float32x4.out)))
 
 (executable
  (name ops_float32x4_u)
  (modules ops_float32x4_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -544,7 +544,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float32x4_u.out
@@ -552,14 +552,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float32x4_u.out)))
 
 (executable
  (name ops_float64x2)
  (modules ops_float64x2)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -567,7 +567,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float64x2.out
@@ -575,14 +575,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float64x2.out)))
 
 (executable
  (name ops_float64x2_u)
  (modules ops_float64x2_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -590,7 +590,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float64x2_u.out
@@ -598,14 +598,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float64x2_u.out)))
 
 (executable
  (name ops_int64x2)
  (modules ops_int64x2)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -613,7 +613,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int64x2.out
@@ -621,14 +621,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int64x2.out)))
 
 (executable
  (name ops_int64x2_u)
  (modules ops_int64x2_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -636,7 +636,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int64x2_u.out
@@ -644,14 +644,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int64x2_u.out)))
 
 (executable
  (name ops_int32x4)
  (modules ops_int32x4)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -659,7 +659,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int32x4.out
@@ -667,14 +667,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int32x4.out)))
 
 (executable
  (name ops_int32x4_u)
  (modules ops_int32x4_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -682,7 +682,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int32x4_u.out
@@ -690,14 +690,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int32x4_u.out)))
 
 (executable
  (name ops_int16x8)
  (modules ops_int16x8)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -705,7 +705,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int16x8.out
@@ -713,14 +713,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int16x8.out)))
 
 (executable
  (name ops_int16x8_u)
  (modules ops_int16x8_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -728,7 +728,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int16x8_u.out
@@ -736,14 +736,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int16x8_u.out)))
 
 (executable
  (name ops_int8x16)
  (modules ops_int8x16)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -751,7 +751,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int8x16.out
@@ -759,14 +759,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int8x16.out)))
 
 (executable
  (name ops_int8x16_u)
  (modules ops_int8x16_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -774,7 +774,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int8x16_u.out
@@ -782,14 +782,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int8x16_u.out)))
 
 (executable
  (name ops)
  (modules ops)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -797,7 +797,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops.out
@@ -805,14 +805,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops.out)))
 
 (executable
  (name ops_u)
  (modules ops_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -820,7 +820,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_u.out
@@ -828,7 +828,7 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_u.out)))
 
@@ -836,7 +836,7 @@
  (name ops256)
  (modules ops256)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -847,7 +847,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -858,7 +858,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -868,7 +868,7 @@
  (name ops256_u)
  (modules ops256_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -879,7 +879,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -890,7 +890,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -900,7 +900,7 @@
  (name int_ops)
  (modules int_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -911,7 +911,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -922,7 +922,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -932,7 +932,7 @@
  (name int_ops_u)
  (modules int_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -943,7 +943,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -954,7 +954,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -964,7 +964,7 @@
  (name sse_other_ops)
  (modules sse_other_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -975,7 +975,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -986,7 +986,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -996,7 +996,7 @@
  (name sse_other_ops_u)
  (modules sse_other_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1007,7 +1007,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1018,7 +1018,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1028,7 +1028,7 @@
  (name sse41_test_ops)
  (modules sse41_test_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1039,7 +1039,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1050,7 +1050,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1060,7 +1060,7 @@
  (name sse41_test_ops_u)
  (modules sse41_test_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1071,7 +1071,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1082,7 +1082,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1092,7 +1092,7 @@
  (name avx_test_ops)
  (modules avx_test_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1103,7 +1103,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1114,7 +1114,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1124,7 +1124,7 @@
  (name avx_test_ops_u)
  (modules avx_test_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1135,7 +1135,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1146,7 +1146,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1156,7 +1156,7 @@
  (name sse42_string_ops)
  (modules sse42_string_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1167,7 +1167,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1178,7 +1178,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1188,7 +1188,7 @@
  (name sse42_string_ops_u)
  (modules sse42_string_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1199,7 +1199,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1210,7 +1210,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1220,7 +1220,7 @@
  (name f16c_ops)
  (modules f16c_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1231,7 +1231,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1242,7 +1242,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1252,7 +1252,7 @@
  (name f16c_ops_u)
  (modules f16c_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1263,7 +1263,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1274,7 +1274,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1284,7 +1284,7 @@
  (name fma_ops)
  (modules fma_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1295,7 +1295,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1306,7 +1306,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1316,7 +1316,7 @@
  (name fma_ops_u)
  (modules fma_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1327,7 +1327,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1338,7 +1338,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1348,7 +1348,7 @@
  (name aes_ops)
  (modules aes_ops)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1359,7 +1359,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1370,7 +1370,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1380,7 +1380,7 @@
  (name aes_ops_u)
  (modules aes_ops_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1391,7 +1391,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1402,7 +1402,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1411,7 +1411,7 @@
 (executable
  (name arrays)
  (modules arrays)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1419,7 +1419,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays.out
@@ -1427,14 +1427,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays.out)))
 
 (executable
  (name arrays_u)
  (modules arrays_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1442,7 +1442,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays_u.out
@@ -1450,14 +1450,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays_u.out)))
 
 (executable
  (name scalar_ops)
  (modules scalar_ops)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1465,7 +1465,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    scalar_ops.out
@@ -1473,14 +1473,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected scalar_ops.out)))
 
 (executable
  (name consts)
  (modules consts)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1488,7 +1488,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    consts.out
@@ -1496,14 +1496,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected consts.out)))
 
 (executable
  (name consts_u)
  (modules consts_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1511,7 +1511,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    consts_u.out
@@ -1519,14 +1519,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected consts_u.out)))
 
 (executable
  (name callback)
  (modules callback)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1534,7 +1534,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    callback.out
@@ -1542,14 +1542,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected callback.out)))
 
 (executable
  (name callback256)
  (modules callback256)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1557,7 +1557,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    callback256.out
@@ -1565,14 +1565,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected callback256.out)))
 
 (executable
  (name test_callee_save_neon_regs)
  (modules test_callee_save_neon_regs)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1580,7 +1580,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    test_callee_save_neon_regs.out
@@ -1588,14 +1588,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected test_callee_save_neon_regs.out)))
 
 (executable
  (name probes)
  (modules probes)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1603,7 +1603,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    probes.out
@@ -1611,14 +1611,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected probes.out)))
 
 (executable
  (name probes256)
  (modules probes256)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1626,7 +1626,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    probes256.out
@@ -1634,7 +1634,7 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected probes256.out)))
 
@@ -1642,7 +1642,7 @@
  (name preemption256)
  (modules preemption256)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1653,7 +1653,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1664,7 +1664,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1673,7 +1673,7 @@
 (executable
  (name arrays256)
  (modules arrays256)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1681,7 +1681,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays256.out
@@ -1689,14 +1689,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays256.out)))
 
 (executable
  (name arrays256_u)
  (modules arrays256_u)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1704,7 +1704,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays256_u.out
@@ -1712,7 +1712,7 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays256_u.out)))
 
@@ -1720,7 +1720,7 @@
  (name consts256)
  (modules consts256)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1731,7 +1731,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1742,7 +1742,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1752,7 +1752,7 @@
  (name consts256_u)
  (modules consts256_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1763,7 +1763,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1774,7 +1774,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1784,7 +1784,7 @@
  (name ops_float32x8)
  (modules ops_float32x8)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1795,7 +1795,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1806,7 +1806,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1816,7 +1816,7 @@
  (name ops_float64x4)
  (modules ops_float64x4)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1827,7 +1827,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1838,7 +1838,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1848,7 +1848,7 @@
  (name ops_int32x8)
  (modules ops_int32x8)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1859,7 +1859,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1870,7 +1870,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1880,7 +1880,7 @@
  (name ops_int64x4)
  (modules ops_int64x4)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1891,7 +1891,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1902,7 +1902,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1912,7 +1912,7 @@
  (name ops_int16x16)
  (modules ops_int16x16)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1923,7 +1923,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1934,7 +1934,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1944,7 +1944,7 @@
  (name ops_int8x32)
  (modules ops_int8x32)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1955,7 +1955,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1966,7 +1966,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1976,7 +1976,7 @@
  (name ops_float32x8_u)
  (modules ops_float32x8_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1987,7 +1987,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -1998,7 +1998,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2008,7 +2008,7 @@
  (name ops_float64x4_u)
  (modules ops_float64x4_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2019,7 +2019,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2030,7 +2030,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2040,7 +2040,7 @@
  (name ops_int32x8_u)
  (modules ops_int32x8_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2051,7 +2051,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2062,7 +2062,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2072,7 +2072,7 @@
  (name ops_int64x4_u)
  (modules ops_int64x4_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2083,7 +2083,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2094,7 +2094,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2104,7 +2104,7 @@
  (name ops_int16x16_u)
  (modules ops_int16x16_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2115,7 +2115,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2126,7 +2126,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2136,7 +2136,7 @@
  (name ops_int8x32_u)
  (modules ops_int8x32_u)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2147,7 +2147,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2158,7 +2158,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2167,7 +2167,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2177,7 +2177,7 @@
  (name int128_nodynlink)
  (modules int128_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2188,7 +2188,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2199,7 +2199,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2207,14 +2207,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy basic.ml basic_nodynlink.ml)))
 
 (executable
  (name basic_nodynlink)
  (modules basic_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2222,7 +2222,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic_nodynlink.out
@@ -2230,20 +2230,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy basic_u.ml basic_u_nodynlink.ml)))
 
 (executable
  (name basic_u_nodynlink)
  (modules basic_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2251,7 +2251,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic_u_nodynlink.out
@@ -2259,20 +2259,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy basic256.ml basic256_nodynlink.ml)))
 
 (executable
  (name basic256_nodynlink)
  (modules basic256_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2280,7 +2280,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic256_nodynlink.out
@@ -2288,20 +2288,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic256_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy basic256_u.ml basic256_u_nodynlink.ml)))
 
 (executable
  (name basic256_u_nodynlink)
  (modules basic256_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2309,7 +2309,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    basic256_u_nodynlink.out
@@ -2317,14 +2317,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected basic256_u_nodynlink.out)))
 
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2334,7 +2334,7 @@
  (name load_store_nodynlink)
  (modules load_store_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2345,7 +2345,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2356,7 +2356,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2364,14 +2364,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy let_mutable.ml let_mutable_nodynlink.ml)))
 
 (executable
  (name let_mutable_nodynlink)
  (modules let_mutable_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2379,7 +2379,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    let_mutable_nodynlink.out
@@ -2387,20 +2387,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected let_mutable_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy let_mutable_u.ml let_mutable_u_nodynlink.ml)))
 
 (executable
  (name let_mutable_u_nodynlink)
  (modules let_mutable_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2408,7 +2408,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    let_mutable_u_nodynlink.out
@@ -2416,20 +2416,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected let_mutable_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy mixed_modules.ml mixed_modules_nodynlink.ml)))
 
 (executable
  (name mixed_modules_nodynlink)
  (modules mixed_modules_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2437,7 +2437,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    mixed_modules_nodynlink.out
@@ -2445,20 +2445,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected mixed_modules_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_float32x4.ml ops_float32x4_nodynlink.ml)))
 
 (executable
  (name ops_float32x4_nodynlink)
  (modules ops_float32x4_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2466,7 +2466,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float32x4_nodynlink.out
@@ -2474,20 +2474,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float32x4_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_float32x4_u.ml ops_float32x4_u_nodynlink.ml)))
 
 (executable
  (name ops_float32x4_u_nodynlink)
  (modules ops_float32x4_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2495,7 +2495,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float32x4_u_nodynlink.out
@@ -2503,20 +2503,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float32x4_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_float64x2.ml ops_float64x2_nodynlink.ml)))
 
 (executable
  (name ops_float64x2_nodynlink)
  (modules ops_float64x2_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2524,7 +2524,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float64x2_nodynlink.out
@@ -2532,20 +2532,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float64x2_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_float64x2_u.ml ops_float64x2_u_nodynlink.ml)))
 
 (executable
  (name ops_float64x2_u_nodynlink)
  (modules ops_float64x2_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2553,7 +2553,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_float64x2_u_nodynlink.out
@@ -2561,20 +2561,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_float64x2_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int64x2.ml ops_int64x2_nodynlink.ml)))
 
 (executable
  (name ops_int64x2_nodynlink)
  (modules ops_int64x2_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2582,7 +2582,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int64x2_nodynlink.out
@@ -2590,20 +2590,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int64x2_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int64x2_u.ml ops_int64x2_u_nodynlink.ml)))
 
 (executable
  (name ops_int64x2_u_nodynlink)
  (modules ops_int64x2_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2611,7 +2611,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int64x2_u_nodynlink.out
@@ -2619,20 +2619,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int64x2_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int32x4.ml ops_int32x4_nodynlink.ml)))
 
 (executable
  (name ops_int32x4_nodynlink)
  (modules ops_int32x4_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2640,7 +2640,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int32x4_nodynlink.out
@@ -2648,20 +2648,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int32x4_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int32x4_u.ml ops_int32x4_u_nodynlink.ml)))
 
 (executable
  (name ops_int32x4_u_nodynlink)
  (modules ops_int32x4_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2669,7 +2669,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int32x4_u_nodynlink.out
@@ -2677,20 +2677,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int32x4_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int16x8.ml ops_int16x8_nodynlink.ml)))
 
 (executable
  (name ops_int16x8_nodynlink)
  (modules ops_int16x8_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2698,7 +2698,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int16x8_nodynlink.out
@@ -2706,20 +2706,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int16x8_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int16x8_u.ml ops_int16x8_u_nodynlink.ml)))
 
 (executable
  (name ops_int16x8_u_nodynlink)
  (modules ops_int16x8_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2727,7 +2727,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int16x8_u_nodynlink.out
@@ -2735,20 +2735,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int16x8_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int8x16.ml ops_int8x16_nodynlink.ml)))
 
 (executable
  (name ops_int8x16_nodynlink)
  (modules ops_int8x16_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2756,7 +2756,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int8x16_nodynlink.out
@@ -2764,20 +2764,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int8x16_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_int8x16_u.ml ops_int8x16_u_nodynlink.ml)))
 
 (executable
  (name ops_int8x16_u_nodynlink)
  (modules ops_int8x16_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2785,7 +2785,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_int8x16_u_nodynlink.out
@@ -2793,20 +2793,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_int8x16_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops.ml ops_nodynlink.ml)))
 
 (executable
  (name ops_nodynlink)
  (modules ops_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2814,7 +2814,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_nodynlink.out
@@ -2822,20 +2822,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy ops_u.ml ops_u_nodynlink.ml)))
 
 (executable
  (name ops_u_nodynlink)
  (modules ops_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2843,7 +2843,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    ops_u_nodynlink.out
@@ -2851,14 +2851,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected ops_u_nodynlink.out)))
 
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2868,7 +2868,7 @@
  (name ops256_nodynlink)
  (modules ops256_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2879,7 +2879,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2890,7 +2890,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2899,7 +2899,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2909,7 +2909,7 @@
  (name ops256_u_nodynlink)
  (modules ops256_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2920,7 +2920,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2931,7 +2931,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2940,7 +2940,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2950,7 +2950,7 @@
  (name int_ops_nodynlink)
  (modules int_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -2961,7 +2961,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2972,7 +2972,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2981,7 +2981,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -2991,7 +2991,7 @@
  (name int_ops_u_nodynlink)
  (modules int_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3002,7 +3002,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3013,7 +3013,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3022,7 +3022,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3032,7 +3032,7 @@
  (name sse_other_ops_nodynlink)
  (modules sse_other_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3043,7 +3043,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3054,7 +3054,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3063,7 +3063,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3073,7 +3073,7 @@
  (name sse_other_ops_u_nodynlink)
  (modules sse_other_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3084,7 +3084,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3095,7 +3095,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3104,7 +3104,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3114,7 +3114,7 @@
  (name sse41_test_ops_nodynlink)
  (modules sse41_test_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3125,7 +3125,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3136,7 +3136,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3145,7 +3145,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3155,7 +3155,7 @@
  (name sse41_test_ops_u_nodynlink)
  (modules sse41_test_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3166,7 +3166,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3177,7 +3177,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3186,7 +3186,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3196,7 +3196,7 @@
  (name avx_test_ops_nodynlink)
  (modules avx_test_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3207,7 +3207,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3218,7 +3218,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3227,7 +3227,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3237,7 +3237,7 @@
  (name avx_test_ops_u_nodynlink)
  (modules avx_test_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3248,7 +3248,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3259,7 +3259,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3268,7 +3268,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3278,7 +3278,7 @@
  (name sse42_string_ops_nodynlink)
  (modules sse42_string_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3289,7 +3289,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3300,7 +3300,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3309,7 +3309,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3319,7 +3319,7 @@
  (name sse42_string_ops_u_nodynlink)
  (modules sse42_string_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3330,7 +3330,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3341,7 +3341,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3350,7 +3350,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3360,7 +3360,7 @@
  (name f16c_ops_nodynlink)
  (modules f16c_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3371,7 +3371,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3382,7 +3382,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3391,7 +3391,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3401,7 +3401,7 @@
  (name f16c_ops_u_nodynlink)
  (modules f16c_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3412,7 +3412,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3423,7 +3423,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3432,7 +3432,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3442,7 +3442,7 @@
  (name fma_ops_nodynlink)
  (modules fma_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3453,7 +3453,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3464,7 +3464,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3473,7 +3473,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3483,7 +3483,7 @@
  (name fma_ops_u_nodynlink)
  (modules fma_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3494,7 +3494,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3505,7 +3505,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3514,7 +3514,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3524,7 +3524,7 @@
  (name aes_ops_nodynlink)
  (modules aes_ops_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3535,7 +3535,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3546,7 +3546,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3555,7 +3555,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3565,7 +3565,7 @@
  (name aes_ops_u_nodynlink)
  (modules aes_ops_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3576,7 +3576,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3587,7 +3587,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3595,14 +3595,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy arrays.ml arrays_nodynlink.ml)))
 
 (executable
  (name arrays_nodynlink)
  (modules arrays_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3610,7 +3610,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays_nodynlink.out
@@ -3618,20 +3618,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy arrays_u.ml arrays_u_nodynlink.ml)))
 
 (executable
  (name arrays_u_nodynlink)
  (modules arrays_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3639,7 +3639,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays_u_nodynlink.out
@@ -3647,20 +3647,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy scalar_ops.ml scalar_ops_nodynlink.ml)))
 
 (executable
  (name scalar_ops_nodynlink)
  (modules scalar_ops_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3668,7 +3668,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    scalar_ops_nodynlink.out
@@ -3676,20 +3676,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected scalar_ops_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy consts.ml consts_nodynlink.ml)))
 
 (executable
  (name consts_nodynlink)
  (modules consts_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3697,7 +3697,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    consts_nodynlink.out
@@ -3705,20 +3705,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected consts_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy consts_u.ml consts_u_nodynlink.ml)))
 
 (executable
  (name consts_u_nodynlink)
  (modules consts_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3726,7 +3726,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    consts_u_nodynlink.out
@@ -3734,20 +3734,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected consts_u_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy callback.ml callback_nodynlink.ml)))
 
 (executable
  (name callback_nodynlink)
  (modules callback_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3755,7 +3755,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    callback_nodynlink.out
@@ -3763,20 +3763,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected callback_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy callback256.ml callback256_nodynlink.ml)))
 
 (executable
  (name callback256_nodynlink)
  (modules callback256_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3784,7 +3784,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    callback256_nodynlink.out
@@ -3792,20 +3792,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected callback256_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy test_callee_save_neon_regs.ml test_callee_save_neon_regs_nodynlink.ml)))
 
 (executable
  (name test_callee_save_neon_regs_nodynlink)
  (modules test_callee_save_neon_regs_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3813,7 +3813,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    test_callee_save_neon_regs_nodynlink.out
@@ -3821,20 +3821,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected test_callee_save_neon_regs_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy probes.ml probes_nodynlink.ml)))
 
 (executable
  (name probes_nodynlink)
  (modules probes_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3842,7 +3842,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    probes_nodynlink.out
@@ -3850,20 +3850,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected probes_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy probes256.ml probes256_nodynlink.ml)))
 
 (executable
  (name probes256_nodynlink)
  (modules probes256_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3871,7 +3871,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    probes256_nodynlink.out
@@ -3879,14 +3879,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected probes256_nodynlink.out)))
 
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3896,7 +3896,7 @@
  (name preemption256_nodynlink)
  (modules preemption256_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -3907,7 +3907,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3918,7 +3918,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3926,14 +3926,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy arrays256.ml arrays256_nodynlink.ml)))
 
 (executable
  (name arrays256_nodynlink)
  (modules arrays256_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3941,7 +3941,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays256_nodynlink.out
@@ -3949,20 +3949,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays256_nodynlink.out)))
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (copy arrays256_u.ml arrays256_u_nodynlink.ml)))
 
 (executable
  (name arrays256_u_nodynlink)
  (modules arrays256_u_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3970,7 +3970,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
   (with-outputs-to
    arrays256_u_nodynlink.out
@@ -3978,14 +3978,14 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (action
    (diff empty.expected arrays256_u_nodynlink.out)))
 
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -3995,7 +3995,7 @@
  (name consts256_nodynlink)
  (modules consts256_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4006,7 +4006,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4017,7 +4017,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4026,7 +4026,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4036,7 +4036,7 @@
  (name consts256_u_nodynlink)
  (modules consts256_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4047,7 +4047,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4058,7 +4058,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4067,7 +4067,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4077,7 +4077,7 @@
  (name ops_float32x8_nodynlink)
  (modules ops_float32x8_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4088,7 +4088,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4099,7 +4099,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4108,7 +4108,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4118,7 +4118,7 @@
  (name ops_float64x4_nodynlink)
  (modules ops_float64x4_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4129,7 +4129,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4140,7 +4140,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4149,7 +4149,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4159,7 +4159,7 @@
  (name ops_int32x8_nodynlink)
  (modules ops_int32x8_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4170,7 +4170,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4181,7 +4181,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4190,7 +4190,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4200,7 +4200,7 @@
  (name ops_int64x4_nodynlink)
  (modules ops_int64x4_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4211,7 +4211,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4222,7 +4222,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4231,7 +4231,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4241,7 +4241,7 @@
  (name ops_int16x16_nodynlink)
  (modules ops_int16x16_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4252,7 +4252,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4263,7 +4263,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4272,7 +4272,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4282,7 +4282,7 @@
  (name ops_int8x32_nodynlink)
  (modules ops_int8x32_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4293,7 +4293,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4304,7 +4304,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4313,7 +4313,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4323,7 +4323,7 @@
  (name ops_float32x8_u_nodynlink)
  (modules ops_float32x8_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4334,7 +4334,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4345,7 +4345,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4354,7 +4354,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4364,7 +4364,7 @@
  (name ops_float64x4_u_nodynlink)
  (modules ops_float64x4_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4375,7 +4375,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4386,7 +4386,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4395,7 +4395,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4405,7 +4405,7 @@
  (name ops_int32x8_u_nodynlink)
  (modules ops_int32x8_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4416,7 +4416,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4427,7 +4427,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4436,7 +4436,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4446,7 +4446,7 @@
  (name ops_int64x4_u_nodynlink)
  (modules ops_int64x4_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4457,7 +4457,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4468,7 +4468,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4477,7 +4477,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4487,7 +4487,7 @@
  (name ops_int16x16_u_nodynlink)
  (modules ops_int16x16_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4498,7 +4498,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4509,7 +4509,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4518,7 +4518,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4528,7 +4528,7 @@
  (name ops_int8x32_u_nodynlink)
  (modules ops_int8x32_u_nodynlink)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4539,7 +4539,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4550,7 +4550,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4559,7 +4559,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4569,7 +4569,7 @@
  (name int128_internal_assembler)
  (modules int128_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4580,7 +4580,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4591,7 +4591,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4600,7 +4600,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4610,7 +4610,7 @@
  (name basic_internal_assembler)
  (modules basic_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4621,7 +4621,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4632,7 +4632,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4641,7 +4641,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4651,7 +4651,7 @@
  (name basic_u_internal_assembler)
  (modules basic_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4662,7 +4662,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4673,7 +4673,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4682,7 +4682,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4692,7 +4692,7 @@
  (name basic256_internal_assembler)
  (modules basic256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4703,7 +4703,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4714,7 +4714,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4723,7 +4723,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4733,7 +4733,7 @@
  (name basic256_u_internal_assembler)
  (modules basic256_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4744,7 +4744,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4755,7 +4755,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4764,7 +4764,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4774,7 +4774,7 @@
  (name load_store_internal_assembler)
  (modules load_store_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4785,7 +4785,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4796,7 +4796,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4805,7 +4805,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4815,7 +4815,7 @@
  (name let_mutable_internal_assembler)
  (modules let_mutable_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4826,7 +4826,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4837,7 +4837,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4846,7 +4846,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4856,7 +4856,7 @@
  (name let_mutable_u_internal_assembler)
  (modules let_mutable_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4867,7 +4867,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4878,7 +4878,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4887,7 +4887,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4897,7 +4897,7 @@
  (name mixed_modules_internal_assembler)
  (modules mixed_modules_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4908,7 +4908,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4919,7 +4919,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4928,7 +4928,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4938,7 +4938,7 @@
  (name ops_float32x4_internal_assembler)
  (modules ops_float32x4_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4949,7 +4949,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4960,7 +4960,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4969,7 +4969,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -4979,7 +4979,7 @@
  (name ops_float32x4_u_internal_assembler)
  (modules ops_float32x4_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -4990,7 +4990,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5001,7 +5001,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5010,7 +5010,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5020,7 +5020,7 @@
  (name ops_float64x2_internal_assembler)
  (modules ops_float64x2_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5031,7 +5031,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5042,7 +5042,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5051,7 +5051,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5061,7 +5061,7 @@
  (name ops_float64x2_u_internal_assembler)
  (modules ops_float64x2_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5072,7 +5072,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5083,7 +5083,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5092,7 +5092,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5102,7 +5102,7 @@
  (name ops_int64x2_internal_assembler)
  (modules ops_int64x2_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5113,7 +5113,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5124,7 +5124,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5133,7 +5133,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5143,7 +5143,7 @@
  (name ops_int64x2_u_internal_assembler)
  (modules ops_int64x2_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5154,7 +5154,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5165,7 +5165,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5174,7 +5174,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5184,7 +5184,7 @@
  (name ops_int32x4_internal_assembler)
  (modules ops_int32x4_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5195,7 +5195,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5206,7 +5206,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5215,7 +5215,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5225,7 +5225,7 @@
  (name ops_int32x4_u_internal_assembler)
  (modules ops_int32x4_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5236,7 +5236,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5247,7 +5247,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5256,7 +5256,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5266,7 +5266,7 @@
  (name ops_int16x8_internal_assembler)
  (modules ops_int16x8_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5277,7 +5277,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5288,7 +5288,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5297,7 +5297,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5307,7 +5307,7 @@
  (name ops_int16x8_u_internal_assembler)
  (modules ops_int16x8_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5318,7 +5318,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5329,7 +5329,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5338,7 +5338,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5348,7 +5348,7 @@
  (name ops_int8x16_internal_assembler)
  (modules ops_int8x16_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5359,7 +5359,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5370,7 +5370,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5379,7 +5379,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5389,7 +5389,7 @@
  (name ops_int8x16_u_internal_assembler)
  (modules ops_int8x16_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5400,7 +5400,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5411,7 +5411,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5420,7 +5420,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5430,7 +5430,7 @@
  (name ops_internal_assembler)
  (modules ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5441,7 +5441,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5452,7 +5452,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5461,7 +5461,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5471,7 +5471,7 @@
  (name ops_u_internal_assembler)
  (modules ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5482,7 +5482,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5493,7 +5493,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5502,7 +5502,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5512,7 +5512,7 @@
  (name ops256_internal_assembler)
  (modules ops256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5523,7 +5523,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5534,7 +5534,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5543,7 +5543,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5553,7 +5553,7 @@
  (name ops256_u_internal_assembler)
  (modules ops256_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5564,7 +5564,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5575,7 +5575,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5584,7 +5584,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5594,7 +5594,7 @@
  (name int_ops_internal_assembler)
  (modules int_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5605,7 +5605,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5616,7 +5616,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5625,7 +5625,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5635,7 +5635,7 @@
  (name int_ops_u_internal_assembler)
  (modules int_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5646,7 +5646,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5657,7 +5657,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5666,7 +5666,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5676,7 +5676,7 @@
  (name sse_other_ops_internal_assembler)
  (modules sse_other_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5687,7 +5687,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5698,7 +5698,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5707,7 +5707,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5717,7 +5717,7 @@
  (name sse_other_ops_u_internal_assembler)
  (modules sse_other_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5728,7 +5728,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5739,7 +5739,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5748,7 +5748,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5758,7 +5758,7 @@
  (name sse41_test_ops_internal_assembler)
  (modules sse41_test_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5769,7 +5769,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5780,7 +5780,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5789,7 +5789,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5799,7 +5799,7 @@
  (name sse41_test_ops_u_internal_assembler)
  (modules sse41_test_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5810,7 +5810,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5821,7 +5821,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5830,7 +5830,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5840,7 +5840,7 @@
  (name avx_test_ops_internal_assembler)
  (modules avx_test_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5851,7 +5851,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5862,7 +5862,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5871,7 +5871,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5881,7 +5881,7 @@
  (name avx_test_ops_u_internal_assembler)
  (modules avx_test_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5892,7 +5892,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5903,7 +5903,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5912,7 +5912,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5922,7 +5922,7 @@
  (name sse42_string_ops_internal_assembler)
  (modules sse42_string_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5933,7 +5933,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5944,7 +5944,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5953,7 +5953,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5963,7 +5963,7 @@
  (name sse42_string_ops_u_internal_assembler)
  (modules sse42_string_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -5974,7 +5974,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5985,7 +5985,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -5994,7 +5994,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6004,7 +6004,7 @@
  (name f16c_ops_internal_assembler)
  (modules f16c_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6015,7 +6015,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6026,7 +6026,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6035,7 +6035,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6045,7 +6045,7 @@
  (name f16c_ops_u_internal_assembler)
  (modules f16c_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6056,7 +6056,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6067,7 +6067,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6076,7 +6076,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6086,7 +6086,7 @@
  (name fma_ops_internal_assembler)
  (modules fma_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6097,7 +6097,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6108,7 +6108,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6117,7 +6117,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6127,7 +6127,7 @@
  (name fma_ops_u_internal_assembler)
  (modules fma_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6138,7 +6138,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6149,7 +6149,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6158,7 +6158,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6168,7 +6168,7 @@
  (name aes_ops_internal_assembler)
  (modules aes_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6179,7 +6179,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6190,7 +6190,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6199,7 +6199,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6209,7 +6209,7 @@
  (name aes_ops_u_internal_assembler)
  (modules aes_ops_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6220,7 +6220,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6231,7 +6231,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6240,7 +6240,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6250,7 +6250,7 @@
  (name arrays_internal_assembler)
  (modules arrays_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6261,7 +6261,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6272,7 +6272,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6281,7 +6281,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6291,7 +6291,7 @@
  (name arrays_u_internal_assembler)
  (modules arrays_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6302,7 +6302,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6313,7 +6313,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6322,7 +6322,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6332,7 +6332,7 @@
  (name scalar_ops_internal_assembler)
  (modules scalar_ops_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6343,7 +6343,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6354,7 +6354,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6363,7 +6363,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6373,7 +6373,7 @@
  (name consts_internal_assembler)
  (modules consts_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6384,7 +6384,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6395,7 +6395,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6404,7 +6404,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6414,7 +6414,7 @@
  (name consts_u_internal_assembler)
  (modules consts_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6425,7 +6425,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6436,7 +6436,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6445,7 +6445,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6455,7 +6455,7 @@
  (name callback_internal_assembler)
  (modules callback_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6466,7 +6466,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6477,7 +6477,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6486,7 +6486,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6496,7 +6496,7 @@
  (name callback256_internal_assembler)
  (modules callback256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6507,7 +6507,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6518,7 +6518,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6527,7 +6527,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6537,7 +6537,7 @@
  (name test_callee_save_neon_regs_internal_assembler)
  (modules test_callee_save_neon_regs_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6548,7 +6548,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6559,7 +6559,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6568,7 +6568,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6578,7 +6578,7 @@
  (name probes_internal_assembler)
  (modules probes_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6589,7 +6589,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6600,7 +6600,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6609,7 +6609,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6619,7 +6619,7 @@
  (name probes256_internal_assembler)
  (modules probes256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6630,7 +6630,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6641,7 +6641,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6650,7 +6650,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6660,7 +6660,7 @@
  (name preemption256_internal_assembler)
  (modules preemption256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6671,7 +6671,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6682,7 +6682,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6691,7 +6691,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6701,7 +6701,7 @@
  (name arrays256_internal_assembler)
  (modules arrays256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6712,7 +6712,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6723,7 +6723,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6732,7 +6732,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6742,7 +6742,7 @@
  (name arrays256_u_internal_assembler)
  (modules arrays256_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6753,7 +6753,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6764,7 +6764,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6773,7 +6773,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6783,7 +6783,7 @@
  (name consts256_internal_assembler)
  (modules consts256_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6794,7 +6794,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6805,7 +6805,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6814,7 +6814,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6824,7 +6824,7 @@
  (name consts256_u_internal_assembler)
  (modules consts256_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6835,7 +6835,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6846,7 +6846,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6855,7 +6855,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6865,7 +6865,7 @@
  (name ops_float32x8_internal_assembler)
  (modules ops_float32x8_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6876,7 +6876,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6887,7 +6887,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6896,7 +6896,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6906,7 +6906,7 @@
  (name ops_float64x4_internal_assembler)
  (modules ops_float64x4_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6917,7 +6917,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6928,7 +6928,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6937,7 +6937,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6947,7 +6947,7 @@
  (name ops_int32x8_internal_assembler)
  (modules ops_int32x8_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6958,7 +6958,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6969,7 +6969,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6978,7 +6978,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -6988,7 +6988,7 @@
  (name ops_int64x4_internal_assembler)
  (modules ops_int64x4_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -6999,7 +6999,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7010,7 +7010,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7019,7 +7019,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7029,7 +7029,7 @@
  (name ops_int16x16_internal_assembler)
  (modules ops_int16x16_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7040,7 +7040,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7051,7 +7051,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7060,7 +7060,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7070,7 +7070,7 @@
  (name ops_int8x32_internal_assembler)
  (modules ops_int8x32_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7081,7 +7081,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7092,7 +7092,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7101,7 +7101,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7111,7 +7111,7 @@
  (name ops_float32x8_u_internal_assembler)
  (modules ops_float32x8_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7122,7 +7122,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7133,7 +7133,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7142,7 +7142,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7152,7 +7152,7 @@
  (name ops_float64x4_u_internal_assembler)
  (modules ops_float64x4_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7163,7 +7163,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7174,7 +7174,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7183,7 +7183,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7193,7 +7193,7 @@
  (name ops_int32x8_u_internal_assembler)
  (modules ops_int32x8_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7204,7 +7204,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7215,7 +7215,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7224,7 +7224,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7234,7 +7234,7 @@
  (name ops_int64x4_u_internal_assembler)
  (modules ops_int64x4_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7245,7 +7245,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7256,7 +7256,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7265,7 +7265,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7275,7 +7275,7 @@
  (name ops_int16x16_u_internal_assembler)
  (modules ops_int16x16_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7286,7 +7286,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7297,7 +7297,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7306,7 +7306,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7316,7 +7316,7 @@
  (name ops_int8x32_u_internal_assembler)
  (modules ops_int8x32_u_internal_assembler)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
@@ -7327,7 +7327,7 @@
 (rule
  (alias   runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
@@ -7338,7 +7338,7 @@
 (rule
  (alias runtest)
  (enabled_if
-      (and (= %{context_name} "main")
+      (and (<> %{context_name} "default")
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action

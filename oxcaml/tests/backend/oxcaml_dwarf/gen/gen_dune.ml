@@ -7,17 +7,17 @@ let () =
   let dwarf_5 =
     Array.exists (fun arg -> String.equal arg "--dwarf-5") Sys.argv
   in
-  let enabled_if = {|(enabled_if (= %{context_name} "main"))|} in
+  let enabled_if = {|(enabled_if (<> %{context_name} "default"))|} in
   let enabled_if_with_lldb =
     {|(enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))|}
   in
   let enabled_if_without_lldb =
     {|(enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{env:OXCAML_LLDB=} "")))|}
   in
   let ocamlopt_flags =

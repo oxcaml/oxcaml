@@ -9,7 +9,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (action
   (with-stdout-to
    fdo_counters.output.corrected
@@ -18,7 +18,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (deps fdo_counters.output fdo_counters.output.corrected)
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
@@ -43,7 +43,7 @@
  (targets function_ids.output.corrected)
  (deps function_ids.ml function_ids_edited.ml fdo_annotations.exe)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (action
   (progn
    (run
@@ -79,7 +79,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (deps function_ids.output function_ids.output.corrected)
  (action
   (diff function_ids.output function_ids.output.corrected)))
@@ -92,7 +92,7 @@
  (targets body_hash.output.corrected)
  (deps body_hash.ml body_hash_edited.ml fdo_annotations.exe)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (action
   (progn
    (run
@@ -128,7 +128,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (deps body_hash.output body_hash.output.corrected)
  (action
   (diff body_hash.output body_hash.output.corrected)))

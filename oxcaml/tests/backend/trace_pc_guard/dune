@@ -18,7 +18,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{system} "linux")))
  (targets trace_pc_guard.out)
  (deps trace_pc_guard.exe)
@@ -31,7 +31,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{system} "linux")))
  (action
   (diff trace_pc_guard.expected trace_pc_guard.out)))

@@ -10,28 +10,28 @@
 
 ; Compile test_file1.c to test_file1.o
 (rule
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (target test_file1.o)
  (deps test_file1.c)
  (action (run %{cc} -c %{deps} -o %{target})))
 
 ; Compile test_file2.c to test_file2.o
 (rule
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (target test_file2.o)
  (deps test_file2.c)
  (action (run %{cc} -c %{deps} -o %{target})))
 
 ; Create archive from the object files
 (rule
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (target test_archive.a)
  (deps test_file1.o test_file2.o)
  (action (run ar rcs %{target} %{deps})))
 
 ; Run the test and capture output
 (rule
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (target test_archive.output)
  (deps test_archive.exe test_archive.a)
  (action (with-outputs-to %{target} (run ./test_archive.exe test_archive.a))))
@@ -40,7 +40,7 @@
 ; Uses ar and readelf to get the same information Owee should produce
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{system} "linux")))
  (target test_archive.expected)
  (deps test_archive.a test_file1.o test_file2.o generate_expected.sh)
@@ -52,7 +52,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{system} "linux")))
  (deps test_archive.expected test_archive.output)
  (action (diff test_archive.expected test_archive.output)))
@@ -62,7 +62,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{system} "macosx")))
  (deps test_archive.output)
  (action (bash "

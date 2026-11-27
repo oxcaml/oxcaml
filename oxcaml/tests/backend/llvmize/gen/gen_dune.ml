@@ -132,14 +132,14 @@ let print_rule ~extra_subst ~buf rule_template =
   let enabled_if =
     {|(enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))|}
   in
   let enabled_if_without_llvm =
     {|(enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (= %{env:OXCAML_CLANG=} "")))|}
   in

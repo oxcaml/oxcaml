@@ -5,7 +5,7 @@
 let enabled_if =
   {|(enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))|}
 

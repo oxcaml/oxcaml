@@ -1,7 +1,8 @@
-let enabled_if_main = {|(enabled_if (= %{context_name} "main"))|}
+let enabled_if_main = {|(enabled_if (<> %{context_name} "default"))|}
 
 let enabled_if_main_amd64 =
-  {|(enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )|}
+  {|(enabled_if (and (<> %{context_name} "default") |}
+  ^ {|(= %{architecture} "amd64")) )|}
 
 let flags =
   "-S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg \

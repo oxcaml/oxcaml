@@ -71,7 +71,7 @@
  (targets flags.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -82,7 +82,7 @@
  (targets flags.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -110,7 +110,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets bytecode.out)
  (deps bytecode.bc)
  (action
@@ -125,7 +125,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (diff bytecode.expected bytecode.out)))

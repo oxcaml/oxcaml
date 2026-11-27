@@ -3,7 +3,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (deps f32c1.expected f32c1.corrected)
  (action
   (progn
@@ -22,7 +22,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets f32c1.corrected)
  (deps
   (:ml f32c1.ml))
@@ -43,7 +43,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets f32c4.corrected)
  (deps
   (:ml f32c4.ml))
@@ -64,7 +64,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i32c1.corrected)
  (deps
   (:ml i32c1.ml))
@@ -85,7 +85,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i32c4.corrected)
  (deps
   (:ml i32c4.ml))
@@ -106,7 +106,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets f64c1.corrected)
  (deps
   (:ml f64c1.ml))
@@ -127,7 +127,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets f64c2.corrected)
  (deps
   (:ml f64c2.ml))
@@ -148,7 +148,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i16c1.corrected)
  (deps
   (:ml i16c1.ml))
@@ -169,7 +169,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i16c8.corrected)
  (deps
   (:ml i16c8.ml))
@@ -190,7 +190,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i8c1.corrected)
  (deps
   (:ml i8c1.ml))
@@ -211,7 +211,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i8c16.corrected)
  (deps
   (:ml i8c16.ml))
@@ -232,7 +232,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i64c1.corrected)
  (deps
   (:ml i64c1.ml))
@@ -253,7 +253,7 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (targets i64c2.corrected)
  (deps
   (:ml i64c2.ml))

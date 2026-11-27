@@ -20,7 +20,7 @@
  (targets flags512.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -31,7 +31,7 @@
  (targets flags512.sexp)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{architecture} "amd64")))
  (action
   (with-stdout-to
@@ -48,7 +48,7 @@
  (modules avx512_available)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (foreign_stubs
