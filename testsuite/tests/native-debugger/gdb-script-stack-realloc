@@ -1,0 +1,44 @@
+set disable-randomization off
+set debuginfod enabled off
+python
+import re
+
+def stop_at(function):
+    breakpoint = gdb.Breakpoint(function, internal=True)
+    breakpoint.silent = True
+    return breakpoint
+
+# With frame pointers, the %rbp of a frame that is at a call points to the
+# saved %rbp of its caller, which the return address follows.
+def has_frame_pointer(frame):
+    caller = frame.older()
+    try:
+        address = (int(frame.read_register("rbp")) + 8) % 2**64
+        slot = gdb.selected_inferior().read_memory(address, 8)
+    except gdb.MemoryError:
+        return False
+    return caller is not None and int.from_bytes(slot, "little") == caller.pc()
+
+def print_frames():
+    frame = gdb.selected_frame()
+    # Frame 1 is a function of the runtime that keeps a frame pointer exactly
+    # when OCaml code does. Frame 3 then has one too, which the debugger finds
+    # with the unwind information of frame 2.
+    frame_pointers = has_frame_pointer(frame.older())
+    while frame is not None and frame.level() < 4:
+        name = re.sub(r"(__[a-z_]+)_[0-9].*", r"\1", frame.name() or "??")
+        print("frame %d: %s" % (frame.level(), name))
+        if frame.level() == 3 and frame_pointers:
+            if not has_frame_pointer(frame):
+                print("frame 3: %rbp is not the frame pointer")
+        frame = frame.older()
+
+breakpoint = stop_at("caml_try_realloc_stack")
+for command in ["run", "continue", "continue", "continue"]:
+    gdb.execute(command, to_string=True)
+    print_frames()
+breakpoint.delete()
+stop_at("caml_stash_backtrace_wrapper")
+gdb.execute("continue", to_string=True)
+print_frames()
+end

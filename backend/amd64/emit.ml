@@ -245,9 +245,28 @@ let frame_required = ref false
 
 let contains_calls = ref false
 
+(* Whether the frame of the function is allocated when control reaches a label:
+   see [compute_frame_at_labels]. *)
+let frame_at_labels : bool Label.Tbl.t = Label.Tbl.create 16
+
+(* Whether the CFA that the CFI directives emitted so far give is the one of the
+   allocated frame. *)
+let cfi_frame = ref false
+
+(* Whether the last instruction emitted is a call to the runtime. The functions
+   of the runtime that OCaml code calls, such as [caml_raise_exn] and
+   [caml_c_call], are marked as signal frames: the unwinder then looks up the
+   return address as it is, and not the address before it. A change of the CFA
+   right after such a call means that it does not return; its return address
+   must keep the CFA of the call. *)
+let call_precedes = ref false
+
 let frame_size () =
   Proc.frame_size ~stack_offset:!stack_offset ~num_stack_slots
     ~contains_calls:!contains_calls
+
+(* The offset of the CFA from rsp, with or without the frame of the function. *)
+let cfa_offset ~frame = if frame then frame_size () else !stack_offset + 8
 
 let slot_offset loc stack_class =
   let offset =
@@ -258,6 +277,13 @@ let slot_offset loc stack_class =
   | Bytes_relative_to_stack_pointer n -> n
   | Bytes_relative_to_domainstate_pointer _ ->
     Misc.fatal_errorf "Not a stack slot"
+
+(* To be called before the CFA changes: see [call_precedes]. *)
+let keep_cfa_of_return_address () =
+  if !call_precedes
+  then (
+    I.nop ();
+    call_precedes := false)
 
 let emit_stack_offset n =
   if n < 0 then I.add (int (-n)) rsp else if n > 0 then I.sub (int n) rsp;
@@ -647,25 +673,24 @@ let record_frame live dbg =
   let lbl = record_frame_label live dbg in
   D.define_label lbl
 
-(* Out-of-line code is emitted after the body of the function, in the CFI state
-   that the body ends with, but runs with the stack of the instruction that
-   branches to it: inside a [try], say, that frame is larger. [f] emits such
-   code at [label], for a site where the frame had the given size. When the CFA
-   changes right after the body, a [nop] keeps the address of the code apart
-   from the return address of a call that ends the body, which an unwinder may
-   look up as it is. *)
-let emit_out_of_line ~label ~frame_size:site_frame_size ~after_body f =
+(* Out-of-line code is emitted after the body of the function, with the CFA of
+   the frame at the end of the body, but runs with the stack of the instruction
+   that branches to it: inside a [try], say, that frame is larger. [f] emits
+   such code at [label], for a site where the frame had the given size; the code
+   ends with a jump. *)
+let emit_out_of_line ~label ~frame_size:site_frame_size f =
   let end_of_body_frame_size = frame_size () in
   if site_frame_size = end_of_body_frame_size || not Config.asm_cfi_supported
   then (
     D.define_label label;
     f ())
   else (
-    if after_body then I.nop ();
+    keep_cfa_of_return_address ();
     D.define_label label;
     D.cfi_def_cfa_offset ~bytes:site_frame_size;
     f ();
-    D.cfi_def_cfa_offset ~bytes:end_of_body_frame_size)
+    D.cfi_def_cfa_offset ~bytes:end_of_body_frame_size);
+  call_precedes := false
 
 (* Record calls to the GC -- we've moved them out of the way *)
 
@@ -691,9 +716,8 @@ let call_gc_local_sym ~simd : Cmm.symbol =
   Cmm.local_symbol ~ty:Cmm.typ_code_pointer
     (Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd))
 
-let emit_call_gc ~after_body gc =
-  emit_out_of_line ~label:gc.gc_lbl ~frame_size:gc.gc_frame_size ~after_body
-    (fun () ->
+let emit_call_gc gc =
+  emit_out_of_line ~label:gc.gc_lbl ~frame_size:gc.gc_frame_size (fun () ->
       emit_debug_info gc.gc_dbg;
       emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
       (* Record the frame descriptor here, where its return-address label is
@@ -716,9 +740,8 @@ type local_realloc_call =
 
 let local_realloc_sites = ref ([] : local_realloc_call list)
 
-let emit_local_realloc ~after_body lr =
-  emit_out_of_line ~label:lr.lr_lbl ~frame_size:lr.lr_frame_size ~after_body
-    (fun () ->
+let emit_local_realloc lr =
+  emit_out_of_line ~label:lr.lr_lbl ~frame_size:lr.lr_frame_size (fun () ->
       emit_debug_info lr.lr_dbg;
       emit_call (global_gc_sym "caml_call_local_realloc" ~simd:lr.lr_save_simd);
       I.jmp (emit_asm_label_arg lr.lr_return_lbl))
@@ -785,8 +808,12 @@ type stack_realloc =
   { sc_label : L.t; (* Label of the reallocation code. *)
     sc_return : L.t; (* Label to return to after reallocation. *)
     sc_size_in_bytes : int; (* Size for reallocation. *)
-    sc_save_simd : Regs.Save_simd_regs.t
+    sc_save_simd : Regs.Save_simd_regs.t;
         (* What SIMD regs, if any, we need to save. *)
+    sc_cfa_offset : int; (* Offset of the CFA from rsp at the stack check. *)
+    sc_rbp_saved : bool
+        (* Whether the frame-pointer prologue has saved rbp at the stack
+           check. *)
   }
 
 let stack_realloc = ref ([] : stack_realloc list)
@@ -794,9 +821,28 @@ let stack_realloc = ref ([] : stack_realloc list)
 let clear_stack_realloc () = stack_realloc := []
 
 let emit_stack_realloc () =
+  (* With frame pointers, the rule that the prologue gives for rbp is in force
+     after the body. *)
+  let rbp_saved = ref fp in
   List.iter
-    (fun { sc_label; sc_return; sc_size_in_bytes; sc_save_simd } ->
+    (fun { sc_label;
+           sc_return;
+           sc_size_in_bytes;
+           sc_save_simd;
+           sc_cfa_offset;
+           sc_rbp_saved
+         } ->
+      keep_cfa_of_return_address ();
       D.define_label sc_label;
+      (* This code is reached from its stack check only, which may come before
+         the prologue, and not from the code laid out before it. *)
+      D.cfi_def_cfa_offset ~bytes:sc_cfa_offset;
+      if not (Bool.equal sc_rbp_saved !rbp_saved)
+      then (
+        if sc_rbp_saved
+        then cfi_rbp_saved ()
+        else D.cfi_restore ~reg:(Regs.dwarf_reg_number Int (P RBP));
+        rbp_saved := sc_rbp_saved);
       (* Pass the desired frame size on the stack, since all of the
          argument-passing registers may be in use. Also serves to align the
          stack properly before the call *)
@@ -809,7 +855,10 @@ let emit_stack_realloc () =
       I.jmp (emit_asm_label_arg sc_return))
     !stack_realloc
 
-let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
+(* [cfa_offset] is the offset of the CFA from rsp at the check, and [rbp_saved]
+   tells whether the frame-pointer prologue has saved rbp there. *)
+let emit_stack_check ~size_in_bytes ~save_registers ~save_simd ~cfa_offset
+    ~rbp_saved =
   let overflow = L.create Text and ret = L.create Text in
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
@@ -824,7 +873,9 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
     := { sc_label = overflow;
          sc_return = ret;
          sc_size_in_bytes = size_in_bytes;
-         sc_save_simd = save_simd
+         sc_save_simd = save_simd;
+         sc_cfa_offset = cfa_offset;
+         sc_rbp_saved = rbp_saved
        }
        :: !stack_realloc
 
@@ -2165,13 +2216,14 @@ let emit_instr ~first ~last ~fallthrough i =
       D.cfi_adjust_cfa_offset ~bytes:8;
       cfi_rbp_saved ();
       I.mov rsp rbp);
-    if !frame_required
-    then
-      let n = prologue_stack_offset () in
-      if n <> 0
-      then (
-        I.sub (int n) rsp;
-        D.cfi_adjust_cfa_offset ~bytes:n)
+    (if !frame_required
+     then
+       let n = prologue_stack_offset () in
+       if n <> 0
+       then (
+         I.sub (int n) rsp;
+         D.cfi_adjust_cfa_offset ~bytes:n));
+    cfi_frame := true
   | Lepilogue_open ->
     (* Deallocate the stack frame before a return or tail call *)
     let n = prologue_stack_offset () in
@@ -2182,12 +2234,14 @@ let emit_instr ~first ~last ~fallthrough i =
     if fp
     then (
       I.pop rbp;
-      D.cfi_adjust_cfa_offset ~bytes:(-8))
+      D.cfi_adjust_cfa_offset ~bytes:(-8));
+    cfi_frame := false
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
     let n = if fp then n + 8 else n in
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
+    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n;
+    cfi_frame := true
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
     if Nativeint.equal n 0n
@@ -2793,7 +2847,19 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel_for_jump_target label ->
-    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+    (* The code laid out before the label may run in the other state. *)
+    let frame =
+      match Label.Tbl.find_opt frame_at_labels label with
+      | Some frame when not (Bool.equal frame !cfi_frame) -> Some frame
+      | Some _ | None -> None
+    in
+    if Option.is_some frame then keep_cfa_of_return_address ();
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label;
+    Option.iter
+      (fun frame ->
+        D.cfi_def_cfa_offset ~bytes:(cfa_offset ~frame);
+        cfi_frame := frame)
+      frame
   | Llabel_for_dwarf label ->
     emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
@@ -2838,6 +2904,7 @@ let emit_instr ~first ~last ~fallthrough i =
       in
       I.lea (mem64 NONE delta (Scalar RSP)) rbp
   | Ladjust_stack_offset { delta_bytes } ->
+    keep_cfa_of_return_address ();
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
     stack_offset := !stack_offset + delta_bytes
   | Lpushtrap { lbl_handler } ->
@@ -2889,6 +2956,8 @@ let emit_instr ~first ~last ~fallthrough i =
       emit_stack_check ~size_in_bytes:max_frame_size_bytes
         ~save_registers:(not first)
         ~save_simd:(must_save_simd_regs i.live)
+        ~cfa_offset:(cfa_offset ~frame:!cfi_frame)
+        ~rbp_saved:(fp && !cfi_frame)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -2911,6 +2980,24 @@ let rec emit_all ~first ~fallthrough i =
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
         Printlinear.instr i;
       raise exn);
+    (match i.desc with
+    | Lcall_op (Lextcall { alloc; stack_ofs; _ }) ->
+      (* [caml_c_call] or [caml_c_call_stack_args]. *)
+      call_precedes := alloc || stack_ofs > 0
+    | Lraise (Raise_regular | Raise_reraise) ->
+      (* A [nop] follows the call when it ends the function. *)
+      call_precedes := not last
+    | Lcall_op (Lcall_imm { func }) ->
+      call_precedes := String.starts_with ~prefix:"caml_" func.sym_name
+    | Llabel_for_dwarf _ | Ladjust_stack_offset _ | Lepilogue_close -> ()
+    | Lprologue | Lepilogue_open | Lend | Lreloadretaddr | Lreturn | Lentertrap
+    | Lpoptrap _ | Lop _
+    | Lcall_op (Lcall_ind | Ltailcall_ind | Ltailcall_imm _ | Lprobe _)
+    | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+    | Lswitch _ | Lpushtrap _
+    | Lraise Raise_notrace
+    | Lstackcheck _ ->
+      call_precedes := false);
     let fallthrough =
       match i.desc with
       | Llabel_for_dwarf _ -> fallthrough
@@ -2922,6 +3009,118 @@ let rec emit_all ~first ~fallthrough i =
         Linear.has_fallthrough i.desc
     in
     emit_all ~first:false ~fallthrough i.next
+
+(* Whether the prologue is in the first block of the function. Every other block
+   then runs with the frame of the function. *)
+let rec prologue_in_entry_block (i : Linear.instruction) =
+  match i.desc with
+  | Lprologue -> true
+  | Lop _ | Lreloadretaddr | Llabel_for_dwarf _ | Ladjust_stack_offset _
+  | Lstackcheck _ ->
+    prologue_in_entry_block i.next
+  | Lend | Lepilogue_open | Lepilogue_close | Lcall_op _ | Lreturn
+  | Llabel_for_jump_target _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+  | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _ | Lraise _ ->
+    false
+
+(* With shrink-wrapped prologues, a block can be laid out after code that runs
+   with the frame of the function while the block runs without it, or the
+   reverse. The CFI directives describe the code in the order it is laid out, so
+   the CFA is set again at the labels where the two differ. This computes, for
+   each label, whether the frame is allocated when control reaches it.
+
+   A label that follows a call is left to the branches that lead to it, if there
+   are any: the call may not return. Code that runs without the frame is reached
+   without going through a call, so it is given its state before that. A block
+   that needs no frame and is reached in both states keeps the first one. *)
+let compute_frame_at_labels (body : Linear.instruction) =
+  let code_at = Label.Tbl.create 16 in
+  let rec index (i : Linear.instruction) =
+    match i.desc with
+    | Lend -> ()
+    | Llabel_for_jump_target label ->
+      Label.Tbl.replace code_at label i.next;
+      index i.next
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
+    | Lreloadretaddr | Lreturn | Llabel_for_dwarf _ | Lbranch _ | Lcondbranch _
+    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Ladjust_stack_offset _
+    | Lpushtrap _ | Lpoptrap _ | Lraise _ | Lstackcheck _ ->
+      index i.next
+  in
+  index body;
+  let branches = Stack.create () in
+  let after_calls = Queue.create () in
+  let branch frame label =
+    if not (Label.Tbl.mem frame_at_labels label)
+    then (
+      Label.Tbl.replace frame_at_labels label frame;
+      Stack.push label branches)
+  in
+  let rec scan ~after_call frame (i : Linear.instruction) =
+    match i.desc with
+    | Lend -> ()
+    | Llabel_for_jump_target label ->
+      if after_call
+      then Queue.push (label, frame) after_calls
+      else if not (Label.Tbl.mem frame_at_labels label)
+      then (
+        Label.Tbl.replace frame_at_labels label frame;
+        scan ~after_call:false frame i.next)
+    | Lprologue -> scan ~after_call:false true i.next
+    | Lepilogue_open -> scan ~after_call:false false i.next
+    | Lbranch label -> branch frame label
+    | Lcondbranch (_, label) ->
+      branch frame label;
+      scan ~after_call:false frame i.next
+    | Lcondbranch3 (label0, label1, label2) -> (
+      Option.iter (branch frame) label0;
+      Option.iter (branch frame) label1;
+      Option.iter (branch frame) label2;
+      match label0, label1, label2 with
+      | Some _, Some _, Some _ -> ()
+      | None, _, _ | _, None, _ | _, _, None ->
+        scan ~after_call:false frame i.next)
+    | Lswitch labels -> Array.iter (branch frame) labels
+    | Lpushtrap { lbl_handler } ->
+      branch frame lbl_handler;
+      scan ~after_call:false frame i.next
+    | Lcall_op (Ltailcall_imm { func }) ->
+      if String.equal func.sym_name !function_name
+      then Option.iter (branch frame) !tailrec_entry_point
+    | Lcall_op (Ltailcall_ind | Lextcall { returns = false; _ })
+    | Lreturn | Lraise _ | Lepilogue_close ->
+      ()
+    | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall { returns = true; _ }) ->
+      scan ~after_call:true frame i.next
+    | Ladjust_stack_offset _ | Llabel_for_dwarf _ ->
+      scan ~after_call frame i.next
+    | Lop _
+    | Lcall_op (Lprobe _)
+    | Lreloadretaddr | Lentertrap | Lpoptrap _ | Lstackcheck _ ->
+      scan ~after_call:false frame i.next
+  in
+  let scan_from label =
+    scan ~after_call:false
+      (Label.Tbl.find frame_at_labels label)
+      (Label.Tbl.find code_at label)
+  in
+  scan ~after_call:false false body;
+  let rec drain () =
+    match Stack.pop_opt branches with
+    | Some label ->
+      scan_from label;
+      drain ()
+    | None -> (
+      match Queue.take_opt after_calls with
+      | Some (label, frame) ->
+        if not (Label.Tbl.mem frame_at_labels label)
+        then (
+          Label.Tbl.replace frame_at_labels label frame;
+          scan_from label);
+        drain ()
+      | None -> ())
+  in
+  drain ()
 
 let all_functions = ref []
 
@@ -2984,18 +3183,30 @@ let fundecl fundecl =
   then
     emit_call
       (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_assert_stack_invariants");
+  cfi_frame := false;
+  call_precedes := false;
+  Label.Tbl.reset frame_at_labels;
+  if
+    fundecl.fun_prologue_required
+    && not (prologue_in_entry_block fundecl.fun_body)
+  then compute_frame_at_labels fundecl.fun_body;
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
   let fun_body_end = current_output_pos () in
-  List.iteri (fun i gc -> emit_call_gc ~after_body:(i = 0) gc) !call_gc_sites;
-  List.iteri
-    (fun i lr ->
-      emit_local_realloc ~after_body:(i = 0 && List.is_empty !call_gc_sites) lr)
-    !local_realloc_sites;
+  (* The out-of-line code of allocations runs with the frame of the function. *)
+  if
+    !frame_required && (not !cfi_frame)
+    && not (List.is_empty !call_gc_sites && List.is_empty !local_realloc_sites)
+  then (
+    D.cfi_def_cfa_offset ~bytes:(frame_size ());
+    cfi_frame := true);
+  List.iter emit_call_gc !call_gc_sites;
+  List.iter emit_local_realloc !local_realloc_sites;
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
+  call_precedes := false;
   (* [record_for_expect_asm] runs after the trailing out-of-line code so the
      [%%expect_asm_full] variant can include it (e.g. the stack-realloc
      handler). For the plain variant the body still stops at [fun_body_end] and
@@ -3007,7 +3218,9 @@ let fundecl fundecl =
        then current_output_pos ()
        else fun_body_end)
     ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
-  (if !frame_required
+  (* This adjustment is relative to the CFA of the frame. Stack reallocation
+     code ends with the CFA of its check. *)
+  (if !frame_required && !cfi_frame && List.is_empty !stack_realloc
    then
      let n = frame_size () - 8 - if fp then 8 else 0 in
      if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
@@ -3283,7 +3496,9 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   else if n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
-      ~save_simd:(must_save_simd_regs p.probe_insn.live);
+      ~save_simd:(must_save_simd_regs p.probe_insn.live)
+      ~cfa_offset:(if fp then 16 else 8)
+      ~rbp_saved:fp;
   emit_stack_offset n;
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in

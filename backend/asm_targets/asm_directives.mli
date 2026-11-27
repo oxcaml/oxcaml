@@ -149,6 +149,10 @@ val cfi_offset : reg:int -> offset:int -> unit
     value of the register that the frame address is computed from. *)
 val cfi_rel_offset : reg:int -> offset:int -> unit
 
+(** Note that the previous value of [reg] is found as at the start of the
+    function again: this undoes [cfi_offset] and [cfi_rel_offset]. *)
+val cfi_restore : reg:int -> unit
+
 (** Mark the beginning of a function, for CFI purposes. *)
 val cfi_startproc : unit -> unit
 
@@ -475,6 +479,7 @@ module Directive : sig
         { reg : int;
           offset : int
         }
+    | Cfi_restore of { reg : int }
     | Cfi_startproc
     | Cfi_remember_state
     | Cfi_restore_state

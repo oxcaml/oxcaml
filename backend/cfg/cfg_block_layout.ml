@@ -18,8 +18,9 @@ module DLL = Doubly_linked_list
 
    With shrink-wrapping, the DWARF CFI of blocks executed before the prologue
    but laid out after post-prologue blocks is imprecise for asynchronous
-   unwinding; this is a pre-existing property of the emitter (which resets the
-   CFA at [Lprologue]) that the permutation performed here does not change. *)
+   unwinding on arm64; this is a pre-existing property of that emitter that the
+   permutation performed here does not change. The amd64 emitter sets the CFA
+   again at such blocks. *)
 
 (* A block is considered hot if it is reachable from the entry block through
    non-cold blocks only. In particular, blocks reachable only through cold

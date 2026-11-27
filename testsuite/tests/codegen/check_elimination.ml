@@ -70,6 +70,7 @@ arr_sum:
   movq  $0, 272(%r14)
   call  caml_raise_exn@PLT
 .L2:
+  nop
 .L3:
   movl  $1, %eax
   ret

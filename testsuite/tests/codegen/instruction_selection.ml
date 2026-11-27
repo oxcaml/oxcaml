@@ -468,6 +468,7 @@ branch_or_tailcall:
   movq  <hidden PC-relative offset>(%rip), %rax
   call  caml_reraise_exn@PLT
 .L0:
+  nop
 .L1:
   movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
