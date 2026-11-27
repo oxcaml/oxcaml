@@ -605,9 +605,9 @@ let emit_directive state ~current_section ~all_sections
     | None -> Misc.fatal_error "Delta_uleb128: cannot resolve label difference")
   (* Directives that don't emit data *)
   | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc | Cfi_offset _
-  | Cfi_rel_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
-  | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _ | File _ | Global _
-  | Indirect_symbol _ | Loc _ | New_label _ | New_line | Private_extern _
-  | Section _ | Size _ | Type _ | Protected _ | Hidden _ | Weak _ | External _
-  | Reloc _ ->
+  | Cfi_rel_offset _ | Cfi_restore _ | Cfi_startproc | Cfi_remember_state
+  | Cfi_restore_state | Cfi_def_cfa_register _ | Comment _ | Direct_assignment _
+  | File _ | Global _ | Indirect_symbol _ | Loc _ | New_label _ | New_line
+  | Private_extern _ | Section _ | Size _ | Type _ | Protected _ | Hidden _
+  | Weak _ | External _ | Reloc _ ->
     ()

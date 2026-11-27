@@ -16,6 +16,7 @@ immutable_load:
   movq  camlStdlib__List__Pmakeblock2543_19@GOTPCREL(%rip), %rax
   call  caml_reraise_exn@PLT
 .L0:
+  nop
 .L1:
   movq  (%rax), %rax
   leaq  -1(%rax,%rax), %rax
