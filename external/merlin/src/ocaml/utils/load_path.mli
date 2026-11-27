@@ -31,6 +31,19 @@ type include_flags =
   { visibility : visibility;
     cmx_guaranteed : bool }
 
+(** A file located in the load path. Files are contributed either by
+    directories (-I, -H) or by manifest entries; for the latter,
+    [manifest_location] is the entry's location, that is the file's path
+    relative to the manifest files root ([$MANIFEST_FILES_ROOT]). *)
+type found =
+  { path : string;
+    include_flags : include_flags;
+    manifest_location : string option }
+
+val resolve_manifest_location : string -> string option
+(** The path of the file at the given location relative to the manifest files
+    root, or [None] if no root is set. *)
+
 val add_dir : include_flags -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
 
@@ -101,6 +114,10 @@ val find_normalized_with_include_flags : string -> string * include_flags
 (** Same as [find_normalized], but also reports the [include_flags] of the
     load path entry the file was found in, e.g. whether it was found in a
     -I directory (Visible) or a -H directory (Hidden) *)
+
+val find_normalized_with_origin : string -> found
+(** Same as [find_normalized_with_include_flags], also reporting the manifest
+    location if the file was found through a manifest entry. *)
 
 val[@deprecated] add : Dir.t -> unit
 (** Old name for {!append_dir} *)
