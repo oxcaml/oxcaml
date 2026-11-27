@@ -2186,9 +2186,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       (* Elements are tracked unless their implied modalities make them both
          [aliased] and [many]. *)
       let gf =
-        match
-          Types.get_desc (Ctype.expand_head pat.pat_env pat.pat_type)
-        with
+        match Types.get_desc (Ctype.expand_head pat.pat_env pat.pat_type) with
         | Tconstr (p, _, _) -> (
           match Predef.find_type_constr p with
           | Some (#Types.array_flavor as array_flavor) ->
