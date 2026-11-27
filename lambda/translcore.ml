@@ -434,6 +434,14 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* Reading a flat float field [e] allocates a box for the float. Boxing it at
+   the mode of the read is unsound if the field type crosses locality, since
+   the box can then be used beyond its region, so box on the heap instead. *)
+let float_field_read_mode e locality_mode =
+  if Ctype.crosses_locality e.exp_env e.exp_type
+  then alloc_heap
+  else transl_typed_locality_mode_r locality_mode
+
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
 
@@ -918,7 +926,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             | Boxing (locality_mode, _) -> locality_mode
             | Non_boxing _ -> assert false
           in
-          let mode = transl_typed_locality_mode_r locality_mode in
+          let mode = float_field_read_mode e locality_mode in
           Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
           Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
@@ -954,7 +962,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                 if i <> lbl.lbl_pos then Lambda.alloc_heap
                 else
                   match float with
-                    | Boxing (mode, _) -> transl_typed_locality_mode_r mode
+                    | Boxing (mode, _) -> float_field_read_mode e mode
                     | Non_boxing _ ->
                         Misc.fatal_error
                           "expected typechecking to make [float] boxing mode\

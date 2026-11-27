@@ -31,7 +31,12 @@
 
 module Iarray = Stdlib_stable.IarrayLabels
 
-let ( .:() ) = Iarray.( .:() )
+(* Use the primitive directly: binding it with [let] would make a generic
+   function, whose reads box floats on the heap. *)
+open struct
+  external ( .:() ) : ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
+    = "%array_safe_get"
+end
 
 external opaque_local : local_ 'a -> local_ 'a = "%opaque"
 
