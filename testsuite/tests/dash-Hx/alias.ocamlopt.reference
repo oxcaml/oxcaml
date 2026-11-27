@@ -1,2 +1,3 @@
->> Fatal error: slambda eval: unexpected missing value
+>> Fatal error: slambda eval: Expected value at file "alias.ml", line 3, characters 8-20
+to not be missing because it's a kind template being instantiated
 Fatal error: exception Misc.Fatal_error
