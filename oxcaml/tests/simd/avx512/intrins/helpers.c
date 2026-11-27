@@ -46,18 +46,14 @@ intnat test_buf_eq(intnat unused)
   return memcmp(bufs[1], bufs[2], 512) == 0;
 }
 
-intnat test_has_avx512_bf16(intnat unused)
+/* Whether CPUID.(EAX=7,ECX=subleaf) sets [bit] of register [reg], where 0-3
+   are EAX-EDX. */
+intnat test_cpuid7(intnat subleaf, intnat reg, intnat bit)
 {
-  unsigned int eax, ebx, ecx, edx;
-  (void)unused;
-  return __get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx) && (eax & (1u << 5));
-}
-
-intnat test_has_vpclmulqdq(intnat unused)
-{
-  unsigned int eax, ebx, ecx, edx;
-  (void)unused;
-  return __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) && (ecx & (1u << 10));
+  unsigned int regs[4];
+  return __get_cpuid_count(7, subleaf, &regs[0], &regs[1], &regs[2],
+                           &regs[3]) &&
+         ((regs[reg] >> bit) & 1);
 }
 
 #ifdef ARCH_AVX512

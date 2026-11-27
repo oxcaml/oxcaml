@@ -304,6 +304,8 @@ val any_rec_info : t
 
 val null : t
 
+val nullable : t -> t
+
 val any_non_null_value : t
 
 val this_tagged_immediate : Target_ocaml_int.t -> t

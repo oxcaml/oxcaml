@@ -1,0 +1,55 @@
+(let $camlStatic_const_or_variable__s5 = "static_const_or_variable.ml" in
+ let $camlStatic_const_or_variable__s6 =
+   Block 0 ($camlStatic_const_or_variable__s5, 17, 9)
+ in
+ let $camlStatic_const_or_variable__s7 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure,
+            $camlStatic_const_or_variable__s6)
+ in
+ let $camlStatic_const_or_variable__s4 = 0x1p+2 in
+ let $camlStatic_const_or_variable__s2 = 0x1p+1 in
+ let $camlStatic_const_or_variable__s1 = 0x1p+0 in
+ let $camlStatic_const_or_variable__s0 = 0x1.8p+1 in
+ let v = %opaque ($camlStatic_const_or_variable__s0) in
+ let prim = %unbox_num.`float` ($camlStatic_const_or_variable__s1) in
+ let prim_1 = %unbox_num.`float` (v) in
+ let prim_2 = %bfloat_arith.add (prim_1, prim) in
+ let float_add_into_float_add_field_unboxed_float = prim_2 in
+ let prim_3 = %unbox_num.`float` ($camlStatic_const_or_variable__s2) in
+ let prim_4 = float_add_into_float_add_field_unboxed_float in
+ let $camlStatic_const_or_variable__s3 = Float_block (prim_4, prim_3) in
+ (let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let prim_5 = %block_load.`float`.[`0`] ($camlStatic_const_or_variable__s3)
+   in
+   let Pfloatfield_into_Pfloatfield_field_unboxed_float = prim_5 in
+   let prim_6 = %unbox_num.`float` ($camlStatic_const_or_variable__s4) in
+   let prim_7 = Pfloatfield_into_Pfloatfield_field_unboxed_float in
+   let prim_8 = %float_comp.eq (prim_7, prim_6) in
+   let float_ordered_and_equal = %tag_imm (prim_8) in
+   (let untagged = %untag_imm (float_ordered_and_equal) in
+    switch untagged
+      | 0 -> k4
+      | 1 -> k2)
+     where k4 =
+       cont k3)
+    where k3 =
+      cont error pop(regular error) ($camlStatic_const_or_variable__s7)
+    where k2 =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
+      cont k1)
+   where k1 =
+     let $camlStatic_const_or_variable__s8 =
+       Block 0 (v, poison.val.reaper_field_of_static_const)
+     in
+     cont k)
+  where k define_root_symbol =
+    let field_0 =
+      %block_load.tag[`0`].`size`[`2`].[`0`]
+        ($camlStatic_const_or_variable__s8)
+    in
+    let $camlStatic_const_or_variable =
+      Block 0 (field_0, $camlStatic_const_or_variable__s3)
+    in
+    cont done ($camlStatic_const_or_variable)

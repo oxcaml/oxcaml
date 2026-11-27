@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # OxCaml LLVMIZE Test Suite
 
-This directory contains tests for the LLVM backend (llvmize) in the OxCaml compiler. The tests verify that OCaml programs compiled with the LLVM backend produce correct output and generate expected LLVM IR.
+This directory contains tests for the LLVM backend (llvmize) in the OxCaml compiler. The tests verify that OCaml programs compiled with the LLVM backend produce correct output.
 
 ## Prerequisites
 
@@ -21,15 +21,12 @@ export OXCAML_CLANG=/path/to/custom/clang
 - `test_*_main.ml` - Main entry points that use the compiled modules
 - `test_*_data.ml` / `test_*_defn.ml` - Supporting modules with data/definitions
 - `test_*.output` - Expected program output
-- `test_*_ir.output` - Expected filtered LLVM IR output
 - `*.c` - C stubs for foreign function tests
-- `filter.sh` - Normalizes LLVM IR output for stable comparisons
 - `gen/gen_dune.ml` - Generates dune rules for all tests
 
 **Build System:**
 - `dune.inc` - Auto-generated from `gen/gen_dune.ml`, contains test rules
 - Tests compile with `-llvm-backend -llvm-path ${OXCAML_CLANG}`
-- IR output is filtered to remove volatile identifiers
 - Foreign C stubs compiled with clang
 
 ## Commands
@@ -63,15 +60,7 @@ make promote
 
 ## Test Patterns
 
-### Simple IR Test (no execution)
-Tests that only verify LLVM IR generation:
-```ocaml
-(* id_fn.ml *)
-let id x = x
-```
-
-### IR Test with Execution
-Tests that verify both IR generation and program execution:
+### Test with a Main Module
 ```ocaml
 (* const_val.ml *)
 let x = 37
@@ -112,14 +101,12 @@ value stub_function(value x) { ... }
 
 2. Add test to `gen/gen_dune.ml`:
    ```ocaml
-   print_test_ir_and_run "test_name";  (* For IR + execution *)
-   print_test_ir_only "test_name";     (* For IR only *)
+   print_test_with_main "test_name";
    ```
 
 3. Create empty output files:
    ```bash
    touch test_name.output
-   touch test_name_ir.output  # If applicable
    ```
 
 4. Regenerate dune.inc and run tests:
@@ -143,7 +130,6 @@ value stub_function(value x) { ... }
 
 - Tests require AMD64 architecture
 - OXCAML_CLANG environment variable must be set
-- IR output is filtered to remove non-deterministic elements
 - All tests run with `-O3 -g` optimization flags
 - Poll insertion is currently disabled (`-disable-poll-insertion`)
 
@@ -179,17 +165,9 @@ value stub_function(value x) { ... }
 When tests fail, the diff shows expected vs actual output:
 
 ```bash
-# View the generated LLVM IR
-cat _build/default/oxcaml/tests/backend/llvmize/test_name.ll
-
-# View the filtered IR output
-cat _build/default/oxcaml/tests/backend/llvmize/test_name_ir.output.corrected
-
 # View execution output
 cat _build/default/oxcaml/tests/backend/llvmize/test_name.output.corrected
 ```
 
 Common issues:
 - Missing OXCAML_CLANG environment variable
-- Non-deterministic IR elements not properly filtered
-- Changes in LLVM IR format between versions
