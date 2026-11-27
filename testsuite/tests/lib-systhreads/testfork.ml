@@ -26,9 +26,15 @@ let main () =
   ignore(Thread.create compute_thread '1');
   Thread.delay 0.1;
   print_string "Forking..."; print_newline();
+  (* The child waits on this pipe until the parent has printed its line, which
+     comes first in the expected output. The read also returns if the parent
+     dies. *)
+  let (rd, wr) = Unix.pipe () in
   match Unix.fork() with
   | 0 ->
-      Thread.delay 0.05;
+      Unix.close wr;
+      ignore (Unix.read rd (Bytes.create 1) 0 1);
+      Unix.close rd;
       print_string "In child..."; print_newline();
       Gc.minor();
       print_string "Child did minor GC."; print_newline();
@@ -37,7 +43,9 @@ let main () =
       print_string "Child is exiting."; print_newline();
       exit 0
   | pid ->
+      Unix.close rd;
       print_string "In parent..."; print_newline();
+      Unix.close wr;
       let pid', stat = Unix.waitpid [WUNTRACED] pid in
       assert (pid = pid');
       assert (stat = WEXITED 0);

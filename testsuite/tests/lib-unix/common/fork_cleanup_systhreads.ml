@@ -20,6 +20,8 @@ let () =
   | 0 ->
      Unix.close fd;
      print_endline "OK"
-  | _ ->
+  | pid ->
      Unix.close fd;
-     Thread.join th
+     Thread.join th;
+     (* The child prints the test's output: do not exit before it has. *)
+     ignore (Unix.waitpid [] pid)
