@@ -83,6 +83,7 @@ let caml_sys_const name =
     | Backend_type -> "backend_type"
     | Arch_amd64 -> "arch_amd64"
     | Arch_arm64 -> "arch_arm64"
+    | Target_is_jsir -> "target_is_jsir"
   in
   ccallf "caml_sys_const_%s" const_name
 

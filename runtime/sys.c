@@ -712,6 +712,11 @@ CAMLprim value caml_sys_const_arch_arm64(value unit)
 #endif
 }
 
+CAMLprim value caml_sys_const_target_is_jsir(value unit)
+{
+  return Val_false;
+}
+
 CAMLprim value caml_sys_get_config(value unit)
 {
   CAMLparam0 ();   /* unit is unused */

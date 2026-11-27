@@ -388,6 +388,15 @@ function caml_sys_const_arch_arm64(_unit) {
   return arch === "arm64" ? 1 : 0;
 }
 
+// Only bytecode calls this: [%target_is_jsir] is a compile-time constant in
+// code compiled with [ocamlopt -target js_of_ocaml].
+//Provides: caml_sys_const_target_is_jsir const
+//Version: >= 5.2
+//If: oxcaml
+function caml_sys_const_target_is_jsir(_unit) {
+  return 0;
+}
+
 //Provides: caml_is_boot_compiler
 //Version: >= 5.2
 //If: oxcaml
