@@ -95,6 +95,8 @@ type hidden_include_file =
 val hidden_include_files : hidden_include_file list ref
 val parse_hidden_include_file :
   cmx_guaranteed:bool -> string -> (hidden_include_file, string) result
+val persistent_deps : bool ref
+val use_persistent_deps : bool ref
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref

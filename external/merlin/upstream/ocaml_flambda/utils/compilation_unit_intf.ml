@@ -47,3 +47,40 @@ let dummy = "*dummy*"
 let predef_exn = "*predef*"
 
 let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)
+
+module Found = struct
+  type cui = t
+
+  (* The path is ignored by [compare], [equal] and [hash]. The empty string
+     means no location is recorded. *)
+  type t =
+    { intf : cui;
+      cmi_path : Misc.filepath
+    }
+
+  let create intf ~cmi_path = { intf; cmi_path }
+
+  let without_cmi_path intf = create intf ~cmi_path:""
+
+  let intf t = t.intf
+
+  let cmi_path t = match t.cmi_path with "" -> None | path -> Some path
+
+  let doc_print ppf t = doc_print ppf t.intf
+
+  include Identifiable.Make (struct
+    type nonrec t = t
+
+    let compare t1 t2 = String.compare t1.intf t2.intf
+
+    let equal t1 t2 = String.equal t1.intf t2.intf
+
+    let hash t = Hashtbl.hash t.intf
+
+    let print ppf t = Fmt.compat doc_print ppf t
+
+    let output = Misc.output_of_doc_print doc_print
+  end)
+
+  let print = doc_print
+end

@@ -530,6 +530,8 @@ let ocaml_ignored_flags =
     "-Oclassic";
     "-only-erasable-extensions";
     "-opaque";
+    "-persistent-deps";
+    "-use-persistent-deps";
     "-output-complete-obj";
     "-output-complete-exe";
     "-output-obj";
