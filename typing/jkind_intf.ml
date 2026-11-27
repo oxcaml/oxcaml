@@ -71,10 +71,7 @@ module type Sort = sig
        information is stored in the data portion of the block. This property is
        encoded by the [addressable] kind operator: [k addressable] is "[k] made
        addressable", which is like [k] but may change how it is boxed.
-
-       (Currently, [addressable] does not yet actually affect boxed
-       representations. It will always be the case that it does not change how a
-       sort is represented outside of a block.)
+       Addressable does not change how a sort is represented outside of a block.
 
        The core properties of [addressable] are reflected in
        [Sort.constrain_addressable]. We also provide the following notes:

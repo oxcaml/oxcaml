@@ -549,6 +549,7 @@ and layout =
   | Punboxed_mask
   | Pvoid
   | Punboxed_product of layout list
+  | Paddressable of layout
   | Pbottom
   | Psplicevar of Layout_ident.t
 
@@ -573,6 +574,7 @@ and 'a mixed_block_element =
   | Untagged_immediate
   | Void
   | Product of 'a mixed_block_element array
+  | Addressable of 'a mixed_block_element
   | Splice_variable of Layout_ident.t
 
 and mixed_block_shape = unit mixed_block_element array
@@ -805,10 +807,14 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal
       (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
+  | Addressable e1, Addressable e2 ->
+      (* CR zeisbach: consider removing or turning this into a real comment.
+         Correctness relies on non-redundancy invariant *)
+      equal_mixed_block_element eq_param ~equal_value_kind e1 e2
   | Splice_variable id1, Splice_variable id2 -> Layout_ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
-     | Mask | Word | Untagged_immediate | Void | Product _
+     | Mask | Word | Untagged_immediate | Void | Product _ | Addressable _
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
@@ -907,6 +913,8 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Value v1, Value v2 -> Some (Value (join_value_kind v1 v2))
   | Product es1, Product es2 when Array.length es1 = Array.length es2 ->
       Option.map (fun es -> Product es) (join_mixed_block_shape es1 es2)
+  | Addressable e1, Addressable e2 ->
+      Option.map (fun e -> Addressable e) (join_mixed_block_element e1 e2)
   | Float_boxed (), Float_boxed () -> Some m1
   | Float64, Float64
   | Float32, Float32
@@ -923,9 +931,9 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Void, Void -> Some m1
   | Splice_variable id1, Splice_variable id2 when Layout_ident.equal id1 id2 ->
       Some m1
-  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
-      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-      | Untagged_immediate | Void | Product _ | Splice_variable _ ),
+  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+      | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+      | Void | Product _ | Addressable _ | Splice_variable _ ),
       _ ) ->
       None
 
@@ -961,6 +969,12 @@ let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
   | Void -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
+  | Addressable elem ->
+    (* CR zeisbach: maybe turn this into a real comment
+       This is a little subtle, but when deciding to use a mixed vs uniform
+       block, we don't care about addressability. Both [(value & void) box]
+       and [(value & void inherit) box] are singleton blocks. *)
+    is_value_or_void_element elem
   | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
@@ -1001,6 +1015,7 @@ let rec join_layout x y =
   | Punboxed_product layouts1, Punboxed_product layouts2
     when List.length layouts1 = List.length layouts2 ->
       Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Paddressable l1, Paddressable l2 -> Paddressable (join_layout l1 l2)
   | Punboxed_float f1, Punboxed_float f2
     when Primitive.equal_unboxed_float f1 f2 ->
       x
@@ -1013,7 +1028,8 @@ let rec join_layout x y =
   | Punboxed_mask, Punboxed_mask -> x
   | Psplicevar id1, Psplicevar id2 when Layout_ident.equal id1 id2 -> x
   | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ | Pvoid
-      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Paddressable _
+      |  Psplicevar _ ),
       _ ) ->
       Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
@@ -2073,6 +2089,7 @@ let rec sort_vars_of_mixed_block_element
   : type a. a mixed_block_element -> Layout_ident.Set.t = function
   | Splice_variable var -> Layout_ident.Set.singleton var
   | Product elements -> sort_vars_of_mixed_block_shape elements
+  | Addressable elem -> sort_vars_of_mixed_block_element elem
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Void
     ->
@@ -2088,6 +2105,7 @@ and sort_vars_of_mixed_block_shape
 let rec sort_vars_of_layout = function
   | Psplicevar var -> Layout_ident.Set.singleton var
   | Punboxed_product layouts -> sort_vars_of_list sort_vars_of_layout layouts
+  | Paddressable l -> sort_vars_of_layout l
   | Pvalue value_kind -> sort_vars_of_value_kind value_kind
   | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _
   | Punboxed_vector _ | Punboxed_mask | Pvoid | Pbottom ->
@@ -2367,6 +2385,7 @@ let mixed_block_shape_has_splices shape =
   let rec has_splices : 'a mixed_block_element -> bool = function
     | Splice_variable _ -> true
     | Product shape -> Array.exists has_splices shape
+    | Addressable elem -> has_splices elem
     | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
     | Untagged_immediate | Void -> false
@@ -2397,6 +2416,8 @@ let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Product shapes ->
     let get_value_kind _ = generic_value in
     Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Addressable elem ->
+    Addressable (mixed_block_element_for_read ~get_value_kind ~get_mode i elem)
   | Splice_variable id -> Splice_variable id
 
 and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
@@ -3041,44 +3062,39 @@ let project_from_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list
           -> 'a mixed_block_element
     = fun shape ~path ->
-  match path with
-  | [] ->
-    Misc.fatal_error "project_from_mixed_block_shape: path must be non-empty"
-  | field :: path ->
-    (* Perform the initial projection to identify which boxed field is
-       requested. *)
+  let rec project_from_shape shape field path =
     if field < 0 || field >= Array.length shape
     then
       Misc.fatal_errorf
         "project_from_mixed_block_shape: field index %d out of bounds for \
          shape of %d elements"
         field (Array.length shape);
-    let element = shape.(field) in
-    (* Now follow the path through any unboxed product nodes. *)
-    let rec project_from_mixed_block_element_by_path element path =
-      match path with
-      | [] ->
-        (* End of path reached. *)
-        element
-      | field :: path -> (
-        (* Path still continuing: we must be at an unboxed product node.
-           Extract the relevant projection and continue. *)
-        match element with
-        | Product shape ->
-          if field < 0 || field >= Array.length shape
-          then
-            Misc.fatal_errorf
-              "project_from_mixed_block_element: field index %d out of bounds \
-               for (nested) shape of %d elements"
-              field (Array.length shape);
-          project_from_mixed_block_element_by_path shape.(field) path
-        | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-        | Bits64 | Word | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
-        | Void | Splice_variable _ ->
-          Misc.fatal_error "project_from_mixed_block_element: path too long \
-            for mixed block shape")
-    in
-    project_from_mixed_block_element_by_path element path
+      (* Now follow the path through any unboxed product nodes. *)
+      project_from_element shape.(field) path
+  and project_from_element element path =
+    match element, path with
+    | _, [] ->
+      (* End of path reached. *)
+      element
+    | Product shape, field :: path ->
+      (* Path still continuing: we must be at an unboxed product node.
+         Extract the relevant projection and continue. *)
+      project_from_shape shape field path
+    | Addressable elem, _ :: _ -> project_from_element elem path
+    | ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+      | Bits64 | Word | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
+      | Void | Splice_variable _ ),
+      _ :: _ ->
+      Misc.fatal_error "project_from_mixed_block_element: path too long \
+        for mixed block shape"
+  in
+  match path with
+  | [] ->
+    Misc.fatal_error "project_from_mixed_block_shape: path must be non-empty"
+  | field :: path ->
+    (* Perform the initial projection to identify which boxed field is
+       requested. *)
+    project_from_shape shape field path
 
 let mixed_block_projection_may_allocate shape ~path =
   let rec allocates element =
@@ -3095,6 +3111,7 @@ let mixed_block_projection_may_allocate shape ~path =
           | Some alloc_mode, Some alloc_mode' ->
             Some (join_locality_mode alloc_mode alloc_mode'))
         None shape
+    | Addressable elem -> allocates elem
     (* CR layout poly: "At worst" this allocates on the stack because it'll be a
        Float_boxed. This should probably be computed after slambda eval, but
        it's currently used by transl. *)
@@ -3580,6 +3597,7 @@ let strip_locality_mode shape =
     match elt with
     | Float_boxed _ -> Float_boxed ()
     | Product elts -> Product (Array.map strip_elt elts)
+    | Addressable elem -> Addressable (strip_elt elem)
     | Value vk -> Value vk
     | Float64 -> Float64
     | Float32 -> Float32
@@ -3678,6 +3696,7 @@ let rec layout_of_mixed_block_element element =
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
+  | Addressable elem -> Paddressable (layout_of_mixed_block_element elem)
   | Splice_variable id -> Psplicevar id
 
 let layout_of_mixed_block_shape
@@ -3696,6 +3715,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
+  | Paddressable layout -> Addressable (mixed_block_element_of_layout layout)
   | Ptop | Pbottom ->
     Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
@@ -3729,6 +3749,8 @@ let rec layout_of_mixed_block_element_for_idx_set
     Punboxed_product
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+  | Addressable elem ->
+    Paddressable (layout_of_mixed_block_element_for_idx_set ext elem)
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
     let raw_kind =
       value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
@@ -3756,6 +3778,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Void -> []
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
+  | Addressable elem -> mixed_block_element_leaves elem
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate
   | Splice_variable _ ->
@@ -3765,9 +3788,9 @@ type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
 let will_be_reordered (mbe : _ mixed_block_element) =
   let acc =
     List.fold_left
-      (fun acc el ->
-        match el with
-        | Void | Product _ -> assert false
+      (fun acc leaf_element ->
+        match leaf_element with
+        | Void | Product _ | Addressable _ -> assert false
         | Splice_variable _ ->
           (* CR layout poly: Treat variables as potentially both, that causes
              this function to be maximally pessimistic. *)
