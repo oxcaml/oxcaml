@@ -575,7 +575,9 @@ let destroyed_at_small_memory_op =
     (* Everything stated above in the comment for [destroyed_at_large_memory_op]
        applies here too, but in addition we need one more scratch register [r10]
        in order to compute the additional [SlowPathCheck] for memory accesses that
-       are smaller than one word. *)
+       are smaller than one word. This is also the check made for the first and
+       the last byte of a vector that may be unaligned: see
+       [Emit.Address_sanitizer.emit_sanitize]. *)
     [| rdi; r10; r11 |]
   else
     [||]
@@ -635,9 +637,16 @@ let destroyed_by_simd_op (op : Simd.operation) =
        | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y
        | Kflag _ -> [||])
 
+(* The address sanitizer check for the memory operand of a SIMD operation is
+   that of a load or store of the same width, where a vector is taken to be
+   unaligned: see [Emit.emit_simd_sanitize]. These are the registers of the
+   biggest of these checks, whatever the operand. *)
+let destroyed_at_simd_memory_op = destroyed_at_small_memory_op
+
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
-  | Load op | Store op -> destroyed_by_simd_op op
+  | Load op | Store op ->
+    Array.append destroyed_at_simd_memory_op (destroyed_by_simd_op op)
 
 let destroyed_at_raise () = Lazy.force all_phys_regs
 
@@ -676,11 +685,17 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     Lazy.force destroyed_at_single_float64_store
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
-                Single { reg = Float32 } ), _, _))
+                Single { reg = Float32 } |
+                Onetwentyeight_unaligned |
+                Twofiftysix_aligned | Twofiftysix_unaligned |
+                Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
   | Op (Load { memory_chunk =
                (Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
-                Single _); _ })
+                Single _ |
+                Onetwentyeight_unaligned |
+                Twofiftysix_aligned | Twofiftysix_unaligned |
+                Fivetwelve_aligned | Fivetwelve_unaligned); _ })
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
   | Op(Intop_atomic
          { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
@@ -690,15 +705,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_atomic_compare_set
   | Op(Store( (Word_int | Word_static_block | Word_code_pointer |
                Word_out_of_heap_data_pointer | Word_mask | Word_val | Double |
-               Onetwentyeight_aligned | Onetwentyeight_unaligned |
-               Twofiftysix_aligned | Twofiftysix_unaligned |
-               Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
+               Onetwentyeight_aligned), _, _))
   | Op(Load { memory_chunk =
                 (Word_int | Word_static_block | Word_code_pointer |
                  Word_out_of_heap_data_pointer | Word_mask | Word_val | Double |
-                 Onetwentyeight_aligned | Onetwentyeight_unaligned |
-                 Twofiftysix_aligned | Twofiftysix_unaligned |
-                 Fivetwelve_aligned | Fivetwelve_unaligned); _})
+                 Onetwentyeight_aligned); _})
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->
@@ -715,7 +726,12 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     (* The call to the coverage callback preserves all registers. *)
     [||]
   | Op (Specific (Isimd op)) ->
-    destroyed_by_simd_op op
+    if Simd.is_memory_operation op
+    then
+      (* The memory operand is implicit: see
+         [Emit.emit_implicit_simd_sanitize]. *)
+      Array.append destroyed_at_simd_memory_op (destroyed_by_simd_op op)
+    else destroyed_by_simd_op op
   | Op (Specific (Isimd_mem (op,_))) ->
     destroyed_by_simd_mem_op op
   | Op (Specific (Illvm_intrinsic intr)) ->
