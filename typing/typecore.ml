@@ -8605,7 +8605,8 @@ and type_expect_
       match get_desc (expand_head env ty_expected) with
       | Tconstr(p, [arg1; _], _)
         when Path.same p Predef.path_idx_imm
-          || Path.same p Predef.path_idx_mut ->
+          || Path.same p Predef.path_idx_mut
+          || Path.same p Predef.path_idx_atomic ->
         arg1
       | _ ->
         newgenvar (Jkind.Builtin.value_or_null ~why:Idx_base)
