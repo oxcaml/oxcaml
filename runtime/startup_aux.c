@@ -220,8 +220,16 @@ static void parse_ocamlrunparam(char_os* opt)
 extern char caml_ocamlrunparam[];
 #endif
 
+/* The number of outstanding calls to caml_startup */
+static int startup_count = 0;
+
 void caml_parse_ocamlrunparam(void)
 {
+  /* A call to caml_startup when the runtime is already started is ignored:
+     it must not reset the parameters of the running runtime. */
+  if (startup_count > 0)
+    return;
+
   init_startup_params();
   caml_init_gc_tweaks();
 
@@ -234,9 +242,6 @@ void caml_parse_ocamlrunparam(void)
 
   parse_ocamlrunparam(opt);
 }
-
-/* The number of outstanding calls to caml_startup */
-static int startup_count = 0;
 
 /* Has the runtime been shut down already? */
 static int shutdown_happened = 0;
