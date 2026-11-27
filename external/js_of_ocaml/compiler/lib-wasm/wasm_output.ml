@@ -1286,13 +1286,13 @@ let f ~opt_source_map_file ch fields =
   let module O = Make (struct
     type t = out_channel
 
-    let position oc = pos_out oc
+    let position = pos_out
 
-    let seek oc p = seek_out oc p
+    let seek t p = seek_out t p
 
-    let byte oc b = output_byte oc b
+    let byte t b = output_byte t b
 
-    let string oc s = output_string oc s
+    let string t s = output_string t s
 
     let push_mapping m = mappings := m :: !mappings
 
