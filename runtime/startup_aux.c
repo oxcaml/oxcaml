@@ -117,17 +117,50 @@ static void init_startup_params(void)
   params.event_trace = 0;
 }
 
+/* The value of [c] as a digit in [base], or -1. */
+static int digit (char_os c, uintnat base)
+{
+  int d = c >= '0' && c <= '9' ? c - '0'
+        : c >= 'a' && c <= 'f' ? c - 'a' + 10
+        : c >= 'A' && c <= 'F' ? c - 'A' + 10
+        : -1;
+  return d < (int) base ? d : -1;
+}
+
+/* Reads "=<decimal number>" or "=0x<hexadecimal number>", then one of the
+   multipliers k, M and G. Without a number, the parameter is 1. */
 static void scanmult (char_os *opt, uintnat *var)
 {
-  char_os mult = ' ';
-  unsigned int val = 1;
-  sscanf_os (opt, T("=%u%c"), &val, &mult);
-  sscanf_os (opt, T("=0x%x%c"), &val, &mult);
-  switch (mult) {
-  case 'k':   *var = (uintnat) val * 1024; break;
-  case 'M':   *var = (uintnat) val * (1024 * 1024); break;
-  case 'G':   *var = (uintnat) val * (1024 * 1024 * 1024); break;
-  default:    *var = (uintnat) val; break;
+  char_os *p = opt, *digits;
+  uintnat val = 0, base = 10, scale;
+  int negative = 0, overflow = 0;
+
+  *var = 1;
+  if (*p++ != '=') return;
+  if (p[0] == '0' && p[1] == 'x' && digit(p[2], 16) >= 0) {
+    base = 16;
+    p += 2;
+  } else {
+    while (*p == ' ' || (*p >= '\t' && *p <= '\r')) p++;
+    negative = *p == '-';
+    if (*p == '-' || *p == '+') p++;
+  }
+  for (digits = p; digit(*p, base) >= 0; p++) {
+    overflow |= caml_umul_overflow(val, base, &val);
+    overflow |= caml_uadd_overflow(val, digit(*p, base), &val);
+  }
+  if (p == digits) return;
+  if (negative) val = -val;
+  switch (*p) {
+  case 'k':   scale = 1024; break;
+  case 'M':   scale = 1024 * 1024; break;
+  case 'G':   scale = 1024 * 1024 * 1024; break;
+  default:    scale = 1; break;
+  }
+  if (overflow || caml_umul_overflow(val, scale, var)) {
+    char *number = caml_stat_strdup_of_os(opt + 1);
+    number[strcspn(number, ",")] = '\0';
+    caml_fatal_error("OCAMLRUNPARAM: number too large: %s", number);
   }
 }
 
@@ -220,8 +253,16 @@ static void parse_ocamlrunparam(char_os* opt)
 extern char caml_ocamlrunparam[];
 #endif
 
+/* The number of outstanding calls to caml_startup */
+static int startup_count = 0;
+
 void caml_parse_ocamlrunparam(void)
 {
+  /* A call to caml_startup when the runtime is already started is ignored:
+     it must not reset the parameters of the running runtime. */
+  if (startup_count > 0)
+    return;
+
   init_startup_params();
   caml_init_gc_tweaks();
 
@@ -234,9 +275,6 @@ void caml_parse_ocamlrunparam(void)
 
   parse_ocamlrunparam(opt);
 }
-
-/* The number of outstanding calls to caml_startup */
-static int startup_count = 0;
 
 /* Has the runtime been shut down already? */
 static int shutdown_happened = 0;
