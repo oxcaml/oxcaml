@@ -117,7 +117,7 @@ let run_script ppf name args =
   Clflags.debug := true;
   override_sys_argv args;
   let filename = filename_of_input name in
-  Compmisc.init_path ~dir:(Filename.dirname filename) ();
+  Topeval.init_path ~dir:(Filename.dirname filename) ();
                    (* Note: would use [Filename.abspath] here, if we had it. *)
   Sys.interactive := false;
   run_hooks After_setup;

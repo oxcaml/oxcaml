@@ -51,3 +51,8 @@ include module type of Topcommon.MakeEvalPrinter(EvalBase)
 val load_file : bool -> formatter -> string -> bool
 
 val init: unit -> unit
+
+(* [Compmisc.init_path], after which the environment still knows the CRCs of
+   the interfaces imported by the toplevel itself and by the units that are
+   loaded. *)
+val init_path: ?dir:string -> unit -> unit
