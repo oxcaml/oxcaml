@@ -3240,15 +3240,20 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   assert (k mod 8 = 0);
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
-  (* Allocate stack space *)
+  (* Allocate stack space. The wrapper calls the handler, so with stack checks
+     it checks the stack whatever the size of its frame, as a function that
+     makes a call does. *)
+  clear_stack_realloc ();
   if Config.no_stack_checks
   then (
     if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
     then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
-  else if n >= Stack_check.stack_threshold_size
-  then
+  else
+    (* The arguments of the probe are still in their registers. *)
     emit_stack_check ~size_in_bytes:n ~save_registers:true
-      ~save_simd:(must_save_simd_regs p.probe_insn.live);
+      ~save_simd:
+        (must_save_simd_regs
+           (Reg.add_set_array p.probe_insn.live p.probe_insn.arg));
   emit_stack_offset n;
   (* Save all live hard registers *)
   let offset = aux_offset + tmp_offset + loc_offset in
@@ -3301,6 +3306,11 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   emit_stack_offset (-n);
   if fp then pop rbp;
   I.ret ();
+  if not Config.no_stack_checks
+  then (
+    (* The stack check is made once the frame pointer is pushed. *)
+    if fp then D.cfi_adjust_cfa_offset ~bytes:8;
+    emit_stack_realloc ());
   D.cfi_endproc ();
   emit_function_type_and_size wrap_label
 

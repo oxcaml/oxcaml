@@ -121,3 +121,36 @@
        (= %{system} "linux")))
  (deps f2.expected f2.output)
  (action (diff f2.expected f2.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (targets stack_check.exe stack_check_reaper.exe stack_check_linear.exe)
+ (deps stack_check.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt}  %{deps} -o stack_check.exe)
+   (run %{bin:ocamlopt.opt}  -O3 -flambda2-reaper %{deps} -o stack_check_reaper.exe)
+   (run %{bin:ocamlopt.opt}  -no-cfg-stack-checks %{deps} -o stack_check_linear.exe))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target stack_check.output)
+ (deps stack_check.exe stack_check_reaper.exe stack_check_linear.exe)
+ (action (with-outputs-to %{target}
+         (progn (run ./stack_check.exe narrow) (run ./stack_check.exe wide)
+                (run ./stack_check_reaper.exe narrow)
+                (run ./stack_check_reaper.exe wide)
+                (run ./stack_check_linear.exe narrow)
+                (run ./stack_check_linear.exe wide)))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps stack_check.expected stack_check.output)
+ (action (diff stack_check.expected stack_check.output)))
