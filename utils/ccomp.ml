@@ -46,7 +46,7 @@ let build_response_file lst =
   List.iter (fun f -> Printf.fprintf oc "%s\n" f) lst;
   close_out oc;
   at_exit (fun () -> Misc.remove_file responsefile);
-  "@" ^ responsefile
+  Filename.quote ("@" ^ responsefile)
 
 let quote_files ~response_files lst =
   let lst = List.filter (fun f -> f <> "") lst in

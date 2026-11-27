@@ -1,0 +1,12 @@
+; The generator of the generic functions cache must fail when the archiver
+; does.
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (run
+   sh
+   %{dep:archiver_fails.sh}
+   %{dep:../../../../tools/generate_cached_generic_functions.exe})))
