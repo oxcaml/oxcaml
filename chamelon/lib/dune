@@ -11,7 +11,7 @@
  (name chamelon_lib)
  (libraries chamelon_compat unix)
  (flags (:standard -open Chamelon_compat))
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
 )
 
 (env

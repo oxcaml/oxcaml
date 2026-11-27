@@ -117,13 +117,34 @@ library root. No test is skipped because of the variable: what a pass
 skips is what the tests' own guards (`no-stack-checks;`,
 `only-default-codegen;`, ...) exclude for that variant.
 
-Three things are built for `base` in every build, and no pass of the
-testsuite covers them for another variant: the bytecode runtime (`ocamlrun`,
-and what `-custom` links), the compiler executables themselves, and the dune
-tests (`make runtest`). The one exception is the AddressSanitizer backend
-tests, which `make runtest` also runs in the build context of every variant
-with AddressSanitizer that is built (`asan-fp`, and `asan-fp-poll` where
-`configure` selected it).
+The dune tests take the same variable:
+
+    $ make runtest CODEGEN_VARIANT=fp
+
+builds and runs them in the build context of the variant (`main-fp`) instead
+of the main context, and `make minimizer CODEGEN_VARIANT=fp` builds the
+minimizer there. In the context of a variant:
+
+- The programs that dune compiles for the tests are compiled by the boot
+  compiler, as in the main context, with the variant's flags, against the
+  variant's library tree and runtime.
+- The tests that run a compiler themselves run the `ocamlopt.opt` of that
+  context: the compiler's own code, compiled for the variant and linked with
+  the variant's libraries and runtime. Its default is the variant: the
+  context sets every axis in `OCAMLPARAM`, before the `_`, so a flag that a
+  test passes on purpose still wins (`-disable-poll-insertion`, say).
+- Bytecode has no variant here either: bytecode programs run under the
+  `ocamlrun` that the build installs, as in the main context.
+- The AddressSanitizer backend tests check instrumented code in the context
+  of a variant with AddressSanitizer (`make runtest CODEGEN_VARIANT=asan-fp`)
+  and reduce to one line of output in the others.
+
+Two things remain that no pass covers: the installed compiler executables and
+the bytecode runtime (`ocamlrun`, and what `-custom` links) are always built
+for `base`. The upstream testsuite is never driven by an installed compiler
+that is itself compiled for another variant, and never runs bytecode under a
+runtime built with another variant's C flags (an instrumented `ocamlrun`,
+say).
 
 For a quick pass, add `VARIANT_ONLY=1`:
 

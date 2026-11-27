@@ -120,6 +120,13 @@ include $(ROOTDIR)/Makefile.codegen-variants
 # defined-but-empty BUILD_OCAMLPARAM must degrade to the "_" form: OCAMLPARAM
 # values without a "_" separator are rejected and discarded wholesale, which
 # would silently drop the axis settings.
+# The axis settings come before the "_": they are the context's defaults,
+# which a flag on a command line overrides. The tests that run in the
+# context rely on that (oxcaml/tests/backend/polls compiles with
+# -disable-poll-insertion whatever the variant); no library of the build
+# passes such a flag. OXCAML_VARIANT_OCAMLPARAM has the axis settings
+# alone, for the test rules that replace OCAMLPARAM
+# (oxcaml/tests/backend/vectorizer).
 # A variant context also compiles its C stubs for its variant: its
 # OC_CFLAGS_SEXP names its own C flags, duneconf/oc_cflags_main-<name>.sexp,
 # which the _build/_bootinstall recipe generates. (This is the
@@ -135,7 +142,7 @@ stub_macros_expected = $(strip $(foreach t,asan fp sc,\
   -DEXPECT_$(t)=$(if $(call codegen_variant_has,$(1),$(t)),1,0)))
 
 # $(call VARIANT_ENV_VARS,<name>)
-VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_),$(call codegen_variant_ocamlparam,$(1))") ("OC_CFLAGS_SEXP" "duneconf/oc_cflags_main-$(1).sexp"))
+VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(call codegen_variant_ocamlparam,$(1)),$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_)") ("OXCAML_VARIANT_OCAMLPARAM" "$(call codegen_variant_ocamlparam,$(1)),_") ("OC_CFLAGS_SEXP" "duneconf/oc_cflags_main-$(1).sexp"))
 
 # $(call dune_variant_context,<name>)
 define dune_variant_context
@@ -255,30 +262,38 @@ minimize-failure: boot-minimizer boot-compiler
 # since all the non-merlin directories in that folder are vendored anyways.)
 runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
 
-# The variants with AddressSanitizer among those that are built besides the
-# default.
-asan_variant_names = $(strip $(foreach n,$(codegen_variant_names),\
-  $(if $(call codegen_variant_has,$(n),asan),$(n))))
-
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
-# OXCAML_POLL_INSERTION carries the poll setting of the codegen variant
-# the runtest context builds (the configure default), for tests that must
-# gate on compiler-inserted polls (oxcaml/tests/simd/preemption256.ml).
-runtest: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(CODEGEN_DEFAULT_VARIANT),poll),true,false) $(dune) build $(ws_main) $(runtest_targets)
-# The AddressSanitizer backend tests check instrumented code. Where
-# AddressSanitizer is the configure default they run in the main context,
-# with the rest of runtest; elsewhere they only build there. They also run
-# in the context of every other variant with AddressSanitizer that is
-# built: asan-fp, or asan-fp-poll where poll insertion is the default (see
-# oxcaml/tests/backend/address_sanitizer/dune).
-	set -e; for name in $(asan_variant_names); do \
-	  $(dune) build --workspace=duneconf/main-$$name.ws \
-	    @oxcaml/tests/backend/address_sanitizer/runtest; \
-	done
+#
+# The dune tests can run for any codegen variant this tree builds:
+#   make runtest CODEGEN_VARIANT=fp
+# runs them in the build context of that variant (main-fp) instead of the
+# main context, which is that of the default variant. See "Testing other
+# codegen variants and runtimes" in HACKING.ox.adoc for what such a run
+# covers.
+#
+# $(call codegen_variant_workspace,<name>): the dune option that selects
+# the build context of variant <name>.
+codegen_variant_workspace = $(if $(filter $(CODEGEN_DEFAULT_VARIANT),$(1)),\
+  $(ws_main),--workspace=duneconf/main-$(1).ws)
+
+# The variant that CODEGEN_VARIANT selects for the targets that build in a
+# variant's context (runtest, minimizer): the default one when the variable
+# is not set.
+tested_codegen_variant = \
+  $(or $(strip $(CODEGEN_VARIANT)),$(CODEGEN_DEFAULT_VARIANT))
+tested_codegen_variant_is_default = \
+  $(filter $(CODEGEN_DEFAULT_VARIANT),$(tested_codegen_variant))
+tested_codegen_variant_workspace = \
+  $(call codegen_variant_workspace,$(tested_codegen_variant))
+
+# OXCAML_POLL_INSERTION carries the poll setting of that variant, for tests
+# that must gate on compiler-inserted polls
+# (oxcaml/tests/simd/preemption256.ml).
+runtest: check-codegen-variant compiler
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(tested_codegen_variant),poll),true,false) $(dune) build $(tested_codegen_variant_workspace) $(runtest_targets)
 
 # The LLVM backend requires frame pointers and rejects stack checks and
 # AddressSanitizer whatever the configure default (see
@@ -864,6 +879,8 @@ endef
 # test-one, test-one-no-rebuild, promote-one, promote-one-no-rebuild,
 # promote-failed and runtest-upstream. With VARIANT_ONLY=1 as well, the pass
 # leaves out the test files in which nothing depends on the variant.
+# runtest and minimizer honor the variable too: they build in the variant's
+# context (see runtest).
 CODEGEN_VARIANT ?=
 
 # $(call check_codegen_variants,<names>): fail, before anything is built or

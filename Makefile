@@ -182,10 +182,15 @@ boot-minimizer:
 	cp chamelon/compat/dune.ox chamelon/compat/dune
 	$(dune) build $(ws_boot) @chamelon/all
 
+# With CODEGEN_VARIANT=<name>, the minimizer is built for that codegen
+# variant, in the variant's build context (see runtest in
+# Makefile.common-ox), which needs the variant's library tree: `make
+# compiler` builds it.
 .PHONY: minimizer
-minimizer: boot-compiler
+minimizer: check-codegen-variant \
+  $(if $(tested_codegen_variant_is_default),boot-compiler,compiler)
 	cp chamelon/compat/dune.ox chamelon/compat/dune
-	$(dune) build $(ws_main) @chamelon/all
+	$(dune) build $(tested_codegen_variant_workspace) @chamelon/all
 
 .PHONY: hacking-externals
 hacking-externals: _build/_bootinstall

@@ -22,7 +22,7 @@
  (libraries chamelon_lib minios minisexp unix)
  (package ocaml)
  (flags (:standard -open Chamelon_lib))
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
 )
 
 (env

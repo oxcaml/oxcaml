@@ -41,7 +41,10 @@ let compile ~enabled_if ~extra_flags name =
   in
   (* We override the OCAMLPARAM environment variable below, because
    * the vectorizer tests uses the "dump-to-file" feature of the
-   * compiler which is also used by the CI job for metrics collection. *)
+   * compiler which is also used by the CI job for metrics collection.
+   * The build context of a codegen variant sets the variant in OCAMLPARAM
+   * too: OXCAML_VARIANT_OCAMLPARAM has that part alone (see
+   * VARIANT_ENV_VARS in Makefile.common-ox). *)
   rule ~subst
     {|
 (rule
@@ -52,7 +55,7 @@ let compile ~enabled_if ~extra_flags name =
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} ${flags} ${extra_flags} -o ${runner}))))
 |}
 

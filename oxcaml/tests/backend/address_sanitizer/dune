@@ -9,13 +9,11 @@
 
 ;; These tests check AddressSanitizer instrumentation, so the executable
 ;; removes the -fno-asan that the build contexts compile with (see
-;; Makefile.common-ox). It is then instrumented wherever its context's
-;; codegen variant has AddressSanitizer: in the "main" context when
-;; AddressSanitizer is the configure default, and in the context of a
-;; codegen variant that has it ("main-asan-fp", say), which `make runtest`
-;; also drives for every such variant that is built. In a context whose
-;; variant has no AddressSanitizer the executable builds uninstrumented and
-;; skips its checks.
+;; Makefile.common-ox). It is then instrumented in the context of a codegen
+;; variant that has AddressSanitizer ("main-asan-fp", say), where
+;; `make runtest CODEGEN_VARIANT=asan-fp` runs it. In a context whose variant
+;; has no AddressSanitizer the executable builds uninstrumented and skips
+;; its checks.
 
 (executables
  (names address_sanitizer)
@@ -27,31 +25,13 @@
 
 ;; Whether the executable just built is instrumented (per context, see
 ;; above). The executable reads the answer from should_run_tests.out and
-;; reduces to a single "Possibly running" line when it is false.
-;; In the "main" context this is whether AddressSanitizer is the configure
-;; default, which is not expressible in an "enabled_if" clause because dune
-;; does not support %{ocaml-config:with_address_sanitizer}.
+;; reduces to a single "Possibly running" line when it is false. The answer
+;; comes from the constants that the _build/_bootinstall recipe in
+;; Makefile.common-ox generates for the context (see otherlibs/dynlink/dune):
+;; dune has no %{ocaml-config:...} variable for it.
 
 (rule
- (enabled_if (= %{context_name} "main"))
- (targets should_run_tests.out)
- (action
-   (with-accepted-exit-codes 0
-     (bash
-        "if %{bin:ocamlopt.opt} -config | grep -q 'with_address_sanitizer: true' ;
-        then
-           echo true > %{targets}
-        else
-           echo false > %{targets}
-        fi"))))
-
-;; In the context of a codegen variant, the answer comes from the constants
-;; that the _build/_bootinstall recipe in Makefile.common-ox generates for
-;; the context (see otherlibs/dynlink/dune).
-
-(rule
- (enabled_if
-  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (enabled_if (<> %{context_name} "default"))
  (targets should_run_tests.out)
  (deps
   (:variant

@@ -6,6 +6,9 @@
 ; the default one: every target accepts it. The options that the failure
 ; points to select the other configuration: with it, the run processes the
 ; files that the first run skipped and skips the others.
+; Only in the main context: in the context of a codegen variant the compiler
+; saves IR under the variant's configuration, which it takes from OCAMLPARAM,
+; and the tool, which does not read that variable, would be run without it.
 
 (rule
  (enabled_if

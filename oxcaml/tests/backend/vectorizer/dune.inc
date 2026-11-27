@@ -7,7 +7,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test1_runner.exe))))
 
 (rule
@@ -44,7 +44,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test1_vectorized_runner.exe))))
 
 (rule
@@ -91,7 +91,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_arrays_runner.exe))))
 
 (rule
@@ -128,7 +128,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_arrays_vectorized_runner.exe))))
 
 (rule
@@ -175,7 +175,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_int64_unboxed_runner.exe))))
 
 (rule
@@ -212,7 +212,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_int64_unboxed_vectorized_runner.exe))))
 
 (rule
@@ -259,7 +259,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_float_unboxed_runner.exe))))
 
 (rule
@@ -296,7 +296,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_float_unboxed_vectorized_runner.exe))))
 
 (rule
@@ -343,7 +343,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_int64_runner.exe))))
 
 (rule
@@ -380,7 +380,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_int64_vectorized_runner.exe))))
 
 (rule
@@ -427,7 +427,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_float_runner.exe))))
 
 (rule
@@ -464,7 +464,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_float_vectorized_runner.exe))))
 
 (rule
@@ -511,7 +511,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_float32_unboxed_runner.exe))))
 
 (rule
@@ -548,7 +548,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_float32_unboxed_vectorized_runner.exe))))
 
 (rule
@@ -595,7 +595,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_int32_unboxed_runner.exe))))
 
 (rule
@@ -632,7 +632,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_int32_unboxed_vectorized_runner.exe))))
 
 (rule
@@ -679,7 +679,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_spill_valx2_runner.exe))))
 
 (rule
@@ -716,7 +716,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_spill_valx2_vectorized_runner.exe))))
 
 (rule
@@ -763,7 +763,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_register_compatible_runner.exe))))
 
 (rule
@@ -800,7 +800,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_register_compatible_vectorized_runner.exe))))
 
 (rule
@@ -859,7 +859,7 @@
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -Oclassic -vectorize -o test1_classic_runner.exe))))
 
 (rule
