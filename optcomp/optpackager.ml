@@ -200,6 +200,11 @@ end) : S = struct
         (Compilenv.get_export_info ui
         :: List.map Compilenv.get_export_info units)
     in
+    let ui_static_data =
+      (* [ui.ui_static_data] is an index into [ui.ui_file_sections]. *)
+      Slambda.CU_data.write ~sections:file_sections
+        (Slambda.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
+    in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
       (fun info ->
@@ -234,7 +239,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-        ui_static_data = ui.ui_static_data;
+        ui_static_data;
         ui_lto_info = None;
         ui_file_sections = File_sections.Builder.build file_sections
       }

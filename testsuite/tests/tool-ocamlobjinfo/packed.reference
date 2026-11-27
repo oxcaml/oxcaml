@@ -1,0 +1,19 @@
+File pack.cmx
+Name: Pack
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Packed
+	Pack
+Interfaces imported:
+	00000000000000000000000000000000	Pack
+	00000000000000000000000000000000	CamlinternalFormatBasics
+	00000000000000000000000000000000	Stdlib
+Implementations imported:
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Static data: (missing)
