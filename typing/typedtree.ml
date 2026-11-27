@@ -177,7 +177,7 @@ let aliased_many_use =
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
 type label_ambiguity =
-  | Ambiguous of { path: Path.t; arity : int }
+  | Ambiguous of { path: Path.t; arity : int; boxed : bool }
   | Unambiguous
 
 type _ type_inspection =

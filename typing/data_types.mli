@@ -27,6 +27,7 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
+    cstr_sum: Jkind_types.Sum_repr.t option;
     cstr_shape: constructor_representation;
                                         (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if represented as a constant:
@@ -54,6 +55,12 @@ val may_equal_constr :
 
 (* Type constructor of the constructor's result type. *)
 val cstr_res_type_path : constructor_description -> Path.t
+val is_boxed_sum_constructor : constructor_description -> bool
+
+(** A boxed constructor with a single runtime alternative keeps its ordinary
+    payload representation, even if a fused sibling shifts its runtime tag. *)
+val sum_for_constructor_payload :
+  constructor_description -> Jkind_types.Sum_repr.t option
 
 type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)

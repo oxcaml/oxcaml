@@ -115,6 +115,9 @@ type longindent_kind =
 let needs_parens ~kind txt =
   match kind with
   | Type -> false
+  | Constr | Other when first_is '#' txt && String.length txt > 1 &&
+      Misc.Utf8_lexeme.is_capitalized (String.sub txt 1 (String.length txt - 1))
+      -> false
   | Constr | Other ->
       let fix = fixity_of_string txt in
       is_infix fix
@@ -531,7 +534,13 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
 
-and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
+and jkind_annotation ?(nested = false) ctxt f k =
+  let components sep ts =
+    Misc.pp_parens_if nested (fun f ts ->
+      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep) ts
+    ) f ts
+  in
+  match k.pjka_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation s -> value_longident_loc f s
   | Pjk_operator (t, sa) ->
@@ -555,10 +564,8 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
   | Pjk_kind_of ty -> pp f "(kind_of_ %a)" (core_type ctxt) ty
-  | Pjk_product ts ->
-    Misc.pp_parens_if nested (fun f ts ->
-      pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
-    ) f ts
+  | Pjk_product ts -> components "@ & " ts
+  | Pjk_sum ts -> components "@ + " ts
 
 and tyvar_jkind tyvar f (str, jkind) =
   match jkind with
@@ -808,12 +815,12 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
         (match po with
           | Some ([], x) ->
               (* [true] and [false] are handled above *)
-              pp f "%a@;%a"  value_longident_loc li (simple_pattern ctxt) x
+              pp f "%a@;%a" (with_loc constr) li (simple_pattern ctxt) x
           | Some (vl, x) ->
-              pp f "%a@ (type %a)@;%a" value_longident_loc li
+              pp f "%a@ (type %a)@;%a" (with_loc constr) li
                 (list ~sep:"@ " name_loc_jkind) vl
                 (simple_pattern ctxt) x
-          | None -> pp f "%a" value_longident_loc li)
+          | None -> pp f "%a" (with_loc constr) li)
     | _ -> simple_pattern ctxt f x
 
 and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
@@ -1175,7 +1182,7 @@ and expression ctxt f x =
          | _ -> assert false)
     | Pexp_setfield (e1, li, e2) ->
         pp f "@[<2>%a.%a@ <-@ %a@]"
-          (simple_expr ctxt) e1 value_longident_loc li (simple_expr ctxt) e2
+          (field_receiver ctxt) e1 value_longident_loc li (simple_expr ctxt) e2
     | Pexp_ifthenelse (e1, e2, eo) ->
         (* @;@[<2>else@ %a@]@] *)
         let fmt:(_,_,_)format ="@[<hv0>@[<2>if@ %a@]@;@[<2>then@ %a@]%a@]" in
@@ -1259,13 +1266,19 @@ and expression2 ctxt f x =
   if x.pexp_attributes <> [] then expression ctxt f x
   else match x.pexp_desc with
     | Pexp_field (e, li) ->
-        pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e value_longident_loc li
+        pp f "@[<hov2>%a.%a@]" (field_receiver ctxt) e value_longident_loc li
     | Pexp_unboxed_field (e, li) ->
         pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e value_longident_loc li
     | Pexp_send (e, s) ->
         pp f "@[<hov2>%a#%a@]" (simple_expr ctxt) e ident_of_name s.txt
 
     | _ -> simple_expr ctxt f x
+
+and field_receiver ctxt f expr =
+  match expr.pexp_desc with
+  | Pexp_construct ({ txt = Ldot (_, name); _ }, None)
+    when first_is '#' name.txt -> pp f "(%a)" (simple_expr ctxt) expr
+  | _ -> simple_expr ctxt f expr
 
 and simple_expr ctxt f x =
   if x.pexp_attributes <> [] then expression ctxt f x
@@ -2554,10 +2567,14 @@ let toplevel_phrase f x =
    (* pp_open_hvbox f 0; *)
    (* pp_print_list structure_item f s ; *)
    (* pp_close_box f (); *)
-  | Ptop_dir {pdir_name; pdir_arg = None; _} ->
-   pp f "@[<hov2>#%s@]" pdir_name.txt
-  | Ptop_dir {pdir_name; pdir_arg = Some pdir_arg; _} ->
-   pp f "@[<hov2>#%s@ %a@]" pdir_name.txt directive_argument pdir_arg
+  | Ptop_dir {pdir_name; pdir_arg; _} ->
+   let space =
+     if Misc.Utf8_lexeme.is_capitalized pdir_name.txt then " " else ""
+   in
+   match pdir_arg with
+   | None -> pp f "@[<hov2>#%s%s@]" space pdir_name.txt
+   | Some arg ->
+       pp f "@[<hov2>#%s%s@ %a@]" space pdir_name.txt directive_argument arg
 
 let toplevel_phrase = print_with_maximal_extensions toplevel_phrase
 

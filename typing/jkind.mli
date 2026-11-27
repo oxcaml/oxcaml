@@ -109,6 +109,7 @@ module Layout : sig
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
     | Box of 'sort t * Scannable_axes.t  (** See [Jkind_types.Layout.t] *)
+    | Sum of 'sort t list
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -116,6 +117,10 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
+
+    (** Replace each inline sum with its fixed storage layout, preserving
+        sharing when the layout already describes its own storage. *)
+    val storage_layout : t -> t
 
     val to_string : t -> string
 
@@ -553,6 +558,12 @@ end
     product are represented in the with-bounds. *)
 val product_of_fields :
   why:History.product_creation_reason ->
+  (Types.type_expr * Unboxed_field_transformation.t) list ->
+  Sort.t Layout.t list ->
+  Types.jkind_l
+
+(** Keep the layout of every arm and take the modal bounds of every field. *)
+val sum_of_arms :
   (Types.type_expr * Unboxed_field_transformation.t) list ->
   Sort.t Layout.t list ->
   Types.jkind_l

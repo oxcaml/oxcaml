@@ -150,6 +150,7 @@ module Layout = struct
     | Any of Scannable_axes.t
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
+    | Sum of 'sort t list
 
   type level_error = Sort.level_error =
     | Rigid
@@ -165,17 +166,32 @@ module Layout = struct
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
       | Base b -> Static.of_base b sa
+      | Sum arms -> sum (List.map (fun s -> of_sort_const s sa) arms)
       | Product consts ->
         product (List.map (fun s -> of_sort_const s sa) consts)
       | Univar uv -> univar uv sa
       | Genvar v -> genvar v sa
       | Addressable s -> addressable (of_sort_const s sa)
 
+    let rec storage_layout (layout : t) =
+      match layout with
+      | Sum _ -> (
+        match physical_sort layout with
+        | Some sort -> of_sort_const sort Scannable_axes.max
+        | None -> Misc.fatal_error "Missing storage layout for sum")
+      | Product fields ->
+        let fields' = Misc.Stdlib.List.map_sharing storage_layout fields in
+        if fields == fields' then layout else product fields'
+      | Addressable contents ->
+        let contents' = storage_layout contents in
+        if contents == contents' then layout else addressable contents'
+      | Any _ | Base _ | Univar _ | Genvar _ | Box _ -> layout
+
     let rec equal_up_to_root_scannable_axes c1 c2 =
       match c1, c2 with
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
       | Any _, Any _ -> true
-      | Product cs1, Product cs2 -> List.equal equal cs1 cs2
+      | Product cs1, Product cs2 | Sum cs1, Sum cs2 -> List.equal equal cs1 cs2
       | Univar (uv1, _), Univar (uv2, _) ->
         (* [equal_up_to_root_scannable_axes] is only used to choose which
            abbreviation to use for printing, so physical equality suffices here.
@@ -184,8 +200,8 @@ module Layout = struct
       | Genvar (v1, _), Genvar (v2, _) -> v1 == v2
       | Addressable c1, Addressable c2 -> equal_up_to_root_scannable_axes c1 c2
       | Box (l1, _), Box (l2, _) -> equal l1 l2
-      | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
-          | Box _ ),
+      | ( ( Base _ | Any _ | Product _ | Sum _ | Univar _ | Genvar _
+          | Addressable _ | Box _ ),
           _ ) ->
         false
 
@@ -240,10 +256,11 @@ module Layout = struct
           String.concat " "
             (format_scannable_layout ~include_redundant_scannable_axes sa)
         | Base (b, _) -> Sort.to_string_base b
-        | Product ts ->
+        | (Product ts | Sum ts) as layout ->
+          let separator = match layout with Sum _ -> " + " | _ -> " & " in
           String.concat ""
             [ (if nested then "(" else "");
-              String.concat " & " (List.map (to_string true) ts);
+              String.concat separator (List.map (to_string true) ts);
               (if nested then ")" else "") ]
         | Univar ({ name = n }, sa) ->
           let name = match n with Some n -> n | None -> "_" in
@@ -273,13 +290,13 @@ module Layout = struct
       ||
       match t with
       | Base _ | Any _ | Univar _ | Genvar _ -> false
-      | Product ts -> List.exists (has_component ~component) ts
+      | Product ts | Sum ts -> List.exists (has_component ~component) ts
       | Addressable t -> has_component ~component t
       | Box (t, _) -> has_component ~component t
 
     let rec has_genvar = function
       | Genvar _ -> true
-      | Product ts -> List.exists has_genvar ts
+      | Product ts | Sum ts -> List.exists has_genvar ts
       | Base _ | Any _ | Univar _ -> false
       | Addressable t -> has_genvar t
       | Box (t, _) -> has_genvar t
@@ -301,8 +318,9 @@ module Layout = struct
         fprintf ppf "Sort (%a, %a)" format_sort s
           (Fmt.compat Scannable_axes.debug_print)
           sa
-      | Product ts ->
-        fprintf ppf "Product [ %a ]"
+      | (Product ts | Sum ts) as layout ->
+        let name = match layout with Sum _ -> "Sum" | _ -> "Product" in
+        fprintf ppf "%s [ %a ]" name
           (pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
              (t format_sort))
@@ -325,6 +343,8 @@ module Layout = struct
       | Base b ->
         Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
+      | Sum arms ->
+        Sum (List.map (fun s -> flatten_sort s Scannable_axes.max) arms)
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
       | Univar x -> Sort (Univar x, sa)
@@ -334,6 +354,7 @@ module Layout = struct
     | Any sa -> Any sa
     | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)
+    | Sum ts -> Sum (List.map get ts)
     | Addressable t -> Addressable (get t)
     | Box (t, sa) -> Box (get t, sa)
 
@@ -342,12 +363,12 @@ module Layout = struct
     | Sort (s, sa) as t ->
       let s' = Sort.strip_head_addressable s in
       if s' == s then t else Sort (s', sa)
-    | (Any _ | Product _ | Box _) as t -> t
+    | (Any _ | Product _ | Sum _ | Box _) as t -> t
 
   (* [constrain_below_addressable t] constrains [t < t addressable] *)
   let rec constrain_below_addressable ~allow_mutation :
       Sort.t t -> (unit, error) result = function
-    | Any _ -> Error Incompatible
+    | Any _ | Sum _ -> Error Incompatible
     | Addressable _ -> Ok ()
     | Box _ -> Ok ()
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
@@ -362,6 +383,7 @@ module Layout = struct
   let rec constrain_above_addressable ~allow_mutation :
       Sort.t t -> (unit, error) result = function
     | Any _ -> Ok ()
+    | Sum _ -> Error Incompatible
     | Addressable _ -> Ok ()
     | Box _ -> Ok ()
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
@@ -373,7 +395,7 @@ module Layout = struct
   let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
     | Addressable _ -> true
     | Box _ -> true
-    | Any _ -> false
+    | Any _ | Sum _ -> false
     | Sort (Sort.Flat.Base b, _) -> Sort.base_is_addressable b
     | Sort ((Sort.Flat.Var _ | Sort.Flat.Genvar _ | Sort.Flat.Univar _), _) ->
       false
@@ -406,7 +428,7 @@ module Layout = struct
     | Any _ -> Internal
     | Sort (s, { separability; nullability = _ }) ->
       Sort.implied_externality ~separability s
-    | Product ts ->
+    | Product ts | Sum ts ->
       List.fold_left
         (fun acc t -> Externality.join acc (implied_externality t))
         Externality.min ts
@@ -414,6 +436,21 @@ module Layout = struct
     | Box (t, sa) ->
       Sort.implied_externality
         ~separability:(box_scannable_axes t sa).separability Sort.scannable
+
+  let sum_components ~allow_mutation layout sort n =
+    match Option.bind (get_const layout) Const.runtime_sum_sort with
+    | None -> Error Incompatible
+    | Some _ when not allow_mutation -> (
+      match get_const (Sort (sort, Scannable_axes.max)) with
+      | Some (Const.Sum arms as sum)
+        when Option.is_some (Const.runtime_sum_sort sum) ->
+        Ok (List.map of_const arms)
+      | _ -> Error Incompatible)
+    | Some _ ->
+      let sorts = List.init n (fun _ -> Sort.Var (Sort.new_genvar ())) in
+      Result.map
+        (fun () -> List.map (fun s -> Sort (s, Scannable_axes.max)) sorts)
+        (Sort.equate ~allow_mutation:true sort (Sort.Sum sorts))
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
     let ( let* ) = Result.bind in
@@ -431,6 +468,13 @@ module Layout = struct
             (conservatively) concludes that they are not equal. *)
       then if Scannable_axes.equal sa1 sa2 then Ok () else Error Incompatible
       else Ok ()
+    | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts =
+        sum_components ~allow_mutation layout sort (List.length ts)
+      in
+      Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
+        (fun () -> equate_or_equal ~allow_mutation)
+        () ts sorts
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
       (* CR-someday jbachurski: This might mutate [sort] even if
          [allow_mutation] is [false]. *)
@@ -439,7 +483,7 @@ module Layout = struct
       Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
         (fun () -> equate_or_equal ~allow_mutation)
         () ts sorts
-    | Product ts1, Product ts2 ->
+    | Product ts1, Product ts2 | Sum ts1, Sum ts2 ->
       Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
         (fun () -> equate_or_equal ~allow_mutation)
         () ts1 ts2
@@ -461,23 +505,23 @@ module Layout = struct
           (box_scannable_axes l2 sa2)
       then Ok ()
       else Error Incompatible
-    | Addressable l1, ((Any _ | Sort _ | Product _ | Box _) as t2)
-    | ((Any _ | Sort _ | Product _ | Box _) as t2), Addressable l1 ->
+    | Addressable l1, ((Any _ | Sort _ | Product _ | Sum _ | Box _) as t2)
+    | ((Any _ | Sort _ | Product _ | Sum _ | Box _) as t2), Addressable l1 ->
       let* () = constrain_below_addressable ~allow_mutation t2 in
       equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
-    | (Any _ | Sort _ | Product _ | Box _), _ -> Error Incompatible
+    | (Any _ | Sort _ | Product _ | Sum _ | Box _), _ -> Error Incompatible
 
   let rec get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
     | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
-    | Product _ -> None
+    | Product _ | Sum _ -> None
     | Addressable t -> get_root_scannable_axes t
     | Box (t, sa) -> Some (box_scannable_axes t sa)
 
   let rec is_scannable_or_var : _ t -> bool = function
     | Any _ -> false
     | Sort (b, _) -> Sort.is_scannable_or_var b
-    | Product _ -> false
+    | Product _ | Sum _ -> false
     | Addressable t -> is_scannable_or_var t
     | Box _ -> true
 
@@ -486,7 +530,7 @@ module Layout = struct
     match t with
     | Any sa' -> Any (Scannable_axes.meet sa sa')
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
-    | Product _ -> t
+    | Product _ | Sum _ -> t
     | Addressable t' -> Addressable (meet_root_scannable_axes t' sa)
     | Box (t', sa') -> Box (t', Scannable_axes.meet sa sa')
 
@@ -516,10 +560,10 @@ module Layout = struct
          as [any] is strictly above every addressable layout. *)
       let+ _ = sub (strip_head_addressable l1) t2 in
       Less_or_equal.Less
-    | Addressable _, (Sort _ | Product _ | Box _) ->
+    | Addressable _, (Sort _ | Product _ | Sum _ | Box _) ->
       let* () = constrain_above_addressable ~allow_mutation:true t2 in
       sub t1 (Addressable t2)
-    | (Any _ | Sort _ | Product _ | Box _), Addressable _ ->
+    | (Any _ | Sort _ | Product _ | Sum _ | Box _), Addressable _ ->
       let* () = constrain_below_addressable ~allow_mutation:true t1 in
       sub (Addressable t1) t2
     | Box (l1, sa1), Box (l2, sa2) ->
@@ -547,8 +591,8 @@ module Layout = struct
         |> Less_or_equal.of_le_result
       in
       Less_or_equal.combine result Less
-    | Box _, Product _ -> Error Incompatible
-    | (Any _ | Sort _ | Product _), Box _ -> Error Incompatible
+    | Box _, (Sum _ | Product _) -> Error Incompatible
+    | (Any _ | Sort _ | Product _ | Sum _), Box _ -> Error Incompatible
     | Any sa1, Any sa2 ->
       Scannable_axes.less_or_equal sa1 sa2 |> Less_or_equal.of_le_result
     | Sort (sort, sa1), Any sa2 ->
@@ -561,22 +605,36 @@ module Layout = struct
       if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
       then Error Incompatible
       else Ok Less
-    | Product _, Any _ -> Ok Less
+    | (Product _ | Sum _), Any _ -> Ok Less
     | Any _, _ -> Error Incompatible
     | Sort (s1, sa1), Sort (s2, sa2) ->
       let* () = Sort.equate ~allow_mutation:true s1 s2 in
       if Sort.is_scannable_or_var s1
       then Scannable_axes.less_or_equal sa1 sa2 |> Less_or_equal.of_le_result
       else Ok Less_or_equal.Equal
-    | Product ts1, Product ts2 -> sub_product ts1 ts2
+    | Product ts1, Product ts2 | Sum ts1, Sum ts2 -> sub_components ts1 ts2
+    | (Sum ts as layout), Sort (sort, _) ->
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
+      sub_components ts sorts
+    | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
+      sub_components sorts ts
+    | Sum _, Product _ | Product _, Sum _ -> Error Incompatible
     | Product ts1, Sort (s2, _) ->
       let* ts2 = Sort.decompose_into_product s2 (List.length ts1) in
-      sub_product ts1 (List.map (fun s2 -> Sort (s2, Scannable_axes.max)) ts2)
+      sub_components ts1
+        (List.map (fun s2 -> Sort (s2, Scannable_axes.max)) ts2)
     | Sort (s1, _), Product ts2 ->
       let* ts1 = Sort.decompose_into_product s1 (List.length ts2) in
-      sub_product (List.map (fun s1 -> Sort (s1, Scannable_axes.max)) ts1) ts2
+      sub_components
+        (List.map (fun s1 -> Sort (s1, Scannable_axes.max)) ts1)
+        ts2
 
-  and sub_product ts1 ts2 =
+  and sub_components ts1 ts2 =
     Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
       (fun acc t1 t2 -> sub t1 t2 |> Result.map (Less_or_equal.combine acc))
       Less_or_equal.Equal ts1 ts2
@@ -589,7 +647,7 @@ module Layout = struct
 
   let rec intersection t1 t2 : (sort t, error) result =
     let open Misc.Stdlib.Monad.Result.Syntax in
-    let products ts1 ts2 =
+    let components ts1 ts2 =
       let+ ts =
         Misc.Stdlib.List.fold_left2_result ~unequal_lengths:Incompatible
           (fun ts t1 t2 ->
@@ -597,7 +655,7 @@ module Layout = struct
             t :: ts)
           [] ts1 ts2
       in
-      Product (List.rev ts)
+      List.rev ts
     in
     match t1, t2 with
     | _, Any sa2 -> Ok (meet_root_scannable_axes t1 sa2)
@@ -608,8 +666,8 @@ module Layout = struct
       Result.map
         (fun l -> Addressable l)
         (intersection (strip_head_addressable l1) (strip_head_addressable l2))
-    | Addressable l1, ((Sort _ | Product _ | Box _) as t2)
-    | ((Sort _ | Product _ | Box _) as t2), Addressable l1 ->
+    | Addressable l1, ((Sort _ | Product _ | Sum _ | Box _) as t2)
+    | ((Sort _ | Product _ | Sum _ | Box _) as t2), Addressable l1 ->
       let* () = constrain_above_addressable ~allow_mutation:true t2 in
       intersection (Addressable l1) (Addressable t2)
     | Box (l1, sa1), Box (l2, sa2) ->
@@ -623,16 +681,29 @@ module Layout = struct
     | Sort (s1, sa1), Sort (s2, sa2) ->
       let* () = Sort.equate ~allow_mutation:true s1 s2 in
       Ok (Sort (s1, Scannable_axes.meet sa1 sa2))
-    | Product ts1, Product ts2 -> products ts1 ts2
+    | Product ts1, Product ts2 ->
+      Result.map (fun ts -> Product ts) (components ts1 ts2)
+    | Sum ts1, Sum ts2 -> Result.map (fun ts -> Sum ts) (components ts1 ts2)
+    | (Sum ts as layout), Sort (sort, _) | Sort (sort, _), (Sum ts as layout) ->
+      let* sorts =
+        sum_components ~allow_mutation:true layout sort (List.length ts)
+      in
+      Result.map (fun ts -> Sum ts) (components ts sorts)
+    | Sum _, (Product _ | Box _) | (Product _ | Box _), Sum _ ->
+      Error Incompatible
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts ->
       let* sorts = Sort.decompose_into_product sort (List.length ts) in
-      products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts)
+      let+ ts =
+        components ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts)
+      in
+      Product ts
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
     | Any sa -> Const.any sa
     | Sort (s, sa) ->
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
     | Product p -> Const.product (List.map default_to_scannable_and_get p)
+    | Sum p -> Const.sum (List.map default_to_scannable_and_get p)
     | Addressable t -> Const.addressable (default_to_scannable_and_get t)
     | Box (t, sa) -> Const.box (default_to_scannable_and_get t) sa
 
@@ -654,12 +725,17 @@ module Layout = struct
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
         | Addressable s -> pp_element ~nested ppf (Addressable (Sort (s, sa)))
-        | Product _ when nested -> Fmt.fprintf ppf "(%a)" Sort.format s
-        | Base _ | Product _ | Univar _ ->
+        | (Product _ | Sum _) when nested ->
+          Fmt.fprintf ppf "(%a)" Sort.format s
+        | Base _ | Product _ | Sum _ | Univar _ ->
           (* Scannable axes aren't relevant in these cases *)
           Fmt.fprintf ppf "%a" Sort.format s)
-      | Product ts ->
-        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+      | (Product ts | Sum ts) as layout ->
+        let pp_sep ppf () =
+          match layout with
+          | Sum _ -> Fmt.fprintf ppf "@ + "
+          | _ -> Fmt.fprintf ppf "@ & "
+        in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Addressable t -> (
         match constrain_below_addressable ~allow_mutation:false t with
@@ -678,7 +754,8 @@ module Layout = struct
 
   let rec generalize ~current_level : _ Layout.t -> unit = function
     | Sort (sort, _) -> Sort.generalize ~current_level sort
-    | Product layouts -> List.iter (generalize ~current_level) layouts
+    | Product layouts | Sum layouts ->
+      List.iter (generalize ~current_level) layouts
     | Any _ -> ()
     | Addressable t -> generalize ~current_level t
     | Box (t, _) -> generalize ~current_level t
@@ -687,7 +764,8 @@ module Layout = struct
     function
     | Any _ -> Ok ()
     | Sort (s, _) -> Sort.update_level level s
-    | Product ts -> Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
+    | Product ts | Sum ts ->
+      Misc.Stdlib.List.iter_until_error ~f:(update_level level) ts
     | Addressable t -> update_level level t
     | Box (t, _) -> update_level level t
 
@@ -733,7 +811,7 @@ type error =
   | Unknown_kind_modifier of string
   | Unimplemented_syntax
   | With_on_right : (_ * allowed) History.annotation_context -> error
-  | Abstract_kind_in_product
+  | Abstract_kind_in_compound of [`Product | `Sum]
   | Box_on_abstract_kind of Path.t
 
 module Error : sig
@@ -2308,7 +2386,7 @@ module Const = struct
               |> Option.map (fun t ->
                   Scannable_axes
                     { t = Box t; axes = sa; print_axes_as = box_axes })
-            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> None
+            | Any _ | Base _ | Product _ | Sum _ | Univar _ | Genvar _ -> None
         in
         go target_layout
 
@@ -2495,6 +2573,12 @@ module Const = struct
             | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
             | Not_verbose | Expanded -> Layout.Const.to_string
           in
+          let layout_to_string layout =
+            let name = layout_to_string layout in
+            match (layout : Layout.Const.t) with
+            | Sum _ -> "(" ^ name ^ ")"
+            | _ -> name
+          in
           let out_jkind_verbose =
             convert_with_base ~verbosity env
               ~base:
@@ -2597,8 +2681,8 @@ module Const = struct
       | (Layout _ | Kconstr _), _ -> false)
     && Mod_bounds.equal mod_bounds mod_bounds'
 
-  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
-      =
+  let jkind_of_compound_annotations (type l r) ~loc compound env
+      (jkinds : (l * r) t list) =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
       let { base; mod_bounds; with_bounds } =
@@ -2609,7 +2693,7 @@ module Const = struct
            ticket 5769 *)
         match base with
         | Kconstr (_, sa, _) ->
-          Error.log_or_raise ~loc Abstract_kind_in_product;
+          Error.log_or_raise ~loc (Abstract_kind_in_compound compound);
           Layout.Const.any sa
         | Layout l -> l
       in
@@ -2620,10 +2704,12 @@ module Const = struct
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
-    { base = Layout (Layout.Const.product (List.rev layouts));
-      mod_bounds;
-      with_bounds
-    }
+    let make =
+      match compound with
+      | `Product -> Layout.Const.product
+      | `Sum -> Layout.Const.sum
+    in
+    { base = Layout (make (List.rev layouts)); mod_bounds; with_bounds }
 
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
       (Kind_operator.t Location.loc, _) result =
@@ -2724,14 +2810,15 @@ module Const = struct
           (base_jkind, []) ops
       in
       jkind
-    | Pjk_product ts ->
+    | (Pjk_product ts | Pjk_sum ts) as desc ->
       let jkinds =
         List.map
           (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
              env context)
           ts
       in
-      jkind_of_product_annotations ~loc env jkinds
+      let compound = match desc with Pjk_sum _ -> `Sum | _ -> `Product in
+      jkind_of_compound_annotations ~loc compound env jkinds
     | Pjk_with (base, type_, modalities) -> (
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
@@ -2797,7 +2884,7 @@ module Const = struct
         Stable
       | Univar _ -> Alpha
       | Genvar _ -> Alpha
-      | Product layouts ->
+      | Product layouts | Sum layouts ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
@@ -2856,8 +2943,12 @@ module Desc = struct
       (* Analyze structure (products, addressability, and box) before calling
          [get_const]: the machinery in [Const.format] works better for atomic
          layouts. *)
-      | Layout (Product lays) ->
-        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+      | Layout ((Product lays | Sum lays) as layout) ->
+        let pp_sep ppf () =
+          match layout with
+          | Sum _ -> Fmt.fprintf ppf "@ + "
+          | _ -> Fmt.fprintf ppf "@ & "
+        in
         Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
           (List.map (fun layout -> { desc with base = Layout layout }) lays)
       | Layout (Addressable lay) when Option.is_none (get_const desc) ->
@@ -2903,6 +2994,7 @@ let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
 let rec instance_layout : Sort.t Layout.t -> Sort.t Layout.t = function
   | Sort (s, sa) -> Sort (Sort.instance s, sa)
   | Product ls -> Product (List.map instance_layout ls)
+  | Sum ls -> Sum (List.map instance_layout ls)
   | Any _ as l -> l
   | Addressable l -> Addressable (instance_layout l)
   | Box (l, sa) -> Box (instance_layout l, sa)
@@ -3231,6 +3323,10 @@ let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
     | Any _ -> None
+    | Sum _ ->
+      Option.bind (Jkind_types.Layout.get_const t) (fun layout ->
+          Option.map Sort.of_const
+            (Jkind_types.Layout.Const.runtime_sum_sort layout))
     | Sort (s, _) -> Some s
     | Product ls -> (
       match Misc.Stdlib.List.map_option sort_of_layout ls with
@@ -3355,7 +3451,7 @@ let apply_or_null_l env jkind =
       (* [_ box or_null] is not a box but merely a scannable layout *)
       or_null_axes (Layout.box_scannable_axes l sa)
       |> Option.map (fun sa -> Layout.Sort (Sort.scannable, sa))
-    | Product _ -> None
+    | Product _ | Sum _ -> None
   in
   let jkind =
     { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
@@ -3388,7 +3484,7 @@ let apply_or_null_r env jkind =
       else None
     | Addressable l ->
       payload_layout l |> Option.map (fun l -> Layout.Addressable l)
-    | Box _ | Product _ ->
+    | Box _ | Product _ | Sum _ ->
       (* No or_null type has this layout *)
       None
   in
@@ -3434,7 +3530,7 @@ let decompose_product env jk =
   let mk_jkind layout = set_layout jk layout in
   let rec deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
-    | Base _ -> None
+    | Base _ | Sum _ -> None
     | Product sorts ->
       Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
     | Addressable s ->
@@ -3451,7 +3547,7 @@ let decompose_product env jk =
   | Error _ -> None
   | Ok layout ->
     let rec deal_with_layout : _ Layout.t -> _ = function
-      | Any _ -> None
+      | Any _ | Sum _ -> None
       | Addressable l ->
         (* see [deal_with_sort] *)
         Option.map
@@ -4110,7 +4206,7 @@ module Violation = struct
     | Offending_box_as_scannable_bound, Layout.Box (contents, sa) ->
       Layout.Sort (Sort.scannable, Layout.box_scannable_axes contents sa)
     | ( Offending_box_as_scannable_bound,
-        (Any _ | Sort _ | Product _ | Addressable _) )
+        (Any _ | Sort _ | Product _ | Sum _ | Addressable _) )
     | Offending_exactly, _ ->
       l
 
@@ -4119,7 +4215,8 @@ module Violation = struct
     | Offending_box_as_scannable_bound, Box (_, sa) ->
       Layout.Const.of_sort_const (Sort.Const.base Scannable) sa
     | ( Offending_box_as_scannable_bound,
-        (Any _ | Base _ | Product _ | Univar _ | Genvar _ | Addressable _) )
+        ( Any _ | Base _ | Product _ | Sum _ | Univar _ | Genvar _
+        | Addressable _ ) )
     | Offending_exactly, _ ->
       c
 
@@ -4266,10 +4363,11 @@ module Violation = struct
     let layout_mismatch l1 l2 =
       let display1 =
         match l1, l2 with
-        | Layout.Box _, Layout.(Any _ | Sort _ | Product _ | Addressable _) ->
+        | ( Layout.Box _,
+            Layout.(Any _ | Sort _ | Product _ | Sum _ | Addressable _) ) ->
           Offending_box_as_scannable_bound
         | Layout.Box _, Layout.Box _
-        | Layout.(Any _ | Sort _ | Product _ | Addressable _), _ ->
+        | Layout.(Any _ | Sort _ | Product _ | Sum _ | Addressable _), _ ->
           Offending_exactly
       in
       let display2 =
@@ -4323,7 +4421,7 @@ module Violation = struct
     let rec has_sort_var_layout : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
       | Sort (Univar _, _) | Sort (Genvar _, _) -> false
-      | Product layouts -> List.exists has_sort_var_layout layouts
+      | Product layouts | Sum layouts -> List.exists has_sort_var_layout layouts
       | Sort (Base _, _) | Any _ -> false
       | Addressable layout -> has_sort_var_layout layout
       | Box _ -> false
@@ -4495,18 +4593,8 @@ module Unboxed_field_transformation = struct
 
      This is the best crossing we can give to unboxed versions so that boxing
      them (joining with [immutable_data]) gives the boxed version's crossing. *)
-  let mutable_label_axes =
-    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
-
   let of_field ~(mutability : Types.mutability) ~modality =
-    let mutability_transformation =
-      match mutability with
-      | Immutable -> Axis_lattice.bot
-      | Mutable { atomic = Nonatomic; _ } -> mutable_label_axes
-      | Mutable { atomic = Atomic; _ } ->
-        Misc.fatal_error
-          "Jkind.Unboxed_field_transformation.of_field: atomic field"
-    in
+    let mutability_transformation = unboxed_label_bounds mutability in
     { modality; mutability_transformation }
 
   let of_modality modality = of_field ~mutability:Immutable ~modality
@@ -4583,34 +4671,26 @@ module Unboxed_field_transformation = struct
     | No_intersection _ -> None
 end
 
+let kind_of_inline_fields ~why fields layout =
+  Jkind0.kind_of_inline_fields ~why
+    ~field:(fun
+        ( ty,
+          { Unboxed_field_transformation.modality; mutability_transformation }
+        )
+      -> ty, modality, mutability_transformation)
+    fields layout
+
 let product_of_fields ~why fields layouts =
-  let mod_bounds, with_bounds =
-    List.fold_right
-      (fun ( type_expr,
-             ({ modality; mutability_transformation } :
-               Unboxed_field_transformation.t) ) (mod_bounds, with_bounds) ->
-        ( Mod_bounds.join_axis_lattice mod_bounds mutability_transformation,
-          With_bounds.add_modality ~type_expr ~modality with_bounds ))
-      fields
-      (Mod_bounds.min, No_with_bounds)
-  in
-  fresh_jkind_poly
-    { base = Layout (Layout.product layouts); mod_bounds; with_bounds }
-    ~annotation:None ~why:(Product_creation why)
-  (* [mark_best] is correct here because the with-bounds of a product jkind
-     include all the components of the product. Accordingly, looking through
-     the product, by one step, never loses any information. *)
-  |> mark_best
+  kind_of_inline_fields ~why:(Product_creation why) fields
+    (Layout.product layouts)
+
+let sum_of_arms fields arms =
+  kind_of_inline_fields ~why:(Any_creation Old_style_unboxed_type) fields
+    (Layout.Sum arms)
 
 let for_unboxed_record lbls =
-  let fields =
-    List.map
-      (fun ((lbl : Types.label_declaration), _layout) ->
-        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
-      lbls
-  in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  product_of_fields ~why:Unboxed_record fields layouts
+  let labels, layouts = List.split lbls in
+  for_unboxed_record_layout labels (Layout.product layouts)
 
 let for_abbreviation ~type_jkind_purely wrapping ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
@@ -5008,7 +5088,7 @@ let has_layout_any env jkind =
   let rec is_any : _ Layout.t -> bool = function
     | Any _ -> true
     | Addressable l -> is_any l
-    | Sort _ | Product _ | Box _ -> false
+    | Sort _ | Product _ | Sum _ | Box _ -> false
   in
   match extract_layout env jkind with Ok l -> is_any l | Error _ -> false
 
@@ -5346,8 +5426,9 @@ let report_error ~loc : error -> _ = function
     | Type_variable _ | Type_wildcard _ | Type_of_kind _ | With_error_message _
       ->
       Location.errorf ~loc "'with' syntax is not allowed on a right kind.")
-  | Abstract_kind_in_product ->
-    Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Abstract_kind_in_compound compound ->
+    let name = match compound with `Product -> "products" | `Sum -> "sums" in
+    Location.errorf ~loc "Abstract kinds are not yet supported in %s." name
   | Box_on_abstract_kind p ->
     Location.errorf ~loc
       "The kind constructor box cannot yet be applied to the abstract kind %s."

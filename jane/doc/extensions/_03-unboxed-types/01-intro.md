@@ -34,9 +34,12 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 * `any` is a layout that is the superlayout of all other layouts.  It doesn't correspond
   to a specific runtime representation. More information [below](#the-any-layout).
 
-The type system also supports one *composite* layout: unboxed products:
+The type system also supports two *composite* layouts:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
   of the product has layout `l1`, the second has layout `l2`, and so on.
+* `l1 + l2 + ... + lk` is a sum layout. Its tag selects one of the payload
+  layouts `l1` through `lk`. A constructor with an unboxed variant argument
+  can contribute several [alternatives](#unboxed-variants) to the sum.
 
 ## Value layouts
 
@@ -238,9 +241,7 @@ for more details.
 
 ## Unboxed unit and unboxed bool
 
-While we do not have support for unboxed variants in their full generality, we have
-limited support for specific built-in types, including `unit#`, the type of unboxed
-units, and `bool#`, the type of unboxed booleans.
+The built-in types `unit#` and `bool#` have their own constructor syntax.
 
 Values of type `unit#` can be constructed as `#()` in expressions, and destructed as `#()`
 in patterns.
@@ -310,8 +311,133 @@ versions.
 * Unboxed record fields may have layout `any`, as in
   `type ('a : any) t = #{ x : 'a ; n : int }`, but such a record can only be
   used at an instance whose fields are representable (e.g. `float# t`), like
-  any other type of layout `any` (see the next section).
+  any other type of layout `any` (see [the `any` layout](#the-any-layout)).
 * We plan to add other types with unboxed product layouts (e.g., interior pointers).
+
+# Unboxed variants
+
+An unboxed product stores all its fields together. An unboxed variant stores a tag and the fields of the active constructor. Its layout reserves enough space for any constructor to be active, so a record can store the variant inline at a fixed size. The constructor payload layouts form a sum, written `+`, just as the field layouts of a product are joined with `&`.
+
+Define an unboxed variant directly by adding `[@@unboxed]` to a variant
+declaration with several constructors:
+
+```ocaml
+type measurement = Missing | Reading of int64_u [@@unboxed]
+let sample = Reading #42L
+let or_zero = function Missing -> #0L | Reading n -> n
+```
+
+`measurement` itself is unboxed. Its layout is `void + bits64`: `Missing` has
+no payload, and `Reading` carries an unboxed 64-bit integer.
+
+*Implicit unboxed variants*, like implicit unboxed records, come from ordinary
+boxed declarations. Most closed boxed variants with several constructors get
+an unboxed type `t#` from the declaration of `t`:
+
+```ocaml
+type reply = Missing | Found of string
+type entry = { key : int; reply : reply# }
+
+let boxed message = Found message
+let inline message = #Found message
+let store key message = { key; reply = Found message }
+let read entry = match entry.reply with #Missing -> None | #Found s -> Some s
+```
+
+`boxed` returns a `reply`. The `#` prefix in `inline` selects the `reply#`
+constructor explicitly. In `store`, the field type `reply#` selects the same
+constructor. Patterns follow the same rule, so we could write `read` as:
+
+```ocaml
+let read entry = match entry.reply with Missing -> None | Found s -> Some s
+```
+
+A boxed `Missing` is an immediate and a boxed `Found` allocates a block with one
+field for the string, whereas the `reply#` field in `entry` stores the tag and space
+for one value (either a pointer or an immediate) inside the record, so that `Missing` can store a benign immediate, and `Found` can store the string pointer directly. The record has the same size whichever
+constructor it holds.
+
+Boxing a `t#` produces an ordinary `t`. A boxed unboxed value stores only the fields
+of the selected outer alternative, just like an originally-boxed value would:
+
+| Unboxed value | Boxed representation | Boxed pattern |
+| --- | --- | --- |
+| `#Missing` | Immediate 0 | `Missing` |
+| `#Found s` | Block with tag 0 and a value field for the string | `Found s` |
+
+A match on `t# box` accepts the same patterns as a match on `t` (see the last column of the table above). A separately
+compiled function can box or unbox a value using just its sum layout.
+
+An unboxed variant's constructor can declare record fields, as usual. The unboxed constructor stores the
+fields as a product in declaration order. A pattern can bind that product:
+
+```ocaml
+type counter = Stop | Count of { mutable number : int; name : string }
+let read = function #Stop -> 0 | #Count fields -> fields.#number
+let copy = function #Stop -> #Stop | #Count fields -> #Count fields
+```
+
+The boxed pattern `Count fields` on a `counter` binds the original block, which has a header denoting the tag (that it is `Count`) and two values. `fields.number <- 1` changes that block.
+
+The pattern `#Count fields`, meanwhile, only binds the current values of the fields: a later assignment to the boxed record leaves the bound unboxed record unchanged, and the fields of the unboxed record cannot be assigned.
+
+Unboxed inner variants stored in outer variants are sometimes fused: they share a tag, which differentiates between the constructors of the parent and the children. Whether such fusing happens depends on how each constructor stores its that inner unboxed variant. Consider a variant that uses `reply#` in three different ways:
+
+```ocaml
+type defined_inner = #{ reply : reply# }
+type t = Busy
+       | Direct of reply#
+       | Saved of { mutable reply : reply# }
+       | Deleted of defined_inner
+```
+
+- `Direct` and its argument share one tag: `t` and `reply#` are fused. That tag distinguishes `Direct Missing` from `Direct (Found s)`.
+- A `Saved` record stores a full reply, un-fused, inline in the record: `reply#` keeps its tag so that assigning to `r.reply` can change `Missing` to `Found s` while `r` remains the same record, and so that the record can be extracted by a match without changing its memory layout. Matching `Saved r` and
+constructing `Saved r` again returns the original block.
+- `Deleted`, meanwhile, since it takes an *unboxed* record whose layout reduces to `reply#`, has the same payload layout as `Direct`, and fuses with `t`.
+
+Layouts represent this by making the layout `+` operator non-associative: parenthesis around a pair of values in a series of summed values indicate that the sub-tree around which the parentheses have been placed has its own tag.
+Thus, the layout of `t#` is
+`void + void + value + (void + value) + void + value`: six alternatives at the top level, with the fourth having nested alternatives with their own tag.
+
+A record with several fields has a product layout, so unboxed inner variants inside them are *not* fused with the parent. For example,
+`Saved of { marker : unit#; reply : reply# }` contributes
+`void & (void + value)` to the outer sum. Similarly, two unboxed variant fields in the
+same record each keep their own tag.
+
+Even when variants are fused, source patterns still use the constructor names at both levels, because that is handled by typechecking, not layout.
+By the same token, types with the same layout can have different constructors.
+
+*Limitations and future plans*:
+* As with records, some boxed declarations have no implicit unboxed version.
+  In `type t = Empty | Witness of unit#`, both payloads have layout `void`.
+  The boxed type uses an immediate for `Empty` and a block for `Witness`.
+  The layout `void + void` cannot express that distinction. A GADT result
+  type or an atomic field also prevents an implicit unboxed variant.
+* The limit on boxed block tags counts the alternatives after tag sharing.
+  Immediate alternatives do not use block tags.
+* Arrays of unboxed variants follow the same rule as arrays of unboxed
+  products. The garbage collector must be able to scan the entire element or
+  skip it entirely. A mixed unboxed variant needs both scannable and raw
+  storage. In an array, the two regions would repeat for each element. The
+  mixed-block format describes one scannable prefix, so the compiler rejects
+  arrays of mixed unboxed variants.
+* Writing a whole unboxed variant to an existing field
+  or array element requires `uncontended` write access to the destination.
+  The rule also applies to a product containing an inline variant. A concurrent
+  write could otherwise leave one constructor's tag with another's payload.
+* `Array.get` and `Array.set` accept elements
+  of kind `value_or_null mod separable`. The parallel slice library also
+  excludes sum layouts. Extending these interfaces to supported unboxed
+  element layouts is future library work.
+  * The `parallel_slices.ml` test binds array primitives for one raw unboxed
+    variant. It splits a five-element array into ranges of two and three.
+    Each of two domains writes a different constructor to its range. The
+    slice setter checks the index against its range before using
+    `Obj.magic_uncontended` for the backing-array write. After joining, the
+    test checks the constructor and payload of every element.
+    `parallel_slice_capture.ml` checks that the compiler rejects a worker
+    that writes directly through a captured reference to the same array.
 
 # The `any` layout
 
@@ -451,7 +577,9 @@ Primitives supporting `[@layout_poly]` include:
 
 # Arrays of unboxed elements
 
-Arrays can store elements of any layout. You can think of `array` as having been declared as:
+The `array` type accepts any element layout, subject to the storage restriction
+on mixed elements described under [unboxed variants](#unboxed-variants). You
+can think of `array` as having been declared as:
 
 ```ocaml
 type ('a : any) array = (* ... *)
@@ -538,15 +666,10 @@ type t =
 
 ## The "mixed block" representation
 
-The runtime representation of mixed blocks is slightly different than normal
-OCaml blocks. These differences are present to accommodate the garbage collector,
-which must scan the fields with layout `value`, but not the fields containing
-unboxed types.
-
-To enable this, the header word of mixed blocks remembers how many elements of
-the block are values, with a maximum of 254. The compiler _reorders_ the fields
-of your block so that all the values are first, and the GC knows to stop
-scanning after it has seen that number of fields.
+In native code, a mixed block begins with the words that the garbage collector
+(GC) scans for pointers. Its header gives the length of this *scannable
+prefix* in words, up to 254. The compiler places raw data, such as unboxed
+integers and floats, after the prefix. The GC skips those words.
 
 For example, consider this record type:
 ```ocaml
@@ -587,6 +710,21 @@ type t =
 ```
 This is represented as a block with six fields, and the fields appear the order
 `x`, `z`, `c`, `a`, `w`, `y`.
+
+An [unboxed variant](#unboxed-variants) field can contribute words to both
+parts of the same block. For example:
+
+```ocaml
+type payload = Text of string | Bits of int64_u [@@unboxed]
+type envelope = { payload : payload }
+```
+
+In native code, an `envelope` has the same size and scannable prefix for both
+constructors. The prefix contains one word for the string pointer. The raw
+part holds the constructor tag and space for the 64-bit integer. For `Text s`,
+the GC follows the pointer to `s`. For `Bits n`, the compiler puts an
+immediate in that same prefix word, so the GC can scan it safely. The GC uses
+the prefix length in the record header whichever constructor is active.
 
 ## Generic operations aren't supported
 

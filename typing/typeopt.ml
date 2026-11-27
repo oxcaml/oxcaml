@@ -30,6 +30,7 @@ type error =
   | Unsupported_product_in_lazy of Jkind.Layout.Const.t
   | Unsupported_vector_in_product_array
   | Mixed_product_array of Jkind.Layout.Const.t * type_expr
+  | Mixed_sum_array of type_expr
   | Unsupported_void_in_array
   | Opaque_array_non_value of
       { array_type: type_expr;
@@ -115,21 +116,14 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
-  | Any _ | Univar _ | Genvar _ -> false
-  | Base _ -> true
-  | Product sorts ->
-    List.for_all layout_is_representable sorts
-  | Addressable layout -> layout_is_representable layout
-  | Box _ -> true
-
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
    layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]). *)
 let get_representable_layout_opt env ty =
   let jkind = Ctype.type_jkind env ty in
   match Jkind.get_layout_defaulting_to_scannable env jkind with
-  | Some layout when layout_is_representable layout -> Some layout
+  | Some layout when Jkind_types.Layout.Const.has_concrete_sort layout ->
+    Some layout
   | Some _ | None -> None
 
 (* This function also may mutate [ty] to constrain its jkind to be representable
@@ -189,7 +183,8 @@ type 'a classification =
 let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Addressable layout -> classify ~classify_product env ty layout
-  | Any _ -> Misc.fatal_error "classify called with non-representable layout"
+  | Any _ | Sum _ ->
+    Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _) | Box _ -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
@@ -290,13 +285,15 @@ let rec classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
-let rec scannable_product_array_kind elt_ty_for_error loc layouts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
+let rec scannable_product_array_kind mixed_element_error loc layouts =
+  List.map (sort_to_scannable_product_element_kind mixed_element_error loc)
+    layouts
 
-and sort_to_scannable_product_element_kind elt_ty_for_error loc
+and sort_to_scannable_product_element_kind mixed_element_error loc
       (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
+  | Any _ | Sum _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
   | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
       let open Jkind_axis.Separability in
@@ -304,13 +301,14 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
         then Pint_scannable else Paddr_scannable
   | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
           Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask), _) as c ->
-    raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
+    raise (Error (loc, mixed_element_error c))
   | Base (Void, _) ->
     raise (Error (loc, Unsupported_void_in_array))
   | Product sorts ->
-    Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
+    Pproduct_scannable
+      (scannable_product_array_kind mixed_element_error loc sorts)
   | Addressable layout ->
-    sort_to_scannable_product_element_kind elt_ty_for_error loc layout
+    sort_to_scannable_product_element_kind mixed_element_error loc layout
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
   | Genvar _ ->
@@ -330,7 +328,8 @@ let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
 
 and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
+  | Any _ | Sum _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind called \
                                with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
   | Base (Scannable, _) | Box _ -> Pint_ignorable
@@ -354,18 +353,38 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_representable_elt env loc elt_ty elt_layout =
-  let elt_ty_for_error = elt_ty in (* report the un-scraped ty in errors *)
   let ty = match scrape_ty env elt_ty with Some ty -> ty | None -> elt_ty in
+  (* Wider scannable bounds in a .cmi must use the same product-array
+     representation as the implementation. Decide the GC class of sum
+     fields from the shared carrier, even when the type is more precise. *)
+  let storage_layout = Jkind.Layout.Const.storage_layout elt_layout in
+  let lowered_sum = storage_layout != elt_layout in
+  let rec has_scanned_sum_field ~in_sum (layout : Jkind.Layout.Const.t) =
+    match layout with
+    | Base (Scannable, _) | Box _ | Any _ | Univar _ | Genvar _ -> in_sum
+    | Base _ -> false
+    | Addressable layout -> has_scanned_sum_field ~in_sum layout
+    | Product fields -> List.exists (has_scanned_sum_field ~in_sum) fields
+    | Sum arms -> List.exists (has_scanned_sum_field ~in_sum:true) arms
+  in
   let classify_product ty sorts =
-    if Ctype.is_always_gc_ignorable env ty then
+    let all_ignorable =
+      Ctype.is_always_gc_ignorable env ty
+      && not (lowered_sum && has_scanned_sum_field ~in_sum:false elt_layout)
+    in
+    if all_ignorable then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
     else
+      let mixed_element_error layout =
+        if lowered_sum then Mixed_sum_array elt_ty
+        else Mixed_product_array (layout, elt_ty)
+      in
       Pgcscannableproductarray
-        (scannable_product_array_kind elt_ty_for_error loc sorts)
+        (scannable_product_array_kind mixed_element_error loc sorts)
   in
   (* CR dkalinichenko: many checks in [classify] are redundant
      with separability. *)
-  match classify ~classify_product env ty elt_layout with
+  match classify ~classify_product env ty storage_layout with
   | Any ->
     if Config.flat_float_array
       && not (Ctype.check_type_separability env ty Non_float)
@@ -511,6 +530,7 @@ let value_kind_of_scannable_jkind env jkind =
       | Pointer, Pointer -> Pgenval)
     | Addressable layout -> of_layout layout
     | Any _
+    | Sum _
     | Product _
     | Univar _
     | Genvar _
@@ -743,7 +763,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
-      if cannot_proceed () then
+      if Datarepr.uses_fused_boxed_tags decl then
+        num_nodes_visited, non_nullable Pgenval
+      else if cannot_proceed () then
         num_nodes_visited,
         add_nullability_from_ty env scty
           (value_kind_of_scannable_jkind env decl.type_jkind)
@@ -1296,6 +1318,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.layout_void
+  | Sum arms when Language_extension.(is_at_least Layouts Stable) ->
+    layout_of_const_sort_generic ~value_kind ~error
+      (Jkind_types.Sum_repr.carrier arms)
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
@@ -1309,7 +1334,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     layout_of_const_sort_generic ~value_kind ~error const
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
-      | Product _) as const) ->
+      | Product _ | Sum _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
   | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
@@ -1330,8 +1355,15 @@ let layout env loc sort ty =
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
       | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
-               Bits64) | Product _)
+               Bits64) | Product _ | Sum _)
         as const ->
+        let const =
+          match get_representable_layout_opt env ty with
+          | Some layout
+            when Jkind.Layout.Const.storage_layout layout != layout ->
+            Option.value (Jkind.Layout.Const.get_sort layout) ~default:const
+          | Some _ | None -> const
+        in
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
@@ -1355,7 +1387,7 @@ let layout_of_sort loc sort =
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
     | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
-             Bits64) | Product _)
+             Bits64) | Product _ | Sum _)
       as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
@@ -1530,6 +1562,12 @@ let report_error ppf = function
   | Unsupported_void_in_array ->
       fprintf ppf
         "Types whose layout contains [void] are not yet supported in arrays."
+  | Mixed_sum_array elt_ty ->
+      fprintf ppf
+        "Storage for an array element of type %a contains both@ \
+         GC-scannable fields and raw fields. Inline array elements must be@ \
+         entirely GC-scannable or entirely GC-ignorable."
+        Printtyp.Doc.type_expr elt_ty
   | Mixed_product_array (const, elt_ty) ->
       fprintf ppf
         "An unboxed product array element must be formed from all@ \

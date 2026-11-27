@@ -761,6 +761,20 @@ val estimate_type_jkind : Env.t ->  type_expr -> jkind_l
    types. *)
 val type_jkind : Env.t -> type_expr -> jkind_l
 
+val may_contain_inline_sum : Env.t -> type_expr -> bool
+
+val instance_primitive_destination :
+  Env.t -> Primitive.description -> type_expr -> type_expr
+
+type primitive_access_site =
+  | Declaration
+  | Specialized_value
+  | Function_value
+  | Direct_application of (int -> Location.t)
+
+val check_primitive_sum_access : primitive_access_site -> loc:Location.t ->
+  Env.t -> Primitive.description -> type_expr -> unit
+
 (* Get the jkind of a type, dropping any changes to types caused by
    expansion. *)
 val type_jkind_purely : Env.t -> type_expr -> jkind_l

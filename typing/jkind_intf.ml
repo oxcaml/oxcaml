@@ -97,10 +97,13 @@ module type Sort = sig
       | Addressable of t
           (** Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)] *)
+      | Sum of t list
 
     val base : base -> t
 
     val product : t list -> t
+
+    val sum : t list -> t
 
     val univar : univar -> t
 

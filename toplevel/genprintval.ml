@@ -345,6 +345,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Vec256 | Vec512 | Mask | Word | Untagged_immediate ) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
+      | Sum _ -> Print_as "<unboxed sum>"
       | Addressable sort -> print_sort sort
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
@@ -364,7 +365,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           (* The sort is undetermined (e.g., a field/arg of kind [any]), so
              compute it from the type of this particular value *)
           match Ctype.type_sort env ty ~allow_mutation:false ~why with
-          | Ok sort -> print_sort (Jkind.Sort.default_for_transl_and_get sort)
+          | Ok sort -> print_sort (Jkind.Sort.default_to_scannable_and_get sort)
           | Error _ -> Print_as "<unknown>"
 
     let field_types_of_labels env lbl_list type_params ty_list () =
@@ -582,6 +583,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                    type_params} ->
                     tree_of_val depth obj
                       (instantiate_type env type_params ty_list body)
+                | {type_kind = Type_variant (_ :: _ :: _, Variant_unboxed, _)}
+                  ->
+                    Oval_stuff "<unboxed sum>"
                 | {type_kind = Type_variant (constr_list,rep,_); type_params} ->
                     tree_of_variant depth path type_params ty_list obj
                       constr_list rep
@@ -672,7 +676,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       and tree_of_generic_array am depth obj ty_arg =
         let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
-        if Obj.Uniform_or_mixed.is_mixed obj_block then
+        if Obj.Uniform_or_mixed.is_mixed obj_block
+           || (Clflags.target_is_native ()
+               && Ctype.may_contain_inline_sum env ty_arg) then
           Oval_stuff "<abstr array>"
         else
           let length = O.size obj in

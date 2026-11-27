@@ -1115,18 +1115,10 @@ let label_mutability_contribution (type rep)
     Solver.with_provenance_text ctx
       (fun () -> "mutable fields")
       (Ldd.const Axis_lattice.mutable_data)
-  | Unboxed_product, Mutable { atomic = Nonatomic; _ } ->
-    (* This is the best crossing we can give to unboxed versions so that boxing
-       them (joining with [immutable_data]) gives the boxed version's crossing.
-       (see [Jkind.Unboxed_field_transformation.mutable_label_axes]) *)
+  | Unboxed_product, Mutable _ ->
     Solver.with_provenance_text ctx
       (fun () -> "mutable fields")
-      (Ldd.const
-         (Axis_lattice.co_sub Axis_lattice.mutable_data
-            Axis_lattice.immutable_data))
-  | Unboxed_product, Mutable { atomic = Atomic; _ } ->
-    Misc.fatal_error
-      "Ikind.label_mutability_contribution: atomic label in an unboxed record"
+      (Ldd.const (Btype.Jkind0.unboxed_label_bounds lbl.ld_mutable))
 
 let sum_record_label_contributions (type rep)
     ~(record_form : rep Data_types.record_form) ~(ctx : Solver.ctx)
@@ -1346,9 +1338,14 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
             ~f:(fun (arg : Types.constructor_argument) ->
               let mask = Axis_lattice.mask_of_modality arg.ca_modalities in
               Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
-        | Types.Cstr_record lbls ->
-          sum_record_label_contributions ~record_form:Legacy ~ctx ~base:Ldd.bot
-            ~payload_kind lbls
+        | Types.Cstr_record lbls -> (
+          let sum form =
+            sum_record_label_contributions ~record_form:form ~ctx ~base:Ldd.bot
+              ~payload_kind lbls
+          in
+          match rep, cstrs with
+          | Variant_unboxed, _ :: _ :: _ -> sum Unboxed_product
+          | _ -> sum Legacy)
       in
       Ldd.sum cstrs ~base ~f:constructor_contrib)
 

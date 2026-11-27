@@ -567,6 +567,7 @@ let mk_constructor_description cstr_name =
     cstr_inlined = None;
     cstr_uid = Uid.internal_not_actually_unique;
     cstr_repr = Variant_boxed [||];
+    cstr_sum = None;
     cstr_constant = true
   }
 

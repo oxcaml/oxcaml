@@ -27,6 +27,7 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
+    cstr_sum: Jkind_types.Sum_repr.t option;
     cstr_shape: constructor_representation;
                                         (* Repr of the constructor itself *)
     cstr_constant: bool;
@@ -55,8 +56,23 @@ let may_equal_constr c1 c2 =
      | tag1, tag2 ->
          equal_tag tag1 tag2)
 
+let is_boxed_sum_constructor cstr =
+  match cstr.cstr_repr, get_desc cstr.cstr_res with
+  | Variant_boxed _, _ -> Option.is_some cstr.cstr_sum
+  | Variant_unboxed, Tbox _ -> true
+  | _ -> false
+
+let sum_for_constructor_payload cstr =
+  match cstr.cstr_sum, cstr.cstr_repr, cstr.cstr_tag with
+  | Some sum, Variant_boxed _, Ordinary {src_index}
+    when sum.arms.(src_index).first_tag =
+         Jkind_types.Sum_repr.last_tag sum src_index -> None
+  | sum, _, _ -> sum
+
 let cstr_res_type_path cstr =
-  match get_desc cstr.cstr_res with
+  let ty = match get_desc cstr.cstr_res with
+    | Tbox inner -> inner | _ -> cstr.cstr_res in
+  match get_desc ty with
   | Tconstr (p, _, _) -> p
   | _ -> assert false
 

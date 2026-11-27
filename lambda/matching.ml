@@ -2130,7 +2130,8 @@ let get_pat_args_constr p rem =
     args @ rem
   | _ -> assert false
 
-let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
+let get_expr_args_constr ~scopes ?unboxed head
+    { arg; mut; sort; layout; _ } rem =
   let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
@@ -2214,9 +2215,18 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       }
   in
   let binding_kind = add_barrier_to_let_kind ubr Alias in
-  if cstr.cstr_inlined <> None then
-    { arg; binding_kind; mut; sort; layout } :: rem
-  else
+  match Data_types.sum_for_constructor_payload cstr, cstr.cstr_tag with
+  | Some repr, Ordinary {src_index} ->
+    let arg = Option.value unboxed ~default:arg in
+    let layouts = List.map (Typeopt.layout_of_sort head.pat_loc) arg_sorts in
+    let args = Translrepr.Sum.project loc repr src_index arg layouts in
+    List.map2 (fun arg (sort, layout) ->
+      { arg; binding_kind; mut = compose_mut mut Immutable; sort; layout })
+      args (List.combine arg_sorts layouts) @ rem
+  | _ ->
+    if Option.is_some cstr.cstr_inlined then
+      { arg; binding_kind; mut; sort; layout } :: rem
+    else
     match cstr.cstr_repr with
     | Variant_boxed _ ->
       List.mapi
@@ -2250,9 +2260,9 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
           cstr.cstr_args
         @ rem
 
-let divide_constructor ~scopes ctx pm =
+let divide_constructor ~scopes ?unboxed ctx pm =
   divide
-    (get_expr_args_constr ~scopes)
+    (get_expr_args_constr ~scopes ?unboxed)
     Data_types.equal_constr
     get_key_constr
     get_pat_args_constr
@@ -3787,6 +3797,26 @@ let combine_regular_constructor value_kind loc arg cstr partial
       mk_failaction_pos partial constrs ctx def
   in
   let descr_lambda_list = fails @ descr_lambda_list in
+  match cstr.cstr_sum with
+  | Some repr ->
+    let cases = List.map (fun (cstr, act) ->
+      match cstr.cstr_tag with
+      | Ordinary {src_index} -> src_index, act
+      | Extension _ | Null -> fatal_error "Matching: invalid sum tag")
+      descr_lambda_list
+    in
+    let (low, high), (intervals, actions) =
+      as_interval fail_opt ~low:0 ~high:(nconstrs - 1) cases
+    in
+    let first index = repr.arms.(index).first_tag in
+    let last = Jkind_types.Sum_repr.last_tag repr in
+    let intervals = Array.map (fun (low, high, action) ->
+      first low, last high, action) intervals
+    in
+    Switcher.zyva loc value_kind (first low, last high)
+      (Translrepr.Sum.tag loc repr arg) intervals actions,
+    Jumps.union local_jumps total1
+  | None ->
   let consts, nonconsts, null = split_cases descr_lambda_list in
   (* Our duty below is to generate code, for matching on a list of
      constructor+action cases, that is good for both bytecode and
@@ -4539,10 +4569,24 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             divide_constant
             (combine_constant value_kind ploc arg cst arg_partial)
       | Construct (cstr, _, _) ->
-          compile_test
-            (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env
-               ph.pat_unique_barrier cstr arg_partial)
+          let compile unboxed =
+            let scrutinee = Option.value unboxed ~default:arg in
+            compile_test (divide_constructor ~scopes ?unboxed)
+              (combine_constructor value_kind ploc scrutinee ph.pat_env
+                 ph.pat_unique_barrier cstr arg_partial)
+          in
+          (match cstr.cstr_sum with
+           | Some sum when Data_types.is_boxed_sum_constructor cstr ->
+             let alternatives = sum.alternatives in
+             let sort = Jkind_types.Sum_repr.carrier alternatives in
+             let layout = Typeopt.layout_of_sort ph.pat_loc sort in
+             let id = Ident.create_local "unboxed" in
+             let body, jumps = compile (Some (Lvar id)) in
+             let inline =
+               Translrepr.Boxed_sum.translate ploc Unbox alternatives arg in
+             Llet (Strict, layout, id, Lambda.debug_uid_none, inline, body),
+             jumps
+           | _ -> compile None)
       | Array (_, _, _) ->
           let kind = Typeopt.array_pattern_kind pomega in
           compile_test

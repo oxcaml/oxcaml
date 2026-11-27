@@ -59,3 +59,41 @@ val label_sort_for_representation :
   record_sort:Jkind.Sort.Const.t ->
   variable_sorts:Jkind.Sort.Const.t array option ->
   Jkind.Sort.Const.t
+
+module Sum : sig
+  (** [inject] and [project] take a source constructor index. *)
+  val inject :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    int ->
+    (Lambda.layout * Lambda.lambda) list ->
+    Lambda.lambda
+
+  val project :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    int ->
+    Lambda.lambda ->
+    Lambda.layout list ->
+    Lambda.lambda list
+
+  (** Read the outer tag. A fused constructor occupies a range of tags. *)
+  val tag :
+    Lambda.scoped_location ->
+    Jkind_types.Sum_repr.t ->
+    Lambda.lambda ->
+    Lambda.lambda
+end
+
+module Boxed_sum : sig
+  type direction =
+    | Box of Lambda.locality_mode
+    | Unbox
+
+  val translate :
+    Lambda.scoped_location ->
+    direction ->
+    Jkind.Sort.Const.t list ->
+    Lambda.lambda ->
+    Lambda.lambda
+end

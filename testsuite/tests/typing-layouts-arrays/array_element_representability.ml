@@ -309,15 +309,11 @@ Error: A representable layout is required here.
 external make_uninit : int -> t array = "%makearray_dynamic_uninit"
 let g () = make_uninit 3
 [%%expect{|
-external make_uninit : int -> t array = "%makearray_dynamic_uninit"
-Line 2, characters 11-24:
-2 | let g () = make_uninit 3
-               ^^^^^^^^^^^^^
-Error: A representable layout is required here.
-       The kind of t is k separable
-         because of the definition of t at line 2, characters 0-20.
-       But the kind of t must be representable
-         because it's the type of an array element.
+Line 1, characters 23-37:
+1 | external make_uninit : int -> t array = "%makearray_dynamic_uninit"
+                           ^^^^^^^^^^^^^^
+Error: %makearray_dynamic_uninit cannot create an array whose elements
+       may contain an inline sum. Supply an initializer instead.
 |}]
 
 external idx : int -> (t array, t) idx_mut = "%unsafe_array_idx"

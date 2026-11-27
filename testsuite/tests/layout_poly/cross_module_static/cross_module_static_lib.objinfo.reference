@@ -24,37 +24,37 @@ Static data:
     Cross_module_static_lib/Stamper/3;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure { } [calls/323: *]
+    (closure { } [calls/351: *]
       (ktemplate layout_17
-        (function {nlocal = 0} x/326[$layout_17] : $layout_17
-          (seq (+:=1 calls/323) x/326)))))
+        (function {nlocal = 0} x/354[$layout_17] : $layout_17
+          (seq (+:=1 calls/351) x/354)))))
   (Cross_module_static_lib/id/0
     (closure { } []
       (ktemplate layout_2
-        (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))))
+        (function {nlocal = 0} x/346[$layout_2] : $layout_2 x/346))))
   (Cross_module_static_lib/Stamper/3
     (closure
-     { counted_id/324 = Cross_module_static_lib/counted_id/2; }
-     [calls/323: *; counted_id/324: *]
-      (template {nlocal = 0} X/350 is_a_functor never_inline never_loop
+     { counted_id/352 = Cross_module_static_lib/counted_id/2; }
+     [calls/351: *; counted_id/352: *]
+      (template {nlocal = 0} X/378 is_a_functor never_inline never_loop
         (let
-          (X/329 =a X/350
-           *match*/349 =[value<int>] (+:=1 calls/323)
-           initial/330 =[value<int>] (field_int 0 (field_imm 1 X/329))
-           with_stamp/331 =
+          (X/357 =a X/378
+           *match*/377 =[value<int>] (+:=1 calls/351)
+           initial/358 =[value<int>] (field_int 0 (field_imm 1 X/357))
+           with_stamp/359 =
              (ktemplate layout_29
-               (function {nlocal = 0} x/333[$layout_29] never_inline
+               (function {nlocal = 0} x/361[$layout_29] never_inline
                  : #(?, $layout_29)
                  (region
-                   (seq (+:=1 (field_imm 1 X/329))
+                   (seq (+:=1 (field_imm 1 X/357))
                      (make_unboxed_product #(value<int>, $layout_29)
-                       (%int_add (field_imm 0 X/329)
-                         (field_int 0 (field_imm 1 X/329)))
-                       (apply (kinstantiate counted_id/324 $layout_29) x/333)))))))
-          (makeblock 0 initial/330 with_stamp/331)))))
+                       (%int_add (field_imm 0 X/357)
+                         (field_int 0 (field_imm 1 X/357)))
+                       (apply (kinstantiate counted_id/352 $layout_29) x/361)))))))
+          (makeblock 0 initial/358 with_stamp/359)))))
   (Cross_module_static_lib/pair/1
     (closure { } []
       (ktemplate layout_5 layout_7
-        (function {nlocal = 0} x/321[$layout_5] y/322[$layout_7]
+        (function {nlocal = 0} x/349[$layout_5] y/350[$layout_7]
           : #($layout_5, $layout_7)
-          (make_unboxed_product #($layout_5, $layout_7) x/321 y/322)))))
+          (make_unboxed_product #($layout_5, $layout_7) x/349 y/350)))))

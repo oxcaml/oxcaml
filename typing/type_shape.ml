@@ -477,7 +477,9 @@ module Type_decl_shape = struct
           end
         | Type_variant ([_], Variant_unboxed, _unsafe_mode_crossing) ->
           Misc.fatal_error "Unboxed variant must have constructor arguments."
-        | Type_variant (([] | _ :: _ :: _), Variant_unboxed, _) ->
+        | Type_variant (_ :: _ :: _, Variant_unboxed, _) ->
+          Shape.unknown_type ()
+        | Type_variant ([], Variant_unboxed, _) ->
           Misc.fatal_error "Unboxed variant must have exactly one constructor."
         | Type_variant
             (_, (Variant_extensible | Variant_with_null), _unsafe_mode_crossing)

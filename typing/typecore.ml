@@ -1507,18 +1507,38 @@ let extract_concrete_record (type rep) (record_form : rep record_form) env ty
   | _, Has_no_typedecl | _, Typedecl(_, _, _) -> Not_a_record_type
   | _, May_have_typedecl -> Maybe_a_record_type
 
+type variant_form = Declared_variant | Unboxed_variant | Boxed_sum
+
+let is_inline_record_product env ty =
+  match get_desc ty with
+  | Tconstr (path, _, _) when Path.is_constructor_typath path ->
+    (match (Env.find_type path env).type_kind with
+     | Type_record_unboxed_product _ -> true
+     | _ -> false)
+  | _ -> false
+
 type variant_extraction_result =
-  | Variant_type of Path.t * Path.t * Types.constructor_declaration list
+  | Variant_type of Path.t * Path.t * variant_form
   | Not_a_variant_type
   | Maybe_a_variant_type
 
 let extract_concrete_variant env ty =
   match extract_concrete_typedecl_protected env ty with
-  | Typedecl(p0, p, {type_kind=Type_variant (cstrs, _, _)}) ->
-    Variant_type (p0, p, cstrs)
-  | Typedecl(p0, p, {type_kind=Type_open}) ->
-    Variant_type (p0, p, [])
-  | Has_no_typedecl | Typedecl(_, _, _) -> Not_a_variant_type
+  | Typedecl(p0, p, {type_kind=Type_variant (_, Variant_unboxed, _)}) ->
+    Variant_type (p0, p, Unboxed_variant)
+  | Typedecl(p0, p, {type_kind=(Type_variant _ | Type_open)}) ->
+    Variant_type (p0, p, Declared_variant)
+  | Typedecl(_, _, _) -> Not_a_variant_type
+  | Has_no_typedecl ->
+    begin match get_desc (expand_head env (protect_expansion env ty)) with
+    | Tbox inner ->
+      begin match extract_concrete_typedecl env inner with
+      | Typedecl (p0,p,{type_kind=Type_variant (_::_::_,Variant_unboxed,_)}) ->
+        Variant_type (p0, p, Boxed_sum)
+      | _ -> Not_a_variant_type
+      end
+    | _ -> Not_a_variant_type
+    end
   | May_have_typedecl -> Maybe_a_variant_type
 
 let extract_label_names record_form env ty =
@@ -1665,11 +1685,11 @@ let mode_project_mutable mut_name =
   mode_default mode
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
-let mode_mutate_mutable mut_name =
+let mode_mutate_mutable ~contention mut_name =
   let mode =
     { With_regionality.Const.max with
       visibility = Write;
-      contention = Corrupted }
+      contention }
     |> With_regionality.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
@@ -3304,11 +3324,11 @@ end) = struct
     (* warn only on nominal labels *)
     let ambiguity =
       match check_disambiguated_name lbl candidates_in_scope with
-      | true ->
-        if in_env lbl then
-          warn_for_disambiguated_name warn lid lbl;
-        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl }
-      | false -> Unambiguous
+      | true when in_env lbl ->
+        warn_for_disambiguated_name warn lid lbl;
+        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl;
+                    boxed = false }
+      | true | false -> Unambiguous
     in
     lbl, ambiguity
 end
@@ -3345,9 +3365,7 @@ module Unboxed_label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Unboxed_product ~loc usage path
       env
   let in_env (lbl : t) =
-    match lbl.lbl_repres with
-    | Record_unboxed_product | Record_unboxed_product_undetermined
-    | Record_unboxed_product_variable _ -> true
+    not (Path.is_constructor_typath (get_constr_type_path lbl.lbl_res))
 end)
 
 let label_get_type_path
@@ -3581,6 +3599,75 @@ module Constructor = NameChoice (struct
         | _ -> []
   let in_env _ = true
 end)
+
+let disambiguate_constructor ~loc env usage lid context expected message =
+  let spelling = Longident.last lid.txt in
+  let explicit = String.starts_with ~prefix:"#" spelling in
+  let name, lookup_lid =
+    if not explicit then spelling, lid else
+    let name = String.sub spelling 1 (String.length spelling - 1) in
+    let open Longident in
+    let txt = match lid.txt with
+      | Lident _ -> Longident.Lident name
+      | Ldot (prefix, suffix) -> Ldot (prefix, {suffix with txt = name})
+      | Lapply _ -> lid.txt in
+    name, {lid with txt}
+  in
+  let expected_type, form = match extract_concrete_variant env expected.ty with
+    | Variant_type (p0, p, form) ->
+      let path = if explicit && form <> Unboxed_variant then None
+        else Some (p0, p, is_principal expected.ty) in
+      path, form
+    | Maybe_a_variant_type -> None, Declared_variant
+    | Not_a_variant_type ->
+      let sort = wrong_kind_sort_of_constructor lid.txt in
+      Error.log_and_raise loc env
+        (Wrong_expected_kind (sort, context, expected.ty))
+  in
+  let candidates =
+    Env.lookup_all_constructors ~loc:lid.loc usage lookup_lid.txt env in
+  let candidates =
+    if explicit ||
+       (match expected_type with
+        | Some (_, p, _) -> Path.is_unboxed_version p | None -> false)
+    then Result.bind candidates (fun candidates ->
+      let unboxed ((cstr, locks), use) = match cstr.cstr_repr with
+        | Variant_unboxed -> Some ((cstr, locks), use)
+        | Variant_boxed _ ->
+          let path = Path.unboxed_version (cstr_res_type_path cstr) in
+          let descriptions = match Env.find_type path env with
+            | {type_kind=Type_abstract _; type_manifest=Some ty; _} ->
+              begin match extract_concrete_typedecl env ty with
+              | Typedecl (_, target, _) -> Env.find_type_descrs target env
+              | _ -> Type_abstract Definition
+              end
+            | _ -> Env.find_type_descrs path env
+            | exception Not_found -> Type_abstract Definition in
+          begin match descriptions with
+          | Type_variant (cstrs, Variant_unboxed, _) ->
+            List.find_opt (fun descr -> descr.cstr_name = name) cstrs
+            |> Option.map (fun descr ->
+              let descr = match cstr.cstr_private with
+                | Public -> descr
+                | Private -> {descr with cstr_private = Private} in
+              (descr, locks), use)
+          | _ -> None
+          end
+        | Variant_with_null | Variant_extensible -> None in
+      match List.filter_map unboxed candidates with
+      | [] -> Error (lid.loc, env, Env.Unbound_constructor lid.txt)
+      | candidates -> Ok candidates)
+    else candidates
+  in
+  let (cstr, locks), ambiguity =
+    wrap_disambiguate message expected
+      (Constructor.disambiguate usage lookup_lid env expected_type) candidates
+  in
+  if form = Boxed_sum && not explicit then
+    (Datarepr.boxed_sum_constructor cstr, locks),
+    Ambiguous { path = cstr_res_type_path cstr;
+                arity = get_constr_type_arity cstr.cstr_res; boxed = true }
+  else (cstr, locks), ambiguity
 
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
@@ -4134,23 +4221,9 @@ and type_pat_aux
   | Ppat_unboxed_tuple (spl, closed) ->
       type_tuple_pat ~is_unboxed:true spl closed
   | Ppat_construct(lid, sarg) ->
-      let expected_type =
-        match extract_concrete_variant !!penv expected_ty with
-        | Variant_type(p0, p, _) ->
-            Some (p0, p, is_principal expected_ty)
-        | Maybe_a_variant_type -> None
-        | Not_a_variant_type ->
-            let srt = wrong_kind_sort_of_constructor lid.txt in
-            let err = Wrong_expected_kind(srt, Pattern, expected_ty) in
-            Error.log_and_raise loc !!penv err
-      in
       let (constr, locks), ambiguity =
-        let candidates =
-          Env.lookup_all_constructors Env.Pattern ~loc:lid.loc lid.txt !!penv in
-        wrap_disambiguate "This variant pattern is expected to have"
-          (mk_expected expected_ty)
-          (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
-          candidates
+        disambiguate_constructor ~loc !!penv Env.Pattern lid Pattern
+          (mk_expected expected_ty) "This variant pattern is expected to have"
       in
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
@@ -4323,7 +4396,10 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_record(lid_sp_list, closed) ->
-      type_record_pat Legacy lid_sp_list closed sort
+      if is_inline_record_product !!penv expected_ty then
+        type_record_pat Unboxed_product lid_sp_list closed sort
+      else
+        type_record_pat Legacy lid_sp_list closed sort
   | Ppat_record_unboxed_product(lid_sp_list, closed) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_record_pat Unboxed_product lid_sp_list closed sort
@@ -5130,6 +5206,29 @@ let delayed_checks = ref []
 let reset_delayed_checks () = delayed_checks := []
 let add_delayed_check f =
   delayed_checks := (f, Warnings.backup ()) :: !delayed_checks
+
+let pending_field_writes = ref None
+
+let with_field_write_checks type_rhs =
+  let checks = ref [] in
+  let rhs =
+    Misc.protect_refs [R (pending_field_writes, Some checks)] type_rhs
+  in
+  List.iter (fun check -> check ()) (List.rev !checks);
+  rhs
+
+let check_field_write check =
+  match !pending_field_writes with
+  | None -> check ()
+  | Some checks -> checks := check :: !checks
+
+let specialize_primitive_value exp =
+  match exp.exp_desc with
+  | Texp_ident { desc = { val_kind = Val_prim prim; val_type; _ }; _ }
+    when prim.prim_is_layout_poly ->
+    Ctype.check_primitive_sum_access Specialized_value ~loc:exp.exp_loc
+      exp.exp_env prim val_type
+  | _ -> ()
 
 let force_delayed_checks () =
   (* checks may change type levels *)
@@ -7929,6 +8028,8 @@ and type_expect_
             type_expect
               new_env expected_mode sbody ty_expected_explained
           in
+          List.iter (fun vb -> specialize_primitive_value vb.vb_expr)
+            pat_exp_list;
           let pat_exp_list = match rec_flag with
             | Recursive -> annotate_recursive_bindings env pat_exp_list
             | Nonrecursive -> pat_exp_list
@@ -8127,6 +8228,17 @@ and type_expect_
         type_application env loc expected_mode pm funct funct_mode sargs rt
           ty_expected
       in
+      begin match funct.exp_desc with
+      | Texp_ident { desc = { val_kind = Val_prim prim }; _ }
+        when prim.prim_is_layout_poly ->
+        let arg_loc index = match List.nth_opt args index with
+          | Some (_, Arg (exp, _), _) -> exp.exp_loc
+          | _ -> funct.exp_loc
+        in
+        Ctype.check_primitive_sum_access (Direct_application arg_loc)
+          ~loc:funct.exp_loc env prim funct.exp_type
+      | _ -> ()
+      end;
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
       let mode_ret =
@@ -8367,7 +8479,10 @@ and type_expect_
           exp_env = env }
       end
   | Pexp_record(lid_sexp_list, opt_sexp) ->
-      type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
+      if is_inline_record_product env ty_expected then
+        type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
+      else
+        type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
   | Pexp_record_unboxed_product(lid_sexp_list, opt_sexp) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
@@ -8491,8 +8606,9 @@ and type_expect_
         match label.lbl_mut with
         | Mutable { mode = m0; atomic } ->
           ignore atomic;  (* CR aspsmith: TODO *)
-          submode ~loc:record.exp_loc ~env rmode (mode_mutate_mutable
-            (Record_field label.lbl_name));
+          submode ~loc:record.exp_loc ~env rmode
+            (mode_mutate_mutable ~contention:Corrupted
+               (Record_field label.lbl_name));
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
@@ -8513,6 +8629,12 @@ and type_expect_
                 rmode))
       in
       unify_exp ~sexp env record ty_record;
+      if Ctype.may_contain_inline_sum env newval.exp_type then
+        check_field_write (fun () ->
+          if Ctype.may_contain_inline_sum env newval.exp_type then
+            submode ~loc:record.exp_loc ~env rmode
+              (mode_mutate_mutable ~contention:Uncontended
+                 (Record_field label.lbl_name)));
       let record_repres =
         update_labels env Legacy ~representative_label:label ~loc
           ~why:Field_assignment
@@ -10070,6 +10192,12 @@ and type_ident env ?(recarg=Rejected) lid =
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
+       let ty = if prim.prim_is_layout_poly
+         then Ctype.instance_primitive_destination env prim ty else ty in
+       if prim.prim_is_layout_poly then
+         add_delayed_check (fun () ->
+           Ctype.check_primitive_sum_access Function_value ~loc:lid.loc
+             env prim ty);
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
@@ -11362,8 +11490,10 @@ and type_argument_ ?explanation ?recarg ~overwrite env
 and type_argument ?explanation ?recarg ~overwrite env mode sarg
       ty_expected' ty_expected =
   let delayed () =
-    type_argument_ ?explanation ?recarg ~overwrite env mode
-      sarg ty_expected' ty_expected
+    let exp = type_argument_ ?explanation ?recarg ~overwrite env mode
+        sarg ty_expected' ty_expected in
+    specialize_primitive_value exp;
+    exp
   in
   if !Clflags.typing_recovery then
     Typing_recovery_state.with_saved_types (fun () ->
@@ -11733,24 +11863,10 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
 and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       ty_expected_explained =
   let { ty = ty_expected; explanation } = ty_expected_explained in
-  let expected_type =
-    match extract_concrete_variant env ty_expected with
-    | Variant_type(p0, p,_) ->
-        Some(p0, p, is_principal ty_expected)
-    | Maybe_a_variant_type -> None
-    | Not_a_variant_type ->
-        let srt = wrong_kind_sort_of_constructor lid.txt in
-        let ctx = Expression explanation in
-        let err = Wrong_expected_kind(srt, ctx, ty_expected) in
-        Error.log_and_raise sexp.pexp_loc env err
-  in
-  let constrs =
-    Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
-  in
   let (constr, locks), ambiguity =
-    wrap_disambiguate "This variant expression is expected to have"
-      ty_expected_explained
-      (Constructor.disambiguate Env.Positive lid env expected_type) constrs
+    disambiguate_constructor ~loc:sexp.pexp_loc env Env.Positive lid
+      (Expression explanation) ty_expected_explained
+      "This variant expression is expected to have"
   in
   let sargs =
     match sarg with
@@ -11829,6 +11945,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       | [{pexp_desc =
             Pexp_ident _ |
             Pexp_record (_, (Some {pexp_desc = Pexp_ident _}| None)) |
+            Pexp_record_unboxed_product
+              (_, (Some {pexp_desc = Pexp_ident _}| None)) |
             Pexp_overwrite (_, {pexp_desc =
               Pexp_record (_, (Some {pexp_desc = Pexp_ident _}| None))})}] ->
         Required
@@ -11850,9 +11968,11 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   in
   let (argument_mode, locality_mode) =
     match constr.cstr_repr with
-    | Variant_unboxed | Variant_with_null -> expected_mode, None
+    | Variant_unboxed when not (is_boxed_sum_constructor constr) ->
+      expected_mode, None
+    | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
-    | Variant_boxed _ | Variant_extensible ->
+    | Variant_boxed _ | Variant_unboxed | Variant_extensible ->
        let locality_mode, argument_mode =
          register_allocation ~loc:sexp.pexp_loc expected_mode
        in
@@ -12642,6 +12762,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           ~exp_env ~new_env ~spat_sexp_list ~attrs_list ~mode_pat_typ_list ~pvs
           (fun exp_env ({pvb_attributes; _} as vb) mode expected_ty ->
             let sexp = vb_exp_constraint vb in
+            let type_rhs ty =
+              Builtin_attributes.warning_scope pvb_attributes (fun () ->
+                with_field_write_checks (fun () ->
+                  type_expect exp_env mode sexp (mk_expected ty)))
+            in
             match get_desc expected_ty with
             | Tpoly (ty, tl) ->
                 let vars, ty' =
@@ -12650,16 +12775,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                       generalize_structure ty')
                     (fun () -> instance_poly_fixed ~keep_names:true tl ty)
                 in
-                let exp =
-                  Builtin_attributes.warning_scope pvb_attributes (fun () ->
-                    type_expect exp_env mode sexp (mk_expected ty'))
-                in
+                let exp = type_rhs ty' in
                 exp, Some vars
             | _ ->
-                let exp =
-                  Builtin_attributes.warning_scope pvb_attributes (fun () ->
-                    type_expect exp_env mode sexp (mk_expected expected_ty))
-                in
+                let exp = type_rhs expected_ty in
                 exp, None)
       in
       List.iter2

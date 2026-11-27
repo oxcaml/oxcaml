@@ -1,0 +1,8 @@
+File "layouts_disabled.ml", line 13, characters 39-44:
+13 | let pass (value : Sum_shape.refined) = value
+                                            ^^^^^
+Error: Non-value layout bits32 + value detected as sort for type
+       Sum_shape.refined,
+       but this requires extension layouts, which is not enabled.
+       If you intended to use this layout, please add this flag to your build file.
+       Otherwise, please report this error to the Jane Street compilers team.

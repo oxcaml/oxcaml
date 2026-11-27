@@ -171,6 +171,13 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
     declarations] in [typedecl.ml]. *)
 val prim_can_contain_layout_any : description -> bool
 
+type sum_access =
+  | No_replacement
+  | Store_array | Store_index | Store_pointer | Store_singleton | Blit
+  | Uninitialized_array | Scalar_memory_access | Unclassified
+
+val sum_access : description -> sum_access
+
 type wrong_repr_error =
   | Expected_value_prim
   | Unpacked_product_return
@@ -189,6 +196,9 @@ type error =
   | Inconsistent_noalloc_attributes_for_effects
   | Raw_pointer_requires_noalloc
   | Invalid_representation_polymorphic_attribute
+  | Sum_write_requires_uncontended of string
+  | Uninitialized_sum_array
+  | Unsupported_sum_primitive of string
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }
 

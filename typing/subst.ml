@@ -649,6 +649,9 @@ let rec sort s srt =
   let open Jkind_types.Sort in
   match srt with
   | Base _ | Univar _ -> srt
+  | Sum arms ->
+    let arms' = Misc.Stdlib.List.map_sharing (sort s) arms in
+    if arms == arms' then srt else Sum arms'
   | Product sorts ->
     let sorts' = Misc.Stdlib.List.map_sharing (sort s) sorts in
     if sorts == sorts' then srt
@@ -670,6 +673,9 @@ let rec layout s l =
     let sorts' = Misc.Stdlib.List.map_sharing (layout s) sorts in
     if sorts == sorts' then l
     else Product sorts'
+  | Sum arms ->
+    let arms' = Misc.Stdlib.List.map_sharing (layout s) arms in
+    if arms == arms' then l else Sum arms'
   | Sort (sort_l, ax) ->
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l

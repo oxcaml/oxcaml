@@ -75,6 +75,7 @@ module Sort : sig
     | Product of t list
     | Univar of univar
     | Addressable of t
+    | Sum of t list
 
   and var
 
@@ -115,6 +116,51 @@ module Sort : sig
   *)
   val decompose_into_product : t -> int -> (t list, error) result
 
+  (** Physical storage for a closed sum. Every index refers to the same field
+      for all constructors. Field zero holds the constructor's ordinal. *)
+  module Sum_repr : sig
+    type 'a source_arm =
+      | Fields of 'a list
+      | Splice of 'a list
+
+    val alternatives : payload:('a list -> 'a) -> 'a source_arm list -> 'a list
+
+    type projection =
+      | Void
+      | Field of int * base
+      | Nested_tag of base
+      | Product of projection list
+
+    type arm = private
+      { first_tag : int;
+        arguments : projection list
+      }
+
+    type t = private
+      { fields : base list;
+        arms : arm array;
+        tag_count : int;
+        alternatives : Const.t list
+      }
+
+    (** Arguments within a constructor are in source order. Returns [None] for
+        an unknown representation or an unsupported vector or mask. *)
+    val make : Const.t source_arm list -> t option
+
+    val direct_sum : Const.t -> Const.t list option
+
+    (** Runtime tag and fields of each boxed alternative, in sum order.
+        Immediates have no fields and are numbered separately from blocks. *)
+    val boxed_cases : Const.t list -> (int * Const.t list) list
+
+    (** Inclusive upper bound of a source constructor's range of tags. *)
+    val last_tag : t -> int -> int
+
+    val carrier : Const.t list -> Const.t
+
+    val physical_sort : Const.t -> Const.t option
+  end
+
   module Flat : sig
     type t =
       | Var of Var.id
@@ -123,6 +169,8 @@ module Sort : sig
       | Base of base
   end
 end
+
+module Sum_repr = Sort.Sum_repr
 
 module Kind_operator : sig
   type t =
@@ -180,6 +228,9 @@ module Layout : sig
             [Const.implied_box_axes]), so the scannable axes of a box are the
             meet of those implied axes and the axes applied outside of the box
             constructor. *)
+    | Sum of 'sort t list
+        (** Ordered alternative payload layouts; preserves refinements on each
+            scannable leaf across signature inclusion. *)
 
   module Const : sig
     type t = private
@@ -197,10 +248,13 @@ module Layout : sig
           (** Invariant: axes on const boxes incorporate the axes implied by the
               contents. I.e., given [Box (t, sa)],
               [Scannable_axes.meet (implied_box_axes t) sa = sa]. *)
+      | Sum of t list
 
     val any : Scannable_axes.t -> t
 
     val product : t list -> t
+
+    val sum : t list -> t
 
     val univar : Sort.univar -> Scannable_axes.t -> t
 
@@ -221,6 +275,15 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    (** Machine representation, including a closed sum's shared storage. *)
+    val physical_sort : t -> Sort.Const.t option
+
+    val runtime_sum_sort : t -> Sort.Const.t option
+
+    (** Whether the compiler knows the runtime sort without instantiating
+        variables. An explicit box has a concrete sort for any contents. *)
+    val has_concrete_sort : t -> bool
 
     val implied_externality : t -> Jkind_axis.Externality.t
 

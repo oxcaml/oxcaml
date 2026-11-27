@@ -1032,6 +1032,8 @@ let default_mapper =
         | Pjk_kind_of ty -> Pjk_kind_of (this.typ this ty)
         | Pjk_product ts ->
           Pjk_product (List.map (this.jkind_annotation this) ts)
+        | Pjk_sum arms ->
+          Pjk_sum (List.map (this.jkind_annotation this) arms)
       in
       { pjka_loc; pjka_desc });
 

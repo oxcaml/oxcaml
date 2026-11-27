@@ -334,6 +334,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
           else loc
         in
         let pc =
+          Ctype.check_primitive_sum_access Function_value ~loc:pc_loc
+            env p1 vd2.val_type;
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
            pc_poly_sort = sort1;

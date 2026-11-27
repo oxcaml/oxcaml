@@ -371,6 +371,8 @@ and copy_jkind_annotation_desc :
   | Pjk_kind_of x0 -> Pjk_kind_of (copy_core_type x0)
   | Pjk_product x0 ->
     Pjk_product (List.map copy_jkind_annotation x0)
+  | Pjk_sum x0 ->
+    Pjk_sum (List.map copy_jkind_annotation x0)
 
 and copy_jkind_annotation :
   Ast_999.Parsetree.jkind_annotation -> Ast_500.Parsetree.jkind_annotation =

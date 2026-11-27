@@ -19,6 +19,17 @@
 open Types
 open Data_types
 
+val boxed_sum_constructor : constructor_description -> constructor_description
+val sum_arm : constructor_arguments ->
+  direct_sum:('a -> 'a list option) ->
+  'a list -> 'a Jkind_types.Sum_repr.source_arm
+val sort_arm : constructor_arguments ->
+  Jkind_types.Sort.Const.t list ->
+  Jkind_types.Sort.Const.t Jkind_types.Sum_repr.source_arm
+val sum_argument_sorts : constructor_arguments -> cstr_layout ->
+  Jkind_types.Sort.Const.t list option
+val uses_fused_boxed_tags : type_declaration -> bool
+
 val extension_descr:
   current_unit:(Unit_info.t option) -> Path.t -> extension_constructor ->
   constructor_description
