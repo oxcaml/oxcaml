@@ -436,7 +436,7 @@ void open_files(void)
 }
 
 const char *
-#ifdef __clang___
+#if defined(__clang__) && __has_attribute(retain)
 __attribute__((used, retain))
 #else
 __attribute__((used))

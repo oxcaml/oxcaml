@@ -1310,7 +1310,7 @@ int caml_try_realloc_stack(asize_t required_space)
     CAML_GC_MESSAGE(STACKS,
                     "Growing stack to %"
                     ARCH_INTNAT_PRINTF_FORMAT "u bytes\n",
-                    Bsize_wsize(wsize) * sizeof(value));
+                    Bsize_wsize(wsize));
   }
 
   new_stack = alloc_size_class_stack_noexc(wsize, stack_cache_bucket(wsize),
