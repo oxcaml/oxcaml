@@ -99,7 +99,7 @@ let load_lambda ppf tlam =
   let bytecode, closure = Meta.reify_bytecode code [| events |] None in
   match
     may_trace := true;
-    closure ()
+    with_async_exns closure
   with
   | retval ->
     may_trace := false;
@@ -246,7 +246,7 @@ let load_compunit ic filename ppf compunit =
   begin try
     may_trace := true;
     let _bytecode, closure = Meta.reify_bytecode code events None in
-    ignore (closure ());
+    ignore (with_async_exns closure);
     may_trace := false;
   with exn ->
     record_backtrace ();

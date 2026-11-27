@@ -236,6 +236,21 @@ let record_backtrace () =
   if Printexc.backtrace_status ()
   then backtrace := Some (Printexc.get_backtrace ())
 
+let catch_async_exns = ref false
+
+let with_async_exns f =
+  if not !catch_async_exns
+  then f ()
+  else
+    match
+      Sys.with_async_exns (fun () ->
+        match f () with
+        | v -> Ok v
+        | exception e -> Error (e, Printexc.get_raw_backtrace ()))
+    with
+    | Ok v -> v
+    | Error (e, bt) -> Printexc.raise_with_backtrace e bt
+
 let preprocess_phrase ppf phr =
   let phr =
     match phr with
@@ -307,7 +322,9 @@ let refill_lexbuf buffer len =
       else "  "
     in
     first_line := false;
-    let (len, eof) = !read_interactive_input prompt buffer len in
+    let (len, eof) =
+      with_async_exns (fun () -> !read_interactive_input prompt buffer len)
+    in
     if eof then begin
       Location.echo_eof ();
       if len > 0 then got_eof := true;

@@ -1,0 +1,9 @@
+- : unit = ()
+Interrupted.
+still running
+- : unit = ()
+Line 1, characters 0-11:
+1 | interrupted;;
+    ^^^^^^^^^^^
+Error: Unbound value interrupted
+
