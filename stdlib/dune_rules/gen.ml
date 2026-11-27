@@ -530,10 +530,11 @@ let write_runtime_dune ppf =
      variant, and a non-default variant's archives are suffixed with
      "_" ^ the ABSOLUTE name of the variant's projection onto the
      runtime axes, with '-' mapped to '_' (variants whose projection
-     equals the default's share the default archives). So a
-     no-frame-pointers configure additionally builds libasmrun_fp.a
-     etc., and a --enable-frame-pointers configure builds
-     libasmrun_base.a etc. The names must agree with
+     equals the default's share the default archives). The default is
+     base wherever variants are built (no configure option selects
+     another), so a build with the fp variant additionally builds
+     libasmrun_fp.a etc., and none builds libasmrun_base.a. The names
+     must agree with
      Codegen_variant.runtime_archive_suffix (utils/codegen_variant.ml,
      via the copied utils/codegen_variant_name.ml) and with the
      archive-name composition in asmcomp/asmlink.ml (runtime_lib), which

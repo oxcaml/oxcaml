@@ -111,7 +111,7 @@ let syntax_quotations = "@enable_syntax_quotations@" = "yes"
 
 let reserved_header_bits = @reserved_header_bits@
 
-let no_stack_checks = "@enable_stack_checks@" <> "yes"
+let no_stack_checks = not @stack_checks@
 
 let tsan = @tsan@
 

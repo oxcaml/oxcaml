@@ -31,6 +31,20 @@
 #   with them and looks at the code.
 # - A name in --with-codegen-variants that is a file name pattern: it is not
 #   a variant name, whatever files it matches.
+# - The --enable-<axis> and --disable-<axis> options of the four axes
+#   (frame pointers, stack checks, poll insertion, AddressSanitizer). They
+#   are requirements on the list of variants, with or without
+#   --with-codegen-variants, and set no default: the configured C flags,
+#   linker flags, macros and compiler settings are those of a configure
+#   without them, the variant in the library root is base, and configure
+#   ends with a notice that says so.
+# - Other targets. No machine is needed for what configure decides from the
+#   target: it is given the triplet as the one of the build machine, and
+#   tests the C compiler of this machine believing that. An arm64 target,
+#   Linux or macOS, has the variants poll and sc, and none with frame
+#   pointers or AddressSanitizer. A target with another backend has none,
+#   and its C runtime keeps its mandatory stack checks. A build without the
+#   native compiler has none either, whatever the triplet.
 #
 #   check-configure-variants.sh [CC]
 #
@@ -89,23 +103,102 @@ run_configure() {
   "$srcdir/configure" CC="$compiler" "$@" > log 2>&1 || status=$?
   echo "$status" > status
 }
-(run_configure control cc-with-asan-runtime) &
-(run_configure plain cc-without-asan-runtime) &
-(run_configure variant cc-without-asan-runtime \
-  --with-codegen-variants=asan-fp) &
-(run_configure default cc-without-asan-runtime \
-  --enable-address-sanitizer) &
-(run_configure none cc-with-asan-runtime --disable-codegen-variants) &
-(run_configure nofp cc-with-asan-runtime --with-codegen-variants=poll,sc) &
-(run_configure omit cc-with-asan-runtime --with-codegen-variants=fp-sc \
+# The runs go on at the same time, one per processor at most.
+processors=$(getconf _NPROCESSORS_ONLN 2> /dev/null || echo 4)
+# start NAME CC [OPTION]: run_configure in the background
+start() {
+  while [ "$(jobs -rp | wc -l)" -ge "$processors" ]; do sleep 1; done
+  (run_configure "$@") &
+}
+start control cc-with-asan-runtime
+start plain cc-without-asan-runtime
+start variant cc-without-asan-runtime --with-codegen-variants=asan-fp
+start default cc-without-asan-runtime --enable-address-sanitizer
+start none cc-with-asan-runtime --disable-codegen-variants
+start nofp cc-with-asan-runtime --with-codegen-variants=poll,sc
+start omit cc-with-asan-runtime --with-codegen-variants=fp-sc \
   COMPILER_BYTECODE_CFLAGS=-fomit-frame-pointer \
   COMPILER_NATIVE_CFLAGS=-fomit-frame-pointer \
   COMPILER_BYTECODE_CPPFLAGS=-fomit-frame-pointer \
-  COMPILER_NATIVE_CPPFLAGS=-fomit-frame-pointer) &
+  COMPILER_NATIVE_CPPFLAGS=-fomit-frame-pointer
 # A directory that the pattern matches, where configure runs.
 mkdir -p "$work/pattern/poll"
-(run_configure pattern cc-with-asan-runtime \
-  '--with-codegen-variants=p[oa]ll') &
+start pattern cc-with-asan-runtime '--with-codegen-variants=p[oa]ll'
+
+# The options of the axes. The name of a run is the name of its directory;
+# its options are kept for the messages.
+declare -A options
+# axis_run NAME [OPTION]: with the control's compiler
+axis_run() {
+  local name=$1
+  shift
+  options[$name]=$*
+  start "$name" cc-with-asan-runtime "$@"
+}
+axis_run enable-fp --enable-frame-pointers
+axis_run enable-sc --enable-stack-checks
+axis_run enable-poll --enable-poll-insertion
+axis_run enable-asan --enable-address-sanitizer
+axis_run enable-fp-poll --enable-frame-pointers --enable-poll-insertion
+axis_run enable-poll-sc --enable-poll-insertion --enable-stack-checks
+axis_run enable-asan-poll --enable-address-sanitizer --enable-poll-insertion
+axis_run enable-fp-poll-sc --enable-frame-pointers --enable-poll-insertion \
+  --enable-stack-checks
+axis_run disable-fp --disable-frame-pointers
+axis_run disable-sc --disable-stack-checks
+axis_run disable-poll --disable-poll-insertion
+axis_run disable-asan --disable-address-sanitizer
+axis_run enable-fp-disable-sc --enable-frame-pointers --disable-stack-checks
+axis_run list-with-required --enable-frame-pointers \
+  --with-codegen-variants=fp,sc
+axis_run list-without-disabled --disable-frame-pointers \
+  --with-codegen-variants=base,poll,poll-sc,sc
+axis_run list-without-required --enable-frame-pointers \
+  --with-codegen-variants=fp-sc
+axis_run list-with-axes-apart --enable-poll-insertion --enable-stack-checks \
+  --with-codegen-variants=poll,sc
+axis_run list-empty-required --enable-stack-checks --with-codegen-variants=
+axis_run list-with-disabled --disable-frame-pointers \
+  --with-codegen-variants=poll,fp-sc
+axis_run none-required --enable-frame-pointers --disable-codegen-variants
+axis_run none-disabled --disable-stack-checks --disable-codegen-variants
+axis_run asan-sc --enable-address-sanitizer --enable-stack-checks
+axis_run asan-no-fp --enable-address-sanitizer --disable-frame-pointers
+
+# Other targets, with the control's compiler too.
+riscv_linux=riscv64-unknown-linux-gnu
+# target_run NAME TRIPLET [OPTION]
+target_run() {
+  local name=$1 triplet=$2
+  shift 2
+  options[$name]="for $triplet${*:+ with $*}"
+  start "$name" cc-with-asan-runtime "--build=$triplet" "--host=$triplet" "$@"
+}
+for system in linux macos; do
+  case $system in
+    linux) triplet=aarch64-unknown-linux-gnu ;;
+    *) triplet=aarch64-apple-darwin ;;
+  esac
+  target_run "arm64-$system" "$triplet"
+  target_run "arm64-$system-list" "$triplet" \
+    --with-codegen-variants=base,poll,poll-sc,sc
+  target_run "arm64-$system-enable" "$triplet" --enable-poll-insertion \
+    --enable-stack-checks
+  target_run "arm64-$system-disable" "$triplet" --disable-stack-checks
+  target_run "arm64-$system-fp" "$triplet" --enable-frame-pointers
+  target_run "arm64-$system-asan" "$triplet" --enable-address-sanitizer
+  target_run "arm64-$system-list-fp" "$triplet" --with-codegen-variants=fp-sc
+  target_run "arm64-$system-list-asan" "$triplet" \
+    --with-codegen-variants=asan-fp
+done
+target_run riscv "$riscv_linux"
+target_run riscv-sc "$riscv_linux" --enable-stack-checks
+target_run riscv-no-sc "$riscv_linux" --disable-stack-checks
+target_run riscv-poll "$riscv_linux" --enable-poll-insertion
+target_run riscv-list "$riscv_linux" --with-codegen-variants=sc
+axis_run bytecode --disable-native-compiler
+axis_run bytecode-sc --disable-native-compiler --enable-stack-checks
+axis_run bytecode-list --disable-native-compiler --with-codegen-variants=sc
 wait
 
 failed=false
@@ -255,5 +348,196 @@ not for the name"
 else
   echo "A file name pattern is not a variant name"
 fi
+
+# The options of the axes, on the target of the control run. Nothing below
+# means anything if that run failed.
+if [ "$(status control)" != 0 ]; then exit 1; fi
+
+# succeeded NAME: whether the run did, reporting it if not
+succeeded() {
+  [ "$(status "$1")" = 0 ] ||
+    { fail "$1" "configure ${options[$1]} failed"; return 1; }
+}
+# builds NAME VARIANT...: the run succeeded and builds exactly these
+# variants besides the one of the library root
+builds() {
+  local name=$1
+  shift
+  succeeded "$name" || return 0
+  if [ "$(variants "$name")" = "$*" ]; then
+    echo "configure ${options[$name]}: builds" \
+      "${*:-no variant besides the one of the library root}"
+  else
+    fail "$name" "configure ${options[$name]} selected the variants \
+[$(variants "$name")], not [$*]"
+  fi
+}
+# refused NAME PATTERN: the run failed with an error that matches PATTERN
+refused() {
+  if [ "$(status "$1")" = 0 ]; then
+    fail "$1" "configure ${options[$1]} succeeded"
+  elif ! grep -q "error: .*$2" "$work/$1/log"; then
+    fail "$1" "configure ${options[$1]} failed, but not with an error \
+that matches '$2'"
+  else
+    echo "configure ${options[$1]}: an error"
+  fi
+}
+# sorted VARIANT...: in the order of the list that configure makes
+sorted() { printf '%s\n' "$@" | LC_ALL=C sort -u | tr '\n' ' ' | sed 's/ $//'; }
+# control_without TOKEN: the variants of the control run that do not have
+# the axis
+control_without() {
+  local variant kept=''
+  for variant in $(variants control); do
+    case -$variant- in
+      *-"$1"-*) ;;
+      *) kept="$kept $variant" ;;
+    esac
+  done
+  # shellcheck disable=SC2086
+  sorted $kept
+}
+all=$(variants control)
+
+# An enabled axis: the variant with exactly the enabled axes is built, with
+# the automatic list.
+# shellcheck disable=SC2046,SC2086
+{
+  builds enable-fp $all
+  builds enable-sc $all
+  builds enable-poll $all
+  builds enable-asan $all
+  builds enable-fp-poll $(sorted $all fp-poll)
+  builds enable-poll-sc $(sorted $all poll-sc)
+  builds enable-asan-poll $(sorted $all asan-fp-poll)
+  builds enable-fp-poll-sc $(sorted $all fp-poll-sc)
+  # A disabled axis: no variant with it.
+  builds disable-fp $(control_without fp)
+  builds disable-sc $(control_without sc)
+  builds disable-poll $(control_without poll)
+  builds disable-asan $(control_without asan)
+  builds enable-fp-disable-sc $(control_without sc)
+}
+# The same two rules with a list.
+builds list-with-required fp sc
+builds list-without-disabled poll poll-sc sc
+refused list-without-required "'fp' has to be built"
+refused list-with-axes-apart "'poll-sc' has to be built"
+refused list-empty-required "'sc' has to be built"
+refused list-with-disabled "'fp-sc' conflicts with --disable-frame-pointers"
+refused none-required "conflicts with --disable-codegen-variants"
+builds none-disabled
+refused asan-sc "stack checks together with Address Sanitizer"
+refused asan-no-fp "conflicts with --disable-frame-pointers"
+
+# No option sets a default. What configure writes for the build is what the
+# control run wrote, the list of variants and the record of the options
+# aside: the C and linker flags, the settings of the compiler, the macros
+# of the runtime's headers.
+# configuration NAME: what the run wrote, to compare
+configuration() {
+  (cd "$work/$1" &&
+    grep -v -e '^CODEGEN_VARIANTS=' -e '^CONFIGURE_ARGS=' \
+      Makefile.config Makefile.build_config &&
+    cat runtime/caml/m.h runtime/caml/s.h utils/config.generated.ml)
+}
+configuration control > "$work/control.configuration"
+for name in enable-fp enable-sc enable-poll enable-asan enable-fp-poll \
+  enable-poll-sc enable-asan-poll enable-fp-poll-sc; do
+  [ "$(status "$name")" = 0 ] || continue
+  configuration "$name" > "$work/$name.configuration"
+  if cmp -s "$work/control.configuration" "$work/$name.configuration"; then
+    echo "configure ${options[$name]}: sets no default"
+  else
+    fail "$name" "configure ${options[$name]} changes more of the \
+configuration than the list of variants:
+$(diff "$work/control.configuration" "$work/$name.configuration" | head -n 20)"
+  fi
+done
+if [ "$(setting control CODEGEN_DEFAULT_VARIANT)" != base ]; then
+  fail control "the variant of the library root is \
+[$(setting control CODEGEN_DEFAULT_VARIANT)], not base"
+fi
+axis_macros='WITH_FRAME_POINTERS|STACK_CHECKS_ENABLED|WITH_ADDRESS_SANITIZER'
+if grep -Eq "^#define ($axis_macros)" "$work/control/runtime/caml/m.h"; then
+  fail control "m.h defines the macro of an axis"
+fi
+
+# The notice: with an option of an axis, and only then.
+notice='these options decide which codegen variants are built'
+if [ "$(status enable-fp-poll)" = 0 ]; then
+  log=$work/enable-fp-poll/log
+  if grep -q -- "--enable-frame-pointers --enable-poll-insertion: $notice" \
+       "$log" &&
+     grep -q "builds the variants: base $(variants enable-fp-poll)\$" \
+       "$log" &&
+     grep -q "for 'fp-poll', OCAMLPARAM=frame-pointers=1,poll-insertion=1,_" \
+       "$log"; then
+    echo "configure ${options[enable-fp-poll]}: says that it sets no" \
+      "default, what it builds and how to set one"
+  else
+    fail enable-fp-poll "configure ${options[enable-fp-poll]} does not \
+end with the notice about defaults"
+  fi
+fi
+if [ "$(status disable-sc)" = 0 ] &&
+   ! grep -q -- "--disable-stack-checks: $notice" "$work/disable-sc/log"; then
+  fail disable-sc "configure --disable-stack-checks does not end with the \
+notice about defaults"
+fi
+if grep -q "$notice" "$work/control/log"; then
+  fail control "a configure without an option of an axis prints the \
+notice about defaults"
+fi
+
+# arm64: stack checks and poll insertion only.
+unsupported_fp='frame pointers not supported on this platform'
+unsupported_asan='Address Sanitizer requires Clang on x86_64 Linux'
+for system in linux macos; do
+  builds "arm64-$system" poll sc
+  builds "arm64-$system-list" poll poll-sc sc
+  builds "arm64-$system-enable" poll poll-sc sc
+  builds "arm64-$system-disable" poll
+  refused "arm64-$system-fp" "$unsupported_fp"
+  refused "arm64-$system-asan" "$unsupported_asan"
+  refused "arm64-$system-list-fp" "'fp-sc' cannot be built: $unsupported_fp"
+  refused "arm64-$system-list-asan" \
+    "'asan-fp' cannot be built: $unsupported_asan"
+  if [ "$(status "arm64-$system")" = 0 ] &&
+     [ "$(setting "arm64-$system" ARCH)" != arm64 ]; then
+    fail "arm64-$system" "configure ${options[arm64-$system]} selected the \
+backend [$(setting "arm64-$system" ARCH)]: this run tested nothing"
+  fi
+done
+
+# Another backend: no variants, and the stack checks of the C runtime.
+# stack_checks_in_runtime NAME: whether m.h defines the macro
+stack_checks_in_runtime() {
+  grep -q '^#define STACK_CHECKS_ENABLED' "$work/$1/runtime/caml/m.h"
+}
+no_variants='codegen variants'
+builds riscv
+builds riscv-sc
+builds riscv-no-sc
+refused riscv-poll "--enable-poll-insertion: $no_variants cannot be built"
+refused riscv-list "--with-codegen-variants: $no_variants are not supported"
+for name in riscv riscv-sc riscv-no-sc; do
+  [ "$(status "$name")" = 0 ] || continue
+  if stack_checks_in_runtime "$name"; then
+    echo "configure ${options[$name]}: the C runtime has stack checks"
+  else
+    fail "$name" "configure ${options[$name]} leaves the stack checks out \
+of the C runtime"
+  fi
+done
+if stack_checks_in_runtime control; then
+  fail control "the C runtime of the library root has stack checks"
+fi
+
+# No native compiler: no backend, whatever the triplet.
+builds bytecode
+refused bytecode-sc "--enable-stack-checks: $no_variants cannot be built"
+refused bytecode-list "--with-codegen-variants: $no_variants are not supported"
 
 if $failed; then exit 1; fi

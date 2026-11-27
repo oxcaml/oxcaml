@@ -261,14 +261,15 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AC_ARG_ENABLE([stack_checks],
   [AS_HELP_STRING([--enable-stack-checks],
-    [use explicit stack-limit checks by default in generated code (instead
-     of guard pages), and select the stack-checks runtime and library
-     variant as the install default (either default can be overridden per
-     invocation with -stack-checks/-no-stack-checks)])])
+    [require the codegen variant with explicit stack-limit checks (instead
+     of guard pages) to be built; with other --enable-<axis> options, the
+     variant that combines them.  --disable-stack-checks builds no variant
+     with stack checks.  Neither changes what ocamlopt compiles with no
+     flag, which is the base variant: select another per invocation with
+     -stack-checks, or with OCAMLPARAM=stack-checks=1,_])])
 
 ## Output variables
 
-AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
@@ -713,33 +714,41 @@ AC_ARG_ENABLE([native-toplevel],
 
 AC_ARG_ENABLE([frame-pointers],
   [AS_HELP_STRING([--enable-frame-pointers],
-    [use frame pointers by default in generated code, and select the
-     frame-pointer runtime and library variant as the install default
-     (either default can be overridden per invocation with
-     -frame-pointers/-no-frame-pointers)])])
+    [require the codegen variant with frame pointers to be built; with
+     other --enable-<axis> options, the variant that combines them.
+     --disable-frame-pointers builds no variant with frame pointers.
+     Neither changes what ocamlopt compiles with no flag, which is the
+     base variant: select another per invocation with -frame-pointers, or
+     with OCAMLPARAM=frame-pointers=1,_])])
 
 AC_ARG_ENABLE([address-sanitizer],
   [AS_HELP_STRING([--enable-address-sanitizer],
-    [expose native OCaml operations to AddressSanitizer by default in
-     generated code (also enables frame pointers), and select the
-     asan runtime and library variant as the install default (either
-     default can be overridden per invocation with -asan/-no-asan);
-     requires Clang on x86_64 Linux])])
+    [require the codegen variant that exposes native OCaml operations to
+     AddressSanitizer (and has frame pointers) to be built; with
+     --enable-poll-insertion, the variant that combines them.
+     --disable-address-sanitizer builds no variant with AddressSanitizer.
+     Neither changes what ocamlopt compiles with no flag, which is the
+     base variant: select another per invocation with -asan
+     -frame-pointers, or with OCAMLPARAM=asan=1,frame-pointers=1,_.
+     Requires Clang on x86_64 Linux])])
 
 AC_ARG_ENABLE([codegen-variants],
   [AS_HELP_STRING([--disable-codegen-variants],
-    [do not build runtime archives and library trees for non-default
-     codegen variants (e.g. frame pointers); such variants are only
-     available on x86_64 Linux/macOS with gcc or clang])])
+    [build runtime archives and library trees for the base codegen
+     variant only (no frame pointers, no stack checks, no poll insertion,
+     no AddressSanitizer); other variants are only available on x86_64
+     and arm64 Linux/macOS with gcc or clang])])
 
 AC_ARG_WITH([codegen-variants],
   [AS_HELP_STRING([--with-codegen-variants=NAME,NAME],
-    [comma- or space-separated list of non-default codegen variant names
-     to build runtime archives and library trees for (e.g. fp, base);
-     an empty list builds none, like --disable-codegen-variants; without
-     this option, defaults to the variants obtained by flipping each
-     supported axis from the configure default (AddressSanitizer brings
-     frame pointers with it), plus fp-sc])])
+    [comma- or space-separated list of the codegen variants to build
+     runtime archives and library trees for, besides base, which is
+     always built (e.g. fp,sc); an empty list builds none, like
+     --disable-codegen-variants; without this option: fp, sc, poll and
+     fp-sc on x86_64 (and asan-fp with a Clang on Linux that links
+     AddressSanitizer executables), poll and sc on arm64, without the
+     variants that a --disable-<axis> option excludes and with the
+     variant that the --enable-<axis> options require])])
 
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
@@ -879,10 +888,12 @@ AC_ARG_ENABLE([stack-allocation],
 
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
-    [insert poll points by default in generated code, and select the
-     poll-insertion library variant as the install default (either
-     default can be overridden per invocation with
-     -enable-poll-insertion/-disable-poll-insertion)])])
+    [require the codegen variant with poll points inserted in generated
+     code to be built; with other --enable-<axis> options, the variant
+     that combines them.  --disable-poll-insertion builds no variant with
+     poll insertion.  Neither changes what ocamlopt compiles with no
+     flag, which is the base variant: select another per invocation with
+     -enable-poll-insertion, or with OCAMLPARAM=poll-insertion=1,_])])
 
 AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
   [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
@@ -1959,15 +1970,14 @@ AS_CASE([$arch],
     [arch_specific_SOURCES='$(intel_SOURCES)'],
   [arch_specific_SOURCES=''])
 
-dnl Stack checks can be disabled (in favor of guard pages) only on
-dnl amd64/arm64; every other architecture is forced to checks.  The
-dnl default is recorded in m.h by defining STACK_CHECKS_ENABLED (see
-dnl "## Stack checks" below).
-AS_IF([test x"$enable_stack_checks" = xyes],
-  [],
-  [AS_CASE([$arch],
-    [amd64|arm64], [],
-    [enable_stack_checks=yes])])
+dnl The C runtime can do without explicit stack checks (in favor of guard
+dnl pages) only on amd64 and arm64, where stack checks are an axis of the
+dnl codegen variants (see "## Codegen variants" below).  On every other
+dnl architecture the runtime is built with them, whatever the options say:
+dnl m.h defines STACK_CHECKS_ENABLED there (see "## Stack checks" below).
+AS_CASE([$arch],
+  [amd64|arm64], [stack_checks_mandatory=false],
+  [stack_checks_mandatory=true])
 
 native_cflags=''
 oc_native_cflags=''
@@ -3093,23 +3103,45 @@ AC_ARG_WITH([objcopy],
     'objcopy')])],
   [objcopy=$with_objcopy])
 
-## Frame pointers
+## Codegen variant axes
 
-AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" = "xyes"],
-  [AS_CASE([$target],
-    [x86_64-*-linux*|x86_64-*-darwin*],
-     [AS_CASE([$ocaml_cc_vendor],
-        [clang-*|gcc-*],
-         [common_cflags="$common_cflags -g -fno-omit-frame-pointer"
-         frame_pointers=true
-         AC_DEFINE([WITH_FRAME_POINTERS], [1])
-         AC_MSG_NOTICE([using frame pointers])],
-         [AC_MSG_ERROR([frame pointers not supported on this platform])]
-      )],
-    [AC_MSG_ERROR([frame pointers not supported on this platform])]
-  )],
-  [AC_MSG_NOTICE([not using frame pointers])
-  frame_pointers=false])
+dnl Frame pointers, Address Sanitizer, stack checks and poll insertion are
+dnl settings of native code generation that each invocation of ocamlopt
+dnl chooses, not configure: with no flag, ocamlopt compiles for the base
+dnl variant (every axis off), whose libraries are in the library root, on
+dnl every installation.  configure only decides which other variants get
+dnl runtime archives and library trees ("## Codegen variants" below); the
+dnl --enable-<axis> and --disable-<axis> options are requirements on that
+dnl list.  So no option adds C flags, linker flags or macros for an axis
+dnl here: the root's m.h defines no axis macro, and the build gives each
+dnl variant its own flags (Makefile.codegen-variants).  The variables
+dnl below are what the templates still substitute for "the configured
+dnl default" of each axis.
+
+frame_pointers=false
+address_sanitizer=false
+poll_insertion=false
+
+dnl Where codegen variants can be built: with the native backends that
+dnl generate code for more than one of them, on the systems and with the
+dnl C compilers that their runtime archives are built for.  This is
+dnl decided from the native backend that configure selected and not from
+dnl the target triplet: an ILP32 aarch64 target has no arm64 backend, and
+dnl a build without the native compiler has none at all.  Frame pointers
+dnl additionally need a backend that maintains them, which only amd64
+dnl does.
+
+codegen_variants_supported=false
+fp_variant_supported=false
+AS_IF([$native_compiler],
+  [AS_CASE([$ocaml_cc_vendor],
+     [clang-*|gcc-*],
+       [AS_CASE(["$arch,$system"],
+          [amd64,linux|amd64,macosx],
+            [codegen_variants_supported=true
+             fp_variant_supported=true],
+          [arm64,linux|arm64,macosx],
+            [codegen_variants_supported=true])])])
 
 ## Address Sanitizer
 
@@ -3125,20 +3157,19 @@ AS_CASE([$ocaml_cc_vendor],
   [c_compiler_is_clang=false])
 AC_SUBST([c_compiler_is_clang])
 
-dnl Whether Address Sanitizer can be used, as the default
-dnl (--enable-address-sanitizer) or in a codegen variant, and if not, why.
-dnl Besides Clang on x86_64 Linux it takes a Clang that can link an Address
-dnl Sanitizer executable: the runtime library that such a link needs
-dnl (libclang_rt.asan, from compiler-rt) may not be installed with the
-dnl compiler, which then accepts -fsanitize=address when it compiles and
-dnl fails when it links.  asan_link_failed says that the link is what is
-dnl missing.
+dnl Whether a codegen variant with Address Sanitizer can be built, and if
+dnl not, why.  Besides Clang and the amd64 backend on Linux it takes a
+dnl Clang that can link an Address Sanitizer executable: the runtime
+dnl library that such a link needs (libclang_rt.asan, from compiler-rt) may
+dnl not be installed with the compiler, which then accepts
+dnl -fsanitize=address when it compiles and fails when it links.
+dnl asan_link_failed says that the link is what is missing.
 
 asan_supported=false
 asan_link_failed=false
 asan_unsupported_reason=''
-AS_CASE(["$target,$ocaml_cc_vendor"],
-  [x86_64-*-linux*,clang-*],
+AS_CASE(["$arch,$system,$ocaml_cc_vendor"],
+  [amd64,linux,clang-*],
     [AC_MSG_CHECKING(m4_normalize([whether the C compiler can link Address
        Sanitizer executables]))
      SAVED_LDFLAGS="$LDFLAGS"
@@ -3157,101 +3188,145 @@ AS_CASE(["$target,$ocaml_cc_vendor"],
      on x86_64 Linux (the runtime's ASan report wrappers rely on Clang-only
      attributes)])"])
 
-AS_IF([test x"$enable_address_sanitizer" = "xyes"],
-  [AS_IF([$tsan],
-     [AC_MSG_ERROR(m4_normalize([Address Sanitizer cannot be combined with
-       ThreadSanitizer (the compiler rejects -fsanitize=address together
-       with -fsanitize=thread); configure with at most one of
-       --enable-address-sanitizer and --enable-tsan]))])
-   AS_IF([$asan_supported],
-     [common_cflags="$common_cflags -fsanitize=address -fsanitize-recover=address"
-      oc_ldflags="$oc_ldflags -fsanitize=address -fsanitize-recover=address"
-      address_sanitizer=true
-      AC_DEFINE([WITH_ADDRESS_SANITIZER])
-      AC_MSG_NOTICE([using Address Sanitizer])],
-     [AC_MSG_ERROR(m4_normalize([--enable-address-sanitizer:
-        $asan_unsupported_reason]))])],
-  [AC_MSG_NOTICE([not using Address Sanitizer])
-  address_sanitizer=false])
-
 ## Stack checks
 
-dnl The decision (including the forced-on architectures) was made next to
-dnl the architecture determination above; here the default is recorded in
-dnl m.h, which defines STACK_CHECKS_ENABLED when stack checks are on by
-dnl default.
+dnl Only where they are mandatory (see the architecture determination
+dnl above) does m.h define STACK_CHECKS_ENABLED.  Elsewhere stack checks
+dnl are an axis of the codegen variants, off in the library root.
 
-AS_IF([test x"$enable_stack_checks" = "xyes"],
-  [AS_IF([test x"$address_sanitizer" = "xtrue"],
-     [AC_MSG_ERROR(m4_normalize([stack checks together with Address
-       Sanitizer is an untested combination; configure with at most one of
-       --enable-stack-checks and --enable-address-sanitizer]))])
-   AC_DEFINE([STACK_CHECKS_ENABLED])
+AS_IF([$stack_checks_mandatory],
+  [AC_DEFINE([STACK_CHECKS_ENABLED])
    stack_checks=true
-   AC_MSG_NOTICE([using stack checks])],
-  [stack_checks=false
-   AC_MSG_NOTICE([not using stack checks (using stack guard pages)])])
-
-## Poll insertion
-
-dnl Only the default of the per-invocation -enable-poll-insertion flag:
-dnl poll insertion changes OCaml code generation but neither the runtime
-dnl nor C stubs (inserted polls reuse the ordinary caml_call_gc
-dnl machinery), so there is no macro to define.  (The old POLL_INSERTION
-dnl AC_DEFINE was dead: m.h.in never carried a template line for it.)
-
-AS_IF([test x"$enable_poll_insertion" = "xyes"],
-  [poll_insertion=true
-   AC_MSG_NOTICE([inserting poll points by default])],
-  [poll_insertion=false
-   AC_MSG_NOTICE([not inserting poll points by default])])
+   AC_MSG_NOTICE([using stack checks (mandatory on this architecture)])],
+  [stack_checks=false])
+AC_SUBST([stack_checks])
 
 ## Codegen variants
 
-dnl The configure-default codegen variant's name: the '-'-joined, sorted
-dnl names of the enabled axis tokens ("asan", "fp", "poll", "sc"), or "base"
-dnl when every axis is off. The naming scheme is defined by
-dnl utils/codegen_variant_name.ml, which this must agree with; appending
-dnl the tokens in canonical (sorted-name) order keeps the joined name
-dnl canonical.
+dnl The name of the variant that the library root holds: base, which has
+dnl every axis off.  (On the architectures where stack checks are
+dnl mandatory the root's C runtime is built with them, hence the other
+dnl name there; these have no native backend to build a variant for.)
+dnl The naming scheme is defined by utils/codegen_variant_name.ml: the
+dnl '-'-joined, sorted names of the enabled axis tokens ("asan", "fp",
+dnl "poll", "sc"), or "base" when every axis is off.
 
-codegen_default_tokens=''
-AS_IF([test x"$address_sanitizer" = "xtrue"],
-  [codegen_default_tokens="$codegen_default_tokens asan"])
-AS_IF([test x"$frame_pointers" = "xtrue"],
-  [codegen_default_tokens="$codegen_default_tokens fp"])
-AS_IF([test x"$poll_insertion" = "xtrue"],
-  [codegen_default_tokens="$codegen_default_tokens poll"])
-AS_IF([test x"$stack_checks" = "xtrue"],
-  [codegen_default_tokens="$codegen_default_tokens sc"])
-AS_IF([test -z "$codegen_default_tokens"],
-  [codegen_default_variant=base],
-  [codegen_default_variant=`echo $codegen_default_tokens | tr ' ' '-'`])
+AS_IF([$stack_checks_mandatory],
+  [codegen_default_variant=sc],
+  [codegen_default_variant=base])
 AC_SUBST([codegen_default_variant])
 
-dnl The space-separated list of NON-default codegen variant names that
-dnl additionally get runtime archives and library trees, so that one
-dnl install can serve several per-invocation codegen configurations.
-dnl Computed by flipping each supported axis from the configure default
-dnl and applying constraint closure in both directions (asan ON forces fp
-dnl ON; fp OFF forces asan OFF; asan with sc is rejected), then appending
-dnl the curated extras list below.
-dnl Overridable with --with-codegen-variants=NAME,NAME; emptied by
-dnl --disable-codegen-variants. Silently empty on platforms where frame
-dnl pointers are unsupported.  asan-variant names additionally require a
-dnl Clang toolchain on x86_64 Linux that can link Address Sanitizer
-dnl executables (asan_supported, from the "## Address Sanitizer" section
-dnl above) and a runtime built without ThreadSanitizer (the compiler
-dnl rejects -fsanitize=address together with -fsanitize=thread): the
-dnl automatic flip list drops them elsewhere, silently unless the link is
-dnl all that is missing, and naming them in --with-codegen-variants is an
-dnl error there.
+dnl What the --enable-<axis> and --disable-<axis> options ask of the list
+dnl of variants below.
+dnl - An enabled axis has to be supported (configure fails otherwise), and
+dnl   the variant with exactly the enabled axes has to be built:
+dnl   codegen_required_variant, whose tokens are collected in canonical
+dnl   (sorted-name) order.  Address Sanitizer brings frame pointers with
+dnl   it, and is rejected together with stack checks.
+dnl - No variant with a disabled axis is built: codegen_disabled_tokens.
+dnl codegen_enable_options and codegen_axis_options are the options given,
+dnl for the messages (see also the end of this file).
 
-codegen_variants_supported=false
-AS_CASE([$target],
-  [x86_64-*-linux*|x86_64-*-darwin*],
-   [AS_CASE([$ocaml_cc_vendor],
-      [clang-*|gcc-*], [codegen_variants_supported=true])])
+codegen_enable_options=''
+codegen_axis_options=''
+codegen_required_tokens=''
+codegen_disabled_tokens=''
+
+AS_CASE([$enable_address_sanitizer],
+  [yes],
+    [codegen_enable_options="$codegen_enable_options --enable-address-sanitizer"
+     AS_IF([$tsan],
+       [AC_MSG_ERROR(m4_normalize([Address Sanitizer cannot be combined
+          with ThreadSanitizer (the compiler rejects -fsanitize=address
+          together with -fsanitize=thread); configure with at most one of
+          --enable-address-sanitizer and --enable-tsan]))])
+     AS_IF([$asan_supported && $codegen_variants_supported], [],
+       [$asan_supported],
+       [AC_MSG_ERROR(m4_normalize([--enable-address-sanitizer: codegen
+          variants cannot be built in this configuration]))],
+       [AC_MSG_ERROR(m4_normalize([--enable-address-sanitizer:
+          $asan_unsupported_reason]))])
+     AS_IF([test x"$enable_frame_pointers" = "xno"],
+       [AC_MSG_ERROR(m4_normalize([Address Sanitizer requires frame
+          pointers: --enable-address-sanitizer conflicts with
+          --disable-frame-pointers]))])
+     AS_IF([test x"$enable_stack_checks" = "xyes"],
+       [AC_MSG_ERROR(m4_normalize([stack checks together with Address
+          Sanitizer is an untested combination; configure with at most one
+          of --enable-stack-checks and --enable-address-sanitizer]))])
+     codegen_required_tokens="asan fp"],
+  [no],
+    [codegen_axis_options="$codegen_axis_options --disable-address-sanitizer"
+     codegen_disabled_tokens="$codegen_disabled_tokens asan"])
+
+AS_CASE([$enable_frame_pointers],
+  [yes],
+    [codegen_enable_options="$codegen_enable_options --enable-frame-pointers"
+     AS_IF([$fp_variant_supported], [],
+       [AC_MSG_ERROR([frame pointers not supported on this platform])])
+     AS_IF([test -z "$codegen_required_tokens"],
+       [codegen_required_tokens="fp"])],
+  [no],
+    [codegen_axis_options="$codegen_axis_options --disable-frame-pointers"
+     codegen_disabled_tokens="$codegen_disabled_tokens fp"])
+
+AS_CASE([$enable_poll_insertion],
+  [yes],
+    [codegen_enable_options="$codegen_enable_options --enable-poll-insertion"
+     AS_IF([$codegen_variants_supported], [],
+       [AC_MSG_ERROR(m4_normalize([--enable-poll-insertion: codegen
+          variants cannot be built on this platform or in this
+          configuration]))])
+     codegen_required_tokens="$codegen_required_tokens poll"],
+  [no],
+    [codegen_axis_options="$codegen_axis_options --disable-poll-insertion"
+     codegen_disabled_tokens="$codegen_disabled_tokens poll"])
+
+dnl Where stack checks are mandatory, the options about them change
+dnl nothing, as before.
+AS_IF([$stack_checks_mandatory], [],
+  [AS_CASE([$enable_stack_checks],
+     [yes],
+       [codegen_enable_options="$codegen_enable_options --enable-stack-checks"
+        AS_IF([$codegen_variants_supported], [],
+          [AC_MSG_ERROR(m4_normalize([--enable-stack-checks: codegen
+             variants cannot be built on this platform or in this
+             configuration]))])
+        codegen_required_tokens="$codegen_required_tokens sc"],
+     [no],
+       [codegen_axis_options="$codegen_axis_options --disable-stack-checks"
+        codegen_disabled_tokens="$codegen_disabled_tokens sc"])])
+
+codegen_enable_options=`echo $codegen_enable_options`
+codegen_axis_options=`echo $codegen_enable_options $codegen_axis_options`
+codegen_required_variant=`echo $codegen_required_tokens | tr ' ' '-'`
+
+dnl The space-separated list of the codegen variants that get runtime
+dnl archives and library trees besides base, so that one install can serve
+dnl several per-invocation codegen configurations.  One rule decides it,
+dnl whether the list is the automatic one or comes from
+dnl --with-codegen-variants=NAME,NAME:
+dnl - the variant that the --enable-<axis> options require is built: it is
+dnl   added to the automatic list, and has to be in an explicit one;
+dnl - no variant with an axis that a --disable-<axis> option names is
+dnl   built: the automatic list leaves them out, and naming one in an
+dnl   explicit list is an error.
+dnl The automatic list is fp, sc, poll and fp-sc with the amd64 backend,
+dnl and poll and sc with the arm64 one, which has neither frame pointers
+dnl nor Address Sanitizer.  fp-sc is there because it is the one
+dnl configuration that executes the frame-pointer stack-reallocation walk
+dnl in runtime/fiber.c (live only with frame pointers AND stack checks).
+dnl With the amd64 backend it also has asan-fp where a variant with Address
+dnl Sanitizer can be built: with a Clang on Linux that can link Address
+dnl Sanitizer executables (asan_supported, from the "## Address Sanitizer"
+dnl section above) and a runtime built without ThreadSanitizer (the
+dnl compiler rejects -fsanitize=address together with -fsanitize=thread).
+dnl Elsewhere the automatic list leaves it out, silently unless the link
+dnl is all that is missing, and naming such a variant in
+dnl --with-codegen-variants is an error.
+dnl The list is emptied by --disable-codegen-variants, which therefore
+dnl conflicts with every --enable-<axis> option, and is silently empty
+dnl where codegen variants cannot be built.
 
 asan_variant_supported=$asan_supported
 dnl ASan cannot be combined with TSan in one process (the compiler rejects
@@ -3264,7 +3339,11 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
   [AS_IF([test -n "$with_codegen_variants" \
             -a x"$with_codegen_variants" != "xno"],
      [AC_MSG_ERROR(m4_normalize([--with-codegen-variants conflicts with
-       --disable-codegen-variants]))])],
+       --disable-codegen-variants]))])
+   AS_IF([test -n "$codegen_required_variant"],
+     [AC_MSG_ERROR(m4_normalize([$codegen_enable_options: the codegen
+        variant '$codegen_required_variant' has to be built, which
+        conflicts with --disable-codegen-variants]))])],
   [test x"${with_codegen_variants-unset}" = "xno" \
      -o -z "${with_codegen_variants-unset}"],
   [dnl --with-codegen-variants= gives a list like any other, which
@@ -3277,7 +3356,8 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
        are not supported on this platform/configuration]))])],
   [test -n "$with_codegen_variants" -a x"$with_codegen_variants" != "xyes"],
   [dnl Explicit list: validate each name against the supported token
-   dnl subsets and drop the default variant (served in situ).
+   dnl subsets and the disabled axes, and drop base (always built, in the
+   dnl library root).
    save_IFS=$IFS
    IFS=' ,'
    dnl The list is split into names, which must not be expanded as file
@@ -3299,9 +3379,26 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
             [test x"$asan_variant_supported" != "xtrue"],
             [AC_MSG_ERROR(m4_normalize([--with-codegen-variants: '$name'
               cannot be built: $asan_unsupported_reason]))])])
-     AS_IF([test x"$name" = x"$codegen_default_variant"],
-       [AC_MSG_NOTICE(m4_normalize([--with-codegen-variants: '$name' is the
-         default variant; skipping]))],
+     AS_CASE(["-$name-"],
+       [*-fp-*],
+         [AS_IF([$fp_variant_supported], [],
+            [AC_MSG_ERROR(m4_normalize([--with-codegen-variants: '$name'
+              cannot be built: frame pointers not supported on this
+              platform]))])])
+     for token in $codegen_disabled_tokens; do
+       AS_CASE(["-$name-"],
+         [*"-$token-"*],
+           [AS_CASE([$token],
+              [asan], [disable_option=--disable-address-sanitizer],
+              [fp], [disable_option=--disable-frame-pointers],
+              [poll], [disable_option=--disable-poll-insertion],
+              [disable_option=--disable-stack-checks])
+            AC_MSG_ERROR(m4_normalize([--with-codegen-variants: '$name'
+              conflicts with $disable_option]))])
+     done
+     AS_IF([test x"$name" = "xbase"],
+       [AC_MSG_NOTICE(m4_normalize([--with-codegen-variants: 'base' is
+         always built, in the library root; skipping]))],
        [AS_CASE([" $codegen_variants "],
           [*" $name "*], [:],
           [codegen_variants="$codegen_variants $name"])])
@@ -3309,75 +3406,36 @@ AS_IF([test x"$enable_codegen_variants" = "xno"],
    set +f
    IFS=$save_IFS
    codegen_variants=`echo $codegen_variants`],
-  [dnl Flip each supported axis from the default, keeping the other axes
-   dnl at their defaults and applying the constraint closure in both
-   dnl directions (flipping asan ON forces fp ON; flipping fp OFF forces
-   dnl asan OFF; the asan flip is skipped on toolchains without asan
-   dnl support and when it would combine with a stack-checks default, and
-   dnl flipping sc ON under an asan default is likewise skipped: asan with
-   dnl sc is rejected).  Then append the curated extras: additional
-   dnl variants deliberately built by default even though no single flip
-   dnl produces them.  The only extra today is fp-sc, the one configuration
-   dnl that executes the frame-pointer stack-reallocation walk in
-   dnl runtime/fiber.c (live only with frame pointers AND stack checks).
-   dnl Extras are validated like --with-codegen-variants names, and the
-   dnl default variant and duplicates are dropped.  Candidate token lists
-   dnl are assembled in canonical (sorted-name) order: asan fp poll sc.
-   AS_IF([test x"$address_sanitizer" = "xtrue"],
-     [asan_default_token=asan], [asan_default_token=''])
-   AS_IF([test x"$frame_pointers" = "xtrue"],
-     [fp_default_token=fp], [fp_default_token=''])
-   AS_IF([test x"$poll_insertion" = "xtrue"],
-     [poll_default_token=poll], [poll_default_token=''])
-   AS_IF([test x"$stack_checks" = "xtrue"],
-     [sc_default_token=sc], [sc_default_token=''])
-   AS_IF([test x"$address_sanitizer" = "xtrue"],
-     [asan_flip_tokens="$fp_default_token $poll_default_token $sc_default_token"],
-     [AS_IF([test x"$asan_variant_supported" = "xtrue" \
-               -a -z "$sc_default_token"],
-        [asan_flip_tokens="asan fp $poll_default_token"],
-        [asan_flip_tokens=skip
-         AS_IF([$tsan || test -n "$sc_default_token"], [:],
-           [$asan_link_failed],
-           [AC_MSG_NOTICE(m4_normalize([not building an Address Sanitizer
-              codegen variant: $asan_unsupported_reason]))])])])
-   AS_IF([test x"$frame_pointers" = "xtrue"],
-     [fp_flip_tokens="$poll_default_token $sc_default_token"],
-     [fp_flip_tokens="fp $poll_default_token $sc_default_token"])
-   AS_IF([test x"$poll_insertion" = "xtrue"],
-     [poll_flip_tokens="$asan_default_token $fp_default_token $sc_default_token"],
-     [poll_flip_tokens="$asan_default_token $fp_default_token poll $sc_default_token"])
-   AS_IF([test x"$stack_checks" = "xtrue"],
-     [sc_flip_tokens="$asan_default_token $fp_default_token $poll_default_token"],
-     [AS_IF([test x"$address_sanitizer" = "xtrue"],
-        [sc_flip_tokens=skip],
-        [sc_flip_tokens="$fp_default_token $poll_default_token sc"])])
-   codegen_variant_extras='fp-sc'
-   codegen_variant_candidates=''
-   for tokens in "$asan_flip_tokens" "$fp_flip_tokens" \
-                 "$poll_flip_tokens" "$sc_flip_tokens"
-   do
-     AS_IF([test x"$tokens" = "xskip"], [continue])
-     name=`echo $tokens | tr ' ' '-'`
-     AS_IF([test -z "$name"], [name=base])
-     codegen_variant_candidates="$codegen_variant_candidates $name"
-   done
-   for name in $codegen_variant_extras; do
-     AS_CASE([$name],
-       [asan-fp|asan-fp-poll|base|fp|fp-poll|fp-poll-sc|fp-sc|poll|poll-sc|sc],
-         [codegen_variant_candidates="$codegen_variant_candidates $name"],
-       [AC_MSG_ERROR(m4_normalize([unknown codegen variant name '$name'
-         in the curated extras list]))])
-   done
+  [dnl Automatic list.
+   AS_CASE([$arch],
+     [amd64],
+       [codegen_variant_candidates='fp sc poll fp-sc'
+        AS_CASE([" $codegen_disabled_tokens "],
+          [*" asan "*], [:],
+          [AS_IF([test x"$asan_variant_supported" = "xtrue"],
+             [codegen_variant_candidates="$codegen_variant_candidates asan-fp"],
+             [$tsan], [:],
+             [$asan_link_failed],
+             [AC_MSG_NOTICE(m4_normalize([not building an Address Sanitizer
+                codegen variant: $asan_unsupported_reason]))])])],
+     [codegen_variant_candidates='poll sc'])
    for name in $codegen_variant_candidates; do
-     AS_IF([test x"$name" = x"$codegen_default_variant"], [:],
-       [AS_CASE([" $codegen_variants "],
-          [*" $name "*], [:],
-          [codegen_variants="$codegen_variants $name"])])
+     keep=true
+     for token in $codegen_disabled_tokens; do
+       AS_CASE(["-$name-"], [*"-$token-"*], [keep=false])
+     done
+     AS_IF([$keep], [codegen_variants="$codegen_variants $name"])
    done
+   codegen_variants="$codegen_variants $codegen_required_variant"
    codegen_variants=`for name in $codegen_variants; do echo $name; done \
-     | LC_ALL=C sort`
+     | LC_ALL=C sort -u`
    codegen_variants=`echo $codegen_variants`])
+AS_IF([test -n "$codegen_required_variant"],
+  [AS_CASE([" $codegen_variants "],
+     [*" $codegen_required_variant "*], [],
+     [AC_MSG_ERROR(m4_normalize([$codegen_enable_options: the codegen
+        variant '$codegen_required_variant' has to be built, but
+        --with-codegen-variants does not list it]))])])
 AS_IF([test -n "$codegen_variants"],
   [AC_MSG_NOTICE([building codegen variants: $codegen_variants])])
 AC_SUBST([codegen_variants])
@@ -4115,3 +4173,37 @@ ${mkdll_ldflags}"
 ])
 
 AC_OUTPUT
+
+dnl The --enable-<axis> and --disable-<axis> options of the codegen
+dnl variants used to select what ocamlopt compiles by default.  Say what
+dnl they do now, and how to get a default: last, where it is seen.
+AS_IF([test -n "$codegen_axis_options"],
+  [codegen_example_variant=$codegen_required_variant
+   AS_IF([test -z "$codegen_example_variant"],
+     [for name in $codegen_variants; do
+        codegen_example_variant=$name
+        break
+      done])
+   codegen_example_ocamlparam=''
+   for token in `echo $codegen_example_variant | tr '-' ' '`; do
+     AS_CASE([$token],
+       [asan], [setting='asan=1'],
+       [fp], [setting='frame-pointers=1'],
+       [poll], [setting='poll-insertion=1'],
+       [setting='stack-checks=1'])
+     codegen_example_ocamlparam="$codegen_example_ocamlparam$setting,"
+   done
+   AC_MSG_NOTICE(m4_normalize([$codegen_axis_options: these options decide
+     which codegen variants are built; they no longer set what ocamlopt
+     compiles by default]))
+   AC_MSG_NOTICE(m4_normalize([with no flag, ocamlopt compiles for the
+     'base' variant, on every installation]))
+   AS_IF([test -n "$codegen_variants"],
+     [AC_MSG_NOTICE(m4_normalize([this configuration builds the variants:
+        base $codegen_variants]))
+      AC_MSG_NOTICE(m4_normalize([to make another of them the default of a
+        build, give its settings in OCAMLPARAM before the underscore, where
+        command-line flags still override them: for
+        '$codegen_example_variant',
+        OCAMLPARAM=${codegen_example_ocamlparam}_]))],
+     [AC_MSG_NOTICE([this configuration builds the 'base' variant only])])])

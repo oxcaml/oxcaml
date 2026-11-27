@@ -1603,15 +1603,9 @@ let no_stack_checks = Actions.make
 (* The two predicates below guard [%%expect_asm] recordings, which are
    ABSOLUTE: the expected assembly was captured under one specific codegen
    setting (all axes off, or stack checks only).  So they compare the
-   effective variant against that absolute name, NOT against the configure
-   default: a default-relative check would be a tautology whenever nothing
-   selects a variant (the effective variant is then the default by
-   construction), and on e.g. an --enable-stack-checks configure it would
-   run the tests under non-base codegen against base-recorded assembly.
-   Comparing against the absolute name skips these tests on a
-   non-base-default configure and under a non-base -codegen-variant, as
-   the old [Config]-based predicates did on such configures, while a
-   block's own [codegen_variant] still selects the matching setting. *)
+   effective variant against that absolute name: these tests are skipped
+   under a -codegen-variant with another setting, while a block's own
+   [codegen_variant] still selects the matching setting. *)
 
 let only_default_codegen =
   let base = Codegen_variant_name.to_string Codegen_variant_name.base in

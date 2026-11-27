@@ -944,8 +944,9 @@ stdenv.mkDerivation {
     ''
       # Without OCAMLPARAM: a setting of the build environment would
       # otherwise choose the variant that the archives are generated for.
+      # The library root holds base, named like the other variants below.
       env -u OCAMLPARAM $out/bin/generate_cached_generic_functions.exe \
-        $out/lib/ocaml/cached-generic-functions
+        -codegen-variant base $out/lib/ocaml/cached-generic-functions
       # Each installed codegen-variant library tree gets its own archive,
       # generated for the variant the directory is named after. No variants
       # directory exists when codegen variants are disabled or unsupported
@@ -1027,10 +1028,10 @@ stdenv.mkDerivation {
     '';
 
   # No meta.broken: the compiler builds on every platform this expression
-  # supports. Non-default codegen variants only exist on x86-64 (elsewhere
-  # configure computes an empty variant list and the install simply ships
-  # no variants/ trees), and nothing here can request an unsupported
-  # configure default any more.
+  # supports. configure computes the list of codegen variants that the
+  # platform has besides base (some with frame pointers and AddressSanitizer
+  # on x86-64 only), and nothing here requires a variant that it could
+  # refuse.
   meta = { };
 
   passthru = {
