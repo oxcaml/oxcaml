@@ -69,6 +69,12 @@ extern void caml_dlclose(void * handle);
 CAMLalloc(caml_dlclose, 1)
 extern void * caml_dlopen(char_os * libname, int global);
 
+/* Make the symbols of the shared library [libname], already open as
+   [handle], usable to resolve symbols of libraries opened later on, as if
+   it had been opened with [global] true.
+   Return 0 on error. */
+extern int caml_dlmake_global(char_os * libname, void * handle);
+
 /* Look up the given symbol in the given shared library.
    Return [NULL] if not found, or symbol value if found. */
 extern void * caml_dlsym(void * handle, const char * name);
