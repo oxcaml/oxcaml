@@ -115,6 +115,7 @@ let classify env ty : classification =
       else if
         Path.same p Predef.path_string
         || Path.same p Predef.path_bytes
+        || Path.same p Predef.path_local_array
         || Path.same p Predef.path_array
         || Path.same p Predef.path_iarray
         || Path.same p Predef.path_nativeint
@@ -164,7 +165,9 @@ type can_be_float_array =
 let array_type_kind env ty =
   match scrape_poly env ty with
   | Tconstr (p, [elt_ty], _)
-    when Path.same p Predef.path_array || Path.same p Predef.path_iarray -> (
+    when Path.same p Predef.path_local_array
+         || Path.same p Predef.path_array
+         || Path.same p Predef.path_iarray -> (
     match classify env elt_ty with
     | Any -> if Config.flat_float_array then MaybeFloatArray else NoFloatArray
     | Float -> if Config.flat_float_array then YesFloatArray else NoFloatArray
@@ -198,7 +201,9 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
   | Tconstr (p, _, _) when Path.same p Predef.path_exn -> Or (Imm, Block None)
   | Tconstr (p, _, _) when Path.same p Predef.path_floatarray -> FloatArray
   | Tconstr (p, [ty'], _)
-    when Path.same p Predef.path_array || Path.same p Predef.path_iarray -> (
+    when Path.same p Predef.path_local_array
+         || Path.same p Predef.path_array
+         || Path.same p Predef.path_iarray -> (
     if cannot_proceed ()
     then Array Value
     else

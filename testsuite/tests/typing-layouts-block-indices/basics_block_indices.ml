@@ -1314,7 +1314,7 @@ Line 5, characters 17-22:
                      ^^^^^
 Error: Unable to determine the array kind for array index primitive: the
        result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
-       whose first parameter is equal to "_ array" or "_ iarray".
+       whose first parameter is equal to "_ local_array", "_ array" or "_ iarray".
 |}]
 
 external bad
@@ -1330,7 +1330,7 @@ Line 5, characters 17-22:
                      ^^^^^
 Error: Unable to determine the array kind for array index primitive: the
        result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
-       whose first parameter is equal to "_ array" or "_ iarray".
+       whose first parameter is equal to "_ local_array", "_ array" or "_ iarray".
 |}]
 
 external bad : int -> (_, _) idx_mut = "%unsafe_array_idx"
@@ -1342,7 +1342,7 @@ Line 2, characters 17-22:
                      ^^^^^
 Error: Unable to determine the array kind for array index primitive: the
        result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
-       whose first parameter is equal to "_ array" or "_ iarray".
+       whose first parameter is equal to "_ local_array", "_ array" or "_ iarray".
 |}]
 
 (*************************)

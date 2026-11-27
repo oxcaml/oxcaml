@@ -139,7 +139,9 @@ let rec expression event env = function
              case) *)
           else (Debugcom.Remote_value.field v (n-1),
                 snd (List.nth ty_list (n-1)))
-      | Tconstr(path, [ty_arg], _) when Path.same path Predef.path_array ->
+      | Tconstr(path, [ty_arg], _)
+        when Path.same path Predef.path_local_array
+          || Path.same path Predef.path_array ->
           let size = Debugcom.Remote_value.size v in
           if n >= size
           then raise(Error(Array_index(size, n)))

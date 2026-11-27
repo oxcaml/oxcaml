@@ -543,7 +543,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   tree_of_list depth obj ty_arg
 
               | Tconstr(path, [ty_arg], _)
-                when Path.same path Predef.path_array ->
+                when Path.same path Predef.path_local_array
+                  || Path.same path Predef.path_array ->
                   tree_of_generic_array Asttypes.Mutable depth obj ty_arg
 
               | Tconstr(path, [ty_arg], _)

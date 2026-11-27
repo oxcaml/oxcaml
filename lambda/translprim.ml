@@ -2150,7 +2150,8 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     in
     (match Types.get_desc (Ctype.expand_head env array_ty) with
      | Tconstr (p, _, _)
-       when Path.same p Predef.path_array
+       when Path.same p Predef.path_local_array
+         || Path.same p Predef.path_array
          || Path.same p Predef.path_iarray -> ()
      | _ -> err ());
     let ak =
@@ -3063,9 +3064,10 @@ let report_error_doc ppf = function
       fprintf ppf
         "@[Unable to determine the array kind for array index primitive: \
          the@ result type should be equal to a %a or %a@ \
-         whose first parameter is equal to %a or %a.@]"
+         whose first parameter is equal to %a, %a or %a.@]"
         Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
-        Style.inline_code "_ array" Style.inline_code "_ iarray"
+        Style.inline_code "_ local_array" Style.inline_code "_ array"
+        Style.inline_code "_ iarray"
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays of unboxed products containing a@ \
