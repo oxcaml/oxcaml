@@ -1,0 +1,5 @@
+The files lib/refused.cma and dep.cmo disagree over interface Dep
+Line 1:
+Error: The external function refused_archive_stub is not available
+Another Good was run
+

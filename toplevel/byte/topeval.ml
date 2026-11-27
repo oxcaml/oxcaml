@@ -212,8 +212,8 @@ open Cmo_format
 
 exception Load_failed
 
-let check_consistency ppf filename cu =
-  try Env.import_crcs ~source:filename cu.cu_imports
+let check_imports ppf filename imports =
+  try Env.import_crcs ~source:filename imports
   with Persistent_env.Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = user;
@@ -223,6 +223,32 @@ let check_consistency ppf filename cu =
                  disagree over interface %a@]@."
             user auth (Format_doc.compat Compilation_unit.Name.print) name;
     raise Load_failed
+
+let check_consistency ppf filename cu =
+  check_imports ppf filename cu.cu_imports
+
+(* Refuse the library if one of its units disagrees with what is loaded over
+   an interface. Unlike [check_consistency], this records nothing. *)
+let check_consistency_of_library ppf filename units =
+  let crcs = Compilation_unit.Name.Tbl.create 16 in
+  let record import =
+    Option.iter
+      (Compilation_unit.Name.Tbl.replace crcs (Import_info.name import))
+      (Import_info.crc import)
+  in
+  List.iter record (Env.imports ());
+  let check import =
+    match Import_info.crc import with
+    | None -> ()
+    | Some crc ->
+      let name = Import_info.name import in
+      match Compilation_unit.Name.Tbl.find_opt crcs name with
+      | Some known_crc when not (Digest.equal crc known_crc) ->
+        (* This reports the inconsistency. *)
+        check_imports ppf filename [| import |]
+      | Some _ | None -> ()
+  in
+  List.iter (fun cu -> Array.iter check cu.cu_imports) units
 
 (* This is basically Dynlink.Bytecode.run with no digest *)
 let load_compunit ic filename ppf compunit =
@@ -302,6 +328,8 @@ and really_load_file recursive ppf name filename ic =
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
         seek_in ic toc_pos;
         let lib = (input_value ic : library) in
+        (* Before its shared libraries are opened and its units are run. *)
+        check_consistency_of_library ppf filename lib.lib_units;
         List.iter
           (fun dllib ->
             let name = Dll.extract_dll_name dllib in
