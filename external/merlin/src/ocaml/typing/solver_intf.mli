@@ -472,28 +472,6 @@ module type Solver_mono = sig
       that's suitable for consumption. *)
   val populate_error : 'a obj -> 'a error_raw -> 'a error
 
-  module Unhint : sig
-    (** Unhinted mode is similar to [('a, 'd) mode], but its several outermost
-        morphism applications are unhinted. *)
-    type ('a, 'd) t constraint 'd = 'l * 'r
-
-    (** Treat a regular mode as an unhinted mode, by taking the identity
-        morphism as the outermost unhinted morphism. *)
-    val unhint : ('a, 'l * 'r) mode -> ('a, 'l * 'r) t
-
-    (** Takes an unhinted mode, annotate the outermost unhinted morphisms (as a
-        whole) with the given hint, which gives a regular mode. *)
-    val hint :
-      'a obj ->
-      ?hint:('l * 'r) hint_morph ->
-      ('a, 'l * 'r) t ->
-      ('a, 'l * 'r) mode
-
-    (** Apply another unhinted morphism to an unhinted mode. *)
-    val apply :
-      'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
-  end
-
   (** The exposed description of modes *)
   module Desc : sig
     module Var : sig

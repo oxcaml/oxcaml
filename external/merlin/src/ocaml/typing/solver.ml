@@ -803,24 +803,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in
       Amodemeet (C.apply dst morph a, Apply (hint, a_hint), vs)
 
-  module Unhint = struct
-    type ('a, 'd) t =
-      | Unhint : ('b, 'a, 'd) C.morph * ('b, 'd) mode -> ('a, 'd) t
-      constraint 'd = 'l * 'r
-    [@@ocaml.warning "-62"]
-
-    let unhint : type a l r. (a, l * r) mode -> (a, l * r) t =
-     fun m -> Unhint (C.id, m)
-
-    let hint : type a l r.
-        a C.obj -> ?hint:(l * r) H.Morph.t -> (a, l * r) t -> (a, l * r) mode =
-     fun dst ?hint (Unhint (morph, m)) -> apply dst ?hint morph m
-
-    let apply : type a b l r.
-        b C.obj -> (a, b, l * r) C.morph -> (a, l * r) t -> (b, l * r) t =
-     fun dst morph (Unhint (f, m)) -> Unhint (C.compose dst morph f, m)
-  end
-
   let hint_biased_join obj a a_hint b b_hint =
     (* A version of [hint_join] that assumes that a <= b is false,
        so won't perform this check. *)
