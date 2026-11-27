@@ -371,17 +371,6 @@ let get_tag ~env ~res x =
   let x, res = prim_arg ~env ~res x in
   use_prim0 ~env ~res (Extern ("%direct_obj_tag", None)) [x]
 
-(* [x] may be any value, including a JS value that is not an OCaml block, so the
-   tag is read with optional chaining. *)
-let check_tag ~env ~res x ~tag =
-  let x, res = prim_arg ~env ~res x in
-  let tag_var, env, res =
-    use_prim0 ~env ~res (Extern ("%direct_obj_tag_nullish", None)) [x]
-  in
-  let expr : Jsir.expr = Prim (Eq, [Pv tag_var; int_const tag]) in
-  let var = Jsir.Var.fresh () in
-  Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
-
 let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
     Jsir.field_type =
   match kind with
@@ -662,12 +651,17 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Wasm -> use_prim' (Extern ("caml_is_boxed_float", None)))
   | Is_flat_float_array -> (
     match Clflags.jsir_target_exn () with
-    | Js -> check_tag ~env ~res x ~tag:Obj.double_array_tag
-    | Wasm ->
-      let tag, env, res =
-        use_prim0' ~env ~res (Extern ("caml_obj_tag", None)) [x]
-      in
-      use_prim ~env ~res Eq [Pv tag; int_const Obj.double_array_tag])
+    | Js ->
+      (* Flambda tests this to choose between the [Naked_floats] and [Values]
+         versions of an operation on an array whose kind is not known
+         statically. In JavaScript, a flat float array is an ordinary array of
+         numbers that only differs by its tag, and both versions compile to the
+         same code, so we always choose the [Values] one, and JSOO removes the
+         other. *)
+      let var = Jsir.Var.fresh () in
+      let expr : Jsir.expr = Constant (Int Targetint.zero) in
+      Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+    | Wasm -> use_prim' (Extern ("%is_float_array", None)))
   | End_region _ | End_try_region _ -> no_op ~env ~res
   | Get_header -> use_prim' (Extern ("caml_get_header", None))
   | Peek _ ->
