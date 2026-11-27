@@ -289,7 +289,9 @@ let run
       ?stderr_variable ~exits ~what log env commandline, env
 
 (* The compilers and other tools get the OCAMLRUNPARAM components given by
-   -tool-ocamlrunparam; test programs and scripts, run by [run], don't. *)
+   -tool-ocamlrunparam; test programs and scripts, run by [run], don't.
+   Tools that run test code themselves (the toplevels, the debuggers) pass
+   the components on to it. *)
 let run_cmd =
   run_cmd ~full_environment:false ~ocamlrunparam:Options.tool_ocamlrunparam
 
