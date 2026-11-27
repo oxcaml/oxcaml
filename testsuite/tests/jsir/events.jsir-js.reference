@@ -13,27 +13,22 @@ Entry point: 0
   v6 = imm{tag=248; 0 = v2; 1 = v4}
   v7 = "caml_register_symbol"("Events"j, "camlEvents__E_3"j, v6) 
   v9{arith} = fun(v8{x}){2 ()} [hint:(int)->float never_inline]
-  event events.ml:21:56
   v13 = "caml_register_symbol"("Events"j, "camlEvents__arith_0_7_code"j, v9{arith}) 
   event events.ml:21:56
   v15 = "caml_register_symbol"("Events"j, "camlEvents__arith_4"j, v9{arith}) 
   v18{non_tail} = fun(v16{f}, v17{x}){3 ()} [hint:(value,value)->int never_inline]
-  event events.ml:24:41
   v22 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_1_8_code"j, v18{non_tail}) 
   event events.ml:24:41
   v24 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_5"j, v18{non_tail}) 
   v27{tail} = fun(v25{f}, v26{x}){5 ()} [hint:(value,value)->value never_inline]
-  event events.ml:27:33
   v29 = "caml_register_symbol"("Events"j, "camlEvents__tail_2_9_code"j, v27{tail}) 
   event events.ml:27:33
   v31 = "caml_register_symbol"("Events"j, "camlEvents__tail_6"j, v27{tail}) 
   v33{c_call} = fun(v32{param}){6 ()} [hint:(int)->value never_inline]
-  event events.ml:30:48
   v35 = "caml_register_symbol"("Events"j, "camlEvents__c_call_3_10_code"j, v33{c_call}) 
   event events.ml:30:48
   v37 = "caml_register_symbol"("Events"j, "camlEvents__c_call_7"j, v33{c_call}) 
   v39{raise_e} = fun(v38{x}){7 ()} [hint:(int)->int never_inline]
-  event events.ml:33:67
   v42 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_4_11_code"j, v39{raise_e}) 
   event events.ml:33:67
   v44 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v39{raise_e}) 

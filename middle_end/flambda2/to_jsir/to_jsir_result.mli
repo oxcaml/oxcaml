@@ -124,12 +124,12 @@ val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
 
 (** Register [var] as the variable holding the closure of [code]. Does nothing
     for code that no other unit can refer to. *)
-val register_code : t -> ?loc:Parse_info.t -> Code_id.t -> Jsir.Var.t -> t
+val register_code : t -> Code_id.t -> Jsir.Var.t -> t
 
 (** The variable holding the closure of [code], which must be from another
-    compilation unit. As for [external_symbol_var], the variable is bound at
-    the start of the entry block, and the unit of the code is recorded as an
-    import. *)
+    compilation unit. As for [external_symbol_var], the variable is bound at the
+    start of the entry block, and the unit of the code is recorded as an import.
+*)
 val external_code_var : t -> Code_id.t -> t * Jsir.Var.t
 
 (** Record that [bound_var], a variable created ahead of its definition, refers

@@ -334,7 +334,7 @@ let translate ~env ~res ~translate_body bound_static consts =
       (fun res definition ->
         match definition with
         | Code (code_id, _, closure) ->
-          To_jsir_result.register_code res ?loc:closure.loc code_id closure.var
+          To_jsir_result.register_code res code_id closure.var
         | Closure _ | Block _ -> res)
       res definitions
   in

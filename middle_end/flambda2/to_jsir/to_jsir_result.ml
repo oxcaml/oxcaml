@@ -365,7 +365,7 @@ let register_symbol t ?loc symbol var =
     let t = { t with symbol_exports = (symbol, var) :: t.symbol_exports } in
     add_to_symbol_table t ?loc (symbol_to_name_constants symbol) var
 
-let register_code t ?loc code_id var =
+let register_code t code_id var =
   if not (Name_occurrences.mem_code_id t.reachable_names code_id)
   then
     (* No other compilation unit can refer to this code, as it is not
@@ -373,7 +373,7 @@ let register_code t ?loc code_id var =
     t
   else
     let t = { t with code_exports = (code_id, var) :: t.code_exports } in
-    add_to_symbol_table t ?loc (code_id_to_name_constants code_id) var
+    add_to_symbol_table t (code_id_to_name_constants code_id) var
 
 let predef_exception_lookup symbol : Jsir.expr =
   let symbol_name = Symbol.linkage_name_as_string symbol in
