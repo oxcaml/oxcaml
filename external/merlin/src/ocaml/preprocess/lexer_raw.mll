@@ -496,8 +496,10 @@ let () = Lexer.is_keyword_ref := is_keyword
 
 let find_keyword lexbuf name default =
   match Hashtbl.find keyword_table name with
-  | Some LOCAL -> fail lexbuf Removed_legacy_local
-  | Some GLOBAL -> fail lexbuf Removed_legacy_global
+  | Some LOCAL when not !Clflags.legacy_mode_syntax ->
+      fail lexbuf Removed_legacy_local
+  | Some GLOBAL when not !Clflags.legacy_mode_syntax ->
+      fail lexbuf Removed_legacy_global
   | Some x -> return x
   | None -> fail lexbuf (Unknown_keyword name)
   | exception Not_found -> return default

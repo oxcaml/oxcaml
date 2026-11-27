@@ -19,6 +19,7 @@ type ocaml =
     nopervasives : bool;
     strict_formats : bool;
     syntax_quotations : bool;
+    legacy_mode_syntax : bool;
     open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
@@ -57,6 +58,7 @@ let dump_ocaml x =
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
       ("syntax_quotations", `Bool x.syntax_quotations);
+      ("legacy_mode_syntax", `Bool x.legacy_mode_syntax);
       ( "open_args",
         Json.list
           (fun (arg : Clflags.open_arg) ->
@@ -1063,6 +1065,12 @@ let ocaml_flags =
       Marg.unit (fun ocaml -> { ocaml with syntax_quotations = false }),
       " Do not lex quotation syntax in files without a #syntax quotations \
        directive" );
+    ( "-legacy-mode-syntax",
+      Marg.unit (fun ocaml -> { ocaml with legacy_mode_syntax = true }),
+      " Accept the legacy local_ and global_ mode syntax" );
+    ( "-no-legacy-mode-syntax",
+      Marg.unit (fun ocaml -> { ocaml with legacy_mode_syntax = false }),
+      " Reject the legacy local_ and global_ mode syntax" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
           { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
@@ -1188,6 +1196,7 @@ let initial =
         nopervasives = false;
         strict_formats = false;
         syntax_quotations = Config.syntax_quotations;
+        legacy_mode_syntax = Config.legacy_mode_syntax;
         open_args = [];
         ppx = [];
         pp = None;

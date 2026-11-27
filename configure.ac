@@ -268,6 +268,7 @@ AC_ARG_ENABLE([stack_checks],
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
+AC_SUBST([enable_legacy_mode_syntax])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -793,6 +794,12 @@ AC_ARG_ENABLE([syntax-quotations],
     [enable support for quotation syntax by default @<:@default=no@:>@])],
   [],
   [enable_syntax_quotations=no])
+
+AC_ARG_ENABLE([legacy-mode-syntax],
+  [AS_HELP_STRING([--disable-legacy-mode-syntax],
+    [reject the legacy local_ and global_ mode syntax by default])],
+  [],
+  [enable_legacy_mode_syntax=yes])
 
 AC_ARG_VAR([TARGET_BINDIR],
   [location of the runtime binaries on the target system])

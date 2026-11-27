@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-legacy-mode-syntax";
  toplevel;
 *)
 
@@ -118,3 +119,14 @@ type t = local_ int -> int;;
 type r = { global_ x : int };;
 
 type v = Foo of global_ int;;
+
+(* Lexer edge cases: [local_] stays a keyword, so it can still be used as a raw
+   identifier but not as a label, and it is rejected even right before [#] or
+   as an attribute name. *)
+let \#local_ = 1;;
+
+let f ~local_:x = x;;
+
+let h o = local_#foo;;
+
+let _ = (1 [@local_]);;

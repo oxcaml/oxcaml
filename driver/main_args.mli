@@ -66,6 +66,8 @@ module type Common_options = sig
   val _no_strict_formats : unit -> unit
   val _syntax_quotations : unit -> unit
   val _no_syntax_quotations : unit -> unit
+  val _legacy_mode_syntax : unit -> unit
+  val _no_legacy_mode_syntax : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
   val _dump_debug_uids : unit -> unit

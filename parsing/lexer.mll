@@ -488,8 +488,10 @@ let is_keyword name =
 
 let find_keyword lexbuf name =
   match Hashtbl.find keyword_table name with
-  | Some LOCAL -> error lexbuf Removed_legacy_local
-  | Some GLOBAL -> error lexbuf Removed_legacy_global
+  | Some LOCAL when not !Clflags.legacy_mode_syntax ->
+      error lexbuf Removed_legacy_local
+  | Some GLOBAL when not !Clflags.legacy_mode_syntax ->
+      error lexbuf Removed_legacy_global
   | Some x -> x
   | None -> error lexbuf (Unknown_keyword name)
   | exception Not_found -> LIDENT name
