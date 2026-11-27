@@ -50,7 +50,53 @@ module Disable_inlining = struct
     | Do_not_disable_inlining -> Format.fprintf ppf "Do_not_disable_inlining"
 end
 
-type t =
+(* Continuation lifting involves two different kinds of information.
+
+   The lifting analysis is about the current continuation handler: it records
+   the cost of lifting continuations out of it, should the decision to do so be
+   made. It is reset when entering a continuation handler.
+
+   The lifted continuations are the liftings that have already been decided, for
+   the continuations in scope: their uses must pass the arguments for their
+   lifted params. They are not reset when entering a continuation handler, since
+   lifted continuations can be used from the handlers of other continuations. *)
+
+type lifting_analysis =
+  { rev_variables_defined : Lifted_free_var.t list;
+        (* Variables defined in normal mode by the current continuation handler
+           (including its parameters), the most recent first. These are the
+           parameters that would have to be added to a continuation lifted out
+           of the current one. *)
+    rev_phantom_variables_defined : Bound_var.t list;
+        (* Variables defined by the current continuation handler that cannot be
+           used in normal mode (phantom variables), the most recent first. They
+           cannot be passed as arguments to a continuation lifted out of the
+           current one, and are instead bound as optimised out in its
+           handler. *)
+    num_variables_defined : int;
+        (* Number of variables defined so far in normal mode by the current
+           continuation handler (including its parameters): the number of
+           parameters that would have to be added to a let cont lifted out of
+           it. *)
+    cost_of_lifting : int
+        (* The number of parameters that would have to be created if all the let
+           conts seen so far in the current continuation's handler were lifted
+           out of it. *)
+  }
+
+and lifted_continuations =
+  { continuations :
+      (Lifted_free_var.t list * is_exn_handler:bool) Continuation.Map.t;
+        (* The continuations that have been lifted (out of a continuation being
+           specialized), with their free variables, and whether they are
+           exception handlers. *)
+    free_var_args : Simple.t Variable.Map.t
+        (* For each free variable of the lifted continuations, the argument that
+           stands for it in the current scope, or a variable that is itself a
+           free variable (see [lifted_free_var_arg]). *)
+  }
+
+and t =
   { round : int;
     machine_width : Target_system.Machine_width.t;
     typing_env : TE.t;
@@ -82,23 +128,8 @@ type t =
        why it would not be beneficial) *)
     join_analysis : Apply_cont_rewrite_id.t Join_analysis.t option;
     (* Analysis from the latest join point. *)
-    defined_variables_by_scope : Lifted_cont_params.t list;
-        (* Stack of variables defined. The first element of the list refers to
-           variables defined by the current continuation, and the last element
-           of the list to variables that are defined at toplevel. We use the
-           type [Lifted_cont_params.t] because the current only use of this
-           field is the continuation lifting process. *)
-    lifted : Variable.Set.t;
-        (* This field provides a fast access to the set of parameters (as
-           variables) added to the current continuation by the continuation
-           lifting process. For these variables, it's important that we do not
-           generate a fresh [Lifted_cont_param] when we execute
-           [define_variable]. Note that this set will always be a subset of the
-           head of the defined_variables_by_scope field. *)
-    cost_of_lifting_continuations_out_of_current_one : int;
-        (* This cost is the number of parameters that would have to be created
-           if we lifted all continuations that are defined in the current
-           continuation's handler. *)
+    lifting_analysis : lifting_analysis;
+    lifted_continuations : lifted_continuations;
     has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
@@ -113,6 +144,16 @@ type t =
         (* This is used to dump intermediate representation via the mechanism in
            [Flambda_dump]. *)
   }
+
+let empty_lifting_analysis =
+  { rev_variables_defined = [];
+    rev_phantom_variables_defined = [];
+    num_variables_defined = 0;
+    cost_of_lifting = 0
+  }
+
+let no_lifted_continuations =
+  { continuations = Continuation.Map.empty; free_var_args = Variable.Map.empty }
 
 let print ppf
     { round;
@@ -139,9 +180,13 @@ let print ppf
       loopify_state;
       replay_history;
       specialization_cost;
-      defined_variables_by_scope;
-      lifted = _;
-      cost_of_lifting_continuations_out_of_current_one;
+      lifting_analysis =
+        { rev_variables_defined;
+          rev_phantom_variables_defined = _;
+          num_variables_defined = _;
+          cost_of_lifting
+        };
+      lifted_continuations = _;
       has_seen_a_non_liftable_continuation;
       join_analysis;
       is_cold;
@@ -182,11 +227,11 @@ let print ppf
       a "join_analysis" join_analysis
         (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
              Format.fprintf ppf "()"));
-      a "defined_variables_by_scope" defined_variables_by_scope
+      a "variables_defined_in_current_continuation"
+        (List.rev rev_variables_defined)
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
-           Lifted_cont_params.print);
-      d "cost_of_lifting_continuations_out_of_current_one"
-        cost_of_lifting_continuations_out_of_current_one;
+           Lifted_free_var.print);
+      d "cost_of_lifting_continuations_out_of_current_one" cost_of_lifting;
       b "has_seen_a_non_liftable_continuation"
         has_seen_a_non_liftable_continuation;
       b "is_cold" is_cold ]
@@ -203,21 +248,25 @@ let define_variable0 ~extra t var kind =
     then t.replay_history
     else Replay_history.define_variable (Bound_var.var var) t.replay_history
   in
-  let defined_variables_by_scope =
-    if extra || Variable.Set.mem (Bound_var.var var) t.lifted
-    then t.defined_variables_by_scope
+  let lifting_analysis =
+    if extra
+    then t.lifting_analysis
+    else if not (Name_mode.is_normal (Bound_var.name_mode var))
+    then
+      { t.lifting_analysis with
+        rev_phantom_variables_defined =
+          var :: t.lifting_analysis.rev_phantom_variables_defined
+      }
     else
-      match t.defined_variables_by_scope with
-      | [] -> Misc.fatal_errorf "Empty stack of defined variables in denv."
-      | variables_defined_in_current_continuation :: r ->
-        let kind = Flambda_kind.With_subkind.anything kind in
-        let variables_defined_in_current_continuation =
-          Lifted_cont_params.new_param ~replay_history
-            variables_defined_in_current_continuation
-            (Bound_parameter.create (Bound_var.var var) kind
+      { t.lifting_analysis with
+        rev_variables_defined =
+          Lifted_free_var.create
+            (Bound_parameter.create (Bound_var.var var)
+               (Flambda_kind.With_subkind.anything kind)
                (Bound_var.debug_uid var))
-        in
-        variables_defined_in_current_continuation :: r
+          :: t.lifting_analysis.rev_variables_defined;
+        num_variables_defined = t.lifting_analysis.num_variables_defined + 1
+      }
   in
   let typing_env =
     let var = Bound_name.create_var var in
@@ -232,7 +281,7 @@ let define_variable0 ~extra t var kind =
     typing_env;
     replay_history;
     variables_defined_at_toplevel;
-    defined_variables_by_scope
+    lifting_analysis
   }
 
 let define_variable t var kind =
@@ -271,9 +320,8 @@ let create ~ppf_dump ~round ~machine_width ~(resolver : resolver)
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
-    defined_variables_by_scope = [Lifted_cont_params.empty];
-    lifted = Variable.Set.empty;
-    cost_of_lifting_continuations_out_of_current_one = 0;
+    lifting_analysis = empty_lifting_analysis;
+    lifted_continuations = no_lifted_continuations;
     has_seen_a_non_liftable_continuation = false;
     join_analysis = None;
     is_cold = false;
@@ -315,8 +363,6 @@ let set_at_unit_toplevel_state t at_unit_toplevel = { t with at_unit_toplevel }
 
 let is_defined_at_toplevel t var =
   Variable.Set.mem var t.variables_defined_at_toplevel
-
-let defined_variables_by_scope t = t.defined_variables_by_scope
 
 let get_inlining_state t = t.inlining_state
 
@@ -369,9 +415,8 @@ let enter_set_of_closures
       loopify_state = _;
       replay_history = _;
       specialization_cost = _;
-      defined_variables_by_scope = _;
-      lifted = _;
-      cost_of_lifting_continuations_out_of_current_one = _;
+      lifting_analysis = _;
+      lifted_continuations = _;
       has_seen_a_non_liftable_continuation = _;
       join_analysis = _;
       is_cold = _;
@@ -402,9 +447,8 @@ let enter_set_of_closures
     replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     join_analysis = None;
-    defined_variables_by_scope = [Lifted_cont_params.empty];
-    lifted = Variable.Set.empty;
-    cost_of_lifting_continuations_out_of_current_one = 0;
+    lifting_analysis = empty_lifting_analysis;
+    lifted_continuations = no_lifted_continuations;
     has_seen_a_non_liftable_continuation = false;
     is_cold = false;
     ppf_dump
@@ -790,25 +834,6 @@ let with_replay_history replay t =
   in
   { t with replay_history }
 
-let enter_continuation_handler lifted_params t =
-  let lifted =
-    Lifted_cont_params.fold ~init:Variable.Set.empty
-      ~f:(fun bp set -> Variable.Set.add (Bound_parameter.var bp) set)
-      lifted_params
-  in
-  { t with
-    lifted;
-    defined_variables_by_scope = lifted_params :: t.defined_variables_by_scope;
-    cost_of_lifting_continuations_out_of_current_one = 0;
-    (* we only do shallow lifting : thus the question of whether a continuation
-       k' can be lifted out of the handler of a continuation k, does not depend
-       on whether k has been lifted or not (or was liftable or not). Therefore
-       we reset the `has_seen_a_non_liftable_continuation` when we enter a new
-       continuation handler *)
-    has_seen_a_non_liftable_continuation = false;
-    specialization_cost = Specialization_cost.can_specialize ()
-  }
-
 let add_lifted_constant_state ?maybe_already_defined denv lifted =
   let initial_denv = denv in
   let maybe_already_defined =
@@ -860,21 +885,198 @@ let add_lifted_constant_state ?maybe_already_defined denv lifted =
         pieces_of_code denv)
 
 let variables_defined_in_current_continuation t =
-  match t.defined_variables_by_scope with
-  | [] -> Misc.fatal_errorf "Empty stack of defined_variables_by_scope in denv"
-  | res :: _ -> res
+  List.rev t.lifting_analysis.rev_variables_defined
+
+let phantom_variables_defined_in_current_continuation t =
+  List.rev t.lifting_analysis.rev_phantom_variables_defined
+
+let add_lifted_continuation t cont ~free_vars ~is_exn_handler =
+  let lifted = t.lifted_continuations in
+  { t with
+    lifted_continuations =
+      { lifted with
+        continuations =
+          Continuation.Map.add cont
+            (free_vars, ~is_exn_handler)
+            lifted.continuations
+      }
+  }
+
+let inherit_lifted_continuations ~from t =
+  { t with lifted_continuations = from.lifted_continuations }
+
+let bind_lifted_free_var t ~free_var arg =
+  let lifted = t.lifted_continuations in
+  { t with
+    lifted_continuations =
+      { lifted with
+        free_var_args =
+          Variable.Map.add
+            (Lifted_free_var.var free_var)
+            arg lifted.free_var_args
+      }
+  }
+
+let enter_set_of_handlers t ~lifted_free_vars ~lifted_params =
+  let t =
+    { t with
+      lifting_analysis = empty_lifting_analysis;
+      (* we only do shallow lifting : thus the question of whether a
+         continuation k' can be lifted out of the handler of a continuation k,
+         does not depend on whether k has been lifted or not (or was liftable or
+         not). Therefore we reset the `has_seen_a_non_liftable_continuation`
+         when we enter a new continuation handler *)
+      has_seen_a_non_liftable_continuation = false;
+      specialization_cost = Specialization_cost.can_specialize ()
+    }
+  in
+  List.fold_left2
+    (fun t free_var param ->
+      bind_lifted_free_var t ~free_var (Bound_parameter.simple param))
+    t lifted_free_vars
+    (Bound_parameters.to_list lifted_params)
+
+let bind_lifted_free_vars_in_replay t lifted_cont =
+  match
+    Continuation.Map.find_opt lifted_cont t.lifted_continuations.continuations
+  with
+  | None -> t
+  | Some (free_vars, ~is_exn_handler:_) -> (
+    match Replay_history.replay_variable_mapping t.replay_history with
+    | Still_recording ->
+      Misc.fatal_errorf
+        "Lifted continuation %a should only be referred to in a replayed \
+         handler"
+        Continuation.print lifted_cont
+    | Replayed original_of_current ->
+      let current_of_original =
+        Variable.Map.fold
+          (fun current original acc -> Variable.Map.add original current acc)
+          original_of_current Variable.Map.empty
+      in
+      List.fold_left
+        (fun t free_var ->
+          match
+            Variable.Map.find_opt
+              (Lifted_free_var.var free_var)
+              current_of_original
+          with
+          | Some var -> bind_lifted_free_var t ~free_var (Simple.var var)
+          | None ->
+            Misc.fatal_errorf "Lifted param %a of %a has not been replayed"
+              Lifted_free_var.print free_var Continuation.print lifted_cont)
+        t free_vars)
+
+let has_lifted_params t cont =
+  Continuation.Map.mem cont t.lifted_continuations.continuations
+
+let rec lifted_free_var_arg t var =
+  (* We are calling a continuation that was lifted out of a context defining
+     [var], and we must now figure out what is the new name of [var] in the
+     current context.
+
+     Note that we need to look up lifted variables in the [free_var_args] map
+     repeatedly in case of nested lifting (when we decide to specialize a
+     continuation that was already being lifted). Consider the following
+     example: *)
+
+  (*
+   * let cont k x =
+   *   let var = prim1 in
+   *   let cont k0 () =
+   *     let cont k2 () = k3 var in
+   *     switch y with
+   *     | 0 -> k4 ()
+   *     | 1 -> k5 ()
+   *   in
+   *   switch x with
+   *   | 0 -> k0 ()
+   *   | 1 -> k1 ()
+   *)
+
+  (* Suppose we decide to specialize [k]. Then, we must lift [k0] out of [k],
+     and [k0] gets a lifted param [var'] for [var].
+
+     Suppose then that we decide to also specialize [k0], so that we must lift
+     [k2] out of it: [k2] gets a lifted param [var''] for [var'], since it is in
+     the scope of the [let cont] for [k2].
+
+     When simplifying the occurrence of [var] in [k2], we must first resolve
+     [var] to [var'] (corresponding to the lifting of [k0] out of [k]), then
+     resolve [var'] to [var''] (corresponding to the lifting of [k2] out of
+     [k0]).
+
+     The alternative would be to eagerly resolve the lifted variables when
+     creating the lifted parameters of [k2], but that would be quadratic without
+     an inverse map. *)
+  match Variable.Map.find_opt var t.lifted_continuations.free_var_args with
+  | None -> None
+  | Some arg -> (
+    match Simple.must_be_var arg with
+    | None -> Some arg
+    | Some (arg_var, _coercion) -> (
+      match lifted_free_var_arg t arg_var with
+      | None -> Some arg
+      | Some _ as arg -> arg))
+
+let lifted_args t cont =
+  match Continuation.Map.find_opt cont t.lifted_continuations.continuations with
+  | None -> None
+  | Some (free_vars, ~is_exn_handler) ->
+    let args =
+      List.map
+        (fun free_var ->
+          match lifted_free_var_arg t (Lifted_free_var.var free_var) with
+          | Some arg -> free_var, arg
+          | None ->
+            Misc.fatal_errorf "No argument for lifted param %a of %a"
+              Lifted_free_var.print free_var Continuation.print cont)
+        free_vars
+    in
+    Some (args, ~is_exn_handler)
+
+let add_lifted_args_to_apply_cont t apply_cont =
+  match lifted_args t (Apply_cont.continuation apply_cont) with
+  | None -> apply_cont
+  | Some (lifted_args, ~is_exn_handler) ->
+    let args = Apply_cont.args apply_cont in
+    let lifted_args = List.map snd lifted_args in
+    Apply_cont.update_args apply_cont
+      ~args:
+        (Lifted_free_var.place_lifted ~is_exn_handler ~lifted:lifted_args args)
+
+let add_lifted_args_to_exn_continuation t exn_continuation =
+  let exn_handler = Exn_continuation.exn_handler exn_continuation in
+  match lifted_args t exn_handler with
+  | None -> exn_continuation
+  | Some (lifted_args, ~is_exn_handler) ->
+    let extra_args = Exn_continuation.extra_args exn_continuation in
+    if not is_exn_handler
+    then
+      Misc.fatal_errorf
+        "Lifted continuation %a should be an exception handler but it is not"
+        Continuation.print exn_handler;
+    let lifted_extra_args =
+      List.map
+        (fun (free_var, arg) -> arg, Lifted_free_var.kind free_var)
+        lifted_args
+    in
+    Exn_continuation.create ~exn_handler
+      ~extra_args:(extra_args @ lifted_extra_args)
+
+let add_liftable_let_cont t =
+  let lifting_analysis = t.lifting_analysis in
+  { t with
+    lifting_analysis =
+      { lifting_analysis with
+        cost_of_lifting =
+          lifting_analysis.cost_of_lifting
+          + lifting_analysis.num_variables_defined
+      }
+  }
 
 let cost_of_lifting_continuations_out_of_current_one t =
-  t.cost_of_lifting_continuations_out_of_current_one
-
-let add_lifting_cost cost t =
-  if cost < 0
-  then Misc.fatal_errorf "Negative cost of lifting continuation"
-  else
-    { t with
-      cost_of_lifting_continuations_out_of_current_one =
-        t.cost_of_lifting_continuations_out_of_current_one + cost
-    }
+  t.lifting_analysis.cost_of_lifting
 
 let has_seen_a_non_liftable_continuation t =
   t.has_seen_a_non_liftable_continuation
@@ -933,10 +1135,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     replay_history = denv_for_join.replay_history;
     specialization_cost = denv_for_join.specialization_cost;
     join_analysis = denv_for_join.join_analysis;
-    defined_variables_by_scope = denv_for_join.defined_variables_by_scope;
-    lifted = denv_for_join.lifted;
-    cost_of_lifting_continuations_out_of_current_one =
-      denv_for_join.cost_of_lifting_continuations_out_of_current_one;
+    lifting_analysis = denv_for_join.lifting_analysis;
     has_seen_a_non_liftable_continuation =
       denv_for_join.has_seen_a_non_liftable_continuation;
     is_cold = denv_for_join.is_cold;
@@ -951,5 +1150,6 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     closure_info = denv.closure_info;
     get_imported_code = denv.get_imported_code;
     loopify_state = denv.loopify_state;
+    lifted_continuations = denv.lifted_continuations;
     ppf_dump = denv.ppf_dump
   }

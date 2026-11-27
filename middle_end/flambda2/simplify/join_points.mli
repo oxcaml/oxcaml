@@ -33,5 +33,4 @@ val compute_handler_env :
   env_at_fork:Downwards_env.t ->
   consts_lifted_after_fork:Lifted_constant_state.t ->
   params:Bound_parameters.t ->
-  previous_extra_params_and_args:Continuation_extra_params_and_args.t ->
   result

@@ -16,7 +16,14 @@
 type t = private
   | Recursive of
       { invariant_params : Bound_parameters.t;
-        lifted_params : Lifted_cont_params.t;
+            (** The invariant params, including the lifted params (see
+                [Lifted_free_var.place_lifted]). *)
+        lifted_params : Bound_parameters.t;
+            (** If the continuations have been lifted, their lifted params
+                (which are also in [invariant_params]). *)
+        lifted_free_vars : Lifted_free_var.t list;
+            (** The free variables that the lifted params replace, in the same
+                order. *)
         continuation_handlers : One_recursive_handler.t Continuation.Lmap.t;
         can_be_lifted : bool
       }
@@ -24,7 +31,8 @@ type t = private
 
 val create_recursive :
   invariant_params:Bound_parameters.t ->
-  lifted_params:Lifted_cont_params.t ->
+  lifted_params:Bound_parameters.t ->
+  lifted_free_vars:Lifted_free_var.t list ->
   continuation_handlers:One_recursive_handler.t Continuation.Lmap.t ->
   can_be_lifted:bool ->
   t
@@ -37,4 +45,5 @@ val bound_continuations : t -> Continuation.t list
 
 val can_be_lifted : t -> bool
 
-val add_params_to_lift : t -> Lifted_cont_params.t -> t
+val add_params_to_lift :
+  t -> Lifted_free_var.t list -> phantom_vars:Bound_var.t list -> t

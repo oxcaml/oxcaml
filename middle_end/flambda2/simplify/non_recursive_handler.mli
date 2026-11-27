@@ -16,7 +16,14 @@
 type t = private
   { cont : Continuation.t;
     params : Bound_parameters.t;
-    lifted_params : Lifted_cont_params.t;
+        (** The params of the continuation, including its lifted params (see
+            [Lifted_free_var.place_lifted]). *)
+    lifted_params : Bound_parameters.t;
+        (** If the continuation has been lifted, its lifted params (which are
+            also in [params]). *)
+    lifted_free_vars : Lifted_free_var.t list;
+        (** The free variables that the lifted params replace, in the same
+            order. *)
     handler : Flambda.Expr.t;
     is_exn_handler : bool;
     can_be_lifted : bool;
@@ -26,7 +33,8 @@ type t = private
 val create :
   cont:Continuation.t ->
   params:Bound_parameters.t ->
-  lifted_params:Lifted_cont_params.t ->
+  lifted_params:Bound_parameters.t ->
+  lifted_free_vars:Lifted_free_var.t list ->
   handler:Flambda.Expr.t ->
   is_exn_handler:bool ->
   can_be_lifted:bool ->

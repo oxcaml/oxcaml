@@ -840,7 +840,10 @@ let rebuild_switch
   after_rebuild expr uacc
 
 let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
-  let action = Switch_arm.action switch_arm in
+  let action =
+    DE.add_lifted_args_to_apply_cont (DA.denv dacc)
+      (Switch_arm.action switch_arm)
+  in
   let annotations = Switch_arm.annotations switch_arm in
   let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
   let args = AC.args action in
