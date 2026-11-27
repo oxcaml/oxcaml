@@ -1,10 +1,14 @@
 (* TEST
+ ocamlrunparam += ",Xsmall_heap_limit=256k";
  {
    bytecode;
  }{
    native;
  }
 *)
+
+(* This test depends on the major GC running: it undoes the default
+   OCAMLRUNPARAM of the top-level Makefile. *)
 
 let z = ref (0, 1, 2, 3, 4, 5, 6, 7)
 let finaliser_pending = ref true

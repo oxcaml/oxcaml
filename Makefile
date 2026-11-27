@@ -3,6 +3,14 @@ ROOTDIR = .
 include Makefile.config_if_required
 export ARCH
 
+# By default, the OCaml programs that make runs (the compilers, the tests) do
+# no major GC marking until they have 128M words of GC work, which few of them
+# reach. Not with the debug or instrumented runtime, whose GC is under test.
+# Upstream runtimes ignore the setting. Set OCAMLRUNPARAM to override it.
+ifeq "$(OCAMLRUNPARAM)$(USE_RUNTIME)" ""
+export OCAMLRUNPARAM = Xsmall_heap_limit=128M
+endif
+
 dune = $(opam_exec) $(DUNE)
 
 boot_ocamlc = main_native.exe
