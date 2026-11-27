@@ -2,6 +2,7 @@
  {
    native;
  } {
+   unset OCAMLPARAM;
    flags = "-O3 -zero-alloc-check opt";
    native;
  } {
