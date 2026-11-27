@@ -54,17 +54,22 @@ val code_id_actually_directly_called :
 val arguments_used_by_known_arity_call :
   'f Solution.t ->
   Code_id_or_name.t ->
-  'a list ->
-  ('a * Points_to_analysis.keep_or_delete) list
+  params_arity:[`Complex] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
+  Points_to_analysis.keep_or_delete list * never_returns:bool
 
 val arguments_used_by_unknown_arity_call :
   'f Solution.t ->
   Code_id_or_name.t ->
-  'a list list ->
-  ('a * Points_to_analysis.keep_or_delete) list list
+  params_arity:[`Complex] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
+  Points_to_analysis.keep_or_delete list * never_returns:bool
 
 val get_calling_convention_change :
-  'f Solution.t -> Code_id.t -> Unboxing_analysis.calling_convention_change
+  'f Solution.t ->
+  params_arity:[`Complex] Flambda_arity.t ->
+  Code_id.t ->
+  Unboxing_analysis.calling_convention_change
 
 val is_changing_calling_convention : 'f Solution.t -> Code_id.t -> bool
 

@@ -1,0 +1,53 @@
+let code f_0 deleted in
+let code g_1 deleted in
+let code inline(never) loopify(never) size(17) newer_version_of(f_0)
+      f_0_1 (w : imm tagged, p : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (w) in
+   switch untagged
+     | 0 -> k (0)
+     | 1 -> k2)
+    where k2 =
+      apply &my_alloc_region p (3) -> k * k1
+in
+let $camlUnbox_escaping_argument__f_1 = closure f_0_1 @f &toplevel in
+let code inline(never) loopify(never) size(11) newer_version_of(g_1)
+      g_1_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pmakeblock = %block.[`0`].my_alloc_region (n, n) in
+  apply direct(f_0_1 &my_alloc_region)
+    ($camlUnbox_escaping_argument__f_1 : _ -> imm tagged)
+      (0, Pmakeblock)
+      -> k * k1
+in
+let $camlUnbox_escaping_argument__g_2 = closure g_1_1 @g &toplevel in
+apply direct(g_1_1 &toplevel)
+  ($camlUnbox_escaping_argument__g_2 : _ -> imm tagged) (5) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    let stdout =
+      %project_value_slot.[print_int].[stdout]
+        ($Stdlib.camlStdlib__print_int_45_96)
+    in
+    (apply ccall inlining_state(depth(20))
+       ($`*extern*`.caml_format_int : val * val -> val)
+         ($Stdlib.camlStdlib__immstring_19, apply_result)
+         -> k1 * error
+       where k1 (apply_result_1 : val) =
+         let prim = %string_length (apply_result_1) in
+         let Pstringlength = %tag_imm (prim) in
+         (apply ccall inlining_state(depth(20))
+            ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+              (stdout, apply_result_1, 0, Pstringlength)
+              -> k1 * error
+            where k1 (param) =
+              cont k))
+  where k =
+    let $camlUnbox_escaping_argument =
+      Block 0 ($camlUnbox_escaping_argument__f_1,
+               $camlUnbox_escaping_argument__g_2)
+    in
+    cont done ($camlUnbox_escaping_argument)
