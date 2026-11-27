@@ -1018,6 +1018,10 @@ let rec annotated_result_layout = function
   | Lifused (_, body)
   | Lexclave body ->
       annotated_result_layout body
+  | Lprim ((Psequand | Psequor), _, _) ->
+      (* The second argument of [&&] and [||] is in tail position (see
+         [Lambda.shallow_iter]), but the result is always a boolean. *)
+      Some layout_int
   | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lprim _ | Lstaticraise _
   | Lwhile _ | Lfor _ | Lassign _ | Lkindtemplate _ | Lkindinstantiate _
   | Ltemplate _ | Linstantiate _ ->
