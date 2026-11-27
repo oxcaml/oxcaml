@@ -87,9 +87,10 @@ One build serves every codegen variant it was configured with (see `ocamlopt
     $ make test-one-no-rebuild TEST=effects/test1.ml CODEGEN_VARIANT=fp-sc
     $ make test-no-rebuild CODEGEN_VARIANT=poll
 
-Under `CODEGEN_VARIANT=<name>` the testsuite runs what it would run with a
-compiler configured with that variant as its default. Everything that
-generates or loads native code does so for the variant:
+Without the variable the testsuite targets `base`, which is what `ocamlopt`
+compiles for when nothing selects a variant. Under `CODEGEN_VARIANT=<name>`
+it targets that variant instead. Everything that generates or loads native
+code does so for the variant:
 
 - The native programs that the tests compile and link are built for it: with
   its flags, against its library tree (the compiler's own libraries and `eval`
@@ -106,24 +107,23 @@ generates or loads native code does so for the variant:
   is the variant's library tree.
 
 This is how the tests that need poll insertion (everything guarded by
-`multicore;`) or stack checks run on a build whose default variant is `base`.
-A test that selects a variant itself, with the `codegen_variant` variable,
-keeps its selection.
+`multicore;`) or stack checks run at all: no build has another default
+variant than `base`. A test that selects a variant itself, with the
+`codegen_variant` variable, keeps its selection.
 
 Bytecode and JSIR have no codegen variant: bytecode steps, bytecode expect and
 toplevel tests and JSIR tests run as they do without the variable, against the
-default library tree. No test is skipped because of the variable: what a pass
+library root. No test is skipped because of the variable: what a pass
 skips is what the tests' own guards (`no-stack-checks;`,
-`only-default-codegen;`, ...) exclude for that variant, as on a compiler
-configured with it.
+`only-default-codegen;`, ...) exclude for that variant.
 
-Three things remain that only a compiler configured with the variant covers:
-the bytecode runtime (`ocamlrun`, and what `-custom` links) is always the
-default variant's, so are the compiler executables themselves, and the dune
-tests (`make runtest`) run for the default variant. The one exception is the
-AddressSanitizer backend tests, which `make runtest` also runs in the build
-context of every other variant with AddressSanitizer that is built (`asan-fp`,
-or `asan-fp-poll` where poll insertion is the default).
+Three things are built for `base` in every build, and no pass of the
+testsuite covers them for another variant: the bytecode runtime (`ocamlrun`,
+and what `-custom` links), the compiler executables themselves, and the dune
+tests (`make runtest`). The one exception is the AddressSanitizer backend
+tests, which `make runtest` also runs in the build context of every variant
+with AddressSanitizer that is built (`asan-fp`, and `asan-fp-poll` where
+`configure` selected it).
 
 For a quick pass, add `VARIANT_ONLY=1`:
 
@@ -144,7 +144,7 @@ the like): the testsuite passes the library tree explicitly, and its
 predicates would not know.
 
 Naming a variant that this tree does not build is an error before anything
-runs; naming the default variant is the same as not setting the variable.
+runs; naming `base` is the same as not setting the variable.
 
 The `promote-*` targets accept `CODEGEN_VARIANT` too, because a test that
 only runs under a variant can only be promoted there:
@@ -214,31 +214,73 @@ directory to regenerate the printing script.
 ## Codegen variants
 
 Frame pointers, stack checks, poll insertion and AddressSanitizer are chosen
-each time `ocamlopt` runs, not when OxCaml is configured. Pass the axis flag
+each time `ocamlopt` runs, not when OxCaml is configured. With no flag,
+`ocamlopt` compiles for the variant that has all four off, `base`, on every
+installation: no `configure` option changes that. Pass the axis flag
 (`-frame-pointers`, `-stack-checks`, `-enable-poll-insertion`, `-asan`), or
 set the corresponding `OCAMLPARAM` key (e.g. `OCAMLPARAM=_,frame-pointers=1`),
 for every compilation and for the link of the program you want to profile
 or check (`OCAMLPARAM` reaches both). A single OxCaml
-installation serves all of its built variants, with the non-default runtimes
-and library trees installed under `lib/ocaml/variants/<name>` (names are the
-sorted enabled-axis tokens, e.g. `fp`, `fp-sc`, `asan-fp`, and `base` for
-all-off). The `--enable-*` configure options for these axes only select which
-variant is the default; `--with-codegen-variants=NAME,NAME` picks which
-non-default variants an installation builds, and `--disable-codegen-variants`
-builds none. (Variants other than the default are built on x86-64 Linux and
-macOS only. Frame pointers are supported on those two systems;
-AddressSanitizer requires x86-64 Linux, Clang and frame pointers, and cannot
-be combined with stack checks. It also requires the AddressSanitizer runtime
-library of compiler-rt, `libclang_rt.asan`, which some distributions package
-apart from Clang: without it `configure` leaves the AddressSanitizer variants
-out of the list it selects, and says so.)
+installation serves all of its built variants: the library root, `lib/ocaml`,
+holds the runtimes and the libraries of `base`, and those of every other
+variant are installed under `lib/ocaml/variants/<name>` (names are the sorted
+enabled-axis tokens, e.g. `fp`, `fp-sc`, `asan-fp`; `base` is the name of
+all-off, and has no directory there).
+
+`configure` decides which variants are built besides `base`:
+
+* With no option, `fp`, `sc`, `poll` and `fp-sc` on x86-64, and `poll` and
+  `sc` on arm64. On x86-64 Linux, `asan-fp` as well where the C compiler is
+  a Clang that can link AddressSanitizer executables.
+* `--enable-frame-pointers`, `--enable-stack-checks`,
+  `--enable-poll-insertion` and `--enable-address-sanitizer` are
+  requirements: `configure` fails when an enabled axis is not supported, and
+  it builds the variant that has exactly the enabled axes
+  (`--enable-frame-pointers --enable-poll-insertion` adds `fp-poll` to the
+  list above). AddressSanitizer brings frame pointers with it, and is
+  refused together with stack checks.
+* `--disable-<axis>` builds no variant with that axis:
+  `--disable-frame-pointers` leaves `fp`, `fp-sc` and `asan-fp` out.
+* `--with-codegen-variants=NAME,NAME` gives the list itself, under the same
+  two rules: the variant that the `--enable-<axis>` options require has to be
+  in it, and a variant with a disabled axis must not be.
+* `--disable-codegen-variants` builds `base` alone, and so cannot be combined
+  with an `--enable-<axis>` option.
+
+The `--enable-<axis>` options used to make their settings the default of the
+compiler. They no longer do: a compiler configured with
+`--enable-frame-pointers` compiles for `base` when it is given no flag, like
+any other. When `configure` is given one of these options, or its negation,
+it ends by saying so, with the variants that it builds and the `OCAMLPARAM`
+setting that makes one of them the default of a build (see "Another default
+than `base`", below).
+
+Variants are built on Linux and macOS only, with gcc or Clang, for the two
+architectures that have a native backend. arm64 has stack checks and poll
+insertion, and neither frame pointers nor AddressSanitizer. AddressSanitizer
+requires x86-64 Linux, Clang and frame pointers, and cannot be combined with
+stack checks. It also requires the AddressSanitizer runtime library of
+compiler-rt, `libclang_rt.asan`, which some distributions package apart from
+Clang: without it `configure` leaves the AddressSanitizer variants out of the
+list it selects, and says so. What is supported is decided from the native
+backend that `configure` selects and not from the name of the target alone: a
+build without the native compiler has no variants.
+
+An installation configured with `--enable-mmap-map-stack` cannot grow a
+stack, under any variant: with that option the runtime library of every
+variant allocates each stack once with `mmap`, at its initial size (4096
+words) and without a guard page. Code compiled with stack checks then raises
+`Stack_overflow` at that size, and code compiled without them runs off the
+end of its stack (a segmentation fault, where the memory below it is not
+mapped).
+
 The trees under `lib/ocaml/variants` belong to the compiler's installation.
 Each holds a build for its variant of the libraries of the compiler
 distribution, C stubs included: the stub archives of a tree are compiled with
 its variant's macros and sanitizer flags. Installing the compiler again over
 the same prefix replaces the trees whole: it deletes what something else put
 in `lib/ocaml/variants/<name>`. Other files added under the prefix stay, but
-for a `cached-generic-functions.a` in the default library root, which goes
+for a `cached-generic-functions.a` in the library root itself, which goes
 when the new installation has none. That is for a prefix outside the source
 directory: `_install` there, the prefix of a development build
 (`--prefix="$PWD/_install"`), is deleted and assembled again as a whole.
@@ -267,8 +309,8 @@ it was before there were variants:
   `-enable-poll-insertion` (or `OCAMLPARAM=_,poll-insertion=1`) on an
   installation that has libraries with polls, and with the native backend:
   the LLVM backend inserts no polls, whatever the flag. Where the
-  installation has none, as on the systems without variants when poll
-  insertion is not the default, the link still succeeds, with the libraries
+  installation has none, as on the systems without variants, the link still
+  succeeds, with the libraries
   it has, and prints the alert `no_polled_libraries`: the program is limited
   to one domain. Alerts are not errors where warnings are; `-alert
   -no_polled_libraries` silences this one.
@@ -335,8 +377,8 @@ macOS linker report it as
 
 and the loader of a shared object as `undefined symbol:
 caml_runtime_codegen_variant_is_fp`. The symbol names what the code needs:
-here the runtime library of `fp`, `libasmrun_fp.a` (`libasmrun.a` in an
-installation whose default variant is `fp`). (GNU ld and lld may also name
+here the runtime library of `fp`, `libasmrun_fp.a`. (GNU ld and lld may also
+name
 the startup code of the runtime library, `startup_nat`, in that message: on
 ELF systems it refers weakly to the guard of every variant, for the check
 that it makes when the program starts. If the message names another file,
@@ -454,12 +496,29 @@ the programs that `ocamlopt` links do (a program linked by hand needs
 `-rdynamic`; `-Wl,--export-dynamic-symbol=caml_code_not_fully_polled` is
 enough for a plugin that needs nothing else of the program).
 `OCAMLRUNPARAM=d=1` changes what `Dynlink` accepts, not what the linkers do.
-(The declaration needs ELF
-and the system assembler. On macOS a plugin with units that all have polls
-links with an object file without, and the dynamic linker refuses it in a
-fully polled program when no definition is visible to the plugin. With lld,
-the startup code must also come before the shared objects of the link, as it
-does in the links that `ocamlopt` runs.)
+(With lld, the startup code must also come before the shared objects of the
+link, as it does in the links that `ocamlopt` runs.)
+The declaration needs ELF and the system assembler. On macOS it is not made,
+and two of the outcomes above are weaker there:
+
+* An executable. An object file without polls in a link that is fully
+  polled by its `.cmx` files is an undefined symbol, as above, when nothing
+  else in the link defines `caml_code_not_fully_polled`. But a shared library
+  given to the link that exports a definition, as the OCaml image of an
+  `-output-complete-obj` library does when it is not fully polled, satisfies
+  the reference: the program links, starts as a fully polled program and
+  runs that object file's code with more than one domain. Nothing reports
+  it, at link time or at run time.
+* A plugin. One whose header says that every unit has polls links with an
+  object file without (the linker leaves the undefined symbols of a plugin
+  to the dynamic linker there), and the dynamic linker refuses it in a fully
+  polled program when no definition is visible to the plugin. Where one is
+  visible, the plugin loads, and `Dynlink` takes it for what its header
+  says.
+
+What a link's own `.cmx` files say is checked the same way on every system:
+a program with a unit that was compiled without polls is not fully polled,
+and is limited to one domain.
 All of this is about the files that a link takes: a fully polled program
 vouches for the units that its link took from the files it was given, and a
 plugin for its own. Neither says anything of code that another image of the
@@ -487,7 +546,7 @@ unit info of another compilation, or comes with none, escapes the linker.
 
 `-use-cached-generic-functions` links the archive `cached-generic-functions.a`
 of the selected variant's tree (`-cached-generic-functions-path` names another
-one; a path to the archive of the default root is redirected to the variant's
+one; a path to the archive of the library root is redirected to the variant's
 tree like the other paths inside that root). Installations do not necessarily
 have these archives. `generate_cached_generic_functions.exe <file>` writes
 one: for the variant that `-codegen-variant <name>` names, whatever else is
@@ -501,7 +560,7 @@ on it.
 
 ## Building a dune or findlib project for a codegen variant
 
-An installation serves its default codegen variant and the ones that
+An installation serves `base` and the codegen variants that
 `ocamlopt -config-var codegen_variants` lists (and a variant that differs
 from one of these only in poll insertion, with that one's libraries). To
 build a project for one of them, select it for every compiler invocation with
@@ -512,14 +571,18 @@ build a project for one of them, select it for every compiler invocation with
     $ OCAMLPARAM=_,asan=1,frame-pointers=1 dune build
 
 The keys are `asan`, `frame-pointers`, `poll-insertion` and `stack-checks`; an
-axis that is not mentioned keeps the installation's default.
+axis that is not mentioned is off, unless a flag of the command line turns it
+on.
 
 `ocamlopt -config` and `-config-var` do not tell which variant is selected:
 they print the same with any axis flags and any `OCAMLPARAM`. The fields
 `with_frame_pointers`, `no_stack_checks`, `with_address_sanitizer` and
-`poll_insertion` describe the default variant, the one the compiler was
-configured with. `standard_library` is the library root (`OCAMLLIB`, when
-it is set), and `codegen_variants` lists the variant trees found in it.
+`poll_insertion` describe `base`, which is what `ocamlopt` compiles for when
+nothing selects a variant: they are `false`, `true`, `false` and `false` on
+every installation, whatever options it was configured with.
+`standard_library` is the library root (`OCAMLLIB`, when it is set), and
+`codegen_variants` lists the variant trees found in it: the variants that
+the installation serves besides `base`.
 
 `ocamlc -where` and `-config` report the same library root for every variant,
 so dune and findlib name the libraries of the compiler distribution by path
@@ -538,7 +601,7 @@ already names a variant's tree is used as it is, and so is a file that the
 same invocation of `ocamlopt` wrote: a source in a directory of the root
 that the variant's tree also has, compiled and linked in one command, is
 linked from the `.cmx` file and the object written next to it (a source in a
-directory below it that only the default tree has is another matter, see
+directory below it that only the root has is another matter, see
 below), and a manifest that names the interface or the
 `.cmx` file that the command has just written leads to that file. An
 interface given to `-open-cmi` or `-open-cmi-x` and a manifest that is itself
@@ -562,8 +625,8 @@ searched for by its name on the load path. So when a `.cmx` file and its
 object are found apart in that way and only one of the two has a copy in the
 variant's tree, the link gets the description of one build and the code of
 another. Where the two builds differ in frame pointers, stack checks or
-AddressSanitizer, `ocamlopt` refuses the `.cmx` file of the default tree
-when it reads it. A link that takes the object file of the default tree
+AddressSanitizer, `ocamlopt` refuses the `.cmx` file of the root
+when it reads it. A link that takes the object file of the root
 fails on the link-time guard when it makes an executable; with `-shared` or
 `-output-obj` it may succeed, and what it makes is then checked when it is
 loaded or linked into a program. Where they differ in poll insertion, the
@@ -579,11 +642,11 @@ What to keep in mind:
 * The path and the root are compared as absolute paths, a relative one taken
   from the current directory as the system reports it (`.` components and
   repeated or trailing separators aside). A root reached through a symbolic
-  link, or through `..`, is not recognized, and the default variant's file is
+  link, or through `..`, is not recognized, and the file of `base` is
   then
   refused by the usual checks ("make inconsistent assumptions over
-  implementation", or "was compiled with codegen configuration"). Under a
-  variant that differs from the default in poll insertion alone nothing
+  implementation", or "was compiled with codegen configuration"). Under
+  `poll`, which differs from `base` in poll insertion alone, nothing
   refuses it: it is linked, and the program is not fully polled.
 * A directory of the root is replaced as a whole by its counterpart in the
   variant's tree, which holds what was installed with the compiler. A file
@@ -623,15 +686,15 @@ What to keep in mind:
   naming a `.cmx` file by its path elsewhere on the command line does not put
   its directory on that search path. So
   compile sources that depend on each other outside these directories, or
-  for a variant that the root itself serves: the default one, or one that
-  differs from it in poll insertion alone where the installation has no tree
-  for it. (A variant's tree that `OCAMLLIB` names directly is the root, and
+  for a variant that the root itself serves: `base`, or `poll` where the
+  installation has no tree for it. (A variant's tree that `OCAMLLIB` names
+  directly is the root, and
   serves its own variant in the same way.) One source compiled and linked
   there by one
   command works if it lies in that directory itself or is named by a path. A
   replaced directory hides a directory below it that is not replaced: from
   the root, `ocamlopt ./local/u.ml -o prog` links what it wrote in `local`,
-  which only the default tree has, whereas `ocamlopt local/u.ml -o prog`
+  which only the root has, whereas `ocamlopt local/u.ml -o prog`
   writes `local/u.cmx` and then searches for that name from the variant's
   tree ("Cannot find file local/u.cmx", or the file of that name that an `-I`
   directory leads to). A command that runs in a directory of the root that
@@ -640,7 +703,7 @@ What to keep in mind:
 * Only the files and directories that `ocamlopt` resolves itself are looked
   up in the variant's tree. A search option of the C linker is passed on as
   it is: with `-ccopt -L<root>/pkg -cclib -lfoo`, on the command line or
-  recorded in a `.cmxa`, the linker finds the `libfoo.a` of the default tree
+  recorded in a `.cmxa`, the linker finds the `libfoo.a` of the root
   under every variant. Name the directory with `-I <root>/pkg` instead
   (`ocamlopt` gives its `-I` directories to the linker as well), name the
   archive by its path, or record `-ccopt '-L"$CAMLORIGIN"'` in a `.cmxa`
@@ -670,11 +733,11 @@ What to keep in mind:
 * Only native code has variants: `ocamlc` and `ocamldep` ignore these keys,
   and bytecode builds are the same under every setting.
 * The C stubs that dune compiles itself (`foreign_stubs`) go to the C compiler
-  directly, with the headers of the default tree: they are compiled as for the
-  default variant. A stub that tests `WITH_FRAME_POINTERS`,
+  directly, with the headers of the library root: they are compiled as for
+  `base`. A stub that tests `WITH_FRAME_POINTERS`,
   `STACK_CHECKS_ENABLED` or `WITH_ADDRESS_SANITIZER` needs
   `-DCAML_CODEGEN_VARIANT_EXPLICIT` and a `-D` for each axis that is on in its
-  flags (or `-I <root>/variants/<name>` ahead of the default root).
+  flags (or `-I <root>/variants/<name>` ahead of the library root).
 * For a variant with frame pointers, a stub that can call back into OCaml or
   allocate must keep its frame pointer, whatever it tests: compile it with
   `-fno-omit-frame-pointer`. With stack checks as well (`fp-sc`), the runtime
@@ -687,31 +750,24 @@ What to keep in mind:
   with the macros or the headers of the variant alone (`gcc -O2` uses the
   frame-pointer register as an ordinary register). `ocamlopt` adds the option
   to a `.c` file that it compiles for such a variant.
-* On an installation whose default variant has AddressSanitizer, the C flags
-  that `ocamlc -config` reports instrument every such stub, whatever it tests,
-  and a program built for a variant without `asan` is linked without the
-  AddressSanitizer runtime. Give the stubs `-fno-sanitize=address` there
-  (`(flags (:standard -fno-sanitize=address))`), or the link fails with
-  undefined `__asan_*` symbols. The same goes for a `.c` file compiled with
-  `ocamlc`; `ocamlopt` compiles a `.c` file for the variant it was asked for,
-  also when the configured flags come back to it through `-ccopt` (as with
-  `-cc`, which replaces the configured command): for a variant without `asan`
-  it turns the instrumentation off after those options, when it compiles the
-  file and when it links the program.
-  In the other direction, on an installation with another default, a stub
-  that dune compiles itself is not instrumented under a variant with `asan`,
-  and AddressSanitizer does not check it: the macros and the variant's
-  headers do not instrument anything, `-fsanitize=address` in the flags of
-  the stub does. That option is not a way to select the variant, though:
-  given to `ocamlopt` with `-ccopt` it instruments the `.c` files of the
-  command and links the AddressSanitizer runtime into a program whose OCaml
-  code and runtime library are built without it. Select the variant with
-  `-asan` or `OCAMLPARAM`.
+* The C flags that `ocamlc -config` reports never instrument a stub for
+  AddressSanitizer, whatever the installation was configured with. So a
+  stub that dune compiles itself is not instrumented under a variant with
+  `asan`, and AddressSanitizer does not check it: the macros and the
+  variant's headers do not instrument anything, `-fsanitize=address` in the
+  flags of the stub does. That option is not a way to select the variant,
+  though: given to `ocamlopt` with `-ccopt` it instruments the `.c` files of
+  the command and links the AddressSanitizer runtime into a program whose
+  OCaml code and runtime library are built without it. Select the variant
+  with `-asan` or `OCAMLPARAM`. `ocamlopt` compiles a `.c` file for the
+  variant it was asked for, also when flags of another variant come to it
+  through `-ccopt` (or with `-cc`, which replaces the configured command):
+  for a variant without `asan` it turns the instrumentation off after those
+  options, when it compiles the file and when it links the program.
 * In the tree of a variant with `asan`, the stdlib, the otherlibs and the C
   stubs that native programs link are instrumented. The OCaml code of the
   compiler's own libraries (compiler-libs, the native toplevel, eval, the
-  JIT) is not, as in a compiler configured with `--enable-address-sanitizer`:
-  AddressSanitizer does not check it.
+  JIT) is not: AddressSanitizer does not check it.
 * Only the libraries in the compiler's own library root have a build per
   variant. A library installed elsewhere was built for one variant. Under a
   variant with another setting for frame pointers, stack checks or
@@ -752,12 +808,68 @@ What to keep in mind:
   `-output-obj`, has to name the runtime library of the variant that the code
   was compiled for: the `libasmrun*.a` of `<root>/variants/<name>`
   (`variants/fp/libasmrun_fp.a`, `variants/fp-sc/libasmrun_fp_sc.a`), with the
-  C libraries of that directory. `-L <root> -lasmrun` names the runtime
-  library of the default variant. Naming the wrong one is a link error (see
-  the link-time guard, above).
+  C libraries of that directory. The name follows the settings that change
+  the runtime, which poll insertion does not: `variants/poll/libasmrun.a`,
+  `variants/fp-poll/libasmrun_fp.a`. `-L <root> -lasmrun` names the runtime
+  library of `base`, on every installation. Naming the wrong one is a link
+  error (see the link-time guard, above).
 
 `make check-installed` builds and runs a findlib and a dune consumer of every
 such library under each variant of an installation.
+
+## Another default than `base`
+
+A compiler configured with `--enable-frame-pointers`, `--enable-stack-checks`,
+`--enable-poll-insertion` or `--enable-address-sanitizer` used to compile with
+that setting when it was given no flag. No installation does that now: these
+options only say what has to be built (see "Codegen variants", above). What
+comes closest is to give the settings in `OCAMLPARAM`, before the underscore:
+
+    $ export OCAMLPARAM=frame-pointers=1,_
+    $ export OCAMLPARAM=frame-pointers=1,poll-insertion=1,_
+
+A setting before the underscore is a default: a flag of the command line
+overrides it (`-no-frame-pointers` gives `base` again). A setting after the
+underscore, as in `_,frame-pointers=1` above, overrides the command line.
+
+In both forms this is a default of the `ocamlopt` commands that run in that
+environment, for native compilation and linking. It changes nothing in the
+installation, and so it is less than the configured default was:
+
+* `ocamlopt -config` and `ocamlc -config` describe `base` whatever
+  `OCAMLPARAM` says (`with_frame_pointers: false`), and nothing else in the
+  configuration tells which variant a build selects. A tool that reads the
+  configuration to compile C stubs compiles them for `base`: see the items
+  about stubs, above.
+* The compiler executables, `ocamlnat`, the bytecode runtime and what
+  `ocamlc -custom` links are built for `base`. `ocamlnat` compiles its
+  phrases for `base` whatever the variable says, and refuses a plugin that
+  was compiled for another setting of frame pointers, stack checks or
+  AddressSanitizer (`#load "unit.cmxs"` ends with "was compiled with codegen
+  configuration ..., which is incompatible with the host program's").
+* Only the libraries of the compiler distribution have a tree per variant. A
+  library that was installed in a directory of the library root alone
+  (`<root>/pkg`) is found by a compilation for `base` and not under another
+  variant ("'+pkg' does not exist in the library root selected for codegen
+  variant 'fp'"), and a library installed elsewhere was built for one
+  variant. Each needs a build per variant, outside the library root (see
+  above).
+* An installation that was not built with the variant refuses the first
+  compilation ("... was compiled with codegen configuration ... (note:
+  `<root>` does not contain codegen variant 'fp')"). Poll insertion is the
+  exception: where neither tree of the pair is there, as with
+  `--disable-codegen-variants`, the link uses the libraries of the root and
+  prints the alert `no_polled_libraries`.
+* dune does not rebuild when only `OCAMLPARAM` changes: keep one build
+  directory or one context per variant (above).
+* The linker checks frame pointers, stack checks and AddressSanitizer, and
+  not poll insertion. A unit compiled under `poll-insertion=1` and linked by
+  a command that lost the setting is linked with the libraries without
+  polls, and a unit compiled without the setting is linked by a command
+  that has it. Neither link prints anything, and either program is limited
+  to one domain: `Domain.spawn` fails when it runs. For the other three
+  axes, a command that lost the setting fails ("was compiled with codegen
+  configuration ..., which is incompatible with this invocation's").
 
 ## Benchmarking
 
