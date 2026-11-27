@@ -174,6 +174,12 @@ val map_set_of_closures :
   f:(Set_of_closures.t -> Set_of_closures.t) ->
   t
 
+val remove_unused_value_slots :
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  used_value_slots:Name_occurrences.t ->
+  t ->
+  t
+
 val free_names : t -> Name_occurrences.t
 
 val is_block : t -> bool

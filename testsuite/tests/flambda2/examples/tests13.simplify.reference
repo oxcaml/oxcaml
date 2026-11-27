@@ -3,16 +3,6 @@ let code `fn[tests13.ml:30,31--43]_3` deleted in
 let code `fn[tests13.ml:27,2--118]_1` deleted in
 let code `fn[tests13.ml:41,15--28]_5` deleted in
 let code map_foo_4 deleted in
-let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,31--43]_3`)
-      `fn[tests13.ml:30,31--43]_3_1` (x)
-        my_closure &my_alloc_region my_depth
-        -> k * k1 =
-  cont k (x)
-in
-let $`camlTests13__fn[tests13.ml:30,31--43]_3` =
-  closure `fn[tests13.ml:30,31--43]_3_1` @`fn[tests13.ml:30,31--43]`
-    &toplevel
-in
 let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,44--59]_2`)
       `fn[tests13.ml:30,44--59]_2_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -22,6 +12,16 @@ let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,44--59]_2`)
 in
 let $`camlTests13__fn[tests13.ml:30,44--59]_2` =
   closure `fn[tests13.ml:30,44--59]_2_1` @`fn[tests13.ml:30,44--59]`
+    &toplevel
+in
+let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,31--43]_3`)
+      `fn[tests13.ml:30,31--43]_3_1` (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  cont k (x)
+in
+let $`camlTests13__fn[tests13.ml:30,31--43]_3` =
+  closure `fn[tests13.ml:30,31--43]_3_1` @`fn[tests13.ml:30,31--43]`
     &toplevel
 in
 let code loopify(never) size(10) newer_version_of(`fn[tests13.ml:27,2--118]_1`)
@@ -74,7 +74,7 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
                 | 1 -> k4)
                where k4 =
                  let `fn[tests13.ml:27,2--118]` =
-                   closure `fn[tests13.ml:27,2--118]_1_3`
+                   closure `fn[tests13.ml:27,2--118]_1_2`
                      @`fn[tests13.ml:27,2--118]` &my_alloc_region
                  with {
                    i = 10;
@@ -85,7 +85,7 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
                  cont k2 (`fn[tests13.ml:27,2--118]`)
                where k3 =
                  let `fn[tests13.ml:27,2--118]` =
-                   closure `fn[tests13.ml:27,2--118]_1_2`
+                   closure `fn[tests13.ml:27,2--118]_1_3`
                      @`fn[tests13.ml:27,2--118]` &my_alloc_region
                  with {
                    i = 20;
@@ -111,7 +111,7 @@ and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
       `fn[tests13.ml:27,2--118]_1_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  let Popaque = %opaque (23) in
+  let Popaque = %opaque (13) in
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
          inlining_state(depth(1))
     $camlTests13__map_foo_4 ~ depth do_not_inline -> do_not_inline
@@ -123,7 +123,7 @@ and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
       `fn[tests13.ml:27,2--118]_1_3` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  let Popaque = %opaque (13) in
+  let Popaque = %opaque (23) in
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
          inlining_state(depth(1))
     $camlTests13__map_foo_4 ~ depth do_not_inline -> do_not_inline

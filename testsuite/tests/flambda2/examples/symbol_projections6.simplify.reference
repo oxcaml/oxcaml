@@ -35,48 +35,9 @@ let $camlSymbol_projections6__immstring_0 = "FOO" in
         | 0 -> k ($camlSymbol_projections6__h_2)
         | 1 -> k ($camlSymbol_projections6__g_3)
     and set_of_closures
-          $camlSymbol_projections6__h_2 =
-          closure h_1_1 @h &toplevel
-          with { foo_1 = foo_1 }
-        end
-    and code rec loopify(never) size(52) newer_version_of(h_1)
-          h_1_1 (z : imm tagged)
-            my_closure &my_alloc_region my_depth
-            -> k * k1
-            : [ 0 of [ 0 of val |1 of val ] * imm tagged ] =
-      let foo_2 =
-        %project_value_slot.[h].[foo_1] ($camlSymbol_projections6__h_2)
-      in
-      (let prim = %int_comp.lt (z, 0) in
-       switch prim
-         | 0 -> k2
-         | 1 -> k3
-         where k3 =
-           ((let untagged = %untag_imm (foo_2) in
-             switch untagged
-               | 0 -> k2
-               | 1 -> k3)
-              where k3 =
-                let Pmakeblock =
-                  %block.[`0`].my_alloc_region
-                    ($camlSymbol_projections6__h_2 ~ depth my_depth -> succ my_depth)
-                in
-                let Pmakeblock_1 =
-                  %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
-                in
-                cont k (Pmakeblock_1)))
-        where k2 =
-          let Pmakeblock =
-            %block.[`1`].my_alloc_region
-              ($camlSymbol_projections6__h_2 ~ depth my_depth -> succ my_depth)
-          in
-          let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
-          in
-          cont k (Pmakeblock_1)
-    and set_of_closures
           $camlSymbol_projections6__g_3 =
           closure g_2_1 @g &toplevel
-          with { foo_2 = foo_1 }
+          with { foo_1 = foo_1 }
         end
     and code rec loopify(never) size(52) newer_version_of(g_2)
           g_2_1 (y : imm tagged)
@@ -84,7 +45,7 @@ let $camlSymbol_projections6__immstring_0 = "FOO" in
             -> k * k1
             : [ 0 of [ 0 of val |1 of val ] * imm tagged ] =
       let foo_2 =
-        %project_value_slot.[g].[foo_2] ($camlSymbol_projections6__g_3)
+        %project_value_slot.[g].[foo_1] ($camlSymbol_projections6__g_3)
       in
       (let prim = %int_comp.lt (y, 0) in
        switch prim
@@ -108,6 +69,45 @@ let $camlSymbol_projections6__immstring_0 = "FOO" in
           let Pmakeblock =
             %block.[`1`].my_alloc_region
               ($camlSymbol_projections6__g_3 ~ depth my_depth -> succ my_depth)
+          in
+          let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
+          in
+          cont k (Pmakeblock_1)
+    and set_of_closures
+          $camlSymbol_projections6__h_2 =
+          closure h_1_1 @h &toplevel
+          with { foo_2 = foo_1 }
+        end
+    and code rec loopify(never) size(52) newer_version_of(h_1)
+          h_1_1 (z : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : [ 0 of [ 0 of val |1 of val ] * imm tagged ] =
+      let foo_2 =
+        %project_value_slot.[h].[foo_2] ($camlSymbol_projections6__h_2)
+      in
+      (let prim = %int_comp.lt (z, 0) in
+       switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           ((let untagged = %untag_imm (foo_2) in
+             switch untagged
+               | 0 -> k2
+               | 1 -> k3)
+              where k3 =
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region
+                    ($camlSymbol_projections6__h_2 ~ depth my_depth -> succ my_depth)
+                in
+                let Pmakeblock_1 =
+                  %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
+                in
+                cont k (Pmakeblock_1)))
+        where k2 =
+          let Pmakeblock =
+            %block.[`1`].my_alloc_region
+              ($camlSymbol_projections6__h_2 ~ depth my_depth -> succ my_depth)
           in
           let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
           in

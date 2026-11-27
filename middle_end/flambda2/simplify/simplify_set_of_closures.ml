@@ -105,12 +105,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
-    DE.add_lifted_constant_state ~maybe_already_defined:() denv
-      (DA.get_lifted_constants outer_dacc)
-    |> DE.enter_closure code_id ~return_continuation ~exn_continuation
-         ~my_closure
-         ~my_alloc_region:
-           (Alloc_mode.For_applications.alloc_region my_alloc_mode)
+    DE.enter_closure code_id denv ~return_continuation ~exn_continuation
+      ~my_closure
+      ~my_alloc_region:(Alloc_mode.For_applications.alloc_region my_alloc_mode)
     |> DE.set_loopify_state loopify_state
     |> DE.increment_continuation_scope
   in
@@ -127,7 +124,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   (* CR vlaviron: maybe DA could be restructured so that it can keep track of
      the global values going around the loop here, so we don't forget to add one
      of these lines below... *)
-  dacc
+  DA.fast_forward_lifted_constant_accumulator ~also_add_to_env:() dacc
+    (DA.get_lifted_constants outer_dacc)
   |> DA.with_code_ids_to_remember ~code_ids_to_remember
   |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
   |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
@@ -138,16 +136,21 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
 
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
     ~uacc_after_upwards_traversal =
+  let lifted_consts_after_this_function =
+    (* Subtle point: the uacc may have slightly more lifted constants than the
+       dacc (e.g. switch blocks are added on the upwards path), so we need to
+       look up the lifted constants from the uacc and not the dacc. *)
+    match UA.lifted_constants uacc_after_upwards_traversal with
+    | At_toplevel _ ->
+      Misc.fatal_errorf
+        "Simplify_set_of_closures.extract_accumulators_from_function: uacc \
+         from function should not be at toplevel"
+    | In_a_closure lifted_constants -> lifted_constants
+  in
   let lifted_consts_this_function =
-    (* Subtle point: [uacc_after_upwards_traversal] must be used to retrieve all
-       of the lifted constants generated during the simplification of the
-       function, not [dacc_after_body]. The reason for this is that sometimes
-       the constants in [DA] are cleared (but remembered) and reinstated
-       afterwards, for example at a [Let_cont]. It follows that if the turning
-       point where the downwards traversal turns into an upwards traversal is in
-       such a context, not all of the constants may currently be present in
-       [DA]. *)
-    UA.lifted_constants uacc_after_upwards_traversal
+    LCS.diff
+      (DA.get_lifted_constants outer_dacc)
+      lifted_consts_after_this_function
   in
   let code_ids_to_remember = DA.code_ids_to_remember dacc_after_body in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete dacc_after_body in
@@ -163,8 +166,8 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     TE.code_age_relation (DA.typing_env dacc_after_body)
   in
   let outer_dacc =
-    DA.add_to_lifted_constant_accumulator ~also_add_to_env:() outer_dacc
-      lifted_consts_this_function
+    DA.fast_forward_lifted_constant_accumulator ~also_add_to_env:() outer_dacc
+      lifted_consts_after_this_function
     |> DA.with_code_ids_to_remember ~code_ids_to_remember
     |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
     |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
@@ -202,10 +205,6 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~exn_continuation ~loopify_state (Code.code_metadata code)
   in
   let dacc = dacc_at_function_entry in
-  if not (DA.no_lifted_constants dacc)
-  then
-    Misc.fatal_errorf "Did not expect lifted constants in [dacc]:@ %a" DA.print
-      dacc;
   assert (not (DE.at_unit_toplevel (DA.denv dacc)));
   let my_alloc_region_duid = Flambda_debug_uid.none in
   let my_region_duid = Flambda_debug_uid.none in
@@ -556,8 +555,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
 
 let introduce_code dacc code_id code_const =
   let code = LC.create_code code_id code_const in
-  DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
-    (LCS.singleton code)
+  DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc [code]
 
 let simplify_function context ~outer_dacc function_slot code_id
     ~closure_bound_names_inside_function =
@@ -635,10 +633,6 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   let all_function_decls_in_set =
     Function_declarations.funs_in_order function_decls
   in
-  if not (DA.no_lifted_constants dacc)
-  then
-    Misc.fatal_errorf "Did not expect lifted constants in [dacc]:@ %a" DA.print
-      dacc;
   let ( (code_ids_to_never_delete_this_set, fun_types, outer_dacc),
         all_function_decls_in_set ) =
     Function_slot.Lmap.fold_left_map
@@ -831,7 +825,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   in
   let dacc =
     DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
-      (LCS.singleton set_of_closures_lifted_constant)
+      [set_of_closures_lifted_constant]
   in
   let denv, bindings =
     List.fold_left_map

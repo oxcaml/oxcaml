@@ -35,7 +35,6 @@ let code inline(never) loopify(always) size(26) newer_version_of(iter_0)
 in
 let $camlPhantom_needed_loop_cycle__iter_1 = closure iter_0_1 @iter &toplevel
 in
-let phantom iter = $camlPhantom_needed_loop_cycle__iter_1 in
 let code loopify(never) size(4) newer_version_of(test_1)
       test_1_1 (fuel : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -48,9 +47,10 @@ let code loopify(never) size(4) newer_version_of(test_1)
 in
 let $camlPhantom_needed_loop_cycle__test_2 = closure test_1_1 @test &toplevel
 in
-let phantom test = $camlPhantom_needed_loop_cycle__test_2 in
 let $camlPhantom_needed_loop_cycle =
   Block 0 ($camlPhantom_needed_loop_cycle__iter_1,
            $camlPhantom_needed_loop_cycle__test_2)
 in
+let phantom iter = $camlPhantom_needed_loop_cycle__iter_1 in
+let phantom test = $camlPhantom_needed_loop_cycle__test_2 in
 cont done ($camlPhantom_needed_loop_cycle)

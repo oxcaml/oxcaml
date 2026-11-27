@@ -98,3 +98,14 @@ type binding_to_place =
         original_defining_expr : Named.t option
       }
   | Delete_binding of { original_defining_expr : Named.t option }
+
+let print_binding_to_place ppf = function
+  | Keep_binding
+      { let_bound; simplified_defining_expr; original_defining_expr = _ } ->
+    Format.fprintf ppf "(keep_binding %a = %a)" Bound_pattern.print let_bound
+      print simplified_defining_expr
+  | Delete_binding _ -> Format.fprintf ppf "(delete_binding)"
+
+let binding_to_place_bound_names = function
+  | Keep_binding { let_bound; _ } -> Bound_pattern.free_names let_bound
+  | Delete_binding _ -> Name_occurrences.empty

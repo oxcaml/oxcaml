@@ -28,10 +28,14 @@ val create_have_lifted_set_of_closures :
 
 val dacc : t -> Downwards_acc.t
 
+val bound_names : t -> Name_occurrences.t
+
 val bindings_to_place : t -> Simplified_named.binding_to_place list
 
 val no_bindings : t -> bool
 
 val was_lifted_set_of_closures : t -> bool
+
+val defines_symbols : t -> Symbol.Set.t
 
 val with_dacc : dacc:Downwards_acc.t -> t -> t

@@ -32,8 +32,8 @@ let $camlPhantom_needed_fun_param__consume_1 =
 and $camlPhantom_needed_fun_param__consume_unboxed_2 =
   closure consume_1_2 @consume_unboxed &toplevel
 in
-let phantom consume = $camlPhantom_needed_fun_param__consume_1 in
 let $camlPhantom_needed_fun_param =
   Block 0 ($camlPhantom_needed_fun_param__consume_1)
 in
+let phantom consume = $camlPhantom_needed_fun_param__consume_1 in
 cont done ($camlPhantom_needed_fun_param)

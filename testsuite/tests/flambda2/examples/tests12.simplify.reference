@@ -3,16 +3,6 @@ let code `fn[tests12.ml:25,39--51]_3` deleted in
 let code `fn[tests12.ml:25,2--70]_1` deleted in
 let code bar_0 deleted in
 let code map_foo_4 deleted in
-let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,39--51]_3`)
-      `fn[tests12.ml:25,39--51]_3_1` (x)
-        my_closure &my_alloc_region my_depth
-        -> k * k1 =
-  cont k (x)
-in
-let $`camlTests12__fn[tests12.ml:25,39--51]_3` =
-  closure `fn[tests12.ml:25,39--51]_3_1` @`fn[tests12.ml:25,39--51]`
-    &toplevel
-in
 let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,52--67]_2`)
       `fn[tests12.ml:25,52--67]_2_1` (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -22,6 +12,16 @@ let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,52--67]_2`)
 in
 let $`camlTests12__fn[tests12.ml:25,52--67]_2` =
   closure `fn[tests12.ml:25,52--67]_2_1` @`fn[tests12.ml:25,52--67]`
+    &toplevel
+in
+let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,39--51]_3`)
+      `fn[tests12.ml:25,39--51]_3_1` (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  cont k (x)
+in
+let $`camlTests12__fn[tests12.ml:25,39--51]_3` =
+  closure `fn[tests12.ml:25,39--51]_3_1` @`fn[tests12.ml:25,39--51]`
     &toplevel
 in
 let code loopify(never) size(7) newer_version_of(`fn[tests12.ml:25,2--70]_1`)
@@ -72,7 +72,7 @@ and code rec loopify(never) size(75) newer_version_of(map_foo_4)
                 | 1 -> k4)
                where k4 =
                  let `fn[tests12.ml:25,2--70]` =
-                   closure `fn[tests12.ml:25,2--70]_1_3`
+                   closure `fn[tests12.ml:25,2--70]_1_2`
                      @`fn[tests12.ml:25,2--70]` &my_alloc_region
                  with {
                    map_foo =
@@ -82,7 +82,7 @@ and code rec loopify(never) size(75) newer_version_of(map_foo_4)
                  cont k2 (`fn[tests12.ml:25,2--70]`)
                where k3 =
                  let `fn[tests12.ml:25,2--70]` =
-                   closure `fn[tests12.ml:25,2--70]_1_2`
+                   closure `fn[tests12.ml:25,2--70]_1_3`
                      @`fn[tests12.ml:25,2--70]` &my_alloc_region
                  with {
                    map_foo =

@@ -48,6 +48,28 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
     let ppf = Lazy.force lazy_ppf in
     print ~ctx:!dot_count ~print_name ppf graph
 
+(* helper for symbols created during the upwards pass *)
+
+let add_required_lifted_constant (t : T.Flow_result.t) lc =
+  if not (Lifted_constant.is_fully_static lc)
+  then
+    Misc.fatal_errorf
+      "Flow_analysis.add_required_lifted_constant should not be used on non \
+       fully static constants";
+  let bound = Lifted_constant.bound_static lc in
+  if Bound_static.binds_code bound
+  then
+    Misc.fatal_errorf
+      "Flow_analysis.add_required_lifted_constant should not be used to bind \
+       code";
+  let bound_symbols = Bound_static.symbols_being_defined bound in
+  let required_names =
+    Symbol.Set.fold
+      (fun sym required_names -> Name.Set.add (Name.symbol sym) required_names)
+      bound_symbols t.data_flow_result.required_names
+  in
+  { t with data_flow_result = { t.data_flow_result with required_names } }
+
 (* analysis *)
 
 let analyze ?(speculative = false) ?print_name ~machine_width
@@ -82,7 +104,10 @@ let analyze ?(speculative = false) ?print_name ~machine_width
           ~code_age_relation ~used_value_slots ~code_ids_to_never_delete
       in
       if Flambda_features.dump_flow ()
-      then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
+      then
+        Format.eprintf "/// graph%s@\n%a@\n@."
+          (if speculative then " (speculative)" else "")
+          Data_flow_graph.print deps;
       (* Dead variable analysis *)
       let dead_variable_result = Data_flow_graph.required_names deps in
       (* Aliases analysis *)

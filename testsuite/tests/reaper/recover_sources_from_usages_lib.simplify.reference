@@ -89,6 +89,13 @@ in
 let $camlRecover_sources_from_usages_lib__escape_5 =
   closure escape_6_1 @escape &toplevel
 in
+let code inline(never) loopify(never) size(1) newer_version_of(id_7)
+      id_7_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k (x)
+in
+let $camlRecover_sources_from_usages_lib__id_8 =
+  closure id_7_1 @`id` &toplevel
+in
 apply direct(make_c_2_1 &toplevel)
   ($camlRecover_sources_from_usages_lib__make_c_2 : _ -> val)
     (5)
@@ -159,15 +166,6 @@ apply direct(make_c_2_1 &toplevel)
                   where k1 (param : imm tagged) =
                     cont k)
                  where k =
-                   let code inline(never) loopify(never) size(1) newer_version_of(id_7)
-                         id_7_1 (x)
-                           my_closure &my_alloc_region my_depth
-                           -> k * k1 =
-                     cont k (x)
-                   in
-                   let $camlRecover_sources_from_usages_lib__id_8 =
-                     closure id_7_1 @`id` &toplevel
-                   in
                    ((let Popaque = %opaque (1) in
                      (let untagged = %untag_imm (Popaque) in
                       switch untagged
@@ -192,15 +190,13 @@ apply direct(make_c_2_1 &toplevel)
                                   (apply_result)
                                   -> k * error))
                       where k (o : val) =
+                        let $camlRecover_sources_from_usages_lib =
+                          Block 0 ($camlRecover_sources_from_usages_lib__id_8,
+                                   o)
+                        in
                         (apply
                                 direct(`fn[recover_sources_from_usages_lib.ml:33,2--20]_4_1`
                                 &toplevel) inlined(never)
-                           (o : _ -> imm tagged) (0) -> k1 * error
-                           where k1 (param : imm tagged) =
-                             cont k
-                           where k =
-                             let $camlRecover_sources_from_usages_lib =
-                               Block 0 ($camlRecover_sources_from_usages_lib__id_8,
-                                        o)
-                             in
+                           (o : _ -> imm tagged) (0) -> k * error
+                           where k (param : imm tagged) =
                              cont done ($camlRecover_sources_from_usages_lib))))))

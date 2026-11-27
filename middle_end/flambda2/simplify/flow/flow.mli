@@ -121,6 +121,12 @@ module Analysis : sig
     Acc.t ->
     Flow_types.Flow_result.t
 
+  (** Add a required symbols to an already computed result. This should only be
+      used for fully static symbols, such as the ones introduced upwards for
+      switches optimized into an array load. *)
+  val add_required_lifted_constant :
+    Flow_types.Flow_result.t -> Lifted_constant.t -> Flow_types.Flow_result.t
+
   (** [true] iff the mutable unboxing pass actually did unbox things *)
   val did_perform_mutable_unboxing : Flow_types.Flow_result.t -> bool
 

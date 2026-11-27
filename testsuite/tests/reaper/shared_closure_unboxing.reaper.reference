@@ -41,18 +41,16 @@ let code inline(never) loopify(never) size(11) newer_version_of(test_3)
 in
 let $camlShared_closure_unboxing__test_6 = closure test_3_1 @test &toplevel
 in
+let $camlShared_closure_unboxing =
+  Block 0 ($camlShared_closure_unboxing__test_6)
+in
 apply direct(test_3_1 &toplevel)
   ($camlShared_closure_unboxing__test_6 : _ -> imm tagged)
     (1, 2, 3)
-    -> k1 * error
-  where k1 (apply_result : imm tagged) =
+    -> k * error
+  where k (apply_result : imm tagged) =
     let prim = %phys_eq (apply_result, 8) in
     switch prim
       | 0 ->
         error pop(regular error) ($camlShared_closure_unboxing__Pmakeblock_2)
-      | 1 -> k
-  where k =
-    let $camlShared_closure_unboxing =
-      Block 0 ($camlShared_closure_unboxing__test_6)
-    in
-    cont done ($camlShared_closure_unboxing)
+      | 1 -> done ($camlShared_closure_unboxing)
