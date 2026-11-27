@@ -40,10 +40,10 @@ module Amd64_simd_instrs = struct
         enc = enc2
       } =
     Stdlib.( == ) id1 id2
-    && Array.length ext1 = Array.length ext2
-    && Array.for_all2 equal_ext ext1 ext2
-    && Array.length args1 = Array.length args2
-    && Array.for_all2 equal_arg args1 args2
+    && Iarray.length ext1 = Iarray.length ext2
+    && Iarray.for_all2 equal_ext ext1 ext2
+    && Iarray.length args1 = Iarray.length args2
+    && Iarray.for_all2 equal_arg args1 args2
     && equal_res res1 res2 && equal_imm imm1 imm2
     && String.equal mnemonic1 mnemonic2
     && equal_enc enc1 enc2
@@ -308,7 +308,7 @@ let print_operation ?addr printreg (op : operation) ppf regs =
   Pseudo_instr.print ppf op.instr;
   Option.iter (fun imm -> fprintf ppf " (%d)" imm) op.imm;
   let _ =
-    Array.fold_left
+    Iarray.fold_left
       (fun idx arg ->
         match Amd64_simd_defs.loc_allows_mem arg.loc, addr with
         | true, Some (print, n) ->

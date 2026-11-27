@@ -308,7 +308,7 @@ module Extension = struct
       | AVX512_IFMA -> enabled AVX512_IFMA
       | GFNI -> enabled GFNI
     in
-    Array.for_all enabled instr.ext
+    Iarray.for_all enabled instr.ext
 end
 
 (* Emit elf notes with trap handling information. *)

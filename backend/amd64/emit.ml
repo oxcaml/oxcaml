@@ -1879,7 +1879,7 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
     addr_used_or_not_provided := true
   in
   let args_used =
-    Array.fold_left
+    Iarray.fold_left
       (fun idx (arg : Simd.arg) ->
         if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
         match Simd.loc_allows_mem arg.loc, mode with
@@ -1897,9 +1897,9 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
     match simd.res with
     | Res_none -> 0
     | Arg rr ->
-      Array.fold_left
+      Iarray.fold_left
         (fun r a ->
-          let len = Simd.loc_reg_count simd.args.(a).loc in
+          let len = Simd.loc_reg_count (Iarray.get simd.args a).loc in
           let a = Simd.unarized_reg_index simd.args a in
           for idx = 0 to len - 1 do
             assert (Reg.same_loc instr.arg.(a + idx) instr.res.(r + idx))
@@ -1907,10 +1907,10 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
           r + len)
         0 rr
     | Res rr ->
-      Array.iteri
+      Iarray.iteri
         (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
         rr;
-      Array.length rr
+      Iarray.length rr
   in
   assert (res_used = Array.length instr.res);
   (* Gathers require that all args are distinct registers. *)
@@ -1984,7 +1984,7 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
   let args =
-    Array.fold_left
+    Iarray.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
         if Simd.arg_is_implicit arg
         then idx + 1, args
@@ -2007,7 +2007,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
     match simd.res with
     | Res_none | Arg _ -> args
     | Res rr ->
-      Array.fold_left
+      Iarray.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
           | Implicit | Immediate | Mask -> idx, acc

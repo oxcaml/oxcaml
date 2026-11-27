@@ -83,7 +83,7 @@ type temp =
 (* Possible argument location *)
 type loc =
   | Pin of reg
-  | Temp of temp array (* All allowed locations *)
+  | Temp of temp iarray (* All allowed locations *)
 
 (* Possible argument encoding within an instruction *)
 type loc_enc =
@@ -101,8 +101,8 @@ type arg =
 
 type res =
   | Res_none (* No result *)
-  | Arg of int array (* Results are modified argument operand(s). *)
-  | Res of arg array (* Separate operand(s) for result. *)
+  | Arg of int iarray (* Results are modified argument operand(s). *)
+  | Res of arg iarray (* Separate operand(s) for result. *)
 
 type legacy_prefix =
   | Prx_none
@@ -182,8 +182,8 @@ type imm =
    of simdgen, backend should only depend on the result of simdgen. *)
 type 'id instr =
   { id : 'id;
-    ext : ext array; (* Multiple extensions may be required. *)
-    args : arg array;
+    ext : ext iarray; (* Multiple extensions may be required. *)
+    args : arg iarray;
     res : res;
     imm : imm;
     mnemonic : string;
@@ -191,7 +191,7 @@ type 'id instr =
   }
 
 let instr_expects_mask instr =
-  Array.exists
+  Iarray.exists
     (fun (arg : arg) ->
       match arg.enc with
       | Mask -> true
@@ -289,8 +289,8 @@ let equal_loc loc0 loc1 =
   match loc0, loc1 with
   | Pin reg0, Pin reg1 -> equal_reg reg0 reg1
   | Temp temp0, Temp temp1 ->
-    Array.length temp0 = Array.length temp1
-    && Array.for_all2 equal_temp temp0 temp1
+    Iarray.length temp0 = Iarray.length temp1
+    && Iarray.for_all2 equal_temp temp0 temp1
   | (Pin _ | Temp _), _ -> false
 
 let equal_loc_enc enc0 enc1 =
@@ -420,9 +420,11 @@ let equal_res res0 res1 =
   match res0, res1 with
   | Res_none, Res_none -> true
   | Arg arg1, Arg arg2 ->
-    Array.length arg1 = Array.length arg2 && Array.for_all2 Int.equal arg1 arg2
+    Iarray.length arg1 = Iarray.length arg2
+    && Iarray.for_all2 Int.equal arg1 arg2
   | Res res1, Res res2 ->
-    Array.length res1 = Array.length res2 && Array.for_all2 equal_arg res1 res2
+    Iarray.length res1 = Iarray.length res2
+    && Iarray.for_all2 equal_arg res1 res2
   | (Res_none | Arg _ | Res _), _ -> false
 
 let temp_is_reg = function
@@ -439,17 +441,17 @@ let temp_is_vm = function
 
 let loc_allows_reg = function
   | Pin _ -> true
-  | Temp temps -> Array.exists temp_is_reg temps
+  | Temp temps -> Iarray.exists temp_is_reg temps
 
 let loc_allows_mem = function
   | Pin _ -> false
-  | Temp temps -> Array.exists (fun temp -> not (temp_is_reg temp)) temps
+  | Temp temps -> Iarray.exists (fun temp -> not (temp_is_reg temp)) temps
 
 let instr_allows_temp (instr : _ instr) temp =
-  Array.exists
+  Iarray.exists
     (fun (arg : arg) ->
       match arg.loc with
-      | Temp temps -> Array.exists (equal_temp temp) temps
+      | Temp temps -> Iarray.exists (equal_temp temp) temps
       | Pin _ -> false)
     instr.args
 
@@ -459,13 +461,13 @@ let instr_allows_gpr instr =
 let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 
 let loc_reg_count = function
-  | Temp ts when Array.exists temp_is_vm ts -> 2
+  | Temp ts when Iarray.exists temp_is_vm ts -> 2
   | Temp _ | Pin _ -> 1
 
 let unarized_reg_index args arg_idx =
   let idx = ref 0 in
   for i = 0 to arg_idx - 1 do
-    idx := !idx + loc_reg_count args.(i).loc
+    idx := !idx + loc_reg_count (Iarray.get args i).loc
   done;
   !idx
 
@@ -507,7 +509,7 @@ let ext_to_string : ext -> string = function
   | GFNI -> "GFNI"
 
 let exts_to_string exts =
-  Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
+  Iarray.map ext_to_string exts |> Iarray.to_list |> String.concat ", "
 
 module Layout = struct
   type reg =
@@ -543,7 +545,7 @@ let loc_register_width = function
       assert (Option.is_none !width);
       width := Some w
     in
-    Array.iter
+    Iarray.iter
       (function
         | R8 -> set Layout.R8
         | R16 -> set Layout.R16
@@ -566,7 +568,7 @@ let loc_memory_width = function
       assert (Option.is_none !width);
       width := Some w
     in
-    Array.iter
+    Iarray.iter
       (function
         | M8 -> set Layout.M8
         | M16 -> set Layout.M16

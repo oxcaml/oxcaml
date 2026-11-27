@@ -792,9 +792,9 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | Res_none | Arg _ -> instr.args.(i).enc
+    | Res_none | Arg _ -> (Iarray.get instr.args i).enc
     | Res rr ->
-      let rr = Array.fold_right
+      let rr = Iarray.fold_right
         (fun ({enc; _} : Amd64_simd_defs.arg) acc ->
           match enc with
           | Implicit -> acc
@@ -803,7 +803,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       in
       let n = Array.length rr in
       if i < n then rr.(i)
-      else instr.args.(i - n).enc
+      else (Iarray.get instr.args (i - n)).enc
   in
   let rm_only () =
     match args with
