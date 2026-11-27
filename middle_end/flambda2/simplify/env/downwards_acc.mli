@@ -123,11 +123,6 @@ val are_lifting_conts : t -> Are_lifting_conts.t
 
 val with_are_lifting_conts : t -> Are_lifting_conts.t -> t
 
-val get_and_clear_lifted_continuations :
-  t -> t * (Downwards_env.t * Original_handlers.t) list
-
-val add_lifted_continuation : Downwards_env.t -> Original_handlers.t -> t -> t
-
 val get_continuation_lifting_budget : t -> int
 
 val reset_continuation_lifting_budget : t -> t

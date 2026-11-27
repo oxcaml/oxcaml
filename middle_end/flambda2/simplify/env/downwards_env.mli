@@ -260,18 +260,6 @@ val add_lifted_constant_state :
 
     The following functions track information about the current continuation. *)
 
-(** The variables defined in normal mode by the current continuation handler
-    (including its parameters), in the order of their definition. This is
-    exactly the free variables that would become lifted parameters if we decide
-    to lift a continuation out of the current one. *)
-val variables_defined_in_current_continuation : t -> Lifted_free_var.t list
-
-(** The variables defined by the current continuation handler that cannot be
-    used in normal mode (phantom variables), in the order of their definition.
-    They are bound as optimised out in the handler of a continuation lifted out
-    of the current one. *)
-val phantom_variables_defined_in_current_continuation : t -> Bound_var.t list
-
 (** Record a liftable let cont seen in the current environment, increasing the
     lifting cost accordingly. *)
 val add_liftable_let_cont : t -> t
@@ -300,9 +288,11 @@ val add_lifted_continuation :
 
 val inherit_lifted_continuations : from:t -> t -> t
 
-(** In a replayed (specialized) handler, bind the free variables of the given
-    lifted continuation to the corresponding variables in the current pass. *)
-val bind_lifted_free_vars_in_replay : t -> Continuation.t -> t
+(** Forget all the lifted continuations, whose uses then no longer get the
+    arguments of their lifted params. This is used for the specialized versions
+    of a handler, which are simplified from its generic version, where these
+    arguments have already been added. *)
+val forget_lifted_continuations : t -> t
 
 val has_lifted_params : t -> Continuation.t -> bool
 

@@ -1051,44 +1051,55 @@ let simplify_switch dacc switch ~down_to_up =
         | Ok (_meet_ty, env_at_use) -> Some (action, env_at_use))
       (Switch.arms switch)
   in
-  match TI.Map.get_singleton arms with
-  | Some (_, (arm, env_at_use)) ->
-    (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
-    let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
-    let dacc = DA.with_denv dacc denv_at_use in
-    Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
-      ~down_to_up:(fun dacc simplified_expr ->
-        down_to_up dacc
-          (SE.notify_removed ~operation:Removed_operations.branch
-             simplified_expr))
-  | None ->
-    let arms, dacc = TI.Map.fold simplify_arm arms (TI.Map.empty, dacc) in
-    let dacc =
-      if TI.Map.cardinal arms <= 1
-      then dacc
-      else
-        DA.map_flow_acc dacc
-          ~f:
-            (Flow.Acc.add_used_in_current_handler (Simple.free_names scrutinee))
-    in
-    let condition_dbg =
-      DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
-    in
-    let dacc =
-      match decide_continuation_specialization ~dacc ~switch ~scrutinee with
-      | `Specialized (continuation, lifting_cost) ->
-        let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
-        let dacc =
-          DA.with_are_lifting_conts dacc
-            (Are_lifting_conts.lift_continuations_out_of continuation)
-        in
-        let dacc = DA.add_continuation_to_specialize dacc continuation in
-        dacc
-      | _ -> dacc
-    in
-    let shareable_constants = DA.shareable_constants dacc_before_switch in
-    let typing_env_before_switch = DA.typing_env dacc_before_switch in
-    let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
+  (* Do this check now, so that we don't try to specialize a switch with zero
+     arms. *)
+  if TI.Map.is_empty arms
+  then
     down_to_up dacc
-      (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~shareable_constants ~typing_env_before_switch ~cse_before_switch)
+      (SE.notify_removed ~operation:Removed_operations.branch
+         (SE.simplified_invalid Zero_switch_arms))
+  else
+    match TI.Map.get_singleton arms with
+    | Some (_, (arm, env_at_use)) ->
+      (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
+      let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
+      let dacc = DA.with_denv dacc denv_at_use in
+      Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
+        ~down_to_up:(fun dacc simplified_expr ->
+          down_to_up dacc
+            (SE.notify_removed ~operation:Removed_operations.branch
+               simplified_expr))
+    | None ->
+      let arms, dacc = TI.Map.fold simplify_arm arms (TI.Map.empty, dacc) in
+      let dacc =
+        if TI.Map.cardinal arms <= 1
+        then dacc
+        else
+          DA.map_flow_acc dacc
+            ~f:
+              (Flow.Acc.add_used_in_current_handler
+                 (Simple.free_names scrutinee))
+      in
+      let condition_dbg =
+        DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
+      in
+      let dacc =
+        match decide_continuation_specialization ~dacc ~switch ~scrutinee with
+        | `Specialized (continuation, lifting_cost) ->
+          let dacc =
+            DA.decrease_continuation_lifting_budget dacc lifting_cost
+          in
+          let dacc =
+            DA.with_are_lifting_conts dacc
+              (Are_lifting_conts.lift_continuations_out_of continuation)
+          in
+          let dacc = DA.add_continuation_to_specialize dacc continuation in
+          dacc
+        | _ -> dacc
+      in
+      let shareable_constants = DA.shareable_constants dacc_before_switch in
+      let typing_env_before_switch = DA.typing_env dacc_before_switch in
+      let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
+      down_to_up dacc
+        (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+           ~shareable_constants ~typing_env_before_switch ~cse_before_switch)

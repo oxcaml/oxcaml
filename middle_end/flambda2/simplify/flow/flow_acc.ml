@@ -98,6 +98,26 @@ let exit_continuation cont (t : t) =
     let map = Continuation.Map.add cont elt t.map in
     { t with stack; map }
 
+let forget_continuation cont (t : t) =
+  if
+    Flambda_features.check_invariants ()
+    && List.exists
+         (fun (elt : cont_info) -> Continuation.equal cont elt.continuation)
+         t.stack
+  then
+    Misc.fatal_errorf "Cannot forget continuation %a: it is still on the stack"
+      Continuation.print cont;
+  if not (Continuation.Map.mem cont t.map)
+  then
+    Misc.fatal_errorf "Cannot forget unknown continuation %a" Continuation.print
+      cont;
+  if Continuation.Map.mem cont t.extra
+  then
+    Misc.fatal_errorf
+      "Cannot forget continuation %a: it has extra params and args"
+      Continuation.print cont;
+  { t with map = Continuation.Map.remove cont t.map }
+
 let update_top_of_stack ~(t : t) ~f =
   match t.stack with
   | [] -> Misc.fatal_errorf "Empty stack of variable uses"

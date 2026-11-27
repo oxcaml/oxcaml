@@ -82,6 +82,9 @@ let rec rebuild_expr (expr : Simplified_expr.t) uacc ~after_rebuild =
         ~rebuild_body:rebuild_lets_and_let_conts ~rebuild_expr
         (let_cont, simplified_lets_and_let_conts)
         uacc ~after_rebuild
+    | Lifted_let_cont ({ denv = _; handlers }, _) ->
+      Misc.fatal_errorf "Cannot rebuild a let cont which was lifted:@ %a"
+        Original_handlers.print handlers
   in
   rebuild_lets_and_let_conts simplified_lets_and_let_conts uacc ~after_rebuild
 
