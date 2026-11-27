@@ -80,19 +80,10 @@ module Component = struct
     | Safe, Bot -> false
 end
 
-module Tag = struct
-  type t =
-    | NormalReturn
-    | Exception
-    | Diverge
-
-  let compare : t -> t -> int = Stdlib.compare
-
-  let print = function
-    | NormalReturn -> "nor"
-    | Exception -> "exn"
-    | Diverge -> "div"
-end
+type tag =
+  | NormalReturn
+  | Exception
+  | Diverge
 
 module Components = struct
   type 'component t =
@@ -101,24 +92,25 @@ module Components = struct
       div : 'component
     }
 
-  let create f =
-    { nor = f Tag.NormalReturn; exn = f Tag.Exception; div = f Tag.Diverge }
+  let get = function
+    | NormalReturn -> fun { nor; _ } -> nor
+    | Exception -> fun { exn; _ } -> exn
+    | Diverge -> fun { div; _ } -> div
+
+  let create f = { nor = f NormalReturn; exn = f Exception; div = f Diverge }
 
   let iter ~f { nor; exn; div } =
-    f Tag.NormalReturn nor;
-    f Tag.Exception exn;
-    f Tag.Diverge div
+    f NormalReturn nor;
+    f Exception exn;
+    f Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.NormalReturn nor;
-      exn = f Tag.Exception exn;
-      div = f Tag.Diverge div
-    }
+    { nor = f NormalReturn nor; exn = f Exception exn; div = f Diverge div }
 
   let map2 ~f lhs rhs =
-    { nor = f Tag.NormalReturn lhs.nor rhs.nor;
-      exn = f Tag.Exception lhs.exn rhs.exn;
-      div = f Tag.Diverge lhs.div rhs.div
+    { nor = f NormalReturn lhs.nor rhs.nor;
+      exn = f Exception lhs.exn rhs.exn;
+      div = f Diverge lhs.div rhs.div
     }
 
   let lessequal f lhs rhs =
@@ -132,6 +124,174 @@ module Components = struct
     else
       let c = f e1 e2 in
       if c <> 0 then c else f d1 d2
+
+  let of_nonempty_set t = t
+
+  let to_nonempty_set t = if t.nor || t.exn || t.div then Some t else None
+
+  let print print_component ppf { nor; exn; div } =
+    Format.fprintf ppf "@[<hv 2>{ nor = %a;@ exn = %a;@ div = %a }@]"
+      print_component nor print_component exn print_component div
+end
+
+module Tag = struct
+  type t = tag =
+    | NormalReturn
+    | Exception
+    | Diverge
+
+  let all = [NormalReturn; Exception; Diverge]
+
+  let compare : t -> t -> int = Stdlib.compare
+
+  let print ppf = function
+    | NormalReturn -> Format.fprintf ppf "nor"
+    | Exception -> Format.fprintf ppf "exn"
+    | Diverge -> Format.fprintf ppf "div"
+
+  module Nonempty_set = struct
+    type t = bool Components.t
+
+    let compare = Components.compare Bool.compare
+
+    let mem = Components.get
+
+    let subset = Components.lessequal (fun r1 r2 -> (not r1) || r2)
+
+    let union (lhs : t) (rhs : t) : t =
+      { nor = lhs.nor || rhs.nor;
+        exn = lhs.exn || rhs.exn;
+        div = lhs.div || rhs.div
+      }
+
+    let intersection (lhs : t) (rhs : t) : t option =
+      let unchecked : t =
+        { nor = lhs.nor && rhs.nor;
+          exn = lhs.exn && rhs.exn;
+          div = lhs.div && rhs.div
+        }
+      in
+      if unchecked.nor || unchecked.exn || unchecked.div
+      then Some unchecked
+      else None
+
+    let singleton = Fun.compose Components.create ( = )
+  end
+end
+
+module Relevant_components_by_argument_index = struct
+  type t = Tag.Nonempty_set.t Numbers.Int.Map.t
+
+  let compare = Numbers.Int.Map.compare Tag.Nonempty_set.compare
+
+  let join =
+    Numbers.Int.Map.union (fun _ c1 c2 -> Some (Tag.Nonempty_set.union c1 c2))
+
+  let meet t1 t2 =
+    Numbers.Int.Map.merge
+      (fun _argument_index c1 c2 ->
+        match c1, c2 with
+        | Some c1, Some c2 -> Tag.Nonempty_set.intersection c1 c2
+        | None, _ | _, None -> None)
+      t1 t2
+
+  let lessequal t1 t2 =
+    Numbers.Int.Map.for_all
+      (fun argument_index c1 ->
+        match Numbers.Int.Map.find_opt argument_index t2 with
+        | None -> false
+        | Some c2 -> Tag.Nonempty_set.subset c1 c2)
+      t1
+
+  let print_argument ppf (argument_index, (relevant : Tag.Nonempty_set.t)) =
+    let paths =
+      List.filter_map
+        (fun (is_relevant, path) -> if is_relevant then Some path else None)
+        [ relevant.nor, "normal";
+          relevant.exn, "exceptional";
+          relevant.div, "diverging" ]
+    in
+    Format.fprintf ppf "argument #%d on %a paths" (argument_index + 1)
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "/")
+         Format.pp_print_string)
+      paths
+
+  let print ppf t =
+    Format.fprintf ppf "{@[<hov>%a@]}"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+         print_argument)
+      (Numbers.Int.Map.bindings t)
+end
+
+module Allocation_source = struct
+  type 'args t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of 'args
+
+  let map ~f = function
+    | Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments args ->
+      No_allocation_other_than_calling_arguments (f args)
+
+  let compare ~compare_args t1 t2 =
+    match t1, t2 with
+    | ( Allocation_other_than_calling_arguments,
+        Allocation_other_than_calling_arguments ) ->
+      0
+    | ( No_allocation_other_than_calling_arguments _,
+        Allocation_other_than_calling_arguments ) ->
+      -1
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments _ ) ->
+      1
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      compare_args a1 a2
+
+  let lessequal ~lessequal_args t1 t2 =
+    match t1, t2 with
+    | _, Allocation_other_than_calling_arguments -> true
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      lessequal_args a1 a2
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments _ ) ->
+      false
+
+  let join ~join_args t1 t2 =
+    match t1, t2 with
+    | Allocation_other_than_calling_arguments, _
+    | _, Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments (join_args a1 a2)
+
+  let meet ~meet_args t1 t2 =
+    match t1, t2 with
+    | Allocation_other_than_calling_arguments, t
+    | t, Allocation_other_than_calling_arguments ->
+      t
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments (meet_args a1 a2)
+
+  let is_allocation_other_than_calling_arguments = function
+    | Allocation_other_than_calling_arguments -> true
+    | No_allocation_other_than_calling_arguments _ -> false
+
+  let top = Allocation_other_than_calling_arguments
+
+  let print print_args ppf = function
+    | Allocation_other_than_calling_arguments ->
+      Format.fprintf ppf "Allocation_other_than_calling_arguments"
+    | No_allocation_other_than_calling_arguments args ->
+      Format.fprintf ppf
+        "@[<hv 1>No_allocation_other_than_calling_arguments@ %a@]" print_args
+        args
 end
 
 module type WS = sig
@@ -150,12 +310,22 @@ module type WS = sig
   val compare : t -> t -> int
 end
 
+module type Allocation_source = sig
+  type t
+
+  val top : t
+
+  val argument : argument_index:int -> tag:Tag.t -> t
+end
+
 module type Component = sig
   type t
 
+  type allocation_source
+
   type witnesses
 
-  val top : witnesses -> t
+  val top : allocation_source:allocation_source -> witnesses:witnesses -> t
 
   val safe : t
 
@@ -178,7 +348,7 @@ module Make_component (Witnesses : WS) = struct
 
   let bot = Component.Bot
 
-  let top w = Component.Top w
+  let top ~allocation_source:() ~witnesses = Component.Top witnesses
 
   let safe = Component.Safe
 
@@ -199,8 +369,12 @@ module Make_component (Witnesses : WS) = struct
 end
 
 module Make_value
+    (Allocation_source : Allocation_source)
     (Witnesses : WS)
-    (V : Component with type witnesses := Witnesses.t) =
+    (V :
+      Component
+        with type allocation_source := Allocation_source.t
+         and type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
   type t = V.t Components.t
@@ -221,12 +395,17 @@ struct
 
   let safe = Components.create (fun _ignore_tag -> V.safe)
 
-  let top w = Components.create (fun _ignore_tag -> V.top w)
+  let top ~allocation_source ~witnesses =
+    Components.create (fun _ignore_tag -> V.top ~allocation_source ~witnesses)
 
-  let relaxed w : t = { nor = V.safe; exn = V.top w; div = V.top w }
+  let relaxed ~witnesses : t =
+    { nor = V.safe;
+      exn = V.top ~allocation_source:Allocation_source.top ~witnesses;
+      div = V.top ~allocation_source:Allocation_source.top ~witnesses
+    }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
-    let res = if strict then safe else relaxed Witnesses.empty in
+    let res = if strict then safe else relaxed ~witnesses:Witnesses.empty in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
@@ -235,6 +414,14 @@ struct
     Format.fprintf ppf "{ nor=%a;@ exn=%a;@ div=%a }@," pp nor pp exn pp div
 
   let compare = Components.compare V.compare
+end
+
+module No_allocation_source : Allocation_source with type t = unit = struct
+  type t = unit
+
+  let top = ()
+
+  let argument ~argument_index:_ ~tag:_ = ()
 end
 
 module Assume_info = struct
@@ -255,7 +442,7 @@ module Assume_info = struct
   end
 
   module V = Make_component (Witnesses)
-  module Value = Make_value (Witnesses) (V)
+  module Value = Make_value (No_allocation_source) (Witnesses) (V)
 
   type t =
     | No_assume
