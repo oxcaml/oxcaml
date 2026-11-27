@@ -454,7 +454,7 @@ let run
             |> sourcemap_of_info ~base:source_map_base)
       else
         output_gen
-          ~write_shape:false
+          ~write_shape:true
           ~standalone:false
           ~custom_header
           ~build_info:(Build_info.create `Jsir)
