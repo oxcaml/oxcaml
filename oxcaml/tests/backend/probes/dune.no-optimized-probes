@@ -31,6 +31,30 @@
  (deps t2.exe)
  (action (with-outputs-to %{target} (run %{deps}))))
 
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target unboxed_args.exe)
+ (deps unboxed_args.ml)
+ (action (run %{bin:ocamlopt.opt} -no-probes-optimized -O3 -flambda2-reaper %{deps} -o unboxed_args.exe)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target unboxed_args.output)
+ (deps unboxed_args.exe)
+ (action (with-outputs-to %{target} (run %{deps}))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps unboxed_args.expected unboxed_args.output)
+ (action (diff unboxed_args.expected unboxed_args.output)))
+
 
 (rule
  (enabled_if
@@ -72,6 +96,40 @@
        (= %{system} "linux")))
  (deps test_ocamldep.expected test_ocamldep.output)
  (action (diff test_ocamldep.expected test_ocamldep.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (targets vec128.exe vec128_reaper.exe)
+ (deps vec128.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -o vec128.exe)
+   (run %{bin:ocamlopt.opt} -no-probes-optimized -O3 -flambda2-reaper %{deps} -o vec128_reaper.exe))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (target vec128.output)
+ (deps vec128.exe vec128_reaper.exe)
+ (action
+  (with-outputs-to %{target}
+   (progn
+    (run ./vec128.exe)
+    (run ./vec128_reaper.exe)))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (deps vec128.expected vec128.output)
+ (action (diff vec128.expected vec128.output)))
 
 (rule
  (enabled_if
@@ -121,3 +179,36 @@
        (= %{system} "linux")))
  (deps f2.expected f2.output)
  (action (diff f2.expected f2.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (targets stack_check.exe stack_check_reaper.exe stack_check_linear.exe)
+ (deps stack_check.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -o stack_check.exe)
+   (run %{bin:ocamlopt.opt} -no-probes-optimized -O3 -flambda2-reaper %{deps} -o stack_check_reaper.exe)
+   (run %{bin:ocamlopt.opt} -no-probes-optimized -no-cfg-stack-checks %{deps} -o stack_check_linear.exe))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target stack_check.output)
+ (deps stack_check.exe stack_check_reaper.exe stack_check_linear.exe)
+ (action (with-outputs-to %{target}
+         (progn (run ./stack_check.exe narrow) (run ./stack_check.exe wide)
+                (run ./stack_check_reaper.exe narrow)
+                (run ./stack_check_reaper.exe wide)
+                (run ./stack_check_linear.exe narrow)
+                (run ./stack_check_linear.exe wide)))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps stack_check.expected stack_check.output)
+ (action (diff stack_check.expected stack_check.output)))

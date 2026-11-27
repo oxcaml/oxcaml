@@ -38,8 +38,12 @@ let is_nontail_call : Cfg.terminator -> bool =
      implemented. *)
   match term_desc with
   | Call_no_return _ | External_call_no_return _ | Call _ -> true
+  | Prim { op = Probe _; _ } ->
+    (* The wrapper that the probe site calls runs on this stack. *)
+    true
   | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
-  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _ | Prim _
+  | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Prim { op = External _; _ }
   | Invalid _ ->
     false
 
