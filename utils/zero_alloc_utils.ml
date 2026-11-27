@@ -97,8 +97,7 @@ module Components = struct
     | Exception -> fun { exn; _ } -> exn
     | Diverge -> fun { div; _ } -> div
 
-  let create f =
-    { nor = f Tag.NormalReturn; exn = f Tag.Exception; div = f Tag.Diverge }
+  let create f = { nor = f NormalReturn; exn = f Exception; div = f Diverge }
 
   let iter ~f { nor; exn; div } =
     f NormalReturn nor;
@@ -106,9 +105,9 @@ module Components = struct
     f Diverge div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.NormalReturn nor;
-      exn = f Tag.Exception exn;
-      div = f Tag.Diverge div
+    { nor = f NormalReturn nor;
+      exn = f Exception exn;
+      div = f Diverge div
     }
 
   let map2 ~f lhs rhs =
