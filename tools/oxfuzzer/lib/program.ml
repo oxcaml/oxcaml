@@ -2,6 +2,7 @@
 open Asttypes
 open Parsetree_helpers
 module Binding = Ir.Binding
+module Eff = Ir.Eff
 module Exn = Ir.Exn
 module Expr = Ir.Expr
 module Function = Ir.Function
@@ -15,17 +16,19 @@ type t =
   { swarm : Config.Swarm.t;
     record_types : Ty.record list;
     exceptions : Exn.t list;
+    effects : Eff.t list;
     variant_types : Ty.variant list;
     functions : Function.t list;
     toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~swarm ~record_types ~exceptions ~variant_types ~functions
+let create ~swarm ~record_types ~exceptions ~effects ~variant_types ~functions
     ~toplevel_decls ~toplevel_statement =
   { swarm;
     record_types;
     exceptions;
+    effects;
     variant_types;
     functions;
     toplevel_decls;
@@ -344,6 +347,7 @@ let rec print_value path ty expr =
     apply
       (qualified_ident "Printf" "printf")
       [Ast_helper.Exp.constant (Ast_helper.Const.string "%S "); expr]
+  | Ty.Arrow _ -> unit_
 
 and print_sum path sum expr =
   let cases =
@@ -461,6 +465,7 @@ let to_code
     { swarm;
       record_types;
       exceptions;
+      effects;
       variant_types;
       functions;
       toplevel_decls = decls;
@@ -512,6 +517,20 @@ let to_code
     opens
     @ record_declarations record_types
     @ List.filter_map Exn.to_code exceptions
+    (* [Effect.perform] is unsafe on Js_of_ocaml, and any use of it gives a
+       warning since the compiler doesn't know in advance whether we're
+       compiling to JS. We don't fuzz JSOO, so we suppress that warning here. *)
+    (* CR yusumez for selee: revisit this when we add JS/WASM support *)
+    @ (if List.is_empty effects
+       then []
+       else
+         Ast_helper.Str.attribute
+           (Ast_helper.Attr.mk (loc "alert")
+              (PStr
+                 [ Ast_helper.Str.eval
+                     (Ast_helper.Exp.constant
+                        (Ast_helper.Const.string "-unsafe_effects")) ]))
+         :: List.concat_map Eff.to_code effects)
     @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions

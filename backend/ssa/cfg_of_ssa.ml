@@ -48,9 +48,10 @@ open! Int_replace_polymorphic_compare
 
     Comparisons feeding [Branch]: [collect_fused_comparisons] records, per
     comparison [Op], how many [Branch] terminators will fuse it directly into
-    the CFG test. An Op is emitted into the body only if it has more uses than
-    fused-branch consumers — otherwise [fuse_comparison] splices it directly
-    into the terminator and we drop the body Op. *)
+    the CFG test (only when that is safe, see [can_keep_args_live]). An Op is
+    emitted into the body only if it has more uses than fused-branch consumers —
+    otherwise [fuse_comparison] splices it directly into the terminator and we
+    drop the body Op. *)
 
 module DLL = Doubly_linked_list
 open Ssa.Export
@@ -73,10 +74,12 @@ type env =
     block_labels : Label.t Block.Tbl.t;
     call_result_locs : Reg.t array Block.Tbl.t;
     call_stack_ofs : int Block.Tbl.t;
-    fused_comparison_ops : (finished, int) Instruction.Id.Tbl.t
+    fused_comparison_ops : (finished, int) Instruction.Id.Tbl.t;
         (* Comparison ops that will be fused into the block terminator and
            should therefore not be emitted into the block body. The map counts
            how often a comparison has been fused. *)
+    fused_branches : unit Block.Tbl.t
+        (* The blocks whose branch is fused with its comparison. *)
   }
 
 let create_env ssa_graph =
@@ -86,7 +89,8 @@ let create_env ssa_graph =
     block_labels = Block.Tbl.create 64;
     call_result_locs = Block.Tbl.create 16;
     call_stack_ofs = Block.Tbl.create 16;
-    fused_comparison_ops = Instruction.Id.Tbl.create 16
+    fused_comparison_ops = Instruction.Id.Tbl.create 16;
+    fused_branches = Block.Tbl.create 16
   }
 
 let label_of env (blk : block) =
@@ -155,9 +159,9 @@ let emit_parallel_moves body ~src ~dst =
     emit_moves body ~src:tmp_regs ~dst)
   else emit_moves body ~src ~dst
 
-(** A Branch condition that can be folded into the CFG test terminator,
-    consuming the comparison's args directly. *)
-let fuse_comparison (cond : value) ~true_label ~false_label :
+(** The CFG test terminator equivalent to a Branch condition that is a
+    comparison, consuming the comparison's args directly. *)
+let comparison_test (cond : value) ~true_label ~false_label :
     (Cfg.terminator * value array) option =
   match[@warning "-fragile-match"] cond with
   | Res ({ op = Intop_imm (Icomp Cne, 0); args; _ }, 0) ->
@@ -183,6 +187,111 @@ let fuse_comparison (cond : value) ~true_label ~false_label :
     Some (Cfg.Parity_test { ifso = false_label; ifnot = true_label }, args)
   | _ -> None
 
+(* Fusing a comparison into a branch keeps the comparison's args live until the
+   branch. Values may be local, and must not be GC roots once their region has
+   ended. Derived pointers must not be live across a GC. *)
+type blockers =
+  { end_region : bool;
+    gc : bool
+  }
+
+let blockers_of_args (args : value array) =
+  Array.fold_left
+    (fun blockers (arg : value) : blockers ->
+      match Value.typ arg with
+      | Val | Valx2 -> { blockers with end_region = true }
+      | Addr -> { blockers with gc = true }
+      | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Float
+      | Float32 | Vec128 | Vec256 | Vec512 | Mask ->
+        blockers)
+    { end_region = false; gc = false }
+    args
+
+let is_blocker blockers (instr : instruction) =
+  match instr with
+  | Op { op = End_region; _ } -> blockers.end_region
+  | Op { op = Alloc _ | Poll; _ } -> blockers.gc
+  | Op
+      { op =
+          ( Move | Spill | Reload | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | Specific _ | Name_for_debugger _ | Dls_get
+          | Tls_get | Domain_index | Thread_self_id | Pause
+          | Trace_pc_guard_gate | Trace_pc_guard _ );
+        _
+      }
+  | Push_trap _ | Pop_trap _ ->
+    false
+
+let has_call_terminator (block : block) =
+  match Block.terminator block with
+  | Call _ -> true
+  | Continue _ | Switch _ | Invalid _ -> false
+
+let body_after (block : block) (op : finished Instruction.op_data) =
+  let body = Block.body block in
+  let is_op (instr : instruction) =
+    match instr with
+    | Op other -> Instruction.Id.equal other.id op.id
+    | Push_trap _ | Pop_trap _ -> false
+  in
+  match Array.find_index is_op body with
+  | None -> Misc.fatal_error "Cfg_of_ssa.body_after: op not in block"
+  | Some index ->
+    let after = index + 1 in
+    Array.sub body after (Array.length body - after)
+
+type visit =
+  | Visiting
+  | Visited
+
+(* Whether the args can stay live from the end of [def_block] to the terminator
+   of [branch_block], which [def_block] strictly dominates. The blocks in
+   between are those reached backwards from [branch_block] before
+   [def_block]. *)
+let path_keeps_args_live blockers ~def_block ~branch_block =
+  let visits = Block.Tbl.create 16 in
+  (* Calls are GC points *)
+  let check_call block = not (blockers.gc && has_call_terminator block) in
+  let rec keeps_args_live block =
+    Block.equal block def_block
+    ||
+    match Block.Tbl.find_opt visits block with
+    | Some Visiting ->
+      (* Cycles may get a poll from [Cfg_polling] so count as GC points *)
+      not blockers.gc
+    | Some Visited -> true
+    | None ->
+      Block.Tbl.replace visits block Visiting;
+      let result =
+        (not (Array.exists (is_blocker blockers) (Block.body block)))
+        && (Block.equal block branch_block || check_call block)
+        && List.for_all keeps_args_live (Block.predecessors block)
+      in
+      Block.Tbl.replace visits block Visited;
+      result
+  in
+  check_call def_block && keeps_args_live branch_block
+
+let can_keep_args_live args ~def_block ~(cond_op : finished Instruction.op_data)
+    ~branch_block =
+  let blockers = blockers_of_args args in
+  (not (blockers.end_region || blockers.gc))
+  || (not (Array.exists (is_blocker blockers) (body_after def_block cond_op)))
+     && (Block.equal def_block branch_block
+        || path_keeps_args_live blockers ~def_block ~branch_block)
+
+(** A Branch condition of [block] that can be folded into its CFG test
+    terminator. *)
+let fuse_comparison env (block : block) (cond : value) ~true_label ~false_label
+    : (Cfg.terminator * value array) option =
+  if Block.Tbl.mem env.fused_branches block
+  then comparison_test cond ~true_label ~false_label
+  else None
+
 let truncate arr n = if Array.length arr > n then Array.sub arr 0 n else arr
 
 let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
@@ -198,23 +307,24 @@ let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
     DLL.add_end body main;
     main
 
-(** For a call op, return the args to actually pass on the stack/regs (which
-    skips the function-pointer arg for [Indirect]), the matching hard-reg
-    locations, and the stack offset. *)
-let call_arg_locations (call_op : Cfg_intf.S.func_call_operation) virt_args =
-  let rarg =
-    match call_op with
-    | Indirect _ -> Array.sub virt_args 1 (Array.length virt_args - 1)
-    | Direct _ -> virt_args
+(** Move [virt_args] into the OCaml calling-convention locations for [call_op],
+    extending the stack as needed for both the arguments and the results of type
+    [result_type]. Returns the terminator's arguments, the result locations, and
+    the stack offset. *)
+let move_to_call_arg_locs body call_op virt_args result_type =
+  let rarg, loc_arg, stack_ofs_args =
+    Select_utils.call_arg_locations call_op virt_args
   in
-  let loc_arg, stack_ofs = Proc.loc_arguments (Reg.typv rarg) in
-  rarg, loc_arg, stack_ofs
-
-let call_arg_for_terminator (call_op : Cfg_intf.S.func_call_operation) virt_args
-    loc_arg =
-  match call_op with
-  | Indirect _ -> Array.append [| virt_args.(0) |] loc_arg
-  | Direct _ -> loc_arg
+  let loc_res, stack_ofs_res = Proc.loc_results_call result_type in
+  let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
+  if stack_ofs <> 0
+  then
+    DLL.add_end body
+      (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||] Debuginfo.none);
+  emit_moves body ~src:rarg ~dst:loc_arg;
+  ( Select_utils.call_arg_for_terminator call_op virt_args loc_arg,
+    loc_res,
+    stack_ofs )
 
 (** Move [virt_args] into the locations dictated by
     [Proc.loc_external_arguments ty_args], extending the stack as needed and
@@ -445,7 +555,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       then
         let false_label = label_of env targets.(0) in
         let true_label = label_of env targets.(1) in
-        match fuse_comparison index ~true_label ~false_label with
+        match fuse_comparison env block index ~true_label ~false_label with
         | Some (term, args) ->
           make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
@@ -468,55 +578,54 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
             "Cfg_of_ssa: external functions cannot be tail called"
       in
       let virt_args = Array.map (get_reg env) args in
-      let rarg, loc_arg, stack_ofs = call_arg_locations call_op virt_args in
+      let rarg, loc_arg, stack_ofs =
+        Select_utils.call_arg_locations call_op virt_args
+      in
       (* [Ssa_tail_call] only creates tail calls whose arguments fit in
          registers ([stack_offsets_zero]); a tail call with stack arguments
          would write below the stack pointer. *)
       assert (stack_ofs = 0);
       emit_moves body ~src:rarg ~dst:loc_arg;
       make_instr (Cfg.Tailcall_func call_op)
-        (call_arg_for_terminator call_op virt_args loc_arg)
+        (Select_utils.call_arg_for_terminator call_op virt_args loc_arg)
         [||] dbg
     | Call { continuation = Raise _; _ } ->
       Misc.fatal_error "Cfg_of_ssa: a call continuation cannot be Raise"
     | Call { op; args; continuation = Unreachable; _ } -> (
       let virt_args = Array.map (get_reg env) args in
+      let ocaml_call (call_op : Cfg_intf.S.func_call_operation) =
+        let loc_arg, loc_res, _stack_ofs =
+          move_to_call_arg_locs body call_op virt_args Cmm.typ_void
+        in
+        make_instr (Cfg.Call_no_return call_op) loc_arg loc_res dbg
+      in
       match op with
+      | Direct sym -> ocaml_call (Direct sym)
+      | Indirect candidates -> ocaml_call (Indirect candidates)
       | External ({ ty_args; ty_res; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
         in
         make_instr
-          (Cfg.Call_no_return { ext with stack_ofs; stack_align })
+          (Cfg.External_call_no_return { ext with stack_ofs; stack_align })
           loc_arg
           (Proc.loc_external_results ty_res)
           dbg
-      | Direct _ | Indirect _ | Probe _ ->
+      | Probe _ ->
         Misc.fatal_error
-          "Cfg_of_ssa: only an external call can have continuation Unreachable")
+          "Cfg_of_ssa: a probe cannot have continuation Unreachable")
     | Call { op; args; continuation = Goto continuation; _ } -> (
       let virt_args = Array.map (get_reg env) args in
       let virt_res = get_block_params_regs env continuation in
       let ocaml_call (call_op : Cfg_intf.S.func_call_operation) =
-        let rarg, loc_arg, stack_ofs_args =
-          call_arg_locations call_op virt_args
+        let loc_arg, loc_res, stack_ofs =
+          move_to_call_arg_locs body call_op virt_args (Reg.typv virt_res)
         in
-        let loc_res, stack_ofs_res =
-          Proc.loc_results_call (Reg.typv virt_res)
-        in
-        let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
-        if stack_ofs <> 0
-        then
-          DLL.add_end body
-            (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
-               Debuginfo.none);
-        emit_moves body ~src:rarg ~dst:loc_arg;
         Block.Tbl.replace env.call_result_locs continuation loc_res;
         Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
         make_instr
           (Cfg.Call { op = call_op; label_after = label_of env continuation })
-          (call_arg_for_terminator call_op virt_args loc_arg)
-          loc_res dbg
+          loc_arg loc_res dbg
       in
       match op with
       | Direct sym -> ocaml_call (Direct sym)
@@ -586,22 +695,40 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     terminator consumes the comparison's args directly, so the comparison itself
     is no longer needed (provided no other consumer references it). *)
 let collect_fused_comparisons env =
+  let op_blocks = Instruction.Id.Tbl.create 256 in
+  List.iter
+    (fun (block : block) ->
+      Array.iter
+        (fun (instr : instruction) ->
+          match instr with
+          | Op op -> Instruction.Id.Tbl.replace op_blocks op.id block
+          | Push_trap _ | Pop_trap _ -> ())
+        (Block.body block))
+    (Ssa.blocks env.ssa_graph);
+  let can_fuse (block : block) (index : value) =
+    match
+      ( index,
+        comparison_test index ~true_label:Label.none ~false_label:Label.none )
+    with
+    | Res (cond_op, _), Some (_, args) ->
+      can_keep_args_live args
+        ~def_block:(Instruction.Id.Tbl.find op_blocks cond_op.id)
+        ~cond_op ~branch_block:block
+    | (Res _ | Block_param _), _ -> false
+  in
   List.iter
     (fun (block : block) ->
       match Block.terminator block with
-      | Switch { index; targets } when Array.length targets = 2 -> (
-        if
-          Option.is_some
-            (fuse_comparison index ~true_label:Label.none
-               ~false_label:Label.none)
-        then
-          match index with
-          | Res ({ id; _ }, _) ->
-            Instruction.Id.Tbl.replace env.fused_comparison_ops id
-              (1
-              + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
-                |> Option.value ~default:0))
-          | Block_param _ -> assert false)
+      | Switch { index; targets }
+        when Array.length targets = 2 && can_fuse block index -> (
+        Block.Tbl.replace env.fused_branches block ();
+        match index with
+        | Res ({ id; _ }, _) ->
+          Instruction.Id.Tbl.replace env.fused_comparison_ops id
+            (1
+            + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
+              |> Option.value ~default:0))
+        | Block_param _ -> assert false)
       | Switch _ | Continue _ | Call _ | Invalid _ -> ())
     (Ssa.blocks env.ssa_graph)
 

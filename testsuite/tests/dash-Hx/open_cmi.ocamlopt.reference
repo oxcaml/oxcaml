@@ -1,0 +1,6 @@
+File "open_cmi.ml", line 3, characters 8-10:
+3 | let _ = id 42
+            ^^
+Error: The value id is dynamic
+       but is expected to be static
+         because it is layout-polymorphic and being instantiated here.

@@ -574,6 +574,16 @@ CAMLprim value caml_sys_time(value unit)
   return caml_copy_double(caml_sys_time_unboxed(unit));
 }
 
+double caml_sys_gettimeofday_unboxed(value unit)
+{
+  return caml_gettimeofday();
+}
+
+CAMLprim value caml_sys_gettimeofday(value unit)
+{
+  return caml_copy_double(caml_sys_gettimeofday_unboxed(unit));
+}
+
 #ifdef _WIN32
 extern int caml_win32_random_seed(intnat data[16]);
 #else

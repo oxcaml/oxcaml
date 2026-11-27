@@ -453,8 +453,8 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
     | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
+    | Open_cmi { path; cmx_guaranteed } ->
+        let _, env = Env.open_pers_signature_cmi ~cmx_guaranteed path env in
         env
   in
   let add_units env units =
@@ -3694,7 +3694,6 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if alias && aliasable then
       (Env.add_required_global path env; md)
     else begin
-      Env.check_module_path_representable ~loc:lid.loc path env;
       let mty = Mtype.find_type_of_module
           ~strengthen ~aliasable env path
       in

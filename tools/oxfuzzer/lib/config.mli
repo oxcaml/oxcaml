@@ -4,6 +4,10 @@ val fun_min_param_count : int
 
 val fun_max_param_count : int
 
+val wide_fun_min_param_count : int
+
+val wide_fun_max_param_count : int
+
 val max_block_depth : int
 
 val max_loop_stride : int
@@ -41,6 +45,30 @@ val max_match_count : int
 val max_unboxed_tuple_arity : int
 
 val max_unboxed_tuple_depth : int
+
+val max_closure_param_count : int
+
+val max_closure_call_count : int
+
+val max_let_rec_count : int
+
+val max_recursive_functions : int
+
+val max_recursive_param_count : int
+
+val max_recursive_calls : int
+
+val max_recursion_fuel : int
+
+val unused_recursive_functions : bool
+
+val max_effect_count : int
+
+val max_handle_count : int
+
+val max_conditional_expression_count : int
+
+val max_stack_function_count : int
 
 val max_probability : int
 
@@ -89,6 +117,22 @@ val raise_notrace_probability : int
 
 val callee_raises_probability : int
 
+val closure_probability : int
+
+val curried_lambda_probability : int
+
+val opaque_recursive_call_probability : int
+
+val wide_function_probability : int
+
+val tail_call_probability : int
+
+val existing_value_for_wide_argument_probability : int
+
+val reraise_probability : int
+
+val conditional_expression_probability : int
+
 type assertion_mode =
   | Disabled
   | Unreachable_only
@@ -121,7 +165,14 @@ module Swarm : sig
       opaque_initializers : bool;
       opaque_leaves : bool;
       opaque_loop_bounds : bool;
-      exceptions : bool
+      exceptions : bool;
+      closures : bool;
+      partial_applications : bool;
+      recursive_functions : bool;
+      wide_functions : bool;
+      reraises : bool;
+      effects : bool;
+      stack_functions : bool
     }
 
   val create : Random.State.t -> t

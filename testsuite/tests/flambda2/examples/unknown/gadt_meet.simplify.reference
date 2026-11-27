@@ -53,7 +53,7 @@ let code loopify(never) size(44) newer_version_of(test_3)
            (Pfield, 1)
            -> k2 * k1
          where k2 (apply_result : [ 0 of imm tagged ]) =
-           (apply ccall
+           (apply ccall &my_alloc_region
               ($`*extern*`.caml_equal : val * val -> val)
                 (apply_result, $camlGadt_meet__const_block_2)
                 -> k2 * k1

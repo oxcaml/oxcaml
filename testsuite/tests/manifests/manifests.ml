@@ -22,16 +22,20 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(hidden
   Load_path.init ~auto_include:Load_path.no_auto_include ~visible:[] ~hidden:[];
   List.iter (fun basename ->
     let path_with_visibility = try
-      let path, visibility = disable_interactive (fun () -> Load_path.find_normalized_with_visibility basename) in
+      let path, include_flags = disable_interactive (fun () -> Load_path.find_normalized_with_include_flags basename) in
       let path = if String.starts_with ~prefix:cwd path then (
         "$PWD" ^
           (String.sub path (String.length cwd) (String.length path - String.length cwd)))
       else path in
-      let visibility = match visibility with
-        | Load_path.Visible { cmx_guaranteed = true } ->
+      let visibility = match include_flags with
+        | { Load_path.visibility = Visible; cmx_guaranteed = true } ->
           "visible, cmx_guaranteed"
-        | Load_path.Visible { cmx_guaranteed = false } -> "visible"
-        | Hidden -> "hidden"
+        | { visibility = Visible; cmx_guaranteed = false } ->
+          "visible"
+        | { visibility = Hidden; cmx_guaranteed = true } ->
+          "hidden, cmx_guaranteed"
+        | { visibility = Hidden; cmx_guaranteed = false } ->
+          "hidden"
       in
       Format.sprintf "%s (%s)" path visibility
     with Not_found -> "Not_found"
@@ -101,7 +105,7 @@ bar.cmi -> $PWD/manifests/01/bar (visible)
 baz.cmi -> $PWD/manifests/04-baz (hidden)
 |}]
 
-(* Test file_x entries in manifests: qux.cmi is cmx_guaranteed,
+(* Test 'x' entries in manifests: qux.cmi is cmx_guaranteed,
    quux.cmi is not *)
 let () =
   run_test ~include_manifests:[
@@ -113,16 +117,49 @@ qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (visible)
 |}]
 
-(* You can write `file_x` in a hidden includes manifest, but it's just the same
-   as writing `file`. *)
+(* You can also write 'x' entries in hidden includes manifests. *)
 let () =
   run_test ~hidden_include_manifests:[
     "04/04-manifest.txt";
-  ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
+  ] ~files_to_check:["qux.cmi"; "qux.cmx"; "quux.cmi"] ()
 
 [%%expect{|
-qux.cmi -> $PWD/manifests/04/qux (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
+qux.cmx -> $PWD/manifests/04/qux_cmx (hidden)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* Only .cmi files may be marked cmx_guaranteed. *)
+let () =
+  run_test ~include_manifests:[
+    "05/05-manifest.txt";
+  ] ~files_to_check:[] ()
+
+[%%expect{|
+Exception:
+Load_path.Parse_error "Only cmi files may be marked cmx_guaranteed".
+|}]
+
+let () =
+  run_test ~include_manifests:[
+    "06/06-manifest.txt";
+  ] ~files_to_check:[] ()
+
+[%%expect{|
+Exception:
+Load_path.Parse_error "Only cmi files may be marked cmx_guaranteed".
+|}]
+
+(* Backwards compatibility: long forms 'file' and 'manifest' still accepted. *)
+let () =
+  run_test ~include_manifests:[
+    "07/07-manifest.txt";
+  ] ~files_to_check:["qux.cmi"; "quux.cmi"; "bar.cmi"] ()
+
+[%%expect{|
+qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
+quux.cmi -> $PWD/manifests/04/quux (visible)
+bar.cmi -> $PWD/manifests/01/bar (visible)
 |}]
 
 (* Parsing of -H-file arguments *)
@@ -153,7 +190,7 @@ let () =
 
 [%%expect{|
 foo.cmi -> $PWD/manifests/00/foo (hidden)
-qux.cmi -> $PWD/manifests/04/qux (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
 baz.cmi -> Not_found
 |}]
 

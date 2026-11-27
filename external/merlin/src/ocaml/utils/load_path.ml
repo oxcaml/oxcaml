@@ -202,17 +202,20 @@ end = struct
 
   let parse_line ~buffer line =
     match split_and_unescape ~buffer line with
-    | [ "file"; basename; location ] ->
+    | [ ("f" | "file"); basename; location ] ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = false })
-    | [ "file_x"; basename; location ] ->
+    | [ ("f" | "file"); basename; location; "x" ]
+      when Filename.extension basename = ".cmi" ->
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { basename; location; cmx_guaranteed = true })
-    | [ "manifest"; _; location ] ->
+    | [ ("m" | "manifest"); _; location ] ->
       (* The name is included in "manifest" entry only for human
          readability, so we discard it here. *)
       let location = Path.Load_root_relative.of_string location in
       Some (Entry.Manifest location)
+    | [ ("f" | "file" | "m" | "manifest"); _; _; "x" ] ->
+      raise (Parse_error ("Only cmi files may be marked cmx_guaranteed"))
     | [] -> None
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
@@ -239,15 +242,19 @@ module For_testing = struct
     Dune_manifests_reader.Path.For_testing.root_override := path
 end
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
+type visibility = Visible | Hidden
 
-let visibility_eq a b =
-  match a, b with
-  | ( Visible { cmx_guaranteed = cmx_guaranteed_a },
-      Visible { cmx_guaranteed = cmx_guaranteed_b } ) ->
-    Bool.equal cmx_guaranteed_a cmx_guaranteed_b
-  | Hidden, Hidden -> true
-  | Visible _, Hidden | Hidden, Visible _ -> false
+type include_flags =
+  { visibility : visibility;
+    cmx_guaranteed : bool }
+
+let include_flags_eq
+    { visibility = visibility_a; cmx_guaranteed = cmx_guaranteed_a }
+    { visibility = visibility_b; cmx_guaranteed = cmx_guaranteed_b } =
+  (match visibility_a, visibility_b with
+   | Visible, Visible | Hidden, Hidden -> true
+   | Visible, Hidden | Hidden, Visible -> false)
+  && Bool.equal cmx_guaranteed_a cmx_guaranteed_b
 
 module Dir : sig
   type entry = {
@@ -260,14 +267,14 @@ module Dir : sig
   val path : t -> string
   val files : t -> entry list
   val basenames : t -> string list
-  val visibility : t -> visibility
+  val include_flags : t -> include_flags
 
-  val create : visibility -> string -> t
+  val create : include_flags -> string -> t
 
   val find : t -> string -> string option
   val find_normalized : t -> string -> string option
 
-  val check : visibility -> t -> bool
+  val check : include_flags -> t -> bool
 end = struct
   type entry = {
     basename : string;
@@ -278,13 +285,13 @@ end = struct
     path : string;
     files : entry list;
     file_id : File_id.t;
-    visibility : visibility;
+    include_flags : include_flags;
   }
 
   let path t = t.path
   let files t = t.files
   let basenames t = List.map (fun { basename; _ } -> basename) t.files
-  let visibility t = t.visibility
+  let include_flags t = t.include_flags
 
   let find t fn =
     List.find_map (fun { basename; path } ->
@@ -310,14 +317,15 @@ end = struct
      following ones. We thus use individual [file_id]s for directory
      invalidation, so that every impacted instance is eventually updated. *)
 
-  let check visibility t =
-    visibility_eq visibility t.visibility && File_id.check (File_id.get t.path) t.file_id
+  let check include_flags t =
+    include_flags_eq include_flags t.include_flags
+    && File_id.check (File_id.get t.path) t.file_id
 
-  let create visibility path =
+  let create include_flags path =
     let files = Array.to_list (Directory_content_cache.read path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; file_id = File_id.get path; visibility }
+    { path; files; file_id = File_id.get path; include_flags }
 end
 
 (** Stores cached paths to files *)
@@ -335,30 +343,33 @@ module Path_cache : sig
   (* Add path to cache. If path with same basename is already in cache, skip adding. *)
   val add : Dir.t -> unit
 
-  (* Like [prepent_add], but only adds a single file to the cache. *)
-  val prepend_add_single : hidden:bool -> cmx_guaranteed:bool ->
-    string -> string -> unit
+  (* Like [prepend_add], but only adds a single file to the cache. *)
+  val prepend_add_single : include_flags -> string -> string -> unit
 
-  val add_hidden_single : string -> string -> unit
+  (* Like [add], but only adds a single file to the cache. *)
+  val add_single : include_flags -> string -> string -> unit
 
   (* Search for a basename in cache by exact name. *)
-  val find : string -> string * visibility
+  val find : string -> string * include_flags
 
   (* Search in the uncapitalized tables. [fn_already_uncapped] should have
      already been through [Misc.normalized_unit_filename]. *)
-  val find_uncap : fn_already_uncapped:string -> string * visibility
+  val find_uncap : fn_already_uncapped:string -> string * include_flags
 end = struct
   module STbl = Misc.Stdlib.String.Tbl
 
+  type entry =
+    { path : string;
+      cmx_guaranteed : bool }
+
   (* Mappings from basenames to full filenames *)
-  type visible_registry = Clflags.visible_include STbl.t
-  type hidden_registry = string STbl.t
+  type registry = entry STbl.t
 
-  let visible_files : visible_registry ref = s_table STbl.create 42
-  let visible_files_uncap : visible_registry ref = s_table STbl.create 42
+  let visible_files : registry ref = s_table STbl.create 42
+  let visible_files_uncap : registry ref = s_table STbl.create 42
 
-  let hidden_files : hidden_registry ref = s_table STbl.create 42
-  let hidden_files_uncap : hidden_registry ref = s_table STbl.create 42
+  let hidden_files : registry ref = s_table STbl.create 42
+  let hidden_files_uncap : registry ref = s_table STbl.create 42
 
   let reset () =
     STbl.clear !hidden_files;
@@ -366,62 +377,49 @@ end = struct
     STbl.clear !visible_files;
     STbl.clear !visible_files_uncap
 
-  let prepend_add_single ~hidden ~cmx_guaranteed base fn =
+  let registries = function
+    | Visible -> visible_files, visible_files_uncap
+    | Hidden -> hidden_files, hidden_files_uncap
+
+  let prepend_add_single { visibility; cmx_guaranteed } base fn =
     Result.iter (fun ubase ->
-        if hidden then begin
-          STbl.replace !hidden_files base fn;
-          STbl.replace !hidden_files_uncap ubase fn
-        end else begin
-          STbl.replace !visible_files base
-            { Clflags.path = fn; cmx_guaranteed };
-          STbl.replace !visible_files_uncap ubase
-            { Clflags.path = fn; cmx_guaranteed }
-        end)
+        let files, files_uncap = registries visibility in
+        let entry = { path = fn; cmx_guaranteed } in
+        STbl.replace !files base entry;
+        STbl.replace !files_uncap ubase entry)
       (Misc.normalized_unit_filename base)
 
-  let add_hidden_single base fn =
+  let add_single { visibility; cmx_guaranteed } base fn =
     Result.iter (fun ubase ->
-        if not (STbl.mem !hidden_files base) then
-          STbl.replace !hidden_files base fn;
-        if not (STbl.mem !hidden_files_uncap ubase) then
-          STbl.replace !hidden_files_uncap ubase fn)
+        let files, files_uncap = registries visibility in
+        let entry = { path = fn; cmx_guaranteed } in
+        if not (STbl.mem !files base) then
+          STbl.replace !files base entry;
+        if not (STbl.mem !files_uncap ubase) then
+          STbl.replace !files_uncap ubase entry)
       (Misc.normalized_unit_filename base)
 
   let prepend_add dir =
-    let hidden, cmx_guaranteed =
-      match Dir.visibility dir with
-      | Hidden -> true, false
-      | Visible { cmx_guaranteed } -> false, cmx_guaranteed
-    in
+    let include_flags = Dir.include_flags dir in
     List.iter
       (fun ({ basename; path } : Dir.entry) ->
-        prepend_add_single ~hidden ~cmx_guaranteed basename path)
+        prepend_add_single include_flags basename path)
       (Dir.files dir)
 
   let add dir =
-    let update base fn visible_files hidden_files =
-      match Dir.visibility dir with
-      | Hidden ->
-        if not (STbl.mem !hidden_files base) then
-          STbl.replace !hidden_files base fn
-      | Visible { cmx_guaranteed } ->
-        if not (STbl.mem !visible_files base) then
-          STbl.replace !visible_files base { Clflags.path = fn; cmx_guaranteed }
-    in
+    let include_flags = Dir.include_flags dir in
     List.iter
-      (fun ({ basename = base; path = fn } : Dir.entry) ->
-         Result.iter (fun ubase ->
-             update base fn visible_files hidden_files;
-             update ubase fn visible_files_uncap hidden_files_uncap)
-           (Misc.normalized_unit_filename base))
+      (fun ({ basename; path } : Dir.entry) ->
+        add_single include_flags basename path)
       (Dir.files dir)
 
   let find_in fn visible_files hidden_files =
-    try
-      let { Clflags.path; cmx_guaranteed } = STbl.find !visible_files fn in
-      (path, Visible { cmx_guaranteed })
-    with
-    | Not_found -> (STbl.find !hidden_files fn, Hidden)
+    let find_in_registry visibility files =
+      let { path; cmx_guaranteed } = STbl.find !files fn in
+      (path, { visibility; cmx_guaranteed })
+    in
+    try find_in_registry Visible visible_files
+    with Not_found -> find_in_registry Hidden hidden_files
 
   let find fn =
     find_in fn visible_files hidden_files
@@ -468,20 +466,16 @@ let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
 
 type paths =
-  { visible : Clflags.visible_include list;
-    hidden : string list }
+  { visible : Clflags.include_dir list;
+    hidden : Clflags.include_dir list }
 
 let get_paths () =
-  let visible_dir_to_include dir : Clflags.visible_include =
-    let cmx_guaranteed =
-      match Dir.visibility dir with
-      | Hidden -> Misc.fatal_error "Load_path.get_paths"
-      | Visible { cmx_guaranteed } -> cmx_guaranteed
-    in
-    { path = Dir.path dir; cmx_guaranteed }
+  let dir_to_include dir : Clflags.include_dir =
+    { path = Dir.path dir;
+      cmx_guaranteed = (Dir.include_flags dir).cmx_guaranteed }
   in
-  { visible = List.rev_map visible_dir_to_include !visible_dirs;
-    hidden = List.rev_map Dir.path !hidden_dirs }
+  { visible = List.rev_map dir_to_include !visible_dirs;
+    hidden = List.rev_map dir_to_include !hidden_dirs }
 
 (* CR-someday: init_manifests is not currently relevant because Merlin can safely ignore
    the -I-manifest and -H-manifest flags due to current build rules. But at some point,
@@ -504,8 +498,7 @@ let init_manifests () =
       ~f:(fun ~basename ~location ~cmx_guaranteed ->
           visible_basenames := basename :: !visible_basenames;
           Path_cache.prepend_add_single
-            ~hidden:false
-            ~cmx_guaranteed
+            { visibility = Visible; cmx_guaranteed }
             basename
             (Dune_manifests_reader.Path.Cwd_relative.to_string location))
   in
@@ -542,12 +535,13 @@ let load_one_pending_manifest ~uncap fn =
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
-      ~f:(fun ~basename ~location ~cmx_guaranteed:_ ->
+      ~f:(fun ~basename ~location ~cmx_guaranteed ->
+        let include_flags = { visibility = Hidden; cmx_guaranteed } in
         let location =
           Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename
-        then found := Some (location, Hidden);
-        Path_cache.add_hidden_single basename location);
+        then found := Some (location, include_flags);
+        Path_cache.add_single include_flags basename location);
     !found
 
 let rec find_in_pending_manifests ~uncap fn =
@@ -571,8 +565,13 @@ let find_uncap_loading_manifests fn_uncap =
 
 let init ~auto_include ~visible ~hidden =
   assert (not Config.merlin || Local_store.is_bound ());
-  let get_new_dirs ~get_visibility ~get_path new_entries old_dirs =
-    let create_dir entry = Dir.create (get_visibility entry) (get_path entry) in
+  let get_new_dirs visibility new_entries old_dirs =
+    let include_flags ({ path = _; cmx_guaranteed } : Clflags.include_dir) =
+      { visibility; cmx_guaranteed }
+    in
+    let create_dir (entry : Clflags.include_dir) =
+      Dir.create (include_flags entry) entry.path
+    in
     let rec create_dirs ~acc = function
       | [] -> Some acc
       | new_entry :: new_rest -> create_dirs ~acc:(create_dir new_entry :: acc) new_rest
@@ -582,25 +581,16 @@ let init ~auto_include ~visible ~hidden =
       | [], [] -> None
       | new_entry :: new_rest, [] -> create_dirs ~acc (new_entry :: new_rest)
       | [], _ :: _ -> Some acc
-      | new_entry :: new_rest, old_dir :: old_rest ->
-        let visibility = get_visibility new_entry in
-        if String.equal (get_path new_entry) (Dir.path old_dir)
-           && Dir.check visibility old_dir
+      | (new_entry : Clflags.include_dir) :: new_rest, old_dir :: old_rest ->
+        if String.equal new_entry.path (Dir.path old_dir)
+           && Dir.check (include_flags new_entry) old_dir
         then process_entries ~acc:(old_dir :: acc) new_rest old_rest
         else create_dirs ~acc (new_entry :: new_rest)
     in
     process_entries ~acc:[] new_entries old_dirs
   in
-  let new_visible =
-    get_new_dirs visible (List.rev !visible_dirs)
-      ~get_visibility:(fun ({ path = _; cmx_guaranteed } : Clflags.visible_include) ->
-        Visible { cmx_guaranteed })
-      ~get_path:(fun ({ path; cmx_guaranteed = _ } : Clflags.visible_include) -> path)
-  in
-  let new_hidden =
-    get_new_dirs hidden (List.rev !hidden_dirs)
-      ~get_visibility:(Fun.const Hidden) ~get_path:Fun.id
-  in
+  let new_visible = get_new_dirs Visible visible (List.rev !visible_dirs) in
+  let new_hidden = get_new_dirs Hidden hidden (List.rev !hidden_dirs) in
   let update =
     match new_visible, new_hidden with
     | None, None -> None
@@ -638,22 +628,22 @@ let remove_dir dir =
 let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.add dir;
-  match Dir.visibility dir with
+  match (Dir.include_flags dir).visibility with
   | Hidden -> hidden_dirs := dir :: !hidden_dirs
-  | Visible _ -> visible_dirs := dir :: !visible_dirs
+  | Visible -> visible_dirs := dir :: !visible_dirs
 
 let append_dir = add
 
-let add_dir visibility dir = add (Dir.create visibility dir)
+let add_dir include_flags dir = add (Dir.create include_flags dir)
 
 (* Add the directory at the start of load path - so basenames are
    unconditionally added. *)
 let prepend_dir (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.prepend_add dir;
-  match Dir.visibility dir with
+  match (Dir.include_flags dir).visibility with
   | Hidden -> hidden_dirs := !hidden_dirs @ [dir]
-  | Visible _ -> visible_dirs := !visible_dirs @ [dir]
+  | Visible -> visible_dirs := !visible_dirs @ [dir]
 
 let is_basename fn = Filename.basename fn = fn
 
@@ -676,7 +666,10 @@ let is_basename fn = Filename.basename fn = fn
   let expand = Misc.expand_directory Config.standard_library in
   let otherlibs =
     let read_lib lib =
-      lazy (Dir.create (Visible { cmx_guaranteed = true }) (expand ("+" ^ lib)))
+      lazy
+        (Dir.create
+           { visibility = Visible; cmx_guaranteed = true }
+           (expand ("+" ^ lib)))
     in
     List.map (fun lib -> (lib, read_lib lib)) ["dynlink"; "str"; "unix"] in
   auto_include_libs otherlibs *)
@@ -695,11 +688,11 @@ let search_dirs dirs fn =
   List.find_map
     (fun dir ->
       Option.map
-        (fun path -> (path, Dir.visibility dir))
+        (fun path -> (path, Dir.include_flags dir))
         (Dir.find_normalized dir fn))
     dirs
 
-let find_normalized_with_visibility fn =
+let find_normalized_with_include_flags fn =
   assert (not Config.merlin || Local_store.is_bound ());
   match Misc.normalized_unit_filename fn with
   | Error _ -> raise Not_found
@@ -716,9 +709,9 @@ let find_normalized_with_visibility fn =
         | None -> raise Not_found
   with Not_found ->
     (!auto_include_callback Dir.find_normalized fn_uncap,
-     Visible { cmx_guaranteed = false })
+     { visibility = Visible; cmx_guaranteed = false })
 
-let find_normalized fn = fst (find_normalized_with_visibility fn)
+let find_normalized fn = fst (find_normalized_with_include_flags fn)
 
 (* Merlin: expose standard reset function *)
 let reset () = reset ()

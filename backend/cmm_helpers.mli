@@ -415,9 +415,6 @@ module Extended_machtype : sig
 
   val typ_mask : t
 
-  (** Conversion from a normal Cmm machtype. *)
-  val of_machtype : machtype -> t
-
   (** Conversion from a Lambda layout. *)
   val of_layout : Lambda.layout -> t
 
@@ -432,8 +429,14 @@ end
 
 (** Allocations *)
 
-(** Allocate a block of regular values with the given tag *)
+(** Allocate a block of regular values with the given tag.
+
+    When [strict_init] is true, the result of the allocation is not allowed to
+    be exposed to the GC before initialization is complete. This is currently
+    used for closures, where the start-of-env field has to be set to its correct
+    value before the block is published. *)
 val make_alloc :
+  strict_init:bool ->
   mode:Cmm.Alloc_mode.t ->
   Debuginfo.t ->
   tag:int ->
@@ -465,8 +468,11 @@ val make_closure_alloc :
 
 (** Allocate an mixed block of the corresponding tag and scannable prefix size.
     The [memory_chunk] list should give the memory_chunk corresponding to each
-    element from the [expression] list. *)
+    element from the [expression] list.
+
+    See {!make_alloc} for information about [~strict_init]. *)
 val make_mixed_alloc :
+  strict_init:bool ->
   mode:Cmm.Alloc_mode.t ->
   Debuginfo.t ->
   tag:int ->
@@ -748,6 +754,7 @@ val send :
   Extended_machtype.t list ->
   Extended_machtype.t ->
   Lambda.region_close * Cmx_format.return_mode ->
+  returns:bool ->
   Debuginfo.t ->
   expression
 
@@ -1093,6 +1100,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1102,6 +1110,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
@@ -1114,6 +1123,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
@@ -1246,7 +1256,7 @@ val emit_divide_by_zero_message : unit -> Cmm.phrase list
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
-val perform : dbg:Debuginfo.t -> expression -> expression
+val perform : dbg:Debuginfo.t -> returns:bool -> expression -> expression
 
 val with_stack :
   dbg:Debuginfo.t ->
@@ -1255,6 +1265,7 @@ val with_stack :
   effc:expression ->
   f:expression ->
   arg:expression ->
+  returns:bool ->
   expression
 
 val with_stack_preemptible :
@@ -1265,19 +1276,29 @@ val with_stack_preemptible :
   handle_tick:expression ->
   f:expression ->
   arg:expression ->
+  returns:bool ->
   expression
 
 val continue :
-  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  value:expression ->
+  returns:bool ->
+  expression
 
 val discontinue :
-  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  exn:expression ->
+  returns:bool ->
+  expression
 
 val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
   exn:expression ->
   bt:expression ->
+  returns:bool ->
   expression
 
 val reperform :
@@ -1285,6 +1306,7 @@ val reperform :
   eff:expression ->
   cont:expression ->
   last_fiber:expression ->
+  returns:bool ->
   expression
 
 (* CR mshinwell: change unboxed scalar arrays to use mixed block (or similar)

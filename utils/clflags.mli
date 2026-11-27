@@ -51,7 +51,7 @@ val set_int_arg :
 val set_float_arg :
     int option -> Float_arg_helper.parsed ref -> float -> float option -> unit
 
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
@@ -59,7 +59,7 @@ type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
   | Fidelity_low | Fidelity_medium | Fidelity_high
   | Fidelity_very_high | Fidelity_ultra_high | Fidelity_unlimited
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
@@ -81,8 +81,8 @@ val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
-val include_dirs : visible_include list ref
-val hidden_include_dirs : string list ref
+val include_dirs : include_dir list ref
+val hidden_include_dirs : include_dir list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
 
@@ -135,7 +135,7 @@ val match_context_rows : int ref
 val safer_matching : bool ref
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 val open_args : open_arg list ref
 val preprocessor : string option ref
@@ -326,7 +326,11 @@ val keep_locs : bool ref
 val opaque : bool ref
 val default_timings_precision : int
 val timings_precision : int ref
+val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
+val profile_level : int ref
+val set_profile_columns : profile_column list -> unit
+val set_profile_level : int -> unit
 val profile_granularity : profile_granularity_level ref
 val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
@@ -429,7 +433,7 @@ module Compiler_ir : sig
 end
 
 module Compiler_pass : sig
-  type t = Parsing | Typing | Lambda | Middle_end
+  type t = Parsing | Typing | Transl | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
          | Register_allocation | Llvmize
   val of_string : string -> t option

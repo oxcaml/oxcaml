@@ -511,6 +511,13 @@ let print_one bind instr =
     | AVX512VL -> "AVX512VL"
     | AVX512_BF16 -> "AVX512_BF16"
     | VPCLMULQDQ -> "VPCLMULQDQ"
+    | AVX512_VBMI -> "AVX512_VBMI"
+    | AVX512_VBMI2 -> "AVX512_VBMI2"
+    | VAES -> "VAES"
+    | AVX512_BITALG -> "AVX512_BITALG"
+    | AVX512_VPOPCNTDQ -> "AVX512_VPOPCNTDQ"
+    | AVX512_IFMA -> "AVX512_IFMA"
+    | GFNI -> "GFNI"
   in
   let print_temp : temp -> string = function
     | R8 -> "R8"
@@ -807,6 +814,13 @@ let parse_ext = function
   | "AVX512VL" -> Some AVX512VL
   | "AVX512_BF16" -> Some AVX512_BF16
   | "VPCLMULQDQ" -> Some VPCLMULQDQ
+  | "AVX512_VBMI" -> Some AVX512_VBMI
+  | "AVX512_VBMI2" -> Some AVX512_VBMI2
+  | "VAES" -> Some VAES
+  | "AVX512_BITALG" -> Some AVX512_BITALG
+  | "AVX512_VPOPCNTDQ" -> Some AVX512_VPOPCNTDQ
+  | "AVX512_IFMA" -> Some AVX512_IFMA
+  | "GFNI" -> Some GFNI
   | _ -> None
 
 let parse_ext ext =

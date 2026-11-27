@@ -3354,7 +3354,13 @@ and project_head_of_kind_naked_mask ~to_project:_ ~expand:_ head = head
 
 and project_head_of_kind_rec_info ~to_project ~expand head =
   match (head : head_of_kind_rec_info) with
-  | Const _ | Succ _ | Unroll_to _ -> head
+  | Const _ -> head
+  | Succ rec_info ->
+    Rec_info_expr.succ
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
+  | Unroll_to (n, rec_info) ->
+    Rec_info_expr.unroll_to n
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
   | Var var -> (
     if not (Variable.Set.mem var to_project)
     then head
@@ -4376,6 +4382,25 @@ let box_mask (t : t) alloc_mode : t =
 let null : t =
   Value
     (TD.create { non_null = Bottom; is_null = Maybe_null { is_null = None } })
+
+let nullable t : t =
+  match t with
+  | Value descr -> (
+    match TD.descr descr with
+    | Ok (Equals _) ->
+      Misc.fatal_errorf
+        "Cannot represent alias-or-null types: [nullable] must be called on a \
+         concrete type, but got %a"
+        print t
+    | Unknown | Ok (No_alias { non_null = _; is_null = Maybe_null _ }) -> t
+    | Bottom -> null
+    | Ok (No_alias { non_null; is_null = Not_null }) ->
+      Value (TD.create { non_null; is_null = Maybe_null { is_null = None } }))
+  | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
+    Misc.fatal_errorf "Type of wrong kind for [nullable]: %a" print t
 
 let any_non_null_value : t =
   Value (TD.create { non_null = Unknown; is_null = Not_null })

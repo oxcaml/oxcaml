@@ -66,7 +66,9 @@ module T = struct
     type t = reg_class
 
     let of_machtype : Cmm.machtype_component -> t = function
-      | Val | Int | Addr -> GPR
+      | Val | Int | Addr | Static_block | Code_pointer
+      | Out_of_heap_data_pointer ->
+        GPR
       | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
       | Mask -> MASK
 
@@ -228,7 +230,9 @@ module T = struct
     let index_in_class = index_in_class phys_reg in
     let names =
       match (typ : Cmm.machtype_component) with
-      | Int | Addr | Val -> gpr_name
+      | Int | Addr | Val | Static_block | Code_pointer
+      | Out_of_heap_data_pointer ->
+        gpr_name
       | Float | Float32 | Vec128 | Valx2 -> xmm_name
       | Vec256 -> ymm_name
       | Vec512 -> zmm_name

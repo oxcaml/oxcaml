@@ -82,6 +82,9 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
+  (* Note: this significantly degrades the analysis on code being checked by the
+     zero alloc checker. However, it is highly unclear what should be done for
+     such code, so we simply mark the code as escaping. *)
   if never_delete
   then (
     List.iter
@@ -152,23 +155,34 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           names_and_function_slots))
     names_and_function_slots
 
+let traverse_block_allocation denv acc ~base block_shape fields =
+  List.iteri
+    (fun i from ->
+      let kind = K.Block_shape.element_kind block_shape i in
+      Acc.add_constructor_dep acc ~base (Field.block i kind) ~from)
+    fields;
+  let all_constants = Code_id_or_name.name (Env.all_constants denv) in
+  Acc.add_constructor_dep acc ~base Field.is_int ~from:all_constants;
+  Acc.add_constructor_dep acc ~base Field.get_tag ~from:all_constants
+
+let traverse_array_allocation acc ~base free_names =
+  (* The fields of arrays are not tracked. However, they must be kept if the
+     array is used. *)
+  Acc.add_any_source acc base;
+  Name_occurrences.fold_names free_names ~init:() ~f:(fun () name ->
+      Acc.add_use_dep acc ~to_:base ~from:(Code_id_or_name.name name))
+
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
   match prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
-    List.iteri
-      (fun i field ->
-        let kind = K.Block_shape.element_kind block_shape i in
-        let from = Acc.simple_to_node acc ~denv field in
-        default_bp (fun base ->
-            Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
-      fields;
+    let fields = List.map (Acc.simple_to_node acc ~denv) fields in
     default_bp (fun base ->
-        Acc.add_constructor_dep acc ~base Field.is_int
-          ~from:(Code_id_or_name.name (Env.all_constants denv));
-        Acc.add_constructor_dep acc ~base Field.get_tag
-          ~from:(Code_id_or_name.name (Env.all_constants denv)))
+        traverse_block_allocation denv acc ~base block_shape fields)
+  | Variadic (Make_array _, _) ->
+    let free_names = Flambda_primitive.free_names prim in
+    default_bp (fun base -> traverse_array_allocation acc ~base free_names)
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
@@ -240,7 +254,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         _ )
   | Quaternary
       ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
-  | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
+  | Variadic ((Begin_region _ | Begin_try_region _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
       | Arbitrary_effects, _, _, _ ->
@@ -288,35 +302,54 @@ let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
 let traverse_block_like_static_const denv acc symbol
     (static_const : Static_const.t) =
   let name = Name.symbol symbol |> Code_id_or_name.name in
+  let all_constants = Code_id_or_name.name (Env.all_constants denv) in
+  let or_variable_to_node (or_variable : _ Or_variable.t) =
+    match or_variable with
+    | Const _ -> all_constants
+    | Var (var, _) -> Code_id_or_name.var var
+  in
+  let add_boxed_number_dep bn contents =
+    Acc.add_constructor_dep acc ~base:name (Field.boxed_number bn)
+      ~from:(or_variable_to_node contents)
+  in
+  let simples_to_nodes fields =
+    List.map
+      (fun field ->
+        Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field))
+      fields
+  in
   match static_const with
-  | Block (_, _, _, fields) | Immutable_value_array fields ->
-    List.iteri
-      (fun i (field : Simple.With_debuginfo.t) ->
-        let kind = Static_const.block_field_kind static_const i in
-        let from =
-          Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
-        in
-        Acc.add_constructor_dep acc ~base:name (Field.block i kind) ~from)
-      fields;
-    Acc.add_constructor_dep acc ~base:name Field.is_int
-      ~from:(Code_id_or_name.name (Env.all_constants denv));
-    Acc.add_constructor_dep acc ~base:name Field.get_tag
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+  | Block (_, _, shape, fields) ->
+    traverse_block_allocation denv acc ~base:name (Scannable shape)
+      (simples_to_nodes fields)
+  | Immutable_value_array fields ->
+    traverse_block_allocation denv acc ~base:name (Scannable Value_only)
+      (simples_to_nodes fields)
+  | Immutable_float_block fields ->
+    traverse_block_allocation denv acc ~base:name Float_record
+      (List.map or_variable_to_node fields)
+  | Boxed_float32 f -> add_boxed_number_dep Naked_float32 f
+  | Boxed_float f -> add_boxed_number_dep Naked_float f
+  | Boxed_int32 n -> add_boxed_number_dep Naked_int32 n
+  | Boxed_int64 n -> add_boxed_number_dep Naked_int64 n
+  | Boxed_nativeint n -> add_boxed_number_dep Naked_nativeint n
+  | Boxed_vec128 v -> add_boxed_number_dep Naked_vec128 v
+  | Boxed_vec256 v -> add_boxed_number_dep Naked_vec256 v
+  | Boxed_vec512 v -> add_boxed_number_dep Naked_vec512 v
+  | Boxed_mask m -> add_boxed_number_dep Naked_mask m
   | Set_of_closures _ ->
     Misc.fatal_errorf
       "Unexpected [Set_of_closures] in block_like static const traversal for \
        symbol %a"
       Symbol.print symbol
-  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
-  | Empty_array _ | Immutable_string _ ->
-    Acc.add_alias acc ~to_:name
-      ~from:(Code_id_or_name.name (Env.all_constants denv))
+  | Immutable_float_array _ | Immutable_float32_array _ | Immutable_int_array _
+  | Immutable_int8_array _ | Immutable_int16_array _ | Immutable_int32_array _
+  | Immutable_int64_array _ | Immutable_nativeint_array _
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ | Immutable_mask_array _ | Empty_array _
+  | Immutable_string _ ->
+    traverse_array_allocation acc ~base:name
+      (Static_const.free_names static_const)
 
 let traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
@@ -349,61 +382,35 @@ let must_have_callee apply =
 
 let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
-  | Function { function_call = Direct code_id; _ } -> (
+  | Function { function_call = Direct code_id; _ } ->
     (* CR ncourant: think about cross-module propagation *)
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
         ~exn:exn_arg
     in
-    let callee = Apply.callee apply in
-    let is_external =
-      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+    let callee, call_widget =
+      match Apply.callee apply with
+      | None -> None, call_widget
+      | Some callee ->
+        let callee = Acc.simple_to_node acc ~denv callee in
+        Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
+          ~base:callee;
+        let callee_if_any_source =
+          Code_id_or_name.var (Variable.create "callee_if_any_source" K.value)
+        in
+        let widget_if_any_source =
+          Code_id_or_name.var
+            (Variable.create "widget_if_any_source" K.rec_info)
+        in
+        Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
+          ~to_:callee_if_any_source;
+        Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
+          ~from:widget_if_any_source ~to_:call_widget;
+        Some callee_if_any_source, widget_if_any_source
     in
-    let[@local] add_apply acc ~only_if_closure_any_source =
-      let callee, call_widget =
-        if only_if_closure_any_source
-        then (
-          let callee = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-          let callee_if_any_source =
-            Variable.create "callee_if_any_source" K.value
-          in
-          let widget_if_any_source =
-            Code_id_or_name.var
-              (Variable.create "widget_if_any_source" K.rec_info)
-          in
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
-            ~to_:(Code_id_or_name.var callee_if_any_source);
-          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
-            ~from:widget_if_any_source ~to_:call_widget;
-          Some (Simple.var callee_if_any_source), widget_if_any_source)
-        else callee, call_widget
-      in
-      Acc.add_apply acc
-        ~function_containing_apply_expr:(Env.current_code_id denv)
-        ~apply_code_id:code_id
-        ~apply_closure:(Option.map (Acc.simple_to_node acc ~denv) callee)
-        ~apply_call_witness:call_widget
-    in
-    match callee with
-    | None -> add_apply acc ~only_if_closure_any_source:false
-    | Some callee -> (
-      let closure = Acc.simple_to_node acc ~denv callee in
-      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
-        ~base:closure;
-      match Env.should_preserve_direct_calls denv with
-      | Yes -> add_apply acc ~only_if_closure_any_source:false
-      | Auto -> add_apply acc ~only_if_closure_any_source:true
-      | No ->
-        if is_external
-        then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
-          (* CR ncourant: LTO mode will be slightly less precise when no
-             always preserving direct calls; I don't think this really matters.
-           *)
-          add_apply acc ~only_if_closure_any_source:false))
+    Acc.add_apply acc ~function_containing_apply_expr:(Env.current_code_id denv)
+      ~apply_code_id:code_id ~apply_closure:callee
+      ~apply_call_witness:call_widget
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv apply ~returns:return_args
@@ -713,19 +720,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~function_slots_to_keep ~value_slots_to_keep ~my_depth : Rev_code.t =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
-  (* Note: this significantly degrades the analysis on code being checked by the
-     zero alloc checker. However, it is highly unclear what should be done for
-     such code, so we simply mark the code as escaping. *)
   let is_opaque = Code_metadata.is_opaque code_metadata in
-  let check_zero_alloc =
-    match Code.zero_alloc_attribute code with
-    | Default_zero_alloc ->
-      (* The effect of [Clflags.zero_alloc_assert] has been compiled into
-         [Check] earlier. *)
-      false
-    | Assume _ -> false
-    | Check _ -> true
-  in
   let code_dep =
     match Acc.find_code_dep acc code_id with
     | Some code_dep -> code_dep
@@ -747,17 +742,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never -> No
-    | Always -> Yes
-    | Zero_alloc -> if check_zero_alloc then Yes else No
-    | Auto -> Auto
-  in
   let denv =
-    Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-      ~current_code_id:(Some code_id) ~all_constants ~function_slots_to_keep
-      ~value_slots_to_keep
+    Env.create ~parent:Hole ~conts ~current_code_id:(Some code_id)
+      ~all_constants ~function_slots_to_keep ~value_slots_to_keep
   in
   if not is_opaque
   then (
@@ -968,12 +955,6 @@ let run0 unit acc ~free_names ~all_constants () =
     ~params:[dummy_toplevel_exn] ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
   Acc.fixed_arity_continuation acc exn_continuation;
-  let should_preserve_direct_calls : Env.should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never | Zero_alloc -> No
-    | Always -> Yes
-    | Auto -> Auto
-  in
   let function_slots_to_keep =
     Name_occurrences.function_slots_in_normal_projections free_names
   in
@@ -982,8 +963,7 @@ let run0 unit acc ~free_names ~all_constants () =
   in
   ( Code_id_or_name.var dummy_toplevel_return,
     traverse
-      (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-         ~current_code_id:None
+      (Env.create ~parent:Hole ~conts ~current_code_id:None
          ~all_constants:(Name.symbol all_constants)
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )

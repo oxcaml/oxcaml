@@ -44,11 +44,6 @@ module SC = Static_const
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
 
-type should_preserve_direct_calls =
-  | Yes
-  | No
-  | Auto
-
 type 'f env =
   { machine_width : Target_system.Machine_width.t;
     solution : 'f Analysis.Solution.t;
@@ -58,7 +53,6 @@ type 'f env =
       Unboxing_analysis.param_decision list Continuation.Map.t;
     should_keep_param :
       Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
-    should_preserve_direct_calls : should_preserve_direct_calls;
     inside_code_definition : bool
   }
 
@@ -75,24 +69,16 @@ let freshen_decisions :
   | Unbox fields ->
     Unbox (Unboxed_fields.map (fun v -> Variable.rename v) fields)
 
-let is_used env cn = Analysis.has_use env.solution cn
+let get_decision env name = Analysis.get_decision env.solution name
 
-let is_code_id_used env code_id =
-  is_used env (Code_id_or_name.code_id code_id)
-  || not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+let is_code_id_used env code_id = Analysis.code_id_has_use env.solution code_id
 
-let is_symbol_used env symbol = is_used env (Code_id_or_name.symbol symbol)
+let get_var_decision env var = get_decision env (Name.var var)
 
-let raw_is_var_used solution var kind =
-  match (kind : K.t) with
-  | Region | Rec_info -> true
-  | Value | Naked_number _ ->
-    Analysis.has_use solution (Code_id_or_name.var var)
+let get_symbol_decision env symbol = get_decision env (Name.symbol symbol)
 
-let is_var_used env var = raw_is_var_used env.solution var (Variable.kind var)
-
-let is_name_used env name =
-  Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
+let symbol_cannot_be_unboxed symbol =
+  Misc.fatal_errorf "Symbol %a cannot be unboxed" Symbol.print symbol
 
 let poison name kind = Simple.const (Reg_width_const.const_poison kind name)
 
@@ -203,14 +189,6 @@ let bind_field_to_simple (var : _ Unboxed_fields.u) simple hole =
     (Named.create_simple simple)
     ~size_of_defining_expr:(Code_size.simple simple) ~body:hole
 
-let bound_vars_will_be_unboxed env bvs =
-  List.exists
-    (fun bv ->
-      Option.is_some
-        (Analysis.get_unboxed_fields env.solution
-           (Code_id_or_name.var (Bound_var.var bv))))
-    bvs
-
 let bound_vars_will_have_their_representation_changed env bvs =
   List.exists
     (fun bv ->
@@ -276,18 +254,13 @@ let name_poison ~category name =
 let rewrite_simple env simple =
   Simple.pattern_match simple
     ~name:(fun name ~coercion:_ ->
-      if
-        not
-          (Option.is_none
-             (Analysis.get_unboxed_fields env.solution
-                (Code_id_or_name.name name)))
-      then
+      match get_decision env name with
+      | Keep -> simple
+      | Unbox _ ->
         (* This can happen if an unboxed block now only has an application for
            its only use, see [unboxed_or_function.ml] test. *)
         name_poison ~category:"reaper_rewrite_simple_unboxed" name
-      else if is_name_used env name
-      then simple
-      else name_poison ~category:"reaper_unused_name" name)
+      | Delete -> name_poison ~category:"reaper_unused_name" name)
     ~const:(fun _ -> simple)
 
 let rewrite_simple_opt env = function
@@ -295,7 +268,14 @@ let rewrite_simple_opt env = function
   | Some simple as simpl ->
     Simple.pattern_match simple
       ~name:(fun name ~coercion:_ ->
-        if is_name_used env name then simpl else None)
+        match get_decision env name with
+        | Keep -> simpl
+        | Unbox _ ->
+          (* This can happen if two closures with a shared code_id only have an
+             application (which does not use the closure) for its only use, see
+             [shared_closure_unboxing.ml] test. *)
+          None
+        | Delete -> None)
       ~const:(fun _ -> simpl)
 
 let get_args env params_decisions args =
@@ -331,8 +311,16 @@ let rewrite_or_variable default env (or_variable : _ Or_variable.t) =
   (* CR ncourant: rewrite unboxed variables *)
   match or_variable with
   | Const _ -> or_variable
-  | Var (v, _) ->
-    if is_var_used env v then or_variable else Or_variable.Const default
+  | Var (v, _) -> (
+    match get_var_decision env v with
+    | Keep -> or_variable
+    | Delete -> Or_variable.Const default
+    | Unbox _ ->
+      (* This should never be possible, as variables used in a [or_variable] are
+         only naked numbers which can never be unboxed. *)
+      Misc.fatal_errorf
+        "Variable %a was used as an [or_variable] but is unboxed" Variable.print
+        v)
 
 let rewrite_or_variables default env or_variables =
   List.map (rewrite_or_variable default env) or_variables
@@ -1021,20 +1009,11 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       | None -> Some code_id, call_kind
       | Some c ->
         let call_kind_if_unknown =
-          match env.should_preserve_direct_calls with
-          | Yes -> call_kind
-          | No ->
-            if
-              not
-                (Current_unit.is_current (Code_id.get_compilation_unit code_id))
-            then call_kind
-            else Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
-          | Auto ->
-            (* In [auto] mode, the direct call is preserved if and only if we
-               cannot identify which set of code_ids can be called. Since this
-               is exactly the same situation as the one where we do not replace
-               the call_kind, we can leave the direct call here. *)
-            call_kind
+          (* The direct call is preserved if and only if we cannot identify
+             which set of code_ids can be called. Since this is exactly the same
+             situation as the one where we do not replace the call_kind, we can
+             leave the direct call here. *)
+          call_kind
         in
         called c call_kind_if_unknown)
     | Function { function_call = Indirect_unknown_arity } ->
@@ -1464,13 +1443,8 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
             RE.create_let bp named ~size_of_defining_expr ~body:hole)
           (Unboxed to_bind) arg hole))
 
-let rebuild_singleton_binding_which_is_being_unboxed env bv
+let rebuild_singleton_binding_which_is_being_unboxed env bv ~to_bind
     ~(defining_expr : Named.t) ~hole =
-  let to_bind =
-    Option.get
-      (Analysis.get_unboxed_fields env.solution
-         (Code_id_or_name.var (Bound_var.var bv)))
-  in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
     Field.Map.ordered_fold
@@ -1549,31 +1523,18 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
        [rebuild_singleton_binding_which_is_being_unboxed]:@ %a@."
       Named.print defining_expr
 
-let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
+let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs_and_decisions
     ~(set_of_closures : Rev_expr.rev_set_of_closures) ~hole =
-  assert (
-    List.for_all
-      (fun bv ->
-        (not
-           (Analysis.has_use env.solution
-              (Code_id_or_name.var (Bound_var.var bv))))
-        || Option.is_some
-             (Analysis.get_unboxed_fields env.solution
-                (Code_id_or_name.var (Bound_var.var bv))))
-      bvs);
   List.fold_left
-    (fun hole bv ->
-      if
-        not
-          (Analysis.has_use env.solution
-             (Code_id_or_name.var (Bound_var.var bv)))
-      then hole
-      else
-        let to_bind =
-          Option.get
-            (Analysis.get_unboxed_fields env.solution
-               (Code_id_or_name.var (Bound_var.var bv)))
-        in
+    (fun hole (bv, (decision : Analysis.decision)) ->
+      match decision with
+      | Delete -> hole
+      | Keep ->
+        Misc.fatal_errorf
+          "Closure %a is used but not unboxed, whereas other closures of its \
+           set of closures are unboxed"
+          Bound_var.print bv
+      | Unbox to_bind ->
         let value_slots = set_of_closures.value_slots in
         Field.Map.ordered_fold
           (fun field (var : _ Unboxed_fields.u) hole ->
@@ -1590,7 +1551,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                  binding for %a"
                 Field.print field Bound_var.print bv)
           to_bind hole)
-    hole bvs
+    hole bvs_and_decisions
 
 let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     ~(defining_expr : Named.t) ~hole =
@@ -1784,12 +1745,19 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
 
 let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
     ~alloc_mode ~hole =
-  if bound_vars_will_be_unboxed env bvs
+  let bvs_and_decisions =
+    List.map (fun bv -> bv, get_var_decision env (Bound_var.var bv)) bvs
+  in
+  let exists_decision f =
+    List.exists (fun (_bv, decision) -> f decision) bvs_and_decisions
+  in
+  if exists_decision (function Unbox _ -> true | Keep | Delete -> false)
   then
-    ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
-        ~set_of_closures ~hole,
+    ( rebuild_set_of_closures_binding_which_is_being_unboxed env
+        bvs_and_decisions ~set_of_closures ~hole,
       res )
-  else if not (List.exists (fun v -> is_var_used env (Bound_var.var v)) bvs)
+  else if
+    not (exists_decision (function Keep -> true | Unbox _ | Delete -> false))
   then hole, res
   else
     (* [rewrite_set_of_closures] also handles the case where the representation
@@ -1830,54 +1798,48 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
 
 let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
     RE.t * rebuild_result =
-  (* CR ncourant: we should probably properly track regions *)
-  let is_begin_region =
-    match defining_expr with
-    | Prim (prim, _) -> P.is_begin_region prim
-    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
-  in
-  if not (is_begin_region || is_var_used env (Bound_var.var bv))
-  then hole, res
-  else if bound_vars_will_be_unboxed env [bv]
-  then
-    ( rebuild_singleton_binding_which_is_being_unboxed env bv ~defining_expr
-        ~hole,
+  match get_var_decision env (Bound_var.var bv) with
+  | Delete -> hole, res
+  | Unbox to_bind ->
+    ( rebuild_singleton_binding_which_is_being_unboxed env bv ~to_bind
+        ~defining_expr ~hole,
       res )
-  else if bound_vars_will_have_their_representation_changed env [bv]
-  then
-    ( rebuild_singleton_binding_whose_representation_is_being_changed env
-        (Bound_pattern.singleton bv)
-        bv ~defining_expr ~hole,
-      res )
-  else
-    let bound_pattern = Bound_pattern.singleton bv in
-    match[@ocaml.warning "-fragile-match"] defining_expr with
-    | Flambda.Prim
-        (Variadic (Make_block (block_kind, mutability, alloc_mode), fields), dbg)
-      ->
-      ( rebuild_make_block_default_case env bound_pattern ~block_kind
-          ~mutability ~alloc_mode ~fields ~hole dbg,
+  | Keep -> (
+    if bound_vars_will_have_their_representation_changed env [bv]
+    then
+      ( rebuild_singleton_binding_whose_representation_is_being_changed env
+          (Bound_pattern.singleton bv)
+          bv ~defining_expr ~hole,
         res )
-    | Flambda.Prim (Unary (Box_number (bn, _alloc_mode), _contents), _dbg)
-      when not
-             (Analysis.field_used env.solution
-                (Code_id_or_name.var (Bound_var.var bv))
-                (Field.boxed_number bn)) ->
-      (* The contents of the boxed number are never read, so the whole primitive
-         can be replaced by a poison value (as for the unused fields of blocks
-         in [rebuild_make_block_default_case]). *)
-      let simple = poison "reaper_unused_boxed_number" K.value in
-      ( RE.create_let bound_pattern
-          (Named.create_simple simple)
-          ~size_of_defining_expr:(Code_size.simple simple) ~body:hole,
-        res )
-    | _ ->
-      let defining_expr, size_of_defining_expr =
-        rebuild_named_default_case env defining_expr
-      in
-      ( RE.create_let bound_pattern defining_expr ~size_of_defining_expr
-          ~body:hole,
-        res )
+    else
+      let bound_pattern = Bound_pattern.singleton bv in
+      match[@ocaml.warning "-fragile-match"] defining_expr with
+      | Flambda.Prim
+          ( Variadic (Make_block (block_kind, mutability, alloc_mode), fields),
+            dbg ) ->
+        ( rebuild_make_block_default_case env bound_pattern ~block_kind
+            ~mutability ~alloc_mode ~fields ~hole dbg,
+          res )
+      | Flambda.Prim (Unary (Box_number (bn, _alloc_mode), _contents), _dbg)
+        when not
+               (Analysis.field_used env.solution
+                  (Code_id_or_name.var (Bound_var.var bv))
+                  (Field.boxed_number bn)) ->
+        (* The contents of the boxed number are never read, so the whole
+           primitive can be replaced by a poison value (as for the unused fields
+           of blocks in [rebuild_make_block_default_case]). *)
+        let simple = poison "reaper_unused_boxed_number" K.value in
+        ( RE.create_let bound_pattern
+            (Named.create_simple simple)
+            ~size_of_defining_expr:(Code_size.simple simple) ~body:hole,
+          res )
+      | _ ->
+        let defining_expr, size_of_defining_expr =
+          rebuild_named_default_case env defining_expr
+        in
+        ( RE.create_let bound_pattern defining_expr ~size_of_defining_expr
+            ~body:hole,
+          res ))
 
 let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   let bound_and_group =
@@ -1897,7 +1859,11 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
                 "Pattern is [Code %a] but binding is a [Static_const]"
                 Code_id.print code_id);
             Some (p, Rev_expr.Deleted_code))
-        | Block_like sym -> if is_symbol_used env sym then Some arg else None
+        | Block_like sym -> (
+          match get_symbol_decision env sym with
+          | Keep -> Some arg
+          | Delete -> None
+          | Unbox _ -> symbol_cannot_be_unboxed sym)
         | Set_of_closures m ->
           if
             Function_slot.Lmap.exists
@@ -1928,7 +1894,13 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
             in
             Some (Bound_static.Pattern.set_of_closures m, e)
           else if
-            Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
+            Function_slot.Lmap.exists
+              (fun _ sym ->
+                match get_symbol_decision env sym with
+                | Keep -> true
+                | Delete -> false
+                | Unbox _ -> symbol_cannot_be_unboxed sym)
+              m
           then Some arg
           else None)
       (List.combine (Bound_static.to_list bound_static) group)
@@ -1955,9 +1927,10 @@ and rebuild_let_expr_holed env res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result
     =
   if
-    Bound_pattern.fold_all_bound_vars bound_pattern
-      ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
-      ~init:false
+    (not (Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)))
+    && Bound_pattern.fold_all_bound_vars bound_pattern
+         ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
+         ~init:false
   then
     ( RE.from_expr
         ~expr:
@@ -2129,17 +2102,6 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
 
 and rebuild_function_params_and_body env res code_metadata
     (params_and_body : Rev_expr.rev_params_and_body) =
-  let env =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Always | Never | Auto -> env
-    | Zero_alloc ->
-      let should_preserve_direct_calls =
-        match Code_metadata.zero_alloc_attribute code_metadata with
-        | Default_zero_alloc | Assume _ -> No
-        | Check _ -> Yes
-      in
-      { env with should_preserve_direct_calls }
-  in
   let env = { env with inside_code_definition = true } in
   let { Rev_expr.return_continuation;
         exn_continuation;
@@ -2380,39 +2342,28 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
     skeleton
   in
   let should_keep_param cont param kind : Unboxing_analysis.param_decision =
-    let keep_all_parameters =
-      Continuation.Set.mem cont fixed_arity_continuations
+    let keep () =
+      Unboxing_analysis.Keep
+        ( param,
+          Analysis.rewrite_kind_with_subkind solution (Name.var param) kind )
     in
-    match Analysis.get_unboxed_fields solution (Code_id_or_name.var param) with
-    | None ->
+    match Analysis.get_decision solution (Name.var param) with
+    | Unbox fields -> Unbox fields
+    | Keep -> keep ()
+    | Delete ->
       if
-        keep_all_parameters
-        ||
-        let is_var_used =
-          raw_is_var_used solution param (K.With_subkind.kind kind)
-        in
-        is_var_used
+        Continuation.Set.mem cont fixed_arity_continuations
         ||
         let info = Continuation.Map.find cont continuation_info in
         info.is_exn_handler && Variable.equal param (List.hd info.params)
-      then
-        Keep
-          ( param,
-            Analysis.rewrite_kind_with_subkind solution (Name.var param) kind )
+      then keep ()
       else Delete
-    | Some fields -> Unbox fields
   in
   let cont_params_to_keep =
     Continuation.Map.mapi
       (fun cont (info : Traverse_acc.Continuation_info.t) ->
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
-  in
-  let should_preserve_direct_calls =
-    match Flambda_features.reaper_preserve_direct_calls () with
-    | Never | Zero_alloc -> No
-    | Always -> Yes
-    | Auto -> Auto
   in
   (* Make sure [get_code_metadata] returns the updated code metadata in case it
      exists *)
@@ -2433,7 +2384,6 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
-      should_preserve_direct_calls;
       inside_code_definition = false
     }
   in

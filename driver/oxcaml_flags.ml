@@ -121,6 +121,8 @@ end
 
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
+let float_op_fusion = ref true          (* -[no-]float-op-fusion *)
+
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
 let disable_poll_insertion = ref (not Config.poll_insertion)
                                         (* -disable-poll-insertion *)
@@ -153,7 +155,6 @@ let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
-type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
@@ -206,7 +207,6 @@ module Flambda2 = struct
     let join_algorithm = Binary
     let function_result_types : function_result_types = Never
     let enable_reaper = false
-    let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
     let reaper_local_fields = false
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
@@ -230,7 +230,6 @@ module Flambda2 = struct
     join_algorithm : join_algorithm;
     function_result_types : function_result_types;
     enable_reaper : bool;
-    reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
@@ -252,7 +251,6 @@ module Flambda2 = struct
     join_algorithm = Default.join_algorithm;
     function_result_types = Default.function_result_types;
     enable_reaper = Default.enable_reaper;
-    reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     reaper_local_fields = Default.reaper_local_fields;
     reaper_unbox = Default.reaper_unbox;
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
@@ -304,7 +302,6 @@ module Flambda2 = struct
   let kind_checks = ref Default
   let function_result_types = ref Default
   let enable_reaper = ref Default
-  let reaper_preserve_direct_calls = ref Default
   let reaper_local_fields = ref Default
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
@@ -327,6 +324,7 @@ module Flambda2 = struct
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
+    let simplified = ref false
     let simplify = ref false
     let reaper = ref false
   end

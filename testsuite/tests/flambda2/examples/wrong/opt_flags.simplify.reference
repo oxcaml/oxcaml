@@ -3,7 +3,7 @@ let $camlOpt_flags__immstring_0 = "foo" in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k3 push(k2)
    where k3 =
-     (apply ccall
+     (apply ccall &toplevel
         ($`*extern*`.caml_sys_getenv : val -> val)
           ($camlOpt_flags__immstring_0)
           -> k4 * k2

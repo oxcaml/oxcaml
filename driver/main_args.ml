@@ -201,26 +201,33 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
+let mk_Hx f =
+  "-Hx", Arg.String f,
+  "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
+ \     (Like -H, but indicates that cmx files for modules in <dir> are\n\
+ \     always available, like -Ix)"
+
 let mk_I_manifest f =
   "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
   \    reference from a given manifest file. This option is an alternative\n\
   \    to the -I flag, but specifies available files directly instead of\n\
   \    adding whole directories to the search path. Each line of the\n\
   \    manifest file should be in the format\n\
-  \    'file|manifest <basename> <actual_path>', where 'file' means\n\
-  \    that the line describes a file that the compiler can reference,\n\
-  \    'manifest' means that the compiler should read the specified\n\
-  \    manifest file recursively, <basename> is the name under which the\n\
-  \    compiler looks the file up (used as-is, so it must not contain a\n\
-  \    directory component), <actual_path> is where this file is in the\n\
-  \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
-  \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
-  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
-  \    resolved through manifest entries; if the entry's <actual_path> does\n\
-  \    not retain the extension, the companion object files ('foo.o',\n\
-  \    'lib.a') are resolved the same way and must therefore be listed as\n\
-  \    separate manifest entries."
+  \    'f|m <basename> <actual_path> [x]', where 'f' means that the line\n\
+  \    describes a file that the compiler can reference, 'm' means that\n\
+  \    the compiler should read the specified manifest file recursively,\n\
+  \    <basename> is the name under which the compiler looks the file up\n\
+  \    (used as-is, so it must not contain a directory component),\n\
+  \    <actual_path> is where this file is in the filesystem (relative to\n\
+  \    [$MANIFEST_FILES_ROOT]), and 'x' is an optional flag that\n\
+  \    indicates a cmi file's corresponding cmx file is guaranteed to be\n\
+  \    present. The manifest file passed to the [-I-manifest] flag should\n\
+  \    itself be relative to [$MANIFEST_FILES_ROOT]. When linking, files\n\
+  \    given on the command line by their bare names (e.g. 'foo.cmx' or\n\
+  \    'lib.cmxa') are also resolved through manifest entries; if the\n\
+  \    entry's <actual_path> does not retain the extension, the companion\n\
+  \    object files ('foo.o', 'lib.a') are resolved the same way and must\n\
+  \    therefore be listed as separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
@@ -524,6 +531,11 @@ let mk_open_cmi f =
   "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
   \    rather than looking up a module on the include path"
 
+let mk_open_cmi_x f =
+  "-open-cmi-x", Arg.String f,
+  "<file.cmi>  Same as -open-cmi, but indicates that the cmx file for\n\
+  \    the module is always available (like -Ix)"
+
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
 
@@ -650,6 +662,13 @@ let mk_dcounters f =
 
 let mk_dprofile f =
   "-dprofile", Arg.Unit f, Profile.options_doc
+
+let mk_dprofile_level f =
+  "-dprofile-level", Arg.Int f,
+  "<n>  Set the level of detail of -dprofile, -dtimings and -dcounters: \
+   0 disables them, 1 records the main passes, 2 also records the passes \
+   run for each function or continuation. By default, all passes are \
+   recorded"
 
 let mk_dgranularity f =
   "-dgranularity",
@@ -1215,6 +1234,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _H_file : string -> unit
@@ -1237,6 +1257,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _open_cmi : string -> unit
+  val _open_cmi_x : string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit
@@ -1360,6 +1381,7 @@ module type Compiler_options = sig
   val _dtimings_precision : int -> unit
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
+  val _dprofile_level : int -> unit
   val _dgranularity : string -> unit
   val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
@@ -1564,6 +1586,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1604,6 +1627,7 @@ struct
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1679,6 +1703,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -1705,6 +1730,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1735,6 +1761,7 @@ struct
     mk_nopervasives F._nopervasives;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_ppx F._ppx;
     mk_keywords F._keywords;
     mk_principal F._principal;
@@ -1852,6 +1879,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -1907,6 +1935,7 @@ struct
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -1997,6 +2026,7 @@ struct
     mk_dtimings_precision F._dtimings_precision;
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
+    mk_dprofile_level F._dprofile_level;
     mk_dgranularity F._dgranularity;
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
@@ -2042,6 +2072,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -2093,6 +2124,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_o4 F._o4;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -2179,6 +2211,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_H_file F._H_file;
@@ -2206,6 +2239,7 @@ struct
     mk_nocwd F._nocwd;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
+    mk_open_cmi_x F._open_cmi_x;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2328,7 +2362,10 @@ module Default = struct
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
     let _open s = open_args := Open s :: !open_args
-    let _open_cmi s = open_args := Open_cmi s :: !open_args
+    let _open_cmi path =
+      open_args := Open_cmi { path; cmx_guaranteed = false } :: !open_args
+    let _open_cmi_x path =
+      open_args := Open_cmi { path; cmx_guaranteed = true } :: !open_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
@@ -2355,7 +2392,12 @@ module Default = struct
       include_dirs := { Clflags.path; cmx_guaranteed = false } :: !include_dirs
     let _Ix path =
       include_dirs := { Clflags.path; cmx_guaranteed = true } :: !include_dirs
-    let _H dir = hidden_include_dirs := dir :: (!hidden_include_dirs)
+    let _H path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = false } :: !hidden_include_dirs
+    let _Hx path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = true } :: !hidden_include_dirs
     let _I_manifest file = include_manifests := file :: !include_manifests
     let _H_manifest file =
       hidden_include_manifests := file :: !hidden_include_manifests
@@ -2512,10 +2554,13 @@ module Default = struct
     let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
-    let _dprofile () = profile_columns := Profile.all_columns
-    let _dtimings () = profile_columns := [`Time]
+    let _dprofile () = set_profile_columns Profile.all_columns
+    let _dprofile_level n =
+      if n < 0 then raise (Arg.Bad "-dprofile-level: must not be negative");
+      set_profile_level n
+    let _dtimings () = set_profile_columns [`Time]
     let _dtimings_precision n = timings_precision := n
-    let _dcounters () = profile_columns := [`Counters]
+    let _dcounters () = set_profile_columns [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
     let _dprofile_output s =
       Compenv.check_relative_path
@@ -2696,6 +2741,8 @@ module Default = struct
          Odoc_global.hidden_include_dirs :=
            (s :: (!Odoc_global.hidden_include_dirs))
       *) ()
+    let _Hx(_:string) =
+      (* placeholder: same as _H for now *) ()
     let _I_manifest(_:string) = ()
     let _H_manifest(_:string) = ()
     let _H_file(_:string) = ()

@@ -20,13 +20,6 @@ jobs:
       contents: read
       actions: read # the "Print diff artifact URL" step reads workflow artifacts via `gh api`
 
-    env:
-      # OCAMLRUNPARAM for the compilers that CI runs: the major GC starts
-      # marking only once the heap reaches 1GB, which most compilations never
-      # do. Not for test programs. A leg opts out with
-      # `compiler_gc_settings: false`.
-      COMPILER_OCAMLRUNPARAM: ${{ matrix.compiler_gc_settings != false && 'Xsmall_heap_limit=128M' || '' }}
-
     strategy:
       fail-fast: false
       matrix:
@@ -95,9 +88,7 @@ jobs:
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
-            # keep the collected compile times comparable
-            compiler_gc_settings: false
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml testsuite/tests/reaper/unboxed_closure_not_needed.ml'
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml testsuite/tests/reaper/unboxed_closure_not_needed.ml testsuite/tests/reaper/static_const_or_variable.ml'
 
           - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
@@ -395,14 +386,11 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
         run: bash tools/ci/actions/run-make-target.sh compiler
-        # Not matrix.ocamlrunparam: only the upstream testsuite runs on the
-        # debug runtime, and the checks behind V=1 are assertions that
-        # only the debug runtime compiles in.
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
-          OCAMLRUNPARAM: ${{ env.COMPILER_OCAMLRUNPARAM }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Check that `make hacking` builds
@@ -427,8 +415,6 @@ jobs:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
-          # for the compilers ocamltest runs, not the test programs
-          TOOL_RUNPARAM: ${{ env.COMPILER_OCAMLRUNPARAM }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Check installed library metadata
@@ -444,7 +430,7 @@ jobs:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
-          OCAMLRUNPARAM: ${{ env.COMPILER_OCAMLRUNPARAM }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
         # Install the compiler for metrics_collection configuration to populate _install directory
@@ -455,6 +441,7 @@ jobs:
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Promote failed tests and capture diffs

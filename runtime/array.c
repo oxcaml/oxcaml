@@ -1096,7 +1096,8 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLassert (Tag_val(idx) == 0);
   value res;
   mlsize_t depth = Wosize_val(idx);
-#ifdef FLAT_FLOAT_ARRAY
+  /* We check for [Double_array_tag] even if [FLAT_FLOAT_ARRAY] is false,
+     because [float# array]s are always flat float arrays in bytecode. */
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
@@ -1105,7 +1106,6 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
     Store_double_val(res, d);
     CAMLreturn (res);
   }
-#endif
   res = base;
   for (mlsize_t i = 0; i < depth; i++) {
     intnat pos = Long_val(Field(idx, i));
@@ -1136,7 +1136,8 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLparam3 (base, idx, v);
   CAMLassert (Tag_val(idx) == 0);
   mlsize_t depth = Wosize_val(idx);
-#ifdef FLAT_FLOAT_ARRAY
+  /* We check for [Double_array_tag] even if [FLAT_FLOAT_ARRAY] is false,
+     because [float# array]s are always flat float arrays in bytecode. */
   if (Tag_val(base) == Double_array_tag) {
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
@@ -1144,7 +1145,6 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     Store_double_flat_field(base, pos, d);
     CAMLreturn (Val_unit);
   }
-#endif
   // writing into an unboxed product that has been flattened into a singleton
   if (depth == 0) {
     CAMLassert (Wosize_val(base) == Wosize_val(v));

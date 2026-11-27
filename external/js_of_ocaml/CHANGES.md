@@ -109,8 +109,10 @@
   targeting JavaScript (#2441)
 * Compiler: with `--effects=double-translation`, only generate a CPS version
   of the functions that may run below an effect handler (#2441)
+* Runtime: faster conversion of float16 values to doubles (#2634)
 
 ## Bug fixes
+* Runtime: round doubles to float16 only once (#2634)
 * Compiler: with `--effects=double-translation`, fix calls with too many
   arguments to a function that does not perform effects (#2455)
 * Runtime/Wasm: with `--effects=native`, performing an effect that no
@@ -185,6 +187,8 @@
 * Compiler: fix reference unboxing when a variable read from an unboxed
   reference is stored into another unboxed reference in a nested closure
   (#2426)
+* Compiler: do not inline functions with open recursion through a record
+  of closures as functors (memory blow-up at --opt 2 with OCaml 5.6) (#2599)
 # 6.4.1 (2026-06-30) - Lille
 
 ## Bug fixes

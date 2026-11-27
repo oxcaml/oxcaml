@@ -292,7 +292,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Cconst_mask (bits, dbg) ->
       Ok (emit_op env c (Operation.Const_mask bits) dbg Cmm.typ_mask [||])
     | Cconst_symbol (n, dbg) ->
-      Ok (emit_op env c (SU.make_const_symbol n) dbg Cmm.typ_int [||])
+      Ok (emit_op env c (SU.make_const_symbol n) dbg n.sym_type [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -326,7 +326,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            | Cprobe _ | Cprobe_is_enabled _ | Copaque _ ) as op),
           args,
           dbg ) ->
-      emit_expr_op env c op args dbg
+      emit_expr_op env c ~tail op args dbg
     | Cexit (lbl, args, traps) -> emit_expr_exit env c lbl args traps
     | Cinvalid { message; symbol } -> emit_invalid env c message symbol
   in
@@ -374,6 +374,17 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Cursor.move c ~new_pos:cont_block;
     Ok (Block.params cont_block)
   in
+  let call_no_return op : result =
+    finish_block env c ~dbg
+      (Call
+         { op;
+           args = arg_instrs;
+           continuation = Unreachable;
+           may_raise;
+           nontail
+         });
+    Never_returns
+  in
   match new_op with
   | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
   | Call { op = Indirect candidates; _ } ->
@@ -382,16 +393,9 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     call_returning_to (External ext_call) ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
-  | Call_no_return ext_call ->
-    finish_block env c ~dbg
-      (Call
-         { op = External ext_call;
-           args = arg_instrs;
-           continuation = Unreachable;
-           may_raise;
-           nontail
-         });
-    Never_returns
+  | Call_no_return (Direct sym) -> call_no_return (Direct sym)
+  | Call_no_return (Indirect candidates) -> call_no_return (Indirect candidates)
+  | External_call_no_return ext_call -> call_no_return (External ext_call)
   | Never | Return | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
   | Invalid _ ->
@@ -399,7 +403,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
       (Printcfg.terminator_desc ~sep:"")
       new_op
 
-and emit_expr_op env c op args dbg : result =
+and emit_expr_op env c ~tail op args dbg : result =
   let* simple_args, env = emit_parts_list env c args in
   let ty = SU.oper_result_type op in
   let new_op, new_args =
@@ -446,9 +450,13 @@ and emit_expr_op env c op args dbg : result =
     | Terminator term ->
       let nontail =
         match[@warning "-fragile-match"] op with
-        | Cmm.Capply { region; _ } -> (
+        | Cmm.Capply { region; returns; _ } -> (
           match (region : Lambda.region_close) with
-          | Rc_normal -> false
+          | Rc_normal ->
+            (* A call that never returns gets an [Unreachable] continuation,
+               which [Ssa_tail_call] can turn into a tail call. Only allow this
+               in tail position, matching [Cfg_selectgen.emit_tail]. *)
+            not (returns || tail)
           | Rc_nontail -> true
           | Rc_close_at_apply ->
             Misc.fatal_error

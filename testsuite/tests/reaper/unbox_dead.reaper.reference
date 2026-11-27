@@ -23,7 +23,8 @@ let code inline(never) loopify(never) size(65) newer_version_of(f_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply ccall noalloc ($`*extern*`.sqrt : float -> float) (0x1p+1) -> k2 * k1
+  apply ccall noalloc &my_alloc_region
+    ($`*extern*`.sqrt : float -> float) (0x1p+1) -> k2 * k1
     where k2 (a : float) =
       let a_into_a_field_unboxed_float = a in
       (apply direct(go2_2_1 &my_alloc_region)
@@ -41,7 +42,7 @@ let code inline(never) loopify(never) size(65) newer_version_of(f_0)
                    %project_value_slot.[print_string].[stdout]
                      ($Stdlib.camlStdlib__print_string_43_94)
                  in
-                 (apply ccall inlining_state(depth(20))
+                 (apply ccall &my_alloc_region inlining_state(depth(20))
                     ($`*extern*`.caml_ml_output
                      : val * val * val * val -> val)
                       (stdout, $camlUnbox_dead__immstring_2, 0, 1)
@@ -74,7 +75,7 @@ let code inline(never) loopify(never) size(65) newer_version_of(f_0)
                        %project_value_slot.[print_string].[stdout]
                          ($Stdlib.camlStdlib__print_string_43_94)
                      in
-                     apply ccall inlining_state(depth(20))
+                     apply ccall &my_alloc_region inlining_state(depth(20))
                        ($`*extern*`.caml_ml_output
                         : val * val * val * val -> imm tagged)
                          (stdout, $camlUnbox_dead__immstring_4, 0, 1)
@@ -92,7 +93,7 @@ apply direct(f_0_1 &toplevel)
       %project_value_slot.[print_string].[stdout]
         ($Stdlib.camlStdlib__print_string_43_94)
     in
-    (apply ccall inlining_state(depth(20))
+    (apply ccall &toplevel inlining_state(depth(20))
        ($`*extern*`.caml_ml_output : val * val * val * val -> val)
          (stdout, $camlUnbox_dead__immstring_5, 0, 1)
          -> k2 * error

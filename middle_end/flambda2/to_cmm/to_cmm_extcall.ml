@@ -230,14 +230,14 @@ let bind_args_in_evaluation_order args =
           Cmm.Cvar ident :: args ))
     ([], []) (List.rev args)
 
-let callee_symbol_name res apply callee_simple =
+let callee_symbol_name apply callee_simple =
   match callee_simple with
   | None ->
     Misc.fatal_errorf "To_cmm_extcall.callee_symbol_name: no callee:@ %a"
       Apply.print apply
   | Some callee_simple -> (
     match Simple.must_be_symbol callee_simple with
-    | Some (sym, _) -> (To_cmm_result.symbol res sym).sym_name
+    | Some (sym, _) -> Linkage_name.to_string (Symbol.linkage_name sym)
     | None ->
       Misc.fatal_errorf
         "To_cmm_extcall.callee_symbol_name: callee is not a symbol: %a"
@@ -261,7 +261,7 @@ let translate_fat_pointer_external_call env res ~free_vars apply ~callee_simple
     ~args ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
     ~coeffects ~fat_ptr_arg_starts =
   C.fail_if_apply_with_probe apply;
-  let callee = callee_symbol_name res apply callee_simple in
+  let callee = callee_symbol_name apply callee_simple in
   let ty_args =
     List.map C.exttype_of_kind
       (Flambda_arity.unarize (Apply.args_arity apply)
@@ -327,7 +327,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
         ~return_ty:(C.Extended_machtype.to_machtype return_ty)
     in
     (* Make the actual call *)
-    let callee = callee_symbol_name res apply callee_simple in
+    let callee = callee_symbol_name apply callee_simple in
     let returns = Apply.returns apply in
     let effects = To_cmm_effects.transl_c_call_effects effects in
     let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in

@@ -33,24 +33,6 @@ let get_module_info comp_unit =
   then None
   else Compilenv.get_unit_export_info comp_unit
 
-let dump_to_target_if_any main_dump_ppf target ~header ~f a =
-  match (target : Flambda_features.dump_target) with
-  | Nowhere -> ()
-  | Main_dump_stream ->
-    Format.fprintf main_dump_ppf "\n%t%s:%t@ %a@." Flambda_colours.each_file
-      header Flambda_colours.pop f a
-  | File filename ->
-    Misc.protect_output_to_file filename (fun out ->
-        let ppf = Format.formatter_of_out_channel out in
-        f ppf a;
-        Format.pp_print_flush ppf ())
-
-let dump_if_enabled ppf enabled ~header ~f a =
-  let target : Flambda_features.dump_target =
-    if enabled then Main_dump_stream else Nowhere
-  in
-  dump_to_target_if_any ppf target ~header ~f a
-
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
 
@@ -71,20 +53,20 @@ let dump_fexpr_annot ~prefixname suffix unit =
         Format.pp_print_flush ppf ())
 
 let print_rawflambda ppf unit =
-  dump_if_enabled ppf
+  Flambda_dump.if_enabled ppf
     (Flambda_features.dump_rawflambda ())
     ~header:"After CPS conversion" ~f:Flambda_unit.print unit;
-  dump_to_target_if_any ppf
+  Flambda_dump.to_target_if_any ppf
     (Flambda_features.dump_rawfexpr ())
     ~header:"After CPS conversion" ~f:pp_flambda_as_fexpr unit
 
 let print_flambda name condition ppf unit =
   let header = "After " ^ name in
-  dump_if_enabled ppf condition ~header ~f:Flambda_unit.print unit
+  Flambda_dump.if_enabled ppf condition ~header ~f:Flambda_unit.print unit
 
 let print_fexpr name target ppf unit =
   let header = "After " ^ name in
-  dump_to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
+  Flambda_dump.to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
 
 module NO = Flambda2_nominal.Name_occurrences
 
@@ -188,6 +170,9 @@ let flambda_to_flambda0 : type m.
         ~lto_info ) =
     match mode, close_prog_metadata with
     | Classic, Classic (all_code, approxs, free_names, slot_offsets) -> (
+      (* CR gbury: consider running the symbol check here. Currently this cannot
+         be done because from_lambda does not produce code correct wrt that
+         check *)
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = prefixname ^ ".cps_conv" in
@@ -267,8 +252,8 @@ let flambda_to_flambda0 : type m.
             unit = flambda
           } =
         Profile.record_call ~accumulate:true "simplify" (fun () ->
-            Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
-              raw_flambda)
+            Simplify.run ~ppf_dump:ppf ~cmx_loader ~machine_width ~round
+              ~code_slot_offsets raw_flambda)
       in
       (if Flambda_features.inlining_report ()
        then
@@ -306,6 +291,10 @@ let flambda_to_flambda0 : type m.
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
               ~final_typing_env ~free_names flambda
           in
+          (* CR gbury: this checks current fails. @Ekdohibs should probably take
+             a look at that *)
+          if false && Symbol_check.cli_flag ()
+          then Symbol_check.check (Flambda_unit.body flambda);
           ( flambda,
             ~all_code,
             ~slot_offsets,

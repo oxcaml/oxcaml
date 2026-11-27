@@ -23,6 +23,7 @@
     -I An extra directory to add to the load path
     -Ix An extra directory to add to the load path (Like -I, but indicates that cmx files for modules in <dir> are always available)
     -H An extra hidden directory to add to the load path
+    -Hx An extra hidden directory to add to the load path (Like -H, but indicates that cmx files for modules in <dir> are always available)
     --no-cmt-load-path Do not initialize the load path with the paths found in the first input cmt file
     --files-from <file> Read input files from <file>, one per line. Can be repeated.
     --cache-size Set LRU cache size in kb. Will bound memory usage in read-heavy scenarios. Defaults to 1_000_000 (1gb)

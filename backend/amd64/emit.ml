@@ -188,7 +188,8 @@ let zmm_reg_name =
 let register_name typ phys_reg : X86_ast.arg =
   let reg_index = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Val | Addr -> Reg64 int_reg_name.(reg_index)
+  | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Val | Addr ->
+    Reg64 int_reg_name.(reg_index)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(reg_index)
   | Vec256 ->
     I.require_vec256 ();
@@ -335,11 +336,11 @@ let emit_jump s = I.jmp (rel_plt s)
 
 let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
-let emit_cmm_symbol (s : Cmm.symbol) =
+let emit_cmm_symbol (sym_global : Cmm.is_global) sym_name =
   let sym =
-    S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
+    S.create ~visibility:(visibility_of_cmm_global sym_global) sym_name
   in
-  match (s.sym_global : Cmm.is_global) with
+  match sym_global with
   | Global -> `Symbol sym
   (* This label is special in that it is not of the form "Lnumber". Instead, we
      take the symbol, encode it, and turn the resulting string into a label. The
@@ -347,11 +348,6 @@ let emit_cmm_symbol (s : Cmm.symbol) =
   (* CR sspies: Improve the handling of these local symbols in the rest of the
      emission code. *)
   | Local -> `Label (L.create_label_for_local_symbol Text sym)
-
-let emit_cmm_symbol_str (s : Cmm.symbol) =
-  match emit_cmm_symbol s with
-  | `Symbol s -> S.encode s
-  | `Label l -> L.encode l
 
 let load_symbol_addr (s : Cmm.symbol) arg =
   match (s.sym_global : Cmm.is_global) with
@@ -442,7 +438,9 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
     I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
-  | Int | Addr | Val | Mask -> QWORD
+  | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Addr | Val
+  | Mask ->
+    QWORD
   | Float32 -> REAL4
 
 let reg : Reg.t -> X86_ast.arg =
@@ -543,7 +541,12 @@ let addressing addr typ i n =
     let sym_global : Cmm.is_global =
       match sym_global with Global -> Global | Local -> Local
     in
-    mem64_rip typ (emit_cmm_symbol_str { sym_name; sym_global }) ~ofs
+    let sym =
+      match emit_cmm_symbol sym_global sym_name with
+      | `Symbol s -> S.encode s
+      | `Label l -> L.encode l
+    in
+    mem64_rip typ sym ~ofs
   | Iindexed d -> mem64 typ d (arg_idx i n)
   | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg_idx i (n + 1))
   | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg_idx i n)
@@ -556,7 +559,8 @@ let addressing addr typ i n =
 (* A global symbol that maybe calls the GC, suffixed by the class of simd
    register which should be saved *)
 let global_gc_sym ~simd name =
-  Cmm.global_symbol (name ^ Regs.Save_simd_regs.symbol_suffix simd)
+  Cmm.global_symbol ~ty:Cmm.typ_code_pointer
+    (name ^ Regs.Save_simd_regs.symbol_suffix simd)
 
 let must_save_simd_regs live : Regs.Save_simd_regs.t =
   let v128, v256, v512 = ref false, ref false, ref false in
@@ -571,7 +575,9 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
           (* Masks may be used with smaller vectors, but imply zmm support *)
           v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ())
+        | Val | Addr | Int | Static_block | Code_pointer
+        | Out_of_heap_data_pointer ->
+          ())
     live;
   if !v512
   then (
@@ -614,7 +620,11 @@ let compute_live_offset live =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask; _ } ->
+      | { typ =
+            ( Int | Static_block | Code_pointer | Out_of_heap_data_pointer
+            | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask );
+          _
+        } ->
         ())
     live;
   !live_offset
@@ -652,10 +662,8 @@ type gc_call =
 let call_gc_sites = ref ([] : gc_call list)
 
 let call_gc_local_sym ~simd : Cmm.symbol =
-  { sym_name =
-      Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd);
-    sym_global = Local
-  }
+  Cmm.local_symbol ~ty:Cmm.typ_code_pointer
+    (Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd))
 
 let emit_call_gc gc =
   D.define_label gc.gc_lbl;
@@ -713,8 +721,12 @@ let emit_call_safety_error kind sc =
   D.define_label sc.sc_lbl;
   emit_debug_info sc.sc_dbg;
   (match kind with
-  | Bound_check -> emit_call (Cmm.global_symbol "caml_ml_array_bound_error")
-  | Align_check -> emit_call (Cmm.global_symbol "caml_ml_array_align_error"));
+  | Bound_check ->
+    emit_call
+      (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_ml_array_bound_error")
+  | Align_check ->
+    emit_call
+      (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_ml_array_align_error"));
   D.define_label sc.sc_frame
 
 let clear_safety_checks () =
@@ -729,13 +741,15 @@ let emit_call_safety_errors () =
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_bound_error"));
+    emit_call
+      (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_ml_array_bound_error"));
   List.iter (emit_call_safety_error Align_check) align_checks.sc_sites;
   match align_checks.sc_call with
   | None -> ()
   | Some sc_call ->
     D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_align_error")
+    emit_call
+      (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_ml_array_align_error")
 
 (* Stack reallocation *)
 type stack_realloc =
@@ -1277,8 +1291,10 @@ let move (src : Reg.t) (dst : Reg.t) =
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
     if distinct then movss (reg src) (reg dst)
-  | (Int | Val | Addr), (Reg _ | Stack _), (Int | Val | Addr), (Reg _ | Stack _)
-    ->
+  | ( (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      (Reg _ | Stack _),
+      (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer),
+      (Reg _ | Stack _) ) ->
     if distinct then I.mov (reg src) (reg dst)
   | _, Unknown, _, (Reg _ | Stack _ | Unknown)
   | _, (Reg _ | Stack _), _, Unknown ->
@@ -1286,7 +1302,7 @@ let move (src : Reg.t) (dst : Reg.t) =
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
   | ( ( Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Int | Val | Addr
-      | Valx2 ),
+      | Static_block | Code_pointer | Out_of_heap_data_pointer | Valx2 ),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1299,7 +1315,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
   if not (Reg.equal_location src.loc dst.loc)
   then
     match src.typ with
-    | Int | Val ->
+    | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Val ->
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
@@ -1441,7 +1457,9 @@ end = struct
       | Byte_unsigned | Byte_signed -> I8
       | Sixteen_unsigned | Sixteen_signed -> I16
       | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> I32
-      | Word_int | Word_mask | Word_val | Double -> I64
+      | Word_int | Word_static_block | Word_code_pointer
+      | Word_out_of_heap_data_pointer | Word_mask | Word_val | Double ->
+        I64
       | Onetwentyeight_unaligned | Onetwentyeight_aligned -> I128
       | Twofiftysix_unaligned | Twofiftysix_aligned -> I256
       | Fivetwelve_unaligned | Fivetwelve_aligned -> I512
@@ -1676,6 +1694,7 @@ end = struct
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
         | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+        | Word_static_block | Word_code_pointer | Word_out_of_heap_data_pointer
         | Word_mask | Word_val | Double | Onetwentyeight_aligned ->
           emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
@@ -2268,17 +2287,24 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
-      load_symbol_addr (Cmm.global_symbol func) rax;
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_code_pointer func) rax;
       (match stack_align with
-      | Align_16 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args")
-      | Align_32 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx")
+      | Align_16 ->
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_c_call_stack_args")
+      | Align_32 ->
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_code_pointer
+             "caml_c_call_stack_args_avx")
       | Align_64 ->
-        emit_call (Cmm.global_symbol "caml_c_call_stack_args_avx512"));
+        emit_call
+          (Cmm.global_symbol ~ty:Cmm.typ_code_pointer
+             "caml_c_call_stack_args_avx512"));
       record_frame i.live (Dbg_other i.dbg))
     else if alloc
     then (
-      load_symbol_addr (Cmm.global_symbol func) rax;
-      emit_call (Cmm.global_symbol "caml_c_call");
+      load_symbol_addr (Cmm.global_symbol ~ty:Cmm.typ_code_pointer func) rax;
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_c_call");
       record_frame i.live (Dbg_other i.dbg))
     else
       let switch_stacks = not Config.no_stack_checks in
@@ -2291,7 +2317,7 @@ let emit_instr ~first ~last ~fallthrough i =
            through this unless we were to tag this calling frame with
            cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
-      emit_call (Cmm.global_symbol func);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_code_pointer func);
       if switch_stacks
       then (
         I.mov r13 rsp;
@@ -2304,7 +2330,9 @@ let emit_instr ~first ~last ~fallthrough i =
       instruction address dest
     in
     match memory_chunk with
-    | Word_int | Word_val -> load ~dest:(res i 0) QWORD I.mov
+    | Word_int | Word_static_block | Word_code_pointer
+    | Word_out_of_heap_data_pointer | Word_val ->
+      load ~dest:(res i 0) QWORD I.mov
     | Word_mask ->
       load ~dest:(res i 0) QWORD (fun src dst ->
           I.simd kmovq_K_Km64 [| src; dst |])
@@ -2346,7 +2374,9 @@ let emit_instr ~first ~last ~fallthrough i =
       instruction src address
     in
     match chunk with
-    | Word_int | Word_val -> store QWORD arg I.mov
+    | Word_int | Word_static_block | Word_code_pointer
+    | Word_out_of_heap_data_pointer | Word_val ->
+      store QWORD arg I.mov
     | Word_mask ->
       store QWORD arg (fun src dst -> I.simd kmovq_m64_K [| src; dst |])
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
@@ -2803,7 +2833,7 @@ let emit_instr ~first ~last ~fallthrough i =
     stack_offset := !stack_offset - 16
   | Lraise k -> (
     let call_raise sym =
-      emit_call (Cmm.global_symbol sym);
+      emit_call (Cmm.global_symbol ~ty:Cmm.typ_code_pointer sym);
       record_frame Reg.Set.empty (Dbg_raise i.dbg);
       (* Add a nop if this is the last instruction of this function, so that the
          return address (used in backtraces) lies in the right function. *)
@@ -2920,7 +2950,9 @@ let fundecl fundecl =
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
   if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
-  then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
+  then
+    emit_call
+      (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
@@ -3054,7 +3086,8 @@ let begin_assembly unix =
   (* PR#4690 *)
   Regs.Save_simd_regs.all
   |> List.iter (fun simd ->
-      (match emit_cmm_symbol (call_gc_local_sym ~simd) with
+      let sym = call_gc_local_sym ~simd in
+      (match emit_cmm_symbol sym.sym_global sym.sym_name with
       | `Symbol sym -> D.define_symbol_label ~section:Text sym
       | `Label lbl -> D.define_label lbl);
       D.cfi_startproc ();
@@ -3125,7 +3158,9 @@ let size_of_regs regs =
   Array.fold_right
     (fun r acc ->
       match r.Reg.typ with
-      | Int | Addr | Val -> acc + size_int
+      | Int | Addr | Val | Static_block | Code_pointer
+      | Out_of_heap_data_pointer ->
+        acc + size_int
       | Float | Float32 ->
         (* Float32 slots still take up a full word *)
         acc + size_float
@@ -3143,7 +3178,9 @@ let stack_locations ~offset regs =
           n
           +
           match r.Reg.typ with
-          | Int | Val | Addr -> size_int
+          | Int | Val | Addr | Static_block | Code_pointer
+          | Out_of_heap_data_pointer ->
+            size_int
           | Float | Float32 ->
             (* Float32 slots still take up a full word *)
             size_float
@@ -3236,7 +3273,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   I.mov (reg saved_r15) r15;
   (* Emit call to handler *)
   add_used_symbol handler_code_sym;
-  emit_call (Cmm.global_symbol handler_code_sym);
+  emit_call (Cmm.global_symbol ~ty:Cmm.typ_code_pointer handler_code_sym);
   (* Record a frame description for the wrapper *)
   let label = Cmm.new_label () in
   let live_offset =
@@ -3246,7 +3283,9 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 -> acc
+          | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Float
+          | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+            acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

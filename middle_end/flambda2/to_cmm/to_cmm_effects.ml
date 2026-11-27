@@ -44,10 +44,11 @@ type let_binding_classification =
 
 let classify_let_binding var
     ~(effects_and_coeffects_of_defining_expr : Effects_and_coeffects.t)
-    ~(num_normal_occurrences_of_bound_vars : Num_occurrences.t Variable.Map.t) =
-  match Variable.Map.find var num_normal_occurrences_of_bound_vars with
+    ~(num_occurrences_of_bound_vars :
+       Num_occurrences.By_name_mode.t Variable.Map.t) =
+  match Variable.Map.find var num_occurrences_of_bound_vars with
   | exception Not_found -> Regular
-  | Zero -> (
+  | { Num_occurrences.By_name_mode.normal = Zero; phantom = _ } -> (
     match
       classify_by_effects_and_coeffects effects_and_coeffects_of_defining_expr
     with
@@ -56,7 +57,7 @@ let classify_let_binding var
       Regular
       (* Could be May_inline technically, but it doesn't matter since it can
          only be flushed by the env. *))
-  | One -> (
+  | { normal = One; phantom = _ } -> (
     (* This case represents expressions that are guaranteed to be evaluated at
        most once at runtime (and thus do not include expressions inside loops).
 
@@ -72,7 +73,7 @@ let classify_let_binding var
     match effects_and_coeffects_of_defining_expr with
     | _, _, Delay, _ -> Must_inline_once
     | _, _, Strict, _ -> May_inline_once)
-  | More_than_one -> (
+  | { normal = More_than_one; phantom = _ } -> (
     (* Note: expressions in loops are counted as having two occurrences to
        ensure that they fall into this case *)
     match effects_and_coeffects_of_defining_expr with

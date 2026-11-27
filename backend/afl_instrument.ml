@@ -20,7 +20,7 @@ open Cmm
 module V = Backend_var
 module VP = Backend_var.With_provenance
 
-let sym s = { sym_name = s; sym_global = Global }
+let sym s = global_symbol ~ty:typ_out_of_heap_data_pointer s
 let afl_area_ptr dbg = Cconst_symbol (sym "caml_afl_area_ptr", dbg)
 let afl_prev_loc dbg = Cconst_symbol (sym "caml_afl_prev_loc", dbg)
 let afl_map_size = 1 lsl 16
@@ -43,7 +43,7 @@ let rec with_afl_logging b dbg =
     let afl_area = V.create_local "shared_mem" in
     let op oper args = Cop (oper, args, dbg) in
     Clet(VP.create afl_area,
-         op (Cload ({memory_chunk=Word_int;
+         op (Cload ({memory_chunk=Word_out_of_heap_data_pointer;
                      mutability=Asttypes.Mutable;
                      is_atomic=false})) [afl_area_ptr dbg],
          Clet(VP.create cur_pos, op Cxor [op (Cload {memory_chunk=Word_int;

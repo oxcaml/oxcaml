@@ -5,6 +5,8 @@ module Name : sig
   val of_string : string -> t
 
   val to_string : t -> string
+
+  val equal : t -> t -> bool
 end
 
 module NumberTy : sig
@@ -65,7 +67,7 @@ module Number : sig
 
   val of_integral_bits : NumberTy.Base.t -> int64 -> t
 
-  val to_code : t -> Parsetree.expression
+  val to_code : unboxed:bool -> t -> Parsetree.expression
 end
 
 module Ty : sig
@@ -78,6 +80,7 @@ module Ty : sig
     | Or_null of t
     | Bool
     | String
+    | Arrow of t * t
 
   and record =
     { id : int;
@@ -102,6 +105,13 @@ module Ty : sig
     }
 
   val equal : t -> t -> bool
+
+  (** [curry [a; b] c] is [a -> b -> c]. *)
+  val curry : t list -> t -> t
+
+  (** [uncurry (a -> b -> c)] is [([a; b], c)], and [uncurry ty] is [([], ty)]
+      if [ty] is not a function type. *)
+  val uncurry : t -> t list * t
 
   val variant_name : variant -> string
 
@@ -155,6 +165,21 @@ module Exn : sig
   val to_code : t -> Parsetree.structure_item option
 end
 
+(** Effects, each with a handler function that runs a computation and resumes
+    every [perform] with a function of its payload. *)
+module Eff : sig
+  type t =
+    { id : int;
+      payload : Ty.t;  (** A value type. *)
+      result : Ty.t  (** The type of [perform]. A value type. *)
+    }
+
+  val equal : t -> t -> bool
+
+  (** The declaration of the effect and of its handler function. *)
+  val to_code : t -> Parsetree.structure_item list
+end
+
 module Handler : sig
   type pattern =
     | Exn of
@@ -163,9 +188,16 @@ module Handler : sig
         }
     | Catch_all
 
+  (** Raise the caught exception, bound to [name], again after the body. *)
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
   type 'body t =
     { pattern : pattern;
-      body : 'body
+      body : 'body;
+      reraise : reraise option  (** Only for [Exn] patterns. *)
     }
 end
 
@@ -199,21 +231,30 @@ module Bin_op : sig
     | Max
     | Min_num
     | Max_num
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq (* CR-someday xclerc: Also add non-equality. *)
+    | Eq
+    | Ne
     | Lt
     | Le
     | Gt
     | Ge
+    | Compare
+    | Unsigned_compare
     | And
     | Or
 
-  val ops_for_ty : Ty.t -> t list
+  (** Numeric operations returning [ty]. *)
+  val numeric_ops_for_ty : Ty.t -> t list
+
+  (** Comparisons of operands of type [ty], returning a boxed [int]. *)
+  val compare_ops_for_ty : Ty.t -> t list
 
   val to_code :
     Ty.t ->
@@ -223,9 +264,19 @@ module Bin_op : sig
     Parsetree.expression
 end
 
+module Inline : sig
+  type t =
+    | Never
+    | Always
+    | Default
+end
+
 module Expr : sig
   type t =
-    | Const of Number.t
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
     | Bool_const of bool
     | String_const of string
     | String_length of t
@@ -254,7 +305,7 @@ module Expr : sig
           init_name : Name.t;
           init : t
         }
-    | Unboxed_tuple of (Name.t * t) list
+    | Unboxed_tuple of t list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -266,7 +317,7 @@ module Expr : sig
     | Construct of
         { sum : Sum.t;
           constructor : Ty.constructor;
-          args : (Name.t * t) list
+          args : t list
         }
     | Match of
         { sum : Sum.t;
@@ -300,6 +351,42 @@ module Expr : sig
           body : t;
           handlers : t Handler.t list
         }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }  (** An anonymous function, which may capture variables. *)
+    | Apply of
+        { func : t;
+          args : t list
+        }  (** Application of a function value. *)
+    | Let_rec of
+        { functions : (Name.t * t) list;
+              (** Each function must be a [Lambda]. *)
+          body : t
+        }  (** Local mutually recursive functions. *)
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;  (** A value type. *)
+          body : t;
+          resume : t  (** A function from the payload of [eff] to its result. *)
+        }
+        (** Evaluates [body] in a handler of [eff], which resumes every
+            [perform] with [resume] applied to its payload. *)
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;  (** A [Lambda], allocated on the stack. *)
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
+        }  (** Not a tail call, as a local function cannot be one. *)
 
   and raise =
     { exn : Exn.t;
@@ -382,13 +469,6 @@ module Statement : sig
   val sequence : t -> t -> t
 
   val to_code : t -> Parsetree.expression
-end
-
-module Inline : sig
-  type t =
-    | Never
-    | Always
-    | Default
 end
 
 module Function : sig

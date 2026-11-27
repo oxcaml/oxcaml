@@ -654,9 +654,8 @@ let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
-  (* The [add_int_addr] case is only used for string access, and it seems
-     unlikely that the more complicated optimizations done for [add_int] will
-     apply.
+  (* It seems unlikely that the more complicated optimizations done for
+     [add_int] will apply in the [add_int_addr] case.
 
      For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
   if ptr_out_of_heap
@@ -696,7 +695,8 @@ and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
   | Byte_unsigned | Byte_signed -> 8
   | Sixteen_unsigned | Sixteen_signed -> 16
   | Thirtytwo_unsigned | Thirtytwo_signed -> 32
-  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Word_int | Word_static_block | Word_code_pointer
+  | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     arch_bits
@@ -1126,7 +1126,8 @@ let store ~dbg memory_chunk init ~addr ~new_value =
     | Byte_unsigned | Byte_signed -> low_bits ~bits:8 ~dbg new_value
     | Sixteen_unsigned | Sixteen_signed -> low_bits ~bits:16 ~dbg new_value
     | Thirtytwo_unsigned | Thirtytwo_signed -> low_bits ~bits:32 ~dbg new_value
-    | Word_int | Word_mask | Word_val | Single _ | Double
+    | Word_int | Word_static_block | Word_code_pointer
+    | Word_out_of_heap_data_pointer | Word_mask | Word_val | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
       new_value
@@ -1202,8 +1203,7 @@ let same_simple_value (e1 : expression) (e2 : expression) =
   | Cvar v1, Cvar v2 -> V.same v1 v2
   | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
   | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
-  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
-    String.equal s1.sym_name s2.sym_name
+  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
   | _ -> false
 
 (** Whether [cond] is an equality test between the two arms of a [csel], so that
@@ -1507,7 +1507,7 @@ let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 let divide_by_zero_message = "Division by zero after check"
 
 let divide_by_zero_message_symbol =
-  { sym_name = "caml_divide_by_zero_uncaught"; sym_global = Global }
+  global_symbol ~ty:typ_static_block "caml_divide_by_zero_uncaught"
 
 let divide_by_zero dividend ~dbg:_ =
   bind "dividend" dividend (fun _ ->
@@ -1752,7 +1752,8 @@ let box_float32 dbg mode exp =
   Cop
     ( Calloc (mode, Alloc_block_kind_float32),
       [ alloc_boxedfloat32_header mode dbg;
-        Cconst_symbol (global_symbol caml_float32_ops, dbg);
+        Cconst_symbol
+          (global_symbol ~ty:typ_out_of_heap_data_pointer caml_float32_ops, dbg);
         exp ],
       dbg )
 
@@ -1921,7 +1922,9 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
-  | Word_int -> size_int
+  | Word_int | Word_static_block | Word_code_pointer
+  | Word_out_of_heap_data_pointer ->
+    size_int
   | Word_mask -> size_int
   | Word_val -> size_addr
   | Double -> size_float
@@ -1948,7 +1951,7 @@ let get_field_gen mut ptr n dbg =
   get_field_gen_given_memory_chunk Word_val mut ptr n dbg
 
 let get_field_codepointer mut ptr n dbg =
-  get_field_gen_given_memory_chunk Word_int mut ptr n dbg
+  get_field_gen_given_memory_chunk Word_code_pointer mut ptr n dbg
 
 let set_field ptr n newval init dbg =
   Cop (Cstore (Word_val, init), [field_address ptr n dbg; newval], dbg)
@@ -2494,7 +2497,8 @@ let string_length exp dbg =
 
 let bigstring_get_alignment ba idx align dbg =
   bind "ba_data"
-    (Cop (mk_load_mut Word_int, [field_address ba 1 dbg], dbg))
+    (Cop
+       (mk_load_mut Word_out_of_heap_data_pointer, [field_address ba 1 dbg], dbg))
     (fun ba_data ->
       Cop
         ( Cand,
@@ -2536,19 +2540,6 @@ module Extended_machtype_component = struct
     | Vec512
     | Mask
     | Float32
-
-  let of_machtype_component (component : machtype_component) =
-    match component with
-    | Val -> Val
-    | Addr -> Addr
-    | Int -> Any_int
-    | Float -> Float
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Mask -> Mask
-    | Float32 -> Float32
-    | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
   let to_machtype_component t : machtype_component =
     match t with
@@ -2599,9 +2590,6 @@ module Extended_machtype = struct
 
   let typ_void = [||]
 
-  let of_machtype machtype =
-    Array.map Extended_machtype_component.of_machtype_component machtype
-
   let to_machtype t =
     Array.map Extended_machtype_component.to_machtype_component t
 
@@ -2641,6 +2629,9 @@ let machtype_identifier t =
     match component with
     | Val -> 'V'
     | Int -> 'I'
+    | Static_block -> 'B'
+    | Code_pointer -> 'C'
+    | Out_of_heap_data_pointer -> 'P'
     | Float -> 'F'
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
@@ -2666,10 +2657,11 @@ let send_function_name arity result (mode : Cmx_format.return_mode) =
   let suff =
     match mode with Not_alloc_stack -> "" | Maybe_alloc_stack -> "L"
   in
-  global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
+  global_symbol ~ty:typ_code_pointer
+    ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
-let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
-    =
+let call_cached_method obj tag cache pos args args_type result (apos, mode)
+    ~returns dbg =
   Compilenv.need_send_fun
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
@@ -2684,7 +2676,8 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     ( Capply
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
-          callees = Some [sym]
+          callees = Some [sym];
+          returns
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
@@ -2707,7 +2700,9 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_mask | Word_val -> 1
+  | Word_int | Word_static_block | Word_code_pointer
+  | Word_out_of_heap_data_pointer | Word_mask | Word_val ->
+    1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2721,7 +2716,9 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int | Word_mask -> generic_case ()
+  | Word_int | Word_static_block | Word_code_pointer
+  | Word_out_of_heap_data_pointer | Word_mask ->
+    generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2739,8 +2736,8 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
       "Fields with memory_chunk %s are not supported in generic allocations"
       (Printcmm.chunk memory_chunk)
 
-let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
-    args_memory_chunks =
+let make_alloc_generic ~strict_init ~block_kind ~mode ~alloc_block_kind dbg tag
+    wordsize args args_memory_chunks =
   (* allocs of size 0 must be statically allocated else the Gc will bug *)
   assert (List.compare_length_with args 0 > 0);
   if Cmm.Alloc_mode.is_local mode || wordsize <= Config.max_young_wosize
@@ -2751,52 +2748,87 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
       | Heap -> block_header ~block_kind tag wordsize
     in
     Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
-  else
-    let id = V.create_local "*alloc*" in
-    let rec fill_fields idx args memory_chunks =
-      match args, memory_chunks with
-      | [], [] -> Cvar id
-      | e1 :: el, m1 :: ml ->
-        let ofs = memory_chunk_size_in_words_for_mixed_block m1 in
-        Csequence
-          ( alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg,
-            fill_fields (idx + ofs) el ml )
-      | _ ->
-        Misc.fatal_errorf
-          "To_cmm_helpers.make_alloc_generic: mismatched list sizes between \
-           fields and memory chunks"
-    in
-    let caml_alloc_func, caml_alloc_args =
-      match block_kind with
-      | Regular_block -> "caml_alloc_shr_check_gc", [wordsize; tag]
-      | Mixed_block { scannable_prefix } ->
-        Mixed_block_support.assert_mixed_block_support ();
-        "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
-    in
-    Clet
-      ( VP.create id,
-        Cop
-          ( Cextcall
-              { func = caml_alloc_func;
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = []
-              },
-            List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
-            dbg ),
-        fill_fields 0 args args_memory_chunks )
+  else begin
+    (* Note on [strict_init]:
 
-let make_alloc ~mode dbg ~tag args =
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag (List.length args)
-    ~alloc_block_kind:Alloc_block_kind_other args
+       If we're not in the strict case, we generate a call to [caml_alloc],
+       which returns a GC-safe block that we can then initialize field by field,
+       computing the field expressions right when needed. Assuming that the set
+       of free variables of the field expressions is smaller than the number of
+       fields (which is assumed to be the most common case for large
+       allocations), this reduces the number of registers to keep live across
+       the allocation function, improving compile times and even execution
+       times.
+
+       The strict case, however, is for allocations where it is not safe to
+       expose the result to the GC before it has been initialized properly. So
+       we need to use [caml_alloc_shr_check_gc], which will check for urgent GC
+       before allocating the block instead of after, and we need to make sure
+       that no GC can occur between the allocation and the initialization. This
+       is done by binding the field expressions to variables if they're not
+       simple enough, then allocating the block, then patching it using
+       constructions that are never going to trigger a GC. *)
+    let do_alloc args =
+      let id = V.create_local "*alloc*" in
+      let rec fill_fields acc idx args memory_chunks =
+        match args, memory_chunks with
+        | [], [] -> acc
+        | e1 :: el, m1 :: ml ->
+          let ofs = memory_chunk_size_in_words_for_mixed_block m1 in
+          let acc =
+            Csequence
+              (alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg, acc)
+          in
+          fill_fields acc (idx + ofs) el ml
+        | _ ->
+          Misc.fatal_errorf
+            "To_cmm_helpers.make_alloc_generic: mismatched list sizes between \
+             fields and memory chunks"
+      in
+      let caml_alloc_func, caml_alloc_args =
+        match block_kind with
+        | Regular_block ->
+          ( (if strict_init then "caml_alloc_shr_check_gc" else "caml_alloc"),
+            [wordsize; tag] )
+        | Mixed_block { scannable_prefix } ->
+          Mixed_block_support.assert_mixed_block_support ();
+          "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
+      in
+      Clet
+        ( VP.create id,
+          Cop
+            ( Cextcall
+                { func = caml_alloc_func;
+                  ty = typ_val;
+                  alloc = true;
+                  builtin = false;
+                  returns = true;
+                  effects = Arbitrary_effects;
+                  coeffects = Has_coeffects;
+                  ty_args = []
+                },
+              List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
+              dbg ),
+          fill_fields (Cvar id) 0 args args_memory_chunks )
+    in
+    let rec bind_args_then_alloc simple_args = function
+      | [] -> do_alloc simple_args
+      | arg :: args_rev ->
+        bind "alloc_arg" arg (fun arg ->
+            bind_args_then_alloc (arg :: simple_args) args_rev)
+    in
+    if strict_init
+    then bind_args_then_alloc [] (List.rev args)
+    else do_alloc args
+  end
+
+let make_alloc ~strict_init ~mode dbg ~tag args =
+  make_alloc_generic ~strict_init ~block_kind:Regular_block ~mode dbg tag
+    (List.length args) ~alloc_block_kind:Alloc_block_kind_other args
     (List.map (fun _ -> Word_val) args)
 
 let make_float_alloc ~mode dbg ~tag args =
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag
+  make_alloc_generic ~strict_init:false ~block_kind:Regular_block ~mode dbg tag
     ~alloc_block_kind:Alloc_block_kind_float
     (List.length args * size_float / size_addr)
     args
@@ -2809,10 +2841,11 @@ let make_closure_alloc ~mode dbg ~tag args args_memory_chunks =
         acc + memory_chunk_size_in_words_for_mixed_block memory_chunk)
       0 args_memory_chunks
   in
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag size args
-    ~alloc_block_kind:Alloc_block_kind_closure args_memory_chunks
+  make_alloc_generic ~strict_init:true ~block_kind:Regular_block ~mode dbg tag
+    size args ~alloc_block_kind:Alloc_block_kind_closure args_memory_chunks
 
-let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
+let make_mixed_alloc ~strict_init ~mode dbg ~tag ~value_prefix_size args
+    args_memory_chunks =
   let size =
     List.fold_left
       (fun ofs memory_chunk ->
@@ -2836,26 +2869,28 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         then
           (* regular scanned part of a block *)
           match memory_chunk with
-          | Word_int | Word_val -> ok ()
+          | Word_int | Word_static_block | Word_val -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Word_mask ->
+          | Fivetwelve_aligned | Word_mask | Word_code_pointer
+          | Word_out_of_heap_data_pointer ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)
           match memory_chunk with
-          | Word_int | Word_mask | Thirtytwo_unsigned | Thirtytwo_signed
-          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-          | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
-          | Sixteen_unsigned | Sixteen_signed ->
+          | Word_int | Word_static_block | Word_code_pointer
+          | Word_out_of_heap_data_pointer | Word_mask | Thirtytwo_unsigned
+          | Thirtytwo_signed | Double | Onetwentyeight_unaligned
+          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+          | Fivetwelve_unaligned | Fivetwelve_aligned | Single _ | Byte_unsigned
+          | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
             ok ()
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
-  make_alloc_generic
+  make_alloc_generic ~strict_init
     ~block_kind:(Mixed_block { scannable_prefix = value_prefix_size })
     ~alloc_block_kind:Alloc_block_kind_other ~mode dbg tag size args
     args_memory_chunks
@@ -2876,7 +2911,7 @@ let apply_function_sym arity result mode =
   let result = Extended_machtype.change_tagged_int_to_val result in
   assert (List.length arity > 0);
   Compilenv.need_apply_fun arity result mode;
-  global_symbol (apply_function_name arity result mode)
+  global_symbol ~ty:typ_code_pointer (apply_function_name arity result mode)
 
 let tuplify_function_name arity result =
   "caml_tuplify" ^ Int.to_string arity ^ result_layout_suffix result
@@ -2902,14 +2937,13 @@ let curry_function_sym_name function_kind arity result =
     tuplify_function_name (List.length arity) result
 
 let curry_function_sym function_kind arity result =
-  { sym_name = curry_function_sym_name function_kind arity result;
-    sym_global = Global
-  }
+  global_symbol ~ty:typ_code_pointer
+    (curry_function_sym_name function_kind arity result)
 
 let fail_if_called_indirectly_name = "caml_fail_if_called_indirectly"
 
 let fail_if_called_indirectly_sym =
-  { sym_name = fail_if_called_indirectly_name; sym_global = Global }
+  global_symbol ~ty:typ_code_pointer fail_if_called_indirectly_name
 
 (* Big arrays *)
 
@@ -2956,7 +2990,7 @@ let operations_boxed_int (bi : Primitive.boxed_integer) =
     | Boxed_int32 -> caml_int32_ops
     | Boxed_int64 -> caml_int64_ops
   in
-  global_symbol sym_name
+  global_symbol ~ty:typ_out_of_heap_data_pointer sym_name
 
 let alloc_header_boxed_int (bi : Primitive.boxed_integer) mode dbg =
   match bi with
@@ -3493,7 +3527,7 @@ let make_switch arg cases actions dbg =
       (Const_table
          ( Local,
            Array.to_list (Array.map (fun act -> const_actions.(act)) cases) ));
-    let table_sym = { sym_name = table; sym_global = Local } in
+    let table_sym = local_symbol ~ty:typ_out_of_heap_data_pointer table in
     addr_array_ref (Cconst_symbol (table_sym, dbg)) (tag_int arg dbg) dbg
   in
   let make_affine_computation ~offset ~slope arg dbg =
@@ -3710,7 +3744,8 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
+let call_caml_apply extended_ty extended_args_type mut clos args pos mode
+    ~returns dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
   let ty = Extended_machtype.to_machtype extended_ty in
@@ -3718,7 +3753,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     let sym = apply_function_sym extended_args_type extended_ty mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
     Cop
-      ( Capply { result_type = ty; region = pos; callees = Some [sym] },
+      ( Capply { result_type = ty; region = pos; callees = Some [sym]; returns },
         cargs,
         dbg )
   in
@@ -3746,7 +3781,12 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                 dbg,
                 Branch_annotations.default,
                 Cop
-                  ( Capply { result_type = ty; region = pos; callees = None },
+                  ( Capply
+                      { result_type = ty;
+                        region = pos;
+                        callees = None;
+                        returns
+                      },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3773,7 +3813,7 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
            Csequence (Cop (Cendregion, [old_region], dbg ()), Cvar res) )),
       dbg () )
 
-let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
+let apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg =
   match arity with
   | [_] ->
     bind "fun" clos (fun clos ->
@@ -3781,33 +3821,36 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
           ( Capply
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
-                callees = None
+                callees = None;
+                returns
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
-  | _ -> call_caml_apply result arity mut clos args pos mode dbg
+  | _ -> call_caml_apply result arity mut clos args pos mode ~returns dbg
 
 let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
-    mode dbg =
+    mode ~returns dbg =
   match split_arity_for_apply arity args with
   | (arity, args), None -> (
     match old_region with
-    | None -> apply_or_call_caml_apply result arity mut clos args pos mode dbg
+    | None ->
+      apply_or_call_caml_apply result arity mut clos args pos mode ~returns dbg
     | Some old_region ->
       maybe_reset_current_region ~dbg:placeholder_dbg
         ~body_tail:
-          (apply_or_call_caml_apply result arity mut clos args pos mode dbg)
+          (apply_or_call_caml_apply result arity mut clos args pos mode ~returns
+             dbg)
         ~body_nontail:
           (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Maybe_alloc_stack dbg)
+             Cmx_format.Maybe_alloc_stack ~returns dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
         (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
+           Cmx_format.Maybe_alloc_stack ~returns:true dbg) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
-            pos mode dbg)
+            pos mode ~returns dbg)
     in
     (* When splitting [caml_applyM] into [caml_applyN] and [caml_applyK] it is
        possible for [caml_applyN] to allocate on the local stack. If we are not
@@ -3826,23 +3869,25 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
         (fun region -> body (Some region))
     | _ -> body old_region)
 
-let generic_apply mut clos args args_type result (pos, mode) dbg =
-  might_split_call_caml_apply result args_type mut clos args pos mode dbg
+let generic_apply mut clos args args_type result (pos, mode) ~returns dbg =
+  might_split_call_caml_apply result args_type mut clos args pos mode ~returns
+    dbg
 
-let send kind met obj args args_type result akind dbg =
+let send kind met obj args args_type result akind ~returns dbg =
   let call_met obj args args_type clos =
     (* met is never a simple expression, so it never gets turned into an
        Immutable load *)
     generic_apply Asttypes.Mutable clos (obj :: args)
       (Extended_machtype.typ_val :: args_type)
-      result akind dbg
+      result akind ~returns dbg
   in
   bind "obj" obj (fun obj ->
       match (kind : Lambda.meth_kind), args, args_type with
       | Self, _, _ ->
         bind "met" (lookup_label obj met dbg) (call_met obj args args_type)
       | Cached, cache :: pos :: args, _ :: _ :: args_type ->
-        call_cached_method obj met cache pos args args_type result akind dbg
+        call_cached_method obj met cache pos args args_type result akind
+          ~returns dbg
       | _ -> bind "met" (lookup_tag obj met dbg) (call_met obj args args_type))
 
 (*
@@ -4001,7 +4046,12 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     | [arg] -> (
       let app =
         Cop
-          ( Capply { result_type = result; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = result;
+                region = Rc_normal;
+                callees = None;
+                returns = true
+              },
             (* The code pointer and closure info of a closure are write-once;
                reading them immutably is correct and lets the debugger describe
                the call target (and closure projections) for call sites. *)
@@ -4024,7 +4074,11 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
         ( VP.create newclos,
           Cop
             ( Capply
-                { result_type = typ_val; region = Rc_normal; callees = None },
+                { result_type = typ_val;
+                  region = Rc_normal;
+                  callees = None;
+                  returns = true
+                },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -4056,7 +4110,12 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
           dbg (),
           Branch_annotations.default,
           Cop
-            ( Capply { result_type = result; region = Rc_normal; callees = None },
+            ( Capply
+                { result_type = result;
+                  region = Rc_normal;
+                  callees = None;
+                  returns = true
+                },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -4148,7 +4207,9 @@ let send_function (arity, result, mode) =
 let apply_function (arity, result, mode) =
   let args, clos, body = apply_function_body arity result mode in
   let all_args = List.combine args arity @ [clos, typ_val] in
-  let fun_name = global_symbol (apply_function_name arity result mode) in
+  let fun_name =
+    global_symbol ~ty:typ_code_pointer (apply_function_name arity result mode)
+  in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
     { fun_name;
@@ -4183,14 +4244,21 @@ let tuplify_function arity return =
       get_field_gen Asttypes.Mutable (Cvar arg) i (dbg ())
       :: access_components (i + 1)
   in
-  let fun_name = global_symbol (tuplify_function_name arity return) in
+  let fun_name =
+    global_symbol ~ty:typ_code_pointer (tuplify_function_name arity return)
+  in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   Cfunction
     { fun_name;
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply { result_type = return; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = return;
+                region = Rc_normal;
+                callees = None;
+                returns = true
+              },
             (* The closure code pointer is write-once; see
                [apply_function_body]. *)
             get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
@@ -4247,7 +4315,8 @@ let machtype_stored_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-      | Val | Int -> cur + 1
+      | Val | Int | Static_block | Code_pointer | Out_of_heap_data_pointer ->
+        cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -4265,7 +4334,7 @@ let machtype_non_scanned_size t =
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
       | Val -> cur
-      | Int -> cur + 1
+      | Int | Static_block | Code_pointer | Out_of_heap_data_pointer -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -4286,7 +4355,9 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
+        | Int | Static_block | Code_pointer | Out_of_heap_data_pointer | Float
+        | Float32 | Vec128 | Vec256 | Vec512 | Mask ->
+          true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -4308,6 +4379,15 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         match (c : machtype_component) with
         | Int ->
           (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
+        | Static_block ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_static_block non_scanned_pos )
+        | Code_pointer ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_code_pointer non_scanned_pos )
+        | Out_of_heap_data_pointer ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_out_of_heap_data_pointer non_scanned_pos )
         | Float ->
           ( (non_scanned_pos + ints_per_float, scanned_pos),
             load Double non_scanned_pos )
@@ -4343,7 +4423,12 @@ let rec make_curry_apply result narity args_type args clos n =
   match args_type with
   | [] ->
     Cop
-      ( Capply { result_type = result; region = Rc_normal; callees = None },
+      ( Capply
+          { result_type = result;
+            region = Rc_normal;
+            callees = None;
+            returns = true
+          },
         (* Code pointer and chain links of a partial-application closure are
            write-once; reading them immutably lets the debugger describe the
            call target and the recovered arguments as closure projections. *)
@@ -4368,7 +4453,7 @@ let final_curry_function nlocal arity result =
   let last_clos = V.create_local "clos" in
   let narity = List.length arity in
   let fun_name =
-    global_symbol
+    global_symbol ~ty:typ_code_pointer
       (curry_function_sym_name (Lambda.Curried { nlocal }) arity result
       ^ "_"
       ^ Int.to_string (narity - 1))
@@ -4412,7 +4497,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
       let has_nary = curry_clos_has_nary_application ~narity (num + 1) in
       let function_slot_size = if has_nary then 3 else 2 in
       Cfunction
-        { fun_name = global_symbol name2;
+        { fun_name = global_symbol ~ty:typ_code_pointer name2;
           fun_args =
             List.map (fun (arg, t) -> VP.create arg, [| t |]) args
             @ [VP.create clos, typ_val];
@@ -4423,7 +4508,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                     (function_slot_size + machtype_stored_size arg_type + 1)
                     (dbg ());
                   Cconst_symbol
-                    ( global_symbol (name1 ^ "_" ^ Int.to_string (num + 1)),
+                    ( global_symbol ~ty:typ_code_pointer
+                        (name1 ^ "_" ^ Int.to_string (num + 1)),
                       dbg () );
                   Cconst_natint
                     ( pack_closure_info
@@ -4436,7 +4522,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
                 @ (if has_nary
                    then
                      [ Cconst_symbol
-                         ( global_symbol
+                         ( global_symbol ~ty:typ_code_pointer
                              (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
                            dbg () ) ]
                    else [])
@@ -4463,7 +4549,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
              (direct_args @ [clos, typ_val])
          in
          let fun_name =
-           global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
+           global_symbol ~ty:typ_code_pointer
+             (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
          in
          let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
          let cf =
@@ -4698,21 +4785,29 @@ let emit_boxed_int32_constant_fields n cont =
     (* This will sign extend. *)
     Nativeint.of_int32 n
   in
-  Csymbol_address (global_symbol caml_int32_ops) :: Cint n :: cont
+  Csymbol_address
+    (global_symbol ~ty:typ_out_of_heap_data_pointer caml_int32_ops)
+  :: Cint n :: cont
 
 let emit_boxed_int64_constant_fields n cont =
   let lo = Int64.to_nativeint n in
-  Csymbol_address (global_symbol caml_int64_ops) :: Cint lo :: cont
+  Csymbol_address
+    (global_symbol ~ty:typ_out_of_heap_data_pointer caml_int64_ops)
+  :: Cint lo :: cont
 
 let emit_boxed_nativeint_constant_fields n cont =
-  Csymbol_address (global_symbol caml_nativeint_ops) :: Cint n :: cont
+  Csymbol_address
+    (global_symbol ~ty:typ_out_of_heap_data_pointer caml_nativeint_ops)
+  :: Cint n :: cont
 
 let emit_float32_constant symb f cont =
   (* Here we are relying on the fact that the data section is zero initialized
      by just using [Csingle] and not worrying about the high 64 bits of the
      relevant field. *)
   emit_block symb boxedfloat32_header
-    (Csymbol_address (global_symbol caml_float32_ops) :: Csingle f :: cont)
+    (Csymbol_address
+       (global_symbol ~ty:typ_out_of_heap_data_pointer caml_float32_ops)
+    :: Csingle f :: cont)
 
 let emit_float_constant symb f cont =
   emit_block symb float_header (Cdouble f :: cont)
@@ -4779,7 +4874,7 @@ let entry_symbol_name ?compilation_unit () =
 let fail_if_called_indirectly_function () =
   let message = "This function should never be called indirectly" in
   let message_symbol =
-    { sym_name = "caml_fail_if_called_indirectly_message"; sym_global = Local }
+    local_symbol ~ty:typ_static_block "caml_fail_if_called_indirectly_message"
   in
   let string_data = emit_string_constant message_symbol message [] in
   let fun_body = Cinvalid { message; symbol = message_symbol } in
@@ -4825,18 +4920,25 @@ let entry_point namelist =
   let incr_global_inited () =
     Cop
       ( Cstore (Word_int, Assignment),
-        [ cconst_symbol (global_symbol "caml_globals_inited");
+        [ cconst_symbol
+            (global_symbol ~ty:typ_out_of_heap_data_pointer
+               "caml_globals_inited");
           Cop
             ( Caddi,
               [ Cop
                   ( mk_load_mut Word_int,
-                    [cconst_symbol (global_symbol "caml_globals_inited")],
+                    [ cconst_symbol
+                        (global_symbol ~ty:typ_out_of_heap_data_pointer
+                           "caml_globals_inited") ],
                     dbg () );
                 cconst_int 1 ],
               dbg () ) ],
         dbg () )
   in
-  let table_symbol = global_symbol "caml_globals_entry_functions" in
+  let table_symbol =
+    global_symbol ~ty:typ_out_of_heap_data_pointer
+      "caml_globals_entry_functions"
+  in
   let call i =
     let f =
       Cop
@@ -4847,8 +4949,13 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply { result_type = typ_void; region = Rc_normal; callees = None },
-            [Cop (mk_load_immut Word_int, [f], dbg ())],
+          ( Capply
+              { result_type = typ_void;
+                region = Rc_normal;
+                callees = None;
+                returns = true
+              },
+            [Cop (mk_load_immut Word_code_pointer, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
   in
@@ -4856,7 +4963,8 @@ let entry_point namelist =
     List.map
       (fun name ->
         Csymbol_address
-          (global_symbol (entry_symbol_name ~compilation_unit:name ())))
+          (global_symbol ~ty:typ_code_pointer
+             (entry_symbol_name ~compilation_unit:name ())))
       namelist
   in
   let data = Cdefine_symbol table_symbol :: data in
@@ -4898,7 +5006,7 @@ let entry_point namelist =
         dbg,
         false )
   in
-  let fun_name = global_symbol "caml_program" in
+  let fun_name = global_symbol ~ty:typ_code_pointer "caml_program" in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
   [ Cdata data;
     Cfunction
@@ -4918,10 +5026,13 @@ let cint_zero = Cint 0n
 let global_table namelist =
   let mksym name =
     Csymbol_address
-      (global_symbol (make_symbol ~compilation_unit:name "gc_roots"))
+      (global_symbol ~ty:typ_out_of_heap_data_pointer
+         (make_symbol ~compilation_unit:name "gc_roots"))
   in
   Cdata
-    ((Cdefine_symbol (global_symbol "caml_globals") :: List.map mksym namelist)
+    (Cdefine_symbol
+       (global_symbol ~ty:typ_out_of_heap_data_pointer "caml_globals")
+     :: List.map mksym namelist
     @ [cint_zero])
 
 (* Generate the unit dependency table for shared objects / complete objects.
@@ -4969,7 +5080,9 @@ let unit_deps_table units =
     List.fold_left
       (fun acc (cu, _) ->
         let sym_name = Compilenv.new_const_symbol () in
-        StringMap.add (unit_name cu) { sym_name; sym_global = Local } acc)
+        StringMap.add (unit_name cu)
+          (local_symbol ~ty:typ_out_of_heap_data_pointer sym_name)
+          acc)
       StringMap.empty sorted_units
   in
   let string_data =
@@ -4986,7 +5099,9 @@ let unit_deps_table units =
         then data_acc, StringMap.add (unit_name cu) None sym_acc
         else
           let arr_sym_name = Compilenv.new_const_symbol () in
-          let arr_sym = { sym_name = arr_sym_name; sym_global = Local } in
+          let arr_sym =
+            local_symbol ~ty:typ_out_of_heap_data_pointer arr_sym_name
+          in
           let arr_data =
             Cdefine_symbol arr_sym
             :: List.filter_map
@@ -5002,7 +5117,9 @@ let unit_deps_table units =
       ([], StringMap.empty) sorted_units
   in
   (* Emit main table *)
-  let table_sym = global_symbol "caml_unit_deps_table" in
+  let table_sym =
+    global_symbol ~ty:typ_out_of_heap_data_pointer "caml_unit_deps_table"
+  in
   let num_units = List.length sorted_units in
   let table_header =
     [Cdefine_symbol table_sym; Cint (Nativeint.of_int num_units)]
@@ -5013,13 +5130,16 @@ let unit_deps_table units =
         let name = unit_name cu in
         let name_sym = StringMap.find name name_symbols in
         let entry_sym =
-          global_symbol (entry_symbol_name ~compilation_unit:cu ())
+          global_symbol ~ty:typ_code_pointer
+            (entry_symbol_name ~compilation_unit:cu ())
         in
         let gc_roots_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
+          global_symbol ~ty:typ_out_of_heap_data_pointer
+            (make_symbol ~compilation_unit:cu "gc_roots")
         in
         let frametable_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+          global_symbol ~ty:typ_out_of_heap_data_pointer
+            (make_symbol ~compilation_unit:cu "frametable")
         in
         let num_deps =
           List.length
@@ -5050,7 +5170,7 @@ let reference_symbols namelist =
   Cdata (List.map mksym namelist)
 
 let global_data sym_name v =
-  let symbol = { sym_name; sym_global = Global } in
+  let symbol = global_symbol ~ty:typ_static_block sym_name in
   Cdata (emit_string_constant symbol (Marshal.to_string v []) [])
 
 let globals_map v = global_data "caml_globals_map" v
@@ -5060,40 +5180,45 @@ let globals_map v = global_data "caml_globals_map" v
 let frame_table namelist =
   let mksym name =
     Csymbol_address
-      (global_symbol (make_symbol ~compilation_unit:name "frametable"))
+      (global_symbol ~ty:typ_out_of_heap_data_pointer
+         (make_symbol ~compilation_unit:name "frametable"))
   in
   Cdata
-    (Cdefine_symbol (global_symbol "caml_frametable")
+    (Cdefine_symbol
+       (global_symbol ~ty:typ_out_of_heap_data_pointer "caml_frametable")
      :: List.map mksym namelist
     @ [cint_zero])
 
 (* Generate the table of module data and code segments *)
 
-let segment_table namelist symbol begname endname =
+let segment_table ~ty namelist symbol begname endname =
   let addsyms name lst =
-    Csymbol_address (global_symbol (make_symbol ~compilation_unit:name begname))
+    Csymbol_address
+      (global_symbol ~ty (make_symbol ~compilation_unit:name begname))
     :: Csymbol_address
-         (global_symbol (make_symbol ~compilation_unit:name endname))
+         (global_symbol ~ty (make_symbol ~compilation_unit:name endname))
     :: lst
   in
   Cdata
-    (Cdefine_symbol (global_symbol symbol)
+    (Cdefine_symbol (global_symbol ~ty:typ_out_of_heap_data_pointer symbol)
     :: List.fold_right addsyms namelist [cint_zero])
 
 let data_segment_table namelist =
-  segment_table namelist "caml_data_segments" "data_begin" "data_end"
+  segment_table ~ty:typ_out_of_heap_data_pointer namelist "caml_data_segments"
+    "data_begin" "data_end"
 
 let code_segment_table namelist =
-  segment_table namelist "caml_code_segments" "code_begin" "code_end"
+  segment_table ~ty:typ_code_pointer namelist "caml_code_segments" "code_begin"
+    "code_end"
 
 (* Initialize a predefined exception *)
 
 let predef_exception i name =
   let name_sym =
-    { sym_name = Compilenv.new_const_symbol (); sym_global = Local }
+    local_symbol ~ty:typ_static_block (Compilenv.new_const_symbol ())
   in
   let data_items = emit_string_constant name_sym name [] in
-  let exn_sym = global_symbol ("caml_exn_" ^ name) in
+  let exn_sym = global_symbol ~ty:typ_static_block ("caml_exn_" ^ name) in
   let tag = Obj.object_tag in
   let size = 2 in
   let fields = Csymbol_address name_sym :: cint_const (-i - 1) :: data_items in
@@ -5110,7 +5235,9 @@ let plugin_header units =
 (* Build the NULL terminated array of gc roots *)
 
 let emit_gc_roots_table ~symbols cont =
-  let table_symbol = global_symbol (make_symbol "gc_roots") in
+  let table_symbol =
+    global_symbol ~ty:typ_out_of_heap_data_pointer (make_symbol "gc_roots")
+  in
   Cdata
     (Cdefine_symbol table_symbol
      :: List.map (fun s -> Csymbol_address s) symbols
@@ -5368,17 +5495,18 @@ let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
 let load ~dbg memory_chunk mutability ~addr =
   Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)
 
-let direct_call ~dbg ty pos f_code_sym args =
+let direct_call ~dbg ~returns ty pos f_code_sym args =
   Cop
-    ( Capply { result_type = ty; region = pos; callees = Some [f_code_sym] },
+    ( Capply
+        { result_type = ty; region = pos; callees = Some [f_code_sym]; returns },
       Cconst_symbol (f_code_sym, dbg) :: args,
       dbg )
 
-let indirect_call ~dbg ty pos alloc_mode f args_type args =
+let indirect_call ~dbg ~returns ty pos alloc_mode f args_type args =
   might_split_call_caml_apply ty args_type Asttypes.Mutable f args pos
-    alloc_mode dbg
+    alloc_mode ~returns dbg
 
-let indirect_full_call ~dbg ty pos f ~callees args_type args =
+let indirect_full_call ~dbg ~returns ty pos f ~callees args_type args =
   (* Use a variable to avoid duplicating the cmm code of the closure [f]. *)
   let v = Backend_var.create_local "*closure*" in
   let v' = Backend_var.With_provenance.create v in
@@ -5390,7 +5518,7 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
       | [] -> Misc.fatal_error "indirect_full_call: args_type was empty"
       | _ :: _ :: _ -> 2
     in
-    load ~dbg Word_int Asttypes.Mutable
+    load ~dbg Word_code_pointer Asttypes.Mutable
       ~addr:(field_address (Cvar v) offset dbg)
   in
   letin v' ~defining_expr:f
@@ -5399,53 +5527,77 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
          ( Capply
              { result_type = Extended_machtype.to_machtype ty;
                region = pos;
-               callees
+               callees;
+               returns
              },
            (fun_ptr :: args) @ [Cvar v],
            dbg ))
 
 let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
   let ba_data_f = field_address bigarray 1 dbg in
-  let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
-  let addr =
+  let ba_data_p =
+    load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
+  in
+  let addr ~ba_data_p ~index =
     array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
-    box_complex dbg
-      (load ~dbg elt_chunk Mutable ~addr)
-      (load ~dbg elt_chunk Mutable ~addr:addr')
+    (* The address is used twice, so its components are bound. The data pointer
+       is read last: nothing that could release the bigarray is evaluated
+       between that read and the loads. *)
+    bind "index" index (fun index ->
+        bind "ba_data" ba_data_p (fun ba_data_p ->
+            let addr = addr ~ba_data_p ~index in
+            let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+            box_complex dbg
+              (load ~dbg elt_chunk Mutable ~addr)
+              (load ~dbg elt_chunk Mutable ~addr:addr')))
   | Pbigarray_float16 ->
     assert (match elt_chunk with Sixteen_unsigned -> true | _ -> false);
+    let addr = addr ~ba_data_p ~index in
     float_of_float16 dbg (load ~dbg elt_chunk Mutable ~addr)
   | _ ->
     (* Note that no sign extension operation is necessary here: if the element
        type of the bigarray is signed, then the backend will emit a
        sign-extending load instruction. *)
+    let addr = addr ~ba_data_p ~index in
     load ~dbg elt_chunk Mutable ~addr
 
 let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
     ~bigarray ~index ~new_value =
   let ba_data_f = field_address bigarray 1 dbg in
-  let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
-  let addr =
+  let ba_data_p =
+    load ~dbg Word_out_of_heap_data_pointer Mutable ~addr:ba_data_f
+  in
+  let addr ~ba_data_p ~index =
     array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
-    return_unit dbg
-      (sequence
-         (store ~dbg elt_chunk Assignment ~addr
-            ~new_value:(complex_re new_value dbg))
-         (store ~dbg elt_chunk Assignment ~addr:addr'
-            ~new_value:(complex_im new_value dbg)))
+    (* There are two stores, so everything used by both is bound: an argument
+       evaluated once per store could give a different result the second time.
+       The data pointer is read last: nothing that could release the bigarray is
+       evaluated between that read and the stores. *)
+    bind "new_value" new_value (fun new_value ->
+        bind "index" index (fun index ->
+            bind "ba_data" ba_data_p (fun ba_data_p ->
+                let addr = addr ~ba_data_p ~index in
+                let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+                return_unit dbg
+                  (sequence
+                     (store ~dbg elt_chunk Assignment ~addr
+                        ~new_value:(complex_re new_value dbg))
+                     (store ~dbg elt_chunk Assignment ~addr:addr'
+                        ~new_value:(complex_im new_value dbg))))))
   | Pbigarray_float16 ->
     assert (match elt_chunk with Sixteen_unsigned -> true | _ -> false);
+    let addr = addr ~ba_data_p ~index in
     let new_value = float16_of_float dbg new_value in
     return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
-  | _ -> return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
+  | _ ->
+    let addr = addr ~ba_data_p ~index in
+    return_unit dbg (store ~dbg elt_chunk Assignment ~addr ~new_value)
 
 (* Infix field address. Contrary to regular field addresses, these addresses are
    valid ocaml values, and can be live at gc points. *)
@@ -5499,7 +5651,7 @@ let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll
 let gc_root_table syms =
   let table_symbol = make_symbol ?compilation_unit:None "gc_roots" in
   cdata
-    (define_symbol { sym_name = table_symbol; sym_global = Global }
+    (define_symbol (global_symbol ~ty:typ_out_of_heap_data_pointer table_symbol)
     @ List.map symbol_address syms
     @ [cint 0n])
 
@@ -5544,7 +5696,16 @@ let pack_small_ints_into_word ~bits int_list dbg =
       in
       or_int a (loop (previously_packed + bits) rest) dbg
   in
-  loop 0 int_list
+  (* The elements are bound first, the last one outermost, so that they are
+     evaluated from right to left: helpers such as [or_int] can move a [Clet] or
+     [Csequence] at the head of an operand (e.g. an external call) before the
+     evaluation of the operands to its right. *)
+  let rec bind_right_to_left bound = function
+    | [] -> loop 0 bound
+    | last :: rest ->
+      bind "elt" last (fun last -> bind_right_to_left (last :: bound) rest)
+  in
+  bind_right_to_left [] (List.rev int_list)
 
 let make_untagged_int8_array_payload dbg untagged_int8_list =
   let rec aux acc = function
@@ -5732,25 +5893,36 @@ let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
 
 let thread_self_id ~dbg = Cop (Cthread_self_id, [], dbg)
 
-let perform ~dbg eff =
+let perform ~dbg ~returns eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag
       [int_const dbg 0; int_const dbg 0]
-      ~mode:Cmm.Alloc_mode.Heap
+      ~mode:Cmm.Alloc_mode.Heap ~strict_init:false
   in
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
-  let sym = Cmm.global_symbol "caml_perform" in
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_perform" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_nontail; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_nontail;
+          callees = Some [sym];
+          returns
+        },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
-let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
+let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg ~returns =
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
+      [ Cconst_symbol
+          (Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack", dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack";
@@ -5768,11 +5940,18 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
         arg ],
       dbg )
 
-let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
+let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg
+    ~returns =
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
+      [ Cconst_symbol
+          (Cmm.global_symbol ~ty:typ_code_pointer "caml_runstack", dbg);
         Cop
           ( Cextcall
               { func = "caml_alloc_stack_preemptible";
@@ -5795,33 +5974,55 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
    repeated resumes, and these should consume O(1) stack space by tail-calling
    the runtime resume function. *)
 
-let continue ~dbg ~cont ~value =
-  let sym = Cmm.global_symbol "caml_continue" in
+let continue ~dbg ~cont ~value ~returns =
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_continue" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
 
-let discontinue ~dbg ~cont ~exn =
-  let sym = Cmm.global_symbol "caml_discontinue" in
+let discontinue ~dbg ~cont ~exn ~returns =
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_discontinue" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
 
-let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
-  let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
+  let sym =
+    Cmm.global_symbol ~ty:typ_code_pointer "caml_discontinue_with_backtrace"
+  in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
-let reperform ~dbg ~eff ~cont ~last_fiber =
+let reperform ~dbg ~eff ~cont ~last_fiber ~returns =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
-  let sym = Cmm.global_symbol "caml_reperform" in
+  let sym = Cmm.global_symbol ~ty:typ_code_pointer "caml_reperform" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [sym];
+          returns
+        },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )
 

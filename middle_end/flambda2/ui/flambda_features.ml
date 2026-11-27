@@ -94,16 +94,6 @@ let enable_reaper () =
   !Oxcaml_flags.Flambda2.enable_reaper
   |> with_default ~f:(fun d -> d.enable_reaper)
 
-type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
-  | Never
-  | Always
-  | Zero_alloc
-  | Auto
-
-let reaper_preserve_direct_calls () =
-  !Oxcaml_flags.Flambda2.reaper_preserve_direct_calls
-  |> with_default ~f:(fun d -> d.reaper_preserve_direct_calls)
-
 let reaper_local_fields () =
   !Oxcaml_flags.Flambda2.reaper_local_fields
   |> with_default ~f:(fun d -> d.reaper_local_fields)
@@ -201,6 +191,8 @@ let dump_fexpr pass =
 let dump_slot_offsets () = !Oxcaml_flags.Flambda2.Dump.slot_offsets
 
 let dump_flow () = !Oxcaml_flags.Flambda2.Dump.flow
+
+let dump_simplified () = !Oxcaml_flags.Flambda2.Dump.simplified
 
 let dump_simplify () = !Oxcaml_flags.Flambda2.Dump.simplify
 
