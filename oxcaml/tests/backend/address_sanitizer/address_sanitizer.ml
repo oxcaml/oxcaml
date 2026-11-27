@@ -14,8 +14,16 @@ let run_test func_name ~test ~validate =
   | child_pid ->
     (try
        Unix.close write_fd;
-       ignore (Unix.waitpid [] child_pid);
-       let child_output = Unix.in_channel_of_descr read_fd |> In_channel.input_all in
+       (* Read the child's output before waiting for the child: a child whose
+          output does not fit in the pipe blocks until it is read. *)
+       let child_output =
+         let channel = Unix.in_channel_of_descr read_fd in
+         Fun.protect
+           (fun () -> In_channel.input_all channel)
+           ~finally:(fun () ->
+             In_channel.close_noerr channel;
+             ignore (Unix.waitpid [] child_pid))
+       in
        try validate child_output with
        | exn ->
          Printf.eprintf
