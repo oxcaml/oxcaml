@@ -5561,7 +5561,9 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
         bind "ba_data" ba_data_p (fun ba_data_p ->
             let addr = addr ~ba_data_p ~index in
             let addr' =
-              binary Cadd_pointer ~dbg addr (int ~dbg (elt_size / 2))
+              add_int_ptr ~ptr_out_of_heap:true addr
+                (int ~dbg (elt_size / 2))
+                dbg
             in
             box_complex dbg
               (load ~dbg elt_chunk Mutable ~addr)
@@ -5598,7 +5600,9 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
             bind "ba_data" ba_data_p (fun ba_data_p ->
                 let addr = addr ~ba_data_p ~index in
                 let addr' =
-                  binary Cadd_pointer ~dbg addr (int ~dbg (elt_size / 2))
+                  add_int_ptr ~ptr_out_of_heap:true addr
+                    (int ~dbg (elt_size / 2))
+                    dbg
                 in
                 return_unit dbg
                   (sequence
