@@ -109,11 +109,10 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 val compilation_unit_name : Compilation_unit.t -> string
 
 (** Register [var] as the value of [symbol] in the global symbol table, so that
-    other compilation units can fetch it, with an [Event] for [loc] before the
-    registration, and record it as an export of the unit. Does nothing for
-    symbols that no other unit can refer to (those not in [reachable_names]).
-    Module symbols are only recorded as exports, as they are fetched with
-    [caml_get_global] instead. *)
+    other compilation units can fetch it and record it as an export of the unit.
+    Does nothing for symbols that no other unit can refer to. Module symbols are
+    only recorded as exports, as they are fetched with [caml_get_global]
+    instead. *)
 val register_symbol : t -> ?loc:Parse_info.t -> Symbol.t -> Jsir.Var.t -> t
 
 (** The variable holding the value of [symbol], which must be from another
@@ -122,6 +121,16 @@ val register_symbol : t -> ?loc:Parse_info.t -> Symbol.t -> Jsir.Var.t -> t
     Later calls return the same variable without emitting anything. The
     compilation unit of the symbol is recorded as an import. *)
 val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
+
+(** Register [var] as the variable holding the closure of [code]. Does nothing
+    for code that no other unit can refer to. *)
+val register_code : t -> Code_id.t -> Jsir.Var.t -> t
+
+(** The variable holding the closure of [code], which must be from another
+    compilation unit. As for [external_symbol_var], the variable is bound at the
+    start of the entry block, and the unit of the code is recorded as an import.
+*)
+val external_code_var : t -> Code_id.t -> t * Jsir.Var.t
 
 (** Record that [bound_var], a variable created ahead of its definition, refers
     to [defining_var]. All instances of [bound_var] will later be substituted
@@ -140,14 +149,14 @@ val add_var_aliases_exn : t -> var_binding list -> t
 type program =
   { program : Jsir.program;
     imported_compilation_units : Compilation_unit.Set.t;
-    symbol_imports : (Jsir.Var.t * Symbol.t) list;
+    symbol_imports : (Jsir.Var.t * Jsir.Linkage_name.t) list;
         (** The variables bound at the start of the entry block to the symbols
-            of other compilation units (excluding predefined exceptions), for
-            the linker to replace with the exporting unit's variables. *)
-    symbol_exports : (Symbol.t * Jsir.Var.t) list
+            of other compilation units (excluding predefined exceptions) and to
+            the closures of their code. *)
+    symbol_exports : (Jsir.Linkage_name.t * Jsir.Var.t) list
         (** The symbols of this unit that other compilation units may fetch
-            (including the module symbol), with the variables holding their
-            values. *)
+            (including the module symbol) and the code whose closures they may
+            fetch. *)
   }
 
 (** Create a [program] with the blocks in the result, including the current

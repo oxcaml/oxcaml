@@ -83,7 +83,7 @@ val new_closure :
 
 val closure_expr : To_jsir_env.closure -> Jsir.expr
 
-val closure_loc : Code.t -> Parse_info.t option
+val closure_loc : Code_metadata.t -> Parse_info.t option
 
 (** Translate [code] into the block reserved by [closure]. *)
 val code :

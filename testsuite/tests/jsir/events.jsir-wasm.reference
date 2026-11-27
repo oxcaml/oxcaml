@@ -13,25 +13,30 @@ Entry point: 0
   v6 = imm{tag=248; 0 = v2; 1 = v4}
   v7 = "caml_register_symbol"("Events", "camlEvents__E_3", v6) 
   v9{arith} = fun(v8{x}){2 ()} [hint:(int)->float never_inline]
+  v13 = "caml_register_symbol"("Events", "camlEvents__arith_0_7_code", v9{arith}) 
   event events.ml:21:56
-  v14 = "caml_register_symbol"("Events", "camlEvents__arith_4", v9{arith}) 
-  v17{non_tail} = fun(v15{f}, v16{x}){3 ()} [hint:(value,value)->int never_inline]
+  v15 = "caml_register_symbol"("Events", "camlEvents__arith_4", v9{arith}) 
+  v18{non_tail} = fun(v16{f}, v17{x}){3 ()} [hint:(value,value)->int never_inline]
+  v22 = "caml_register_symbol"("Events", "camlEvents__non_tail_1_8_code", v18{non_tail}) 
   event events.ml:24:41
-  v22 = "caml_register_symbol"("Events", "camlEvents__non_tail_5", v17{non_tail}) 
-  v25{tail} = fun(v23{f}, v24{x}){5 ()} [hint:(value,value)->value never_inline]
+  v24 = "caml_register_symbol"("Events", "camlEvents__non_tail_5", v18{non_tail}) 
+  v27{tail} = fun(v25{f}, v26{x}){5 ()} [hint:(value,value)->value never_inline]
+  v29 = "caml_register_symbol"("Events", "camlEvents__tail_2_9_code", v27{tail}) 
   event events.ml:27:33
-  v28 = "caml_register_symbol"("Events", "camlEvents__tail_6", v25{tail}) 
-  v30{c_call} = fun(v29{param}){6 ()} [hint:(int)->value never_inline]
+  v31 = "caml_register_symbol"("Events", "camlEvents__tail_6", v27{tail}) 
+  v33{c_call} = fun(v32{param}){6 ()} [hint:(int)->value never_inline]
+  v35 = "caml_register_symbol"("Events", "camlEvents__c_call_3_10_code", v33{c_call}) 
   event events.ml:30:48
-  v33 = "caml_register_symbol"("Events", "camlEvents__c_call_7", v30{c_call}) 
-  v35{raise_e} = fun(v34{x}){7 ()} [hint:(int)->int never_inline]
+  v37 = "caml_register_symbol"("Events", "camlEvents__c_call_7", v33{c_call}) 
+  v39{raise_e} = fun(v38{x}){7 ()} [hint:(int)->int never_inline]
+  v42 = "caml_register_symbol"("Events", "camlEvents__raise_e_4_11_code", v39{raise_e}) 
   event events.ml:33:67
-  v39 = "caml_register_symbol"("Events", "camlEvents__raise_e_8", v35{raise_e}) 
-  v41 = CONST{1}
+  v44 = "caml_register_symbol"("Events", "camlEvents__raise_e_8", v39{raise_e}) 
+  v46 = CONST{1}
   event events.ml:36:17
-  v42 = v9{arith}!(v41)
+  v47 = v9{arith}!(v46)
   event events.ml:36:26
-  branch 10 (v42)
+  branch 10 (v47)
 
 ==== 2 () ====
   event events.ml:21:25
@@ -45,80 +50,80 @@ Entry point: 0
 
 ==== 3 () ====
   event events.ml:24:34
-  v19 = v15{f}(v16{x})
+  v20 = v16{f}(v17{x})
   event events.ml:24:37
-  branch 4 (v19)
+  branch 4 (v20)
 
-==== 4 (v18) ====
-  v20 = v18 + 1
-  return v20
+==== 4 (v19) ====
+  v21 = v19 + 1
+  return v21
 
 ==== 5 () ====
   event events.ml:27:30
-  v26 = v23{f}(v24{x})
-  return v26
+  v28 = v25{f}(v26{x})
+  return v28
 
 ==== 6 () ====
   event events.ml:30:31
-  v31 = "caml_sys_getenv"(v1) 
-  return v31
+  v34 = "caml_sys_getenv"(v1) 
+  return v34
 
 ==== 7 () ====
   event events.ml:33:27
-  v36 = v34{x} === 3
-  if v36 then 8 () else 9 ()
+  v40 = v38{x} === 3
+  if v40 then 8 () else 9 ()
 
 ==== 8 () ====
-  v37 = imm{tag=0; 0 = v6; 1 = v34{x}}
+  v41 = imm{tag=0; 0 = v6; 1 = v38{x}}
   event events.ml:33:49
-  raise v37
+  raise v41
 
 ==== 9 () ====
-  return v34{x}
+  return v38{x}
 
-==== 10 (v40) ====
-  v45 = fun(v44{x}){12 ()} [hint:(int)->int]
-  v48 = CONST{2}
+==== 10 (v45) ====
+  v50 = fun(v49{x}){12 ()} [hint:(int)->int]
+  v53 = CONST{2}
   event events.ml:37:17
-  v49 = v17{non_tail}!(v45, v48)
+  v54 = v18{non_tail}!(v50, v53)
   event events.ml:37:46
-  branch 11 (v49)
+  branch 11 (v54)
 
-==== 11 (v43) ====
-  v52 = fun(v51{x}){14 ()} [hint:(int)->int]
-  v55 = CONST{3}
+==== 11 (v48) ====
+  v57 = fun(v56{x}){14 ()} [hint:(int)->int]
+  v60 = CONST{3}
   event events.ml:38:17
-  v56 = v25{tail}!(v52, v55)
+  v61 = v27{tail}!(v57, v60)
   event events.ml:38:42
-  branch 13 (v56)
+  branch 13 (v61)
 
 ==== 12 () ====
   event events.ml:37:27
-  v46 = v44{x} + 1
-  return v46
+  v51 = v49{x} + 1
+  return v51
 
-==== 13 (v50) ====
-  v58 = CONST{0}
+==== 13 (v55) ====
+  v63 = CONST{0}
   event events.ml:39:17
-  v59 = v30{c_call}!(v58)
+  v64 = v33{c_call}!(v63)
   event events.ml:39:28
-  branch 15 (v59)
+  branch 15 (v64)
 
 ==== 14 () ====
   event events.ml:38:23
-  v53 = v51{x} + 2
-  return v53
+  v58 = v56{x} + 2
+  return v58
 
-==== 15 (v57) ====
-  v61 = CONST{4}
+==== 15 (v62) ====
+  v66 = CONST{4}
   event events.ml:40:17
-  v62 = v35{raise_e}!(v61)
+  v67 = v39{raise_e}!(v66)
   event events.ml:40:28
-  branch 16 (v62)
+  branch 16 (v67)
 
-==== 16 (v60) ====
-  v63 = imm{tag=0; 0 = v6; 1 = v9{arith}; 2 = v17{non_tail}; 3 = v25{tail}; 4 = v30{c_call}; 5 = v35{raise_e}}
-  v64 = "caml_register_global"(v63, "Events")
+==== 16 (v65) ====
+  v68 = imm{tag=0; 0 = v6; 1 = v9{arith}; 2 = v18{non_tail}; 3 = v27{tail}; 4 = v33{c_call}; 5 = v39{raise_e}}
+  v69 = "caml_register_global"(v68, "Events")
   stop
 
 

@@ -24,6 +24,10 @@ val create_loader :
 
 val get_imported_code : loader -> unit -> Exported_code.t
 
+(** The code or metadata for a code ID of another compilation unit, loading the
+    .cmx file of that unit if it has not been loaded yet. *)
+val find_imported_code : loader -> Code_id.t -> Code_or_metadata.t option
+
 val load_cmx_file_contents :
   loader ->
   Compilation_unit.t ->

@@ -42,11 +42,15 @@ type closure =
     loc : Parse_info.t option
   }
 
-type code =
-  | Shared of
+type shared =
+  | Current_unit of
       { closure : closure;
         code : Code.t
       }
+  | Other_unit of Code_metadata.t
+
+type code =
+  | Shared of shared
   | Instantiated of Code.t
 
 type slots =
@@ -63,10 +67,12 @@ type t =
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
     code : code Code_id.Map.t;
-    closure_slots : slots Jsir.Var.Map.t
+    closure_slots : slots Jsir.Var.Map.t;
+    find_imported_code : Code_id.t -> Code_or_metadata.t option
   }
 
-let create ~module_symbol ~return_continuation ~exn_continuation =
+let create ~module_symbol ~return_continuation ~exn_continuation
+    ~find_imported_code =
   { module_symbol;
     return_continuation;
     exn_continuation;
@@ -75,7 +81,8 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     vars = Variable.Map.empty;
     symbols = Symbol.Map.empty;
     code = Code_id.Map.empty;
-    closure_slots = Jsir.Var.Map.empty
+    closure_slots = Jsir.Var.Map.empty;
+    find_imported_code
   }
 
 let module_symbol t = t.module_symbol
@@ -152,12 +159,50 @@ let register_symbol_exn t ~res ?loc symbol =
   To_jsir_result.register_symbol res ?loc symbol
     (Symbol.Map.find symbol t.symbols)
 
+(* Code that does not use [my_closure] can reuse a single closure defined with
+   the code. This is because the closures that it projects from, if any, do not
+   depend on the closure it is called through. This also ensures a closure
+   binding exists when the reaper unboxes a closure and removes its
+   [Set_of_closures]. *)
+let code_is_shared code = not (Code0.is_my_closure_used code)
+
+let imported_code t code_id =
+  match t.find_imported_code code_id with
+  | None ->
+    Misc.fatal_errorf
+      "Code ID %a is from another compilation unit, but is not in its .cmx file"
+      Code_id.print code_id
+  | Some code_or_metadata -> (
+    match Code_or_metadata.view code_or_metadata with
+    | Code_present code ->
+      if code_is_shared code
+      then Shared (Other_unit (Code0.code_metadata code))
+      else Instantiated code
+    | Metadata_only code_metadata ->
+      if Code_metadata.is_my_closure_used code_metadata
+      then
+        Misc.fatal_errorf
+          "Code ID %a is from another compilation unit and depends on its \
+           closure, but its definition is not in the .cmx file of that unit"
+          Code_id.print code_id;
+      Shared (Other_unit code_metadata))
+
 let get_code_exn t code_id =
   match Code_id.Map.find_opt code_id t.code with
   | Some code -> code
   | None ->
-    Misc.fatal_errorf "Code ID %a not found in the environment" Code_id.print
-      code_id
+    if Code_id.get_compilation_unit code_id |> Current_unit.is_current
+    then
+      Misc.fatal_errorf "Code ID %a not found in the environment" Code_id.print
+        code_id;
+    imported_code t code_id
+
+let get_shared_closure ~res code_id (shared : shared) =
+  match shared with
+  | Current_unit { closure; code = _ } -> closure.var, res
+  | Other_unit _ ->
+    let res, var = To_jsir_result.external_code_var res code_id in
+    var, res
 
 let get_closure_slots_exn t ~closure =
   match Jsir.Var.Map.find_opt closure t.closure_slots with
