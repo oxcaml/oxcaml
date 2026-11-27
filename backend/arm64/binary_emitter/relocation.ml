@@ -45,7 +45,12 @@ module Kind = struct
     | R_AARCH64_ADR_GOT_PAGE of target_with_addend
     | R_AARCH64_LD64_GOT_LO12_NC of target_with_addend
     | R_AARCH64_ADD_ABS_LO12_NC of target_with_addend
+    (* Low 12 bits of the address in the immediate of a load or store of 16, 32,
+       64 or 128 bits, which the instruction scales by the size of the access *)
+    | R_AARCH64_LDST16_ABS_LO12_NC of target_with_addend
+    | R_AARCH64_LDST32_ABS_LO12_NC of target_with_addend
     | R_AARCH64_LDST64_ABS_LO12_NC of target_with_addend
+    | R_AARCH64_LDST128_ABS_LO12_NC of target_with_addend
     | R_AARCH64_CALL26 of target_with_addend
     | R_AARCH64_JUMP26 of target_with_addend
     (* Absolute 64-bit data reference (ARM64_RELOC_UNSIGNED on macOS) *)
@@ -81,9 +86,10 @@ let size (r : t) : Binary_emitter_intf.data_size =
   | R_AARCH64_ABS64 _ -> Binary_emitter_intf.B64
   | R_AARCH64_ADR_PREL_LO21 _ | R_AARCH64_ADR_PREL_PG_HI21 _
   | R_AARCH64_ADR_GOT_PAGE _ | R_AARCH64_LD64_GOT_LO12_NC _
-  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
-  | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _ | R_AARCH64_PREL32_PAIR _
-  | R_AARCH64_PREL32 _ ->
+  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST16_ABS_LO12_NC _
+  | R_AARCH64_LDST32_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
+  | R_AARCH64_LDST128_ABS_LO12_NC _ | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _
+  | R_AARCH64_PREL32_PAIR _ | R_AARCH64_PREL32 _ ->
     Binary_emitter_intf.B32
 
 let primary_target (r : t) : Symbol.target =
@@ -93,7 +99,10 @@ let primary_target (r : t) : Symbol.target =
   | R_AARCH64_ADR_GOT_PAGE { target; _ }
   | R_AARCH64_LD64_GOT_LO12_NC { target; _ }
   | R_AARCH64_ADD_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST16_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST32_ABS_LO12_NC { target; _ }
   | R_AARCH64_LDST64_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST128_ABS_LO12_NC { target; _ }
   | R_AARCH64_CALL26 { target; _ }
   | R_AARCH64_JUMP26 { target; _ }
   | R_AARCH64_ABS64 { target; _ } ->
@@ -114,7 +123,10 @@ let all_targets (r : t) : Symbol.target list =
   | R_AARCH64_ADR_GOT_PAGE { target; _ }
   | R_AARCH64_LD64_GOT_LO12_NC { target; _ }
   | R_AARCH64_ADD_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST16_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST32_ABS_LO12_NC { target; _ }
   | R_AARCH64_LDST64_ABS_LO12_NC { target; _ }
+  | R_AARCH64_LDST128_ABS_LO12_NC { target; _ }
   | R_AARCH64_CALL26 { target; _ }
   | R_AARCH64_JUMP26 { target; _ }
   | R_AARCH64_ABS64 { target; _ } ->
@@ -134,7 +146,10 @@ let all_targets_with_addends (r : t) : (Symbol.target * int) list =
   | R_AARCH64_ADR_GOT_PAGE { target; addend }
   | R_AARCH64_LD64_GOT_LO12_NC { target; addend }
   | R_AARCH64_ADD_ABS_LO12_NC { target; addend }
+  | R_AARCH64_LDST16_ABS_LO12_NC { target; addend }
+  | R_AARCH64_LDST32_ABS_LO12_NC { target; addend }
   | R_AARCH64_LDST64_ABS_LO12_NC { target; addend }
+  | R_AARCH64_LDST128_ABS_LO12_NC { target; addend }
   | R_AARCH64_CALL26 { target; addend }
   | R_AARCH64_JUMP26 { target; addend }
   | R_AARCH64_ABS64 { target; addend } ->
@@ -152,9 +167,10 @@ let is_got_reloc (r : t) =
   match r.kind with
   | R_AARCH64_ADR_GOT_PAGE _ | R_AARCH64_LD64_GOT_LO12_NC _ -> true
   | R_AARCH64_ADR_PREL_LO21 _ | R_AARCH64_ADR_PREL_PG_HI21 _
-  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
-  | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _ | R_AARCH64_ABS64 _
-  | R_AARCH64_PREL32_PAIR _ | R_AARCH64_PREL32 _ ->
+  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST16_ABS_LO12_NC _
+  | R_AARCH64_LDST32_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
+  | R_AARCH64_LDST128_ABS_LO12_NC _ | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _
+  | R_AARCH64_ABS64 _ | R_AARCH64_PREL32_PAIR _ | R_AARCH64_PREL32 _ ->
     false
 
 let is_plt_reloc (r : t) =
@@ -162,8 +178,10 @@ let is_plt_reloc (r : t) =
   | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _ -> true
   | R_AARCH64_ADR_PREL_LO21 _ | R_AARCH64_ADR_PREL_PG_HI21 _
   | R_AARCH64_ADR_GOT_PAGE _ | R_AARCH64_LD64_GOT_LO12_NC _
-  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
-  | R_AARCH64_ABS64 _ | R_AARCH64_PREL32_PAIR _ | R_AARCH64_PREL32 _ ->
+  | R_AARCH64_ADD_ABS_LO12_NC _ | R_AARCH64_LDST16_ABS_LO12_NC _
+  | R_AARCH64_LDST32_ABS_LO12_NC _ | R_AARCH64_LDST64_ABS_LO12_NC _
+  | R_AARCH64_LDST128_ABS_LO12_NC _ | R_AARCH64_ABS64 _
+  | R_AARCH64_PREL32_PAIR _ | R_AARCH64_PREL32 _ ->
     false
 
 let get_addend (kind : Kind.t) : int =
@@ -173,7 +191,10 @@ let get_addend (kind : Kind.t) : int =
   | R_AARCH64_ADR_GOT_PAGE { addend; _ }
   | R_AARCH64_LD64_GOT_LO12_NC { addend; _ }
   | R_AARCH64_ADD_ABS_LO12_NC { addend; _ }
+  | R_AARCH64_LDST16_ABS_LO12_NC { addend; _ }
+  | R_AARCH64_LDST32_ABS_LO12_NC { addend; _ }
   | R_AARCH64_LDST64_ABS_LO12_NC { addend; _ }
+  | R_AARCH64_LDST128_ABS_LO12_NC { addend; _ }
   | R_AARCH64_CALL26 { addend; _ }
   | R_AARCH64_JUMP26 { addend; _ }
   | R_AARCH64_ABS64 { addend; _ }
@@ -223,19 +244,14 @@ let patch_add_imm12 (insn : int32) (offset12 : int64) : int64 =
   let insn = logor insn (shift_left (of_int imm) 10) in
   int64_of_int32_unsigned insn
 
+(* The immediate of the instruction is replaced, not added to: [offset12] is
+   computed from the address of the target plus the addend of the relocation,
+   and that addend is what a REL platform also keeps in the instruction. *)
 let patch_ldr_imm12 (insn : int32) (offset12 : int64) ~(scale : int) : int64 =
+  let imm = Int64.to_int offset12 / scale in
   let open Int32 in
-  let existing_scaled = to_int (logand (shift_right_logical insn 10) 0xfffl) in
-  let new_scaled = Int64.to_int offset12 / scale in
-  let combined_scaled = existing_scaled + new_scaled in
-  if combined_scaled > 0xfff
-  then
-    Misc.fatal_errorf
-      "patch_ldr_imm12: combined offset 0x%x exceeds 12-bit limit (existing \
-       scaled=%d, new scaled=%d)"
-      combined_scaled existing_scaled new_scaled;
   let insn = logand insn (lognot 0x003ffc00l) in
-  let insn = logor insn (shift_left (of_int combined_scaled) 10) in
+  let insn = logor insn (shift_left (of_int imm) 10) in
   int64_of_int32_unsigned insn
 
 (* CR mshinwell: see the comment on the max_displacement function in ast.ml. I'm
@@ -256,6 +272,11 @@ let target_to_string (target : Symbol.target) : string =
 
 let compute_value (r : t) ~target_addr ~place_address ~read_instruction
     ~lookup_target =
+  let patch_ldst ~scale =
+    let low12 = Int64.logand target_addr 0xFFF_L in
+    let insn = read_instruction () in
+    Ok (patch_ldr_imm12 insn low12 ~scale)
+  in
   match r.kind with
   | R_AARCH64_ADR_PREL_LO21 _ ->
     let offset = Int64.sub target_addr place_address in
@@ -272,10 +293,11 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
     let low12 = Int64.logand target_addr 0xFFF_L in
     let insn = read_instruction () in
     Ok (patch_add_imm12 insn low12)
+  | R_AARCH64_LDST16_ABS_LO12_NC _ -> patch_ldst ~scale:2
+  | R_AARCH64_LDST32_ABS_LO12_NC _ -> patch_ldst ~scale:4
   | R_AARCH64_LDST64_ABS_LO12_NC _ | R_AARCH64_LD64_GOT_LO12_NC _ ->
-    let low12 = Int64.logand target_addr 0xFFF_L in
-    let insn = read_instruction () in
-    Ok (patch_ldr_imm12 insn low12 ~scale:8)
+    patch_ldst ~scale:8
+  | R_AARCH64_LDST128_ABS_LO12_NC _ -> patch_ldst ~scale:16
   | R_AARCH64_CALL26 _ | R_AARCH64_JUMP26 _ ->
     let offset = Int64.sub target_addr place_address in
     let insn = read_instruction () in
