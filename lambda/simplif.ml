@@ -1177,9 +1177,9 @@ let simplify_local_functions lam =
     match LamTbl.find_opt layouts lam with
     | Some result -> result
     | None ->
-      let result = annotated_result_layout ~recurse:result_layout lam in
-      LamTbl.add layouts lam result;
-      result
+        let result = annotated_result_layout ~recurse:result_layout lam in
+        LamTbl.add layouts lam result;
+        result
   in
   let rec rewrite lam0 =
     let lam =
