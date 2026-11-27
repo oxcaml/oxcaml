@@ -45,9 +45,15 @@ end) : sig
 
   val find : t -> Id.t -> E.t
 
+  (** Replace the datum of an existing id by one [E.equal] to it. *)
+  val replace : t -> Id.t -> E.t -> unit
+
   type serializable
 
   val export : t -> iter:((Id.t -> unit) -> unit) -> serializable
 
   val import : serializable -> Id.t -> E.t
+
+  (** Rewrite every datum in place, to one [E.equal] to it. *)
+  val map_serializable_inplace : serializable -> f:(E.t -> E.t) -> unit
 end
