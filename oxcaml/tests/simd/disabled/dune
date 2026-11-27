@@ -50,6 +50,9 @@
   (progn
    (diff disabled256_call.expected disabled256_call.corrected))))
 
+; -dump-into-file: with -use-ssa the compiler dumps the Cmm and SSA of the
+; function ahead of the error.
+
 (rule
  (enabled_if
   (and
@@ -75,7 +78,8 @@
        never
        -error-style
        short
-       -fno-avx))
+       -fno-avx
+       -dump-into-file))
      (run head -n 1))))))
 
 ; Test that disabling extensions does not break code that does not need them

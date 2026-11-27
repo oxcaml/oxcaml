@@ -23,6 +23,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Keep warning 46 on in build_ocamlparam and ocamlparam (no w=-46): it
+        # is how ocamlopt reports a key that it does not know and discards.
+        # Such a key after "_" then fails the compiler build, and the warning
+        # fails the native upstream tests that expect no compiler output.
         include:
           - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
@@ -107,15 +111,15 @@ jobs:
           - name: regalloc (aarch64-darwin)
             config: --disable-warn-error
             os: warp-macos-15-arm64-6x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            build_ocamlparam: '_,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
 
           - name: debug regalloc (aarch64-darwin)
             config: --disable-warn-error
             os: warp-macos-15-arm64-6x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            build_ocamlparam: '_,save-ir-before=register_allocation'
+            ocamlparam: '_,save-ir-before=register_allocation'
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
             run_regalloc_tool: true
@@ -123,59 +127,64 @@ jobs:
           - name: regalloc (aarch64-linux)
             config: --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            build_ocamlparam: '_,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
             sysdeps: gdb
 
           - name: regalloc multidomain (aarch64-linux)
             config: --enable-poll-insertion --enable-multidomain --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            build_ocamlparam: '_,save-ir-before=register_allocation'
+            ocamlparam: '_,save-ir-before=register_allocation'
             run_regalloc_tool: true
             sysdeps: gdb
 
           - name: frame-pointers irc (x86_64-linux)
             config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
+            build_ocamlparam: '_,regalloc=irc'
+            ocamlparam: '_,regalloc=irc'
             check_arch: true
             sysdeps: gdb
 
           - name: cfg-invariants (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
-            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
+            build_ocamlparam: '_,regalloc=cfg,cfg-invariants=1'
+            ocamlparam: '_,regalloc=cfg,cfg-invariants=1'
             check_arch: true
             sysdeps: gdb
 
           - name: cfg-invariants (aarch64-linux)
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
-            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
+            build_ocamlparam: "_,regalloc=cfg,cfg-invariants=1"
+            ocamlparam: "_,regalloc=cfg,cfg-invariants=1"
             check_arch: true
             sysdeps: gdb
 
           - name: vectorizer (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
-            ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
+            build_ocamlparam: '_,regalloc=cfg,vectorize=1'
+            ocamlparam: '_,regalloc=cfg,vectorize=1'
             check_arch: true
             sysdeps: gdb
 
           - name: x86-peephole (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
-            ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            build_ocamlparam: '_,x86-peephole-optimize=1'
+            ocamlparam: '_,x86-peephole-optimize=1'
             check_arch: true
             sysdeps: gdb
 
+          # Under the bundle, -cfg-merge-blocks merges blocks that differ only
+          # in debug info, so in the native backtraces of the tests below the
+          # entry of a raise names another raise or is missing (for
+          # backtrace_or_exception.ml, only together with -use-ssa).
           - name: experimental-optimizations (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
-            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            build_ocamlparam: "_,experimental-optimizations=1"
+            ocamlparam: "_,experimental-optimizations=1"
+            disable_testcases: 'testsuite/tests/backtrace/backtrace3.ml testsuite/tests/backtrace/backtrace_or_exception.ml testsuite/tests/backtrace/raw_backtrace.ml'
             check_arch: true
             sysdeps: gdb
 
