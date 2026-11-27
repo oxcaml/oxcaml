@@ -80,6 +80,7 @@ let should_save_cfg_before_emit () =
 
 let should_save_cfg_before_regalloc () =
   should_save_ir_before Compiler_pass.Register_allocation
+  && not !start_from_emit
 
 let linear_unit_info =
   { Linear_format.unit = Compilation_unit.dummy; items = [] }
@@ -105,9 +106,7 @@ let reset () =
       if should_save_ir_after pass || should_save_ir_before pass
       then (
         cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
-        cfg_unit_info.items <- [];
-        cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
-        cfg_before_regalloc_unit_info.items <- []))
+        cfg_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
@@ -116,7 +115,11 @@ let reset () =
   if should_save_cfg_before_emit ()
   then (
     cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
-    cfg_unit_info.items <- [])
+    cfg_unit_info.items <- []);
+  if should_save_cfg_before_regalloc ()
+  then (
+    cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
+    cfg_before_regalloc_unit_info.items <- [])
 
 let save_data dl =
   Compiler_pass_map.iter
