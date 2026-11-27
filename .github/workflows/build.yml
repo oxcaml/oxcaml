@@ -386,13 +386,14 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
         run: bash tools/ci/actions/run-make-target.sh compiler
-        # No OCAMLRUNPARAM here: only the upstream testsuite runs on the
-        # debug runtime, and the checks behind V=1 are assertions that
-        # only the debug runtime compiles in.
+        # Trying GC settings to make the compilers run by the build faster.
+        # Not matrix.ocamlrunparam: only the upstream testsuite runs on the
+        # debug runtime. The bootstrap compiler ignores the X tweak.
         env:
           COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: b=0,o=200,Xsmall_heap_limit=128M,s=256k
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Check that `make hacking` builds
