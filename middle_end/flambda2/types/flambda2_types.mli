@@ -48,6 +48,9 @@ module Code_age_relation : sig
 
   val get_older_version_of : t -> Code_id.t -> Code_id.t option
 
+  val rewrite_newer_version_of :
+    t -> f:(newer:Code_id.t -> older:Code_id.t -> Code_id.t option) -> t
+
   val all_code_ids_for_export : t -> Code_id.Set.t
 
   val apply_renaming : t -> Renaming.t -> t

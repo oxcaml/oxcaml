@@ -3,7 +3,7 @@ let code f1_0 deleted in
 let code g_3 deleted in
 let code h_4 deleted in
 let code f2_2 deleted in
-let code inline(never) loopify(never) size(3) newer_version_of(g_1)
+let code inline(never) loopify(never) size(3)
       g_1_1 (g_into_my_closure_field_x, y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -21,7 +21,7 @@ let code loopify(never) size(4) newer_version_of(f1_0)
   apply direct(g_1_1 &my_alloc_region)  (g_into_g_field_x, x) -> k * k1
 in
 let $camlLambda_lifting__f1_1 = closure f1_0_1 @f1 &toplevel in
-let code inline(never) loopify(never) size(3) newer_version_of(h_4)
+let code inline(never) loopify(never) size(3)
       h_4_1 (h_into_my_closure_field_g_field_x, y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

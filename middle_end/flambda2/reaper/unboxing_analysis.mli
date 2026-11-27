@@ -133,3 +133,6 @@ val compute_code_changes :
     Result_types.t Or_unknown_or_bottom.t) ->
   code_deps:Traverse_acc.Code_dep.t Code_id.Map.t ->
   Code_changes.t
+
+val rewrite_code_age_relation :
+  Code_changes.t -> Code_age_relation.t -> Code_age_relation.t

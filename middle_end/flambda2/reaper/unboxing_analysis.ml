@@ -1070,183 +1070,229 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
     | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
   in
   let forget_all_types = Flambda_features.debug_reaper "forget-types" in
-  Code_id.Map.mapi
-    (fun code_id (code_dep : Traverse_acc.Code_dep.t) ->
-      let code_metadata = code_dep.code_metadata in
-      let is_my_closure_used = is_var_used code_dep.my_closure in
-      let code_metadata =
-        if
-          Bool.equal is_my_closure_used
-            (Code_metadata.is_my_closure_used code_metadata)
-        then code_metadata
-        else if is_my_closure_used
-        then
+  let code_changes =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.Code_dep.t) ->
+        let code_metadata = code_dep.code_metadata in
+        let is_my_closure_used = is_var_used code_dep.my_closure in
+        let code_metadata =
           if
-            (* If the code is opaque or zero-alloc checked, it can look like the
-               closure is used when it actually is not. *)
-            Code_metadata.is_opaque code_metadata
-            ||
-            match Code_metadata.zero_alloc_attribute code_metadata with
-            | Check _ -> true
-            | Default_zero_alloc | Assume _ -> false
+            Bool.equal is_my_closure_used
+              (Code_metadata.is_my_closure_used code_metadata)
           then code_metadata
-          else
-            Misc.fatal_errorf
-              "For code_metadata %a, the analysis says my_closure is used, but \
-               the original code did not use my_closure"
-              Code_metadata.print code_metadata
-        else Code_metadata.with_is_my_closure_used false code_metadata
-      in
-      let calling_convention_change, code_metadata =
-        if cannot_change_calling_convention ~analysis_scope uses code_id
-        then
-          (* We still need to rewrite the kinds and subkinds of parameters and
-             returns, as they could be poisoned. *)
-          let rewrite_kinds vars kinds =
-            List.map2
-              (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
-              vars kinds
-          in
-          let original_arity = Code_metadata.params_arity code_metadata in
-          let params_arity =
-            (* As for the result arity below, the structure of the original
-               arity is preserved. *)
-            Flambda_arity.with_unarized_kinds original_arity
-              (rewrite_kinds code_dep.params
-                 (Flambda_arity.unarize original_arity))
-          in
-          let result_arity =
-            let original_result_arity =
-              Code_metadata.result_arity code_metadata
-            in
-            Flambda_arity.with_unarized_kinds original_result_arity
-              (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarize original_result_arity))
-          in
-          ( Not_changing_calling_convention,
-            Code_metadata.with_params_arity params_arity
-              (Code_metadata.with_result_arity result_arity code_metadata) )
-        else
-          let params_decisions =
-            List.map2
-              (fun param kind ->
-                match get_unboxed_fields (Code_id_or_name.var param) with
-                | None ->
-                  let kind = rewrite_kind_with_subkind (Name.var param) kind in
-                  if is_var_used param then Keep (param, kind) else Delete
-                | Some fields -> Unbox fields)
-              code_dep.params
-              (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
-          in
-          let my_closure_decision, code_metadata =
-            match
-              get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
-            with
-            | None -> Keep_my_closure, code_metadata
-            | Some unboxed_fields ->
-              ( Unbox_my_closure unboxed_fields,
-                Code_metadata.with_is_my_closure_used false code_metadata )
-          in
-          let return_decisions =
-            List.map2
-              (fun v kind ->
-                match get_unboxed_fields (Code_id_or_name.var v) with
-                | None ->
-                  let kind = rewrite_kind_with_subkind (Name.var v) kind in
-                  if is_var_used v then Keep (v, kind) else Delete
-                | Some fields -> Unbox fields)
-              code_dep.return
-              (Flambda_arity.unarize (Code_metadata.result_arity code_metadata))
-          in
-          let result_arity = arity_of_decisions return_decisions in
-          let code_metadata =
-            Code_metadata.with_is_tupled false
-              (Code_metadata.with_result_arity result_arity code_metadata)
-          in
-          let params_decisions_and_modes =
-            Flambda_arity.group_by_parameter
-              (Code_metadata.params_arity code_metadata)
-              (List.combine params_decisions
-                 (Code_metadata.param_modes code_metadata))
-          in
-          let params_decisions_and_modes =
-            match params_decisions_and_modes with
-            | [] ->
+          else if is_my_closure_used
+          then
+            if
+              (* If the code is opaque or zero-alloc checked, it can look like
+                 the closure is used when it actually is not. *)
+              Code_metadata.is_opaque code_metadata
+              ||
+              match Code_metadata.zero_alloc_attribute code_metadata with
+              | Check _ -> true
+              | Default_zero_alloc | Assume _ -> false
+            then code_metadata
+            else
               Misc.fatal_errorf
-                "Empty parameter groups when changing calling convention for \
-                 code id %a"
-                Code_id.print code_id
-            | first :: rest ->
-              let my_closure_decision =
-                match my_closure_decision with
-                (* If we're not unboxing we need to "delete" the extra mode we
-                   prepend below, ultimately this is a no-op. *)
-                | Keep_my_closure -> Delete
-                | Unbox_my_closure fields -> Unbox fields
+                "For code_metadata %a, the analysis says my_closure is used, \
+                 but the original code did not use my_closure"
+                Code_metadata.print code_metadata
+          else Code_metadata.with_is_my_closure_used false code_metadata
+        in
+        let calling_convention_change, code_metadata =
+          if cannot_change_calling_convention ~analysis_scope uses code_id
+          then
+            (* We still need to rewrite the kinds and subkinds of parameters and
+               returns, as they could be poisoned. *)
+            let rewrite_kinds vars kinds =
+              List.map2
+                (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
+                vars kinds
+            in
+            let original_arity = Code_metadata.params_arity code_metadata in
+            let params_arity =
+              (* As for the result arity below, the structure of the original
+                 arity is preserved. *)
+              Flambda_arity.with_unarized_kinds original_arity
+                (rewrite_kinds code_dep.params
+                   (Flambda_arity.unarize original_arity))
+            in
+            let result_arity =
+              let original_result_arity =
+                Code_metadata.result_arity code_metadata
               in
-              ((my_closure_decision, Alloc_mode.For_types.unknown ()) :: first)
-              :: rest
-          in
-          let params_arity, modes =
-            get_arity_and_modes params_decisions_and_modes
-          in
-          let code_metadata =
-            Code_metadata.with_params_arity params_arity
-              (Code_metadata.with_param_modes modes code_metadata)
-          in
-          (* We only change the calling convention if the analysis has shown
-             there are no partial applications. *)
-          let code_metadata =
-            Code_metadata.with_first_complex_local_param
-              First_complex_local_param.Never_partially_applied code_metadata
-          in
-          ( Changing_calling_convention
-              { params_decisions; return_decisions; my_closure_decision },
-            code_metadata )
+              Flambda_arity.with_unarized_kinds original_result_arity
+                (rewrite_kinds code_dep.return
+                   (Flambda_arity.unarize original_result_arity))
+            in
+            ( Not_changing_calling_convention,
+              Code_metadata.with_params_arity params_arity
+                (Code_metadata.with_result_arity result_arity code_metadata) )
+          else
+            let params_decisions =
+              List.map2
+                (fun param kind ->
+                  match get_unboxed_fields (Code_id_or_name.var param) with
+                  | None ->
+                    let kind =
+                      rewrite_kind_with_subkind (Name.var param) kind
+                    in
+                    if is_var_used param then Keep (param, kind) else Delete
+                  | Some fields -> Unbox fields)
+                code_dep.params
+                (Flambda_arity.unarize
+                   (Code_metadata.params_arity code_metadata))
+            in
+            let my_closure_decision, code_metadata =
+              match
+                get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
+              with
+              | None -> Keep_my_closure, code_metadata
+              | Some unboxed_fields ->
+                ( Unbox_my_closure unboxed_fields,
+                  Code_metadata.with_is_my_closure_used false code_metadata )
+            in
+            let return_decisions =
+              List.map2
+                (fun v kind ->
+                  match get_unboxed_fields (Code_id_or_name.var v) with
+                  | None ->
+                    let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                    if is_var_used v then Keep (v, kind) else Delete
+                  | Some fields -> Unbox fields)
+                code_dep.return
+                (Flambda_arity.unarize
+                   (Code_metadata.result_arity code_metadata))
+            in
+            let result_arity = arity_of_decisions return_decisions in
+            let code_metadata =
+              Code_metadata.with_is_tupled false
+                (Code_metadata.with_result_arity result_arity code_metadata)
+            in
+            let params_decisions_and_modes =
+              Flambda_arity.group_by_parameter
+                (Code_metadata.params_arity code_metadata)
+                (List.combine params_decisions
+                   (Code_metadata.param_modes code_metadata))
+            in
+            let params_decisions_and_modes =
+              match params_decisions_and_modes with
+              | [] ->
+                Misc.fatal_errorf
+                  "Empty parameter groups when changing calling convention for \
+                   code id %a"
+                  Code_id.print code_id
+              | first :: rest ->
+                let my_closure_decision =
+                  match my_closure_decision with
+                  (* If we're not unboxing we need to "delete" the extra mode we
+                     prepend below, ultimately this is a no-op. *)
+                  | Keep_my_closure -> Delete
+                  | Unbox_my_closure fields -> Unbox fields
+                in
+                ((my_closure_decision, Alloc_mode.For_types.unknown ()) :: first)
+                :: rest
+            in
+            let params_arity, modes =
+              get_arity_and_modes params_decisions_and_modes
+            in
+            let code_metadata =
+              Code_metadata.with_params_arity params_arity
+                (Code_metadata.with_param_modes modes code_metadata)
+            in
+            (* We only change the calling convention if the analysis has shown
+               there are no partial applications. *)
+            let code_metadata =
+              Code_metadata.with_first_complex_local_param
+                First_complex_local_param.Never_partially_applied code_metadata
+            in
+            ( Changing_calling_convention
+                { params_decisions; return_decisions; my_closure_decision },
+              code_metadata )
+        in
+        let code_metadata =
+          match Code_metadata.result_types code_metadata with
+          | Unknown | Bottom -> code_metadata
+          | Ok result_types ->
+            let result_types =
+              if forget_all_types
+              then Or_unknown_or_bottom.Unknown
+              else
+                let params_vars_and_keep, results_vars_and_keep =
+                  match calling_convention_change with
+                  | Not_changing_calling_convention ->
+                    ( List.map
+                        (fun p -> p, Points_to_analysis.Keep)
+                        code_dep.params,
+                      List.map
+                        (fun p -> p, Points_to_analysis.Keep)
+                        code_dep.return )
+                  | Changing_calling_convention
+                      { my_closure_decision = _;
+                        params_decisions;
+                        return_decisions
+                      } ->
+                    ( List.map2
+                        (fun p decision ->
+                          match decision with
+                          | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                          | Delete -> p, Points_to_analysis.Delete)
+                        code_dep.params params_decisions,
+                      List.map2
+                        (fun p decision ->
+                          match decision with
+                          | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                          | Delete -> p, Points_to_analysis.Delete)
+                        code_dep.return return_decisions )
+                in
+                rewrite_result_types ~my_closure:code_dep.my_closure
+                  ~params:params_vars_and_keep ~results:results_vars_and_keep
+                  result_types
+            in
+            Code_metadata.with_result_types result_types code_metadata
+        in
+        { calling_convention_change; code_metadata })
+      code_deps
+  in
+  let rec rewrite_newer_version_of code_id =
+    (* CR-someday ncourant: this is quadratic in the depth of the code age
+       relation; but I don't think it really matters. *)
+    match code_id with
+    | None -> None
+    | Some code_id -> (
+      match Code_id.Map.find_opt code_id code_changes with
+      | None ->
+        (* Not in [code_changes]: we can't have changed the calling
+           convention. *)
+        Some code_id
+      | Some { calling_convention_change; code_metadata } -> (
+        match calling_convention_change with
+        | Not_changing_calling_convention -> Some code_id
+        | Changing_calling_convention _ ->
+          rewrite_newer_version_of
+            (Code_metadata.newer_version_of code_metadata)))
+  in
+  Code_id.Map.map
+    (fun { calling_convention_change; code_metadata } ->
+      let newer_version_of =
+        match calling_convention_change with
+        | Changing_calling_convention _ -> None
+        | Not_changing_calling_convention ->
+          rewrite_newer_version_of
+            (Code_metadata.newer_version_of code_metadata)
       in
       let code_metadata =
-        match Code_metadata.result_types code_metadata with
-        | Unknown | Bottom -> code_metadata
-        | Ok result_types ->
-          let result_types =
-            if forget_all_types
-            then Or_unknown_or_bottom.Unknown
-            else
-              let params_vars_and_keep, results_vars_and_keep =
-                match calling_convention_change with
-                | Not_changing_calling_convention ->
-                  ( List.map
-                      (fun p -> p, Points_to_analysis.Keep)
-                      code_dep.params,
-                    List.map
-                      (fun p -> p, Points_to_analysis.Keep)
-                      code_dep.return )
-                | Changing_calling_convention
-                    { my_closure_decision = _;
-                      params_decisions;
-                      return_decisions
-                    } ->
-                  ( List.map2
-                      (fun p decision ->
-                        match decision with
-                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                        | Delete -> p, Points_to_analysis.Delete)
-                      code_dep.params params_decisions,
-                    List.map2
-                      (fun p decision ->
-                        match decision with
-                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                        | Delete -> p, Points_to_analysis.Delete)
-                      code_dep.return return_decisions )
-              in
-              rewrite_result_types ~my_closure:code_dep.my_closure
-                ~params:params_vars_and_keep ~results:results_vars_and_keep
-                result_types
-          in
-          Code_metadata.with_result_types result_types code_metadata
+        Code_metadata.with_newer_version_of newer_version_of code_metadata
       in
       { calling_convention_change; code_metadata })
-    code_deps
+    code_changes
+
+let rewrite_code_age_relation t code_age_relation =
+  Code_age_relation.rewrite_newer_version_of code_age_relation
+    ~f:(fun ~newer ~older ->
+      match Code_id.Map.find_opt newer t with
+      | None -> Some older
+      | Some { code_metadata; calling_convention_change = _ } ->
+        Code_metadata.newer_version_of code_metadata)
 
 let get_calling_convention_change t ~analysis_scope code_id =
   match Code_id.Map.find_opt code_id t with

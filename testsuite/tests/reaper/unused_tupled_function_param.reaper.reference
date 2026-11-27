@@ -24,7 +24,7 @@ in
 let $camlUnused_tupled_function_param__tupled_4 =
   closure tupled_0_1 @`tupled` &toplevel
 in
-(let code inline(never) loopify(never) size(1) newer_version_of(id_1)
+(let code inline(never) loopify(never) size(1)
        id_1_1 (f)
          my_closure &my_alloc_region &my_region &my_ghost_region my_depth
          -> k1 * k2 stack =

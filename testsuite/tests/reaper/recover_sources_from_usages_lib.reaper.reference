@@ -5,7 +5,7 @@ let code make_g_5 deleted in
 let code escape_6 deleted in
 let code id_7 deleted in
 let code `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1` deleted in
-let code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
+let code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`)
       `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_2`
         (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -18,7 +18,7 @@ let code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages
   let int_add = %int_barith.add (10, b) in
   cont k (int_add)
 in
-let code inline(never) loopify(never) size(13) newer_version_of(make_c_2)
+let code inline(never) loopify(never) size(13)
       make_c_2_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -48,7 +48,7 @@ let code loopify(never) size(10) newer_version_of(`fn[recover_sources_from_usage
       let int_add = %int_barith.add (apply_result, 1) in
       cont k (int_add)
 in
-let code inline(never) loopify(never) size(19) newer_version_of(make_g_5)
+let code inline(never) loopify(never) size(19)
       make_g_5_1 (v : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -99,7 +99,7 @@ apply direct(make_c_2_1 &toplevel)
                     `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
                     @`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`
                     &toplevel
-                and code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1_1`)
+                and code loopify(never) size(4) newer_version_of(`fn[recover_sources_from_usages_lib.ml:27,2--17]_1`)
                       `fn[recover_sources_from_usages_lib.ml:27,2--17]_1_3`
                         (param : imm tagged)
                         my_closure &my_alloc_region my_depth

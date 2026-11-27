@@ -5,7 +5,7 @@ let  in
 let $camlUnbox_dead__immstring_4 = "y" in
 let code f_0 deleted in
 let $camlUnbox_dead__immstring_5 = "z" in
-let code inline(never) loopify(never) size(1) newer_version_of(go2_2)
+let code inline(never) loopify(never) size(1)
       go2_2_1 (a_into_b_field_unboxed_float : float)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -13,7 +13,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(go2_2)
   cont k (a_into_b_field_unboxed_float)
 in
 let $camlUnbox_dead__go2_8 = closure go2_2_1 @go2 &toplevel in
-let code inline(never) loopify(never) size(1) newer_version_of(go_1)
+let code inline(never) loopify(never) size(1)
       go_1_1 my_closure &my_alloc_region my_depth -> k * k1 : unit =
   cont k
 in

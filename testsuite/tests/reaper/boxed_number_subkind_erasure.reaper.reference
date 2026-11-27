@@ -1,6 +1,6 @@
 let code merge_usages_1 deleted in
 let code f_0 deleted in
-let code inline(never) loopify(never) size(1) newer_version_of(merge_usages_1)
+let code inline(never) loopify(never) size(1)
       merge_usages_1_1 (u) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (u)
 in
