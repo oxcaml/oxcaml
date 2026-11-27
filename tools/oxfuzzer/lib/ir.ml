@@ -1,5 +1,4 @@
 (* The generator's internal representation of a subset of OxCaml. *)
-open Ast_helper
 open Asttypes
 open Parsetree_helpers
 
@@ -23,6 +22,8 @@ module Name = struct
       else name
 
   let to_string s = s
+
+  let equal = String.equal
 end
 
 module NumberTy = struct
@@ -92,7 +93,7 @@ module NumberTy = struct
       | Float32 | Nativeint | Int64 | Int32 -> true
       | Float | Int | Int16 | Int8 -> false
     in
-    Typ.constr (lid (to_string ~no_hash t)) []
+    Ast_helper.Typ.constr (lid (to_string ~no_hash t)) []
 
   let converter_name ~from ~to_ =
     Format.sprintf "%s_of_%s"
@@ -115,8 +116,8 @@ module Number = struct
     | Int16 of int
     | Int8 of int
 
-  (* CR-someday hwasilewski: This feels like a hacky workaround, maybe change
-     the generation to be more direct for each numeric type. *)
+  (* CR-someday xclerc: This feels like a hacky workaround, maybe change the
+     generation to be more direct for each numeric type. *)
 
   (* This function truncates an int64 to an int of a given [width], meaning that
      its last [width] bits are kept, the rest is zeroed and the sign is
@@ -136,30 +137,56 @@ module Number = struct
     | Float | Float32 ->
       Misc.fatal_errorf "Number.of_integral_bits: expected an integral type"
 
-  let to_code = function
+  let to_code ~unboxed number =
+    let constant desc = Ast_helper.Exp.constant (Ast_helper.Const.mk desc) in
+    let integer value suffix =
+      constant
+        (if unboxed
+         then Pconst_unboxed_integer (value, suffix)
+         else Pconst_integer (value, if suffix = 'm' then None else Some suffix))
+    in
+    let floating_point ~value ~suffix ~unbox boxed =
+      if not unboxed
+      then boxed
+      else if Float.is_finite value
+      then
+        (* Hexadecimal literals preserve every finite value, including signed
+           zero and subnormals. NaNs and infinities have no literal spelling. *)
+        constant (Pconst_unboxed_float (Printf.sprintf "%h" value, suffix))
+      else apply unbox [boxed]
+    in
+    match number with
     | Float bits ->
-      apply
-        (qualified_ident "Int64" "float_of_bits")
-        [Exp.constant (Const.int64 bits)]
+      floating_point ~value:(Int64.float_of_bits bits) ~suffix:None
+        ~unbox:(qualified_ident "Float_u" "of_float")
+        (apply
+           (qualified_ident "Int64" "float_of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)])
     | Float32 bits ->
-      apply
-        (qualified_ident "Float32" "of_bits")
-        [Exp.constant (Const.int32 bits)]
-    | Int n -> Exp.constant (Const.int n)
-    | Nativeint n -> Exp.constant (Const.nativeint n)
-    | Int64 n -> Exp.constant (Const.int64 n)
-    | Int32 n -> Exp.constant (Const.int32 n)
-    | Int16 n -> Exp.constant (Const.int ~suffix:'S' n)
-    | Int8 n -> Exp.constant (Const.int ~suffix:'s' n)
+      floating_point ~value:(Int32.float_of_bits bits) ~suffix:(Some 's')
+        ~unbox:(qualified_ident "Float32_u" "of_float32")
+        (apply
+           (qualified_ident "Float32" "of_bits")
+           [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)])
+    | Int n -> integer (Int.to_string n) 'm'
+    | Nativeint n -> integer (Nativeint.to_string n) 'n'
+    | Int64 n -> integer (Int64.to_string n) 'L'
+    | Int32 n -> integer (Int32.to_string n) 'l'
+    | Int16 n -> integer (Int.to_string n) 'S'
+    | Int8 n -> integer (Int.to_string n) 's'
 end
 
 module Ty = struct
   type t =
     | Number of NumberTy.t
-    | Array of NumberTy.t * int list
+    | Array of t * int list
+    | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
+    | Or_null of t
     | Bool
+    | String
+    | Arrow of t * t
 
   and record =
     { id : int; (* Unique record ID. *)
@@ -183,15 +210,32 @@ module Ty = struct
       args : t list
     }
 
-  let equal left right =
+  let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
-    | Array (l, ls), Array (r, rs) ->
-      NumberTy.equal l r && List.equal Int.equal ls rs
+    | Array (l, ls), Array (r, rs) -> equal l r && List.equal Int.equal ls rs
+    | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
-    | Bool, Bool -> true
-    | (Number _ | Array _ | Record _ | Variant _ | Bool), _ -> false
+    | Or_null l, Or_null r -> equal l r
+    | Bool, Bool | String, String -> true
+    | Arrow (l, l_result), Arrow (r, r_result) ->
+      equal l r && equal l_result r_result
+    | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
+        | Or_null _ | Bool | String | Arrow _ ),
+        _ ) ->
+      false
+
+  let curry params result =
+    List.fold_right (fun param result -> Arrow (param, result)) params result
+
+  let rec uncurry = function
+    | Arrow (param, result) ->
+      let params, result = uncurry result in
+      param :: params, result
+    | ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+      | Bool | String ) as ty ->
+      [], ty
 
   let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
 
@@ -199,36 +243,73 @@ module Ty = struct
     Format.sprintf "Variant_%d_C%d" variant.variant_id
       constructor.constructor_index
 
-  let constructor_pattern variant constructor names =
-    if List.length names <> List.length constructor.args
-    then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
-    let patterns =
-      List.map (fun name -> Pat.var (loc (Name.to_string name))) names
-    in
-    let arg =
-      match patterns with
-      | [] -> None
-      | [pattern] -> Some ([], pattern)
-      | patterns ->
-        Some ([], Pat.tuple (List.map (fun p -> None, p) patterns) Closed)
-    in
-    Pat.construct (lid (constructor_name variant constructor)) arg
-
   let record_name { id; unboxed; _ } =
     Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
 
   let field_name record { index; _ } =
     Format.sprintf "%s_field_%d" (record_name record) index
 
-  let to_code = function
+  let rec to_code = function
     | Number nty -> NumberTy.to_code nty
-    | Array (nty, dimensions) ->
+    | Array (element_ty, dimensions) ->
       List.fold_left
-        (fun ty _ -> Typ.constr (lid "array") [ty])
-        (NumberTy.to_code nty) dimensions
-    | Record record -> Typ.constr (lid (record_name record)) []
-    | Variant variant -> Typ.constr (lid (variant_name variant)) []
-    | Bool -> Typ.constr (lid "bool") []
+        (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
+        (to_code element_ty) dimensions
+    | Unboxed_tuple components ->
+      Ast_helper.Typ.unboxed_tuple
+        (List.map (fun ty -> None, to_code ty) components)
+    | Record record -> Ast_helper.Typ.constr (lid (record_name record)) []
+    | Variant variant -> Ast_helper.Typ.constr (lid (variant_name variant)) []
+    | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
+    | Bool -> Ast_helper.Typ.constr (lid "bool") []
+    | String -> Ast_helper.Typ.constr (lid "string") []
+    | Arrow (param, result) ->
+      Ast_helper.Typ.arrow Nolabel (to_code param) (to_code result) [] []
+end
+
+module Sum = struct
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  let ty = function
+    | Variant variant -> Ty.Variant variant
+    | Or_null payload -> Ty.Or_null payload
+
+  let constructors = function
+    | Variant variant -> variant.constructors
+    | Or_null payload ->
+      [ { Ty.constructor_index = 0; args = [] };
+        { Ty.constructor_index = 1; args = [payload] } ]
+
+  let constructor_name sum (constructor : Ty.constructor) =
+    match sum with
+    | Variant variant -> Ty.constructor_name variant constructor
+    | Or_null _ -> (
+      match constructor.constructor_index with
+      | 0 -> "Null"
+      | 1 -> "This"
+      | _ -> Misc.fatal_errorf "Or_null: invalid constructor index")
+
+  let constructor_pattern sum (constructor : Ty.constructor) names =
+    if List.length names <> List.length constructor.args
+    then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
+    let patterns =
+      List.map
+        (fun name -> Ast_helper.Pat.var (loc (Name.to_string name)))
+        names
+    in
+    let arg =
+      match patterns with
+      | [] -> None
+      | [pattern] -> Some ([], pattern)
+      | patterns ->
+        Some
+          ( [],
+            Ast_helper.Pat.tuple (List.map (fun p -> None, p) patterns) Closed
+          )
+    in
+    Ast_helper.Pat.construct (lid (constructor_name sum constructor)) arg
 end
 
 module Binding = struct
@@ -239,14 +320,258 @@ module Binding = struct
     }
 end
 
-(* CR-someday hwasilewski: Add unary operations as well. *)
+module Exn = struct
+  type t =
+    | Division_by_zero
+    | Generated of
+        { id : int;
+          payload : Ty.t option
+        }
+
+  let equal left right =
+    match left, right with
+    | Division_by_zero, Division_by_zero -> true
+    | Generated left, Generated right -> Int.equal left.id right.id
+    | Division_by_zero, Generated _ | Generated _, Division_by_zero -> false
+
+  let name = function
+    | Division_by_zero -> "Division_by_zero"
+    | Generated { id; _ } -> Format.sprintf "Exn_%d" id
+
+  let payload = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } -> payload
+
+  let to_code = function
+    | Division_by_zero -> None
+    | Generated { payload; _ } as t ->
+      let args =
+        match payload with
+        | None -> []
+        | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
+      in
+      Some
+        (Ast_helper.Str.exception_
+           (Ast_helper.Te.mk_exception
+              (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args)
+                 (loc (name t)))))
+end
+
+module Eff = struct
+  type t =
+    { id : int;
+      payload : Ty.t;
+      result : Ty.t
+    }
+
+  let equal left right = Int.equal left.id right.id
+
+  let constructor_name { id; _ } = Format.sprintf "Eff_%d" id
+
+  let handler_name { id; _ } = Format.sprintf "handle_%d" id
+
+  let effect_lid = ldot "Effect" "t"
+
+  (* [Effect.Deep.name] *)
+  let deep name = loc (Longident.Ldot (ldot "Effect" "Deep", loc name))
+
+  (* [type _ Effect.t += Eff_i : payload -> result Effect.t] *)
+  let declaration ({ payload; result; _ } as t) =
+    Ast_helper.Str.type_extension
+      (Ast_helper.Te.mk
+         ~params:[Ast_helper.Typ.any None, (NoVariance, NoInjectivity)]
+         effect_lid
+         [ Ast_helper.Te.decl
+             ~args:
+               (Parsetree.Pcstr_tuple
+                  [Ast_helper.Type.constructor_arg (Ty.to_code payload)])
+             ~res:(Ast_helper.Typ.constr effect_lid [Ty.to_code result])
+             (loc (constructor_name t)) ])
+
+  (* [let handle_i f (resume : payload -> result) = Effect.Deep.try_with f () {
+     effc }], where [effc] resumes the continuation of [Eff_i v] with [resume
+     v]. The annotation keeps [result] from escaping the scope of the locally
+     abstract type of [effc]. *)
+  let handler ({ payload; result; _ } as t) =
+    let a = Ast_helper.Typ.constr (lid "a") [] in
+    let continuation =
+      Ast_helper.Typ.constr (deep "continuation") [a; Ast_helper.Typ.any None]
+    in
+    let resume =
+      function_
+        [ value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "k"))
+               (Some continuation) []) ]
+        (apply
+           (Ast_helper.Exp.ident (deep "continue"))
+           [ident "k"; apply (ident "resume") [ident "v"]])
+    in
+    let effc =
+      Ast_helper.Exp.function_
+        [ { pparam_loc = Location.none;
+            pparam_desc = Pparam_newtype (loc "a", None)
+          };
+          value_param
+            (Ast_helper.Pat.constraint_
+               (Ast_helper.Pat.var (loc "eff"))
+               (Some (Ast_helper.Typ.constr effect_lid [a]))
+               []) ]
+        { mode_annotations = [];
+          ret_mode_annotations = [];
+          ret_type_constraint = None
+        }
+        (Pfunction_body
+           (Ast_helper.Exp.match_ (ident "eff")
+              [ Ast_helper.Exp.case
+                  (Ast_helper.Pat.construct
+                     (lid (constructor_name t))
+                     (Some ([], Ast_helper.Pat.var (loc "v"))))
+                  (Ast_helper.Exp.construct (lid "Some") (Some resume));
+                Ast_helper.Exp.case (Ast_helper.Pat.any ())
+                  (Ast_helper.Exp.construct (lid "None") None) ]))
+    in
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.var (loc (handler_name t)))
+          (function_
+             [ value_param (Ast_helper.Pat.var (loc "f"));
+               value_param
+                 (Ast_helper.Pat.constraint_
+                    (Ast_helper.Pat.var (loc "resume"))
+                    (Some (Ty.to_code (Ty.Arrow (payload, result))))
+                    []) ]
+             (apply
+                (Ast_helper.Exp.ident (deep "try_with"))
+                [ ident "f";
+                  unit_;
+                  Ast_helper.Exp.record [deep "effc", effc] None ])) ]
+
+  let to_code t = [declaration t; handler t]
+end
+
+module Handler = struct
+  type pattern =
+    | Exn of
+        { exn : Exn.t;
+          payload : Binding.t option
+        }
+    | Catch_all
+
+  type reraise =
+    { name : Name.t;
+      notrace : bool
+    }
+
+  type 'body t =
+    { pattern : pattern;
+      body : 'body;
+      reraise : reraise option
+    }
+
+  let pattern_to_code = function
+    | Catch_all -> Ast_helper.Pat.any ()
+    | Exn { exn; payload } ->
+      let payload =
+        match Exn.payload exn, payload with
+        | None, None -> None
+        | Some _, None -> Some ([], Ast_helper.Pat.any ())
+        | Some ty, Some (binding : Binding.t) ->
+          if not (Ty.equal ty binding.ty)
+          then Misc.fatal_errorf "Handler: payload type mismatch";
+          Some
+            ( [],
+              (* CR-soon selee for xclerc: see below comment about
+                 constraints *)
+              Ast_helper.Pat.constraint_
+                (Ast_helper.Pat.var (loc (Name.to_string binding.name)))
+                (Some (Ty.to_code ty))
+                [] )
+        | None, Some _ -> Misc.fatal_errorf "Handler: exception has no payload"
+      in
+      Ast_helper.Pat.construct (lid (Exn.name exn)) payload
+
+  let to_case body_to_code { pattern; body; reraise } =
+    match reraise, pattern with
+    | None, _ ->
+      Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+    | Some { name; notrace }, Exn _ ->
+      let name = Name.to_string name in
+      Ast_helper.Exp.case
+        (Ast_helper.Pat.alias (pattern_to_code pattern) (loc name))
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [Ast_helper.Vb.mk (Ast_helper.Pat.any ()) (body_to_code body)]
+           (apply
+              (ident (if notrace then "raise_notrace" else "raise"))
+              [ident name]))
+    | Some _, Catch_all -> Misc.fatal_errorf "Handler: reraise from catch-all"
+end
+
+module Un_op = struct
+  type t =
+    | Neg
+    | Abs
+    | Succ
+    | Pred
+    | Sqrt
+    | Round
+    | Trunc
+    | Ceil
+    | Floor
+    | Bit_not
+    | Not
+
+  let ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      let numeric = [Neg; Abs; Succ; Pred] in
+      if NumberTy.is_floating_point nty
+      then numeric @ [Sqrt; Round; Trunc; Ceil; Floor]
+      else numeric @ [Bit_not]
+    | Bool -> [Not]
+    | String | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _
+    | Arrow _ ->
+      Misc.fatal_errorf "Un_op.ops_for_ty: expected a numeric or boolean type"
+
+  let to_code ty unop ~arg =
+    let module_name =
+      match ty with
+      | Ty.Number nty -> NumberTy.to_module nty
+      | Ty.Bool -> "Bool"
+      | Ty.String | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ | Ty.Arrow _ ->
+        Misc.fatal_errorf "Un_op.to_code: expected a numeric or boolean type"
+    in
+    let name =
+      match unop with
+      | Neg -> "neg"
+      | Abs -> "abs"
+      | Succ -> "succ"
+      | Pred -> "pred"
+      | Sqrt -> "sqrt"
+      | Round -> "round"
+      | Trunc -> "trunc"
+      | Ceil -> "ceil"
+      | Floor -> "floor"
+      | Bit_not -> "lognot"
+      | Not -> "not"
+    in
+    apply (qualified_ident module_name name) [arg]
+end
+
 module Bin_op = struct
-  (* CR-soon hwasilewski: Add more operators. Especially division and modulo
-     (with safe wrappers). *)
   type t =
     | Add
     | Sub
     | Mul
+    | Div
+    | Rem
+    | Min
+    | Max
+    | Min_num
+    | Max_num
+    | Unsigned_div
+    | Unsigned_rem
     | Bit_and
     | Bit_or
     | Bit_xor
@@ -254,32 +579,61 @@ module Bin_op = struct
     | Shift_right
     | Shift_right_logical
     | Eq
+    | Ne
     | Lt
     | Le
     | Gt
     | Ge
+    | Compare
+    | Unsigned_compare
     | And
     | Or
 
-  let num_binops = [Add; Sub; Mul]
+  let num_binops = [Add; Sub; Mul; Div; Rem]
+
+  (* CR-soon xclerc: Add FMA and copy_sign. FMA needs a ternary expression;
+     copy_sign must avoid NaN sign arguments, whose results are unspecified. *)
+  let floating_point_binops = num_binops @ [Min; Max; Min_num; Max_num]
 
   let integral_binops =
     num_binops
-    @ [Bit_and; Bit_or; Bit_xor; Shift_left; Shift_right; Shift_right_logical]
+    @ [ Unsigned_div;
+        Unsigned_rem;
+        Bit_and;
+        Bit_or;
+        Bit_xor;
+        Shift_left;
+        Shift_right;
+        Shift_right_logical ]
 
-  let ops_for_ty (ty : Ty.t) =
+  let numeric_ops_for_ty (ty : Ty.t) =
     match ty with
     | Number nty ->
-      if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Record _ | Variant _ ->
-      Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
+      if NumberTy.is_floating_point nty
+      then floating_point_binops
+      else integral_binops
+    | Bool | String | Array _ | Unboxed_tuple _ | Record _ | Variant _
+    | Or_null _ | Arrow _ ->
+      Misc.fatal_errorf "Bin_op.numeric_ops_for_ty: expected a numeric type"
+
+  let compare_ops_for_ty (ty : Ty.t) =
+    match ty with
+    | Number nty ->
+      if NumberTy.is_floating_point nty
+      then [Compare]
+      else [Compare; Unsigned_compare]
+    | Bool | String -> [Compare]
+    | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ | Arrow _ ->
+      Misc.fatal_errorf "Bin_op.compare_ops_for_ty: expected a scalar type"
 
   let to_code ty binop ~lhs ~rhs =
     let module_name =
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Record _ | Ty.Variant _ ->
+      | Ty.String -> "String"
+      | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ | Ty.Arrow _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -287,6 +641,14 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Div -> call "div"
+    | Rem -> call "rem"
+    | Min -> call "min"
+    | Max -> call "max"
+    | Min_num -> call "min_num"
+    | Max_num -> call "max_num"
+    | Unsigned_div -> call "unsigned_div"
+    | Unsigned_rem -> call "unsigned_rem"
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
@@ -294,21 +656,81 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
-    (* CR-someday hwasilewski: Sometimes emit compare x y = 0 instead. *)
+    | Ne -> apply (qualified_ident "Bool" "not") [call "equal"]
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
     | Ge -> op ">=" [call "compare"; int 0]
+    | Compare -> call "compare"
+    | Unsigned_compare -> (
+      match ty with
+      | Ty.Number { base = Int; unboxed = false } ->
+        (* [Int] has no [unsigned_compare]. Flipping the sign bit maps unsigned
+           order to signed order without changing the operand width. *)
+        let flip_sign expr =
+          apply
+            (qualified_ident "Int" "logxor")
+            [expr; qualified_ident "Int" "min_int"]
+        in
+        apply (qualified_ident "Int" "compare") [flip_sign lhs; flip_sign rhs]
+      | _ -> call "unsigned_compare")
     | And -> op "&&" [lhs; rhs]
     | Or -> op "||" [lhs; rhs]
 end
 
-module Expr = struct
-  (* CR-soon hwasilewski: Currently this type is constructed manually, but that
-     is a mistake, as we can create for example a [Bin_op] with invalid types.
-     To mitigate, we should make [t] private and add smart constructors. *)
+module Inline = struct
   type t =
-    | Const of Number.t
+    | Never
+    | Always
+    | Default
+
+  let to_attributes inline =
+    let attribute payload =
+      [ Ast_helper.Attr.mk (loc "inline")
+          (PStr [Ast_helper.Str.eval (ident payload)]) ]
+    in
+    match inline with
+    | Default -> []
+    | Never -> attribute "never"
+    | Always -> attribute "always"
+end
+
+let typed_param ({ name; ty; _ } : Binding.t) =
+  value_param
+    (Ast_helper.Pat.constraint_
+       (Ast_helper.Pat.var (loc (Name.to_string name)))
+       (Some (Ty.to_code ty))
+       [])
+
+module Expr = struct
+  (* CR-soon xclerc: Currently this type is constructed manually, but that is a
+     mistake, as we can create for example a [Bin_op] with invalid types. To
+     mitigate, we should make [t] private and add smart constructors. *)
+  type t =
+    | Const of
+        { number : Number.t;
+          unboxed : bool
+        }
+    | Bool_const of bool
+    | String_const of string
+    | String_length of t
+    | Bounded_string_concat of
+        { lhs : t;
+          rhs : t;
+          result_name : Name.t;
+          max_length : int
+        }
+    | Assert_false
+    | Let of
+        { name : Name.t;
+          expr : t;
+          body : t
+        }
+    | If of
+        { condition : t;
+          if_true : t;
+          if_false : t
+        }
     | Read of place
     | Array_literal of t list
     | Array_make of
@@ -316,6 +738,7 @@ module Expr = struct
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of t list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -325,16 +748,21 @@ module Expr = struct
           expr : t
         }
     | Construct of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           constructor : Ty.constructor;
-          args : (Name.t * t) list
+          args : t list
         }
     | Match of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           scrutinee : t;
           cases : case list
         }
     | Opaque of t
+    | Un_op of
+        { ty : Ty.t;
+          op : Un_op.t;
+          arg : t
+        }
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;
@@ -350,6 +778,51 @@ module Expr = struct
         { fun_name : Name.t;
           args : t list
         }
+    | Raise of raise
+    | Try of
+        { ty : Ty.t;
+          body : t;
+          handlers : t Handler.t list
+        }
+    | Lambda of
+        { params : Binding.t list;
+          inline : Inline.t;
+          body : t;
+          result_ty : Ty.t
+        }
+    | Apply of
+        { func : t;
+          args : t list
+        }
+    | Let_rec of
+        { functions : (Name.t * t) list;
+          body : t
+        }
+    | Perform of
+        { eff : Eff.t;
+          arg : t
+        }
+    | Handle of
+        { eff : Eff.t;
+          ty : Ty.t;
+          body : t;
+          resume : t
+        }
+    | Let_stack_function of
+        { name : Name.t;
+          lambda : t;
+          body : t
+        }
+    | Apply_stack_function of
+        { name : Name.t;
+          args : t list
+        }
+
+  and raise =
+    { exn : Exn.t;
+      payload : t option;
+      notrace : bool
+    }
 
   and case =
     { constructor : Ty.constructor;
@@ -361,6 +834,12 @@ module Expr = struct
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let convert_num expr ~(from : NumberTy.t) ~(to_ : NumberTy.t) =
     if NumberTy.equal from to_
@@ -369,8 +848,8 @@ module Expr = struct
 
   let bind name expr body =
     let name = Name.to_string name in
-    Exp.let_ Immutable Nonrecursive
-      [Vb.mk (Pat.var (loc name)) expr]
+    Ast_helper.Exp.let_ Immutable Nonrecursive
+      [Ast_helper.Vb.mk (Ast_helper.Pat.var (loc name)) expr]
       (body (ident name))
 
   (* CR-soon xclerc for xclerc: the constraint always sends the expression
@@ -378,24 +857,56 @@ module Expr = struct
      it, e.g. under a swarm flag, so that plain inference is exercised too;
      generated constructor and field names are unique, so disambiguation does
      not require it. *)
-  let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
+  let constrain ty expr =
+    Ast_helper.Exp.constraint_ expr (Some (Ty.to_code ty)) []
 
   let field_code (record : Ty.record) field receiver =
-    let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+    let project =
+      if record.unboxed
+      then Ast_helper.Exp.unboxed_field
+      else Ast_helper.Exp.field
+    in
     project
       (constrain (Ty.Record record) receiver)
       (lid (Ty.field_name record field))
 
   let record_code (record : Ty.record) fields source =
     let make =
-      if record.unboxed then Exp.record_unboxed_product else Exp.record
+      if record.unboxed
+      then Ast_helper.Exp.record_unboxed_product
+      else Ast_helper.Exp.record
     in
     constrain (Ty.Record record) (make fields source)
 
   let rec to_code : t -> Parsetree.expression = function
-    | Const n -> Number.to_code n
+    | Const { number; unboxed } -> Number.to_code ~unboxed number
+    | Bool_const b -> Ast_helper.Exp.construct (lid (Bool.to_string b)) None
+    | String_const s -> Ast_helper.Exp.constant (Ast_helper.Const.string s)
+    | String_length expr ->
+      apply (qualified_ident "String" "length") [to_code expr]
+    | Bounded_string_concat { lhs; rhs; result_name; max_length } ->
+      bind result_name
+        (apply (qualified_ident "String" "cat") [to_code lhs; to_code rhs])
+        (fun result ->
+          Ast_helper.Exp.ifthenelse
+            (op "<="
+               [ apply (qualified_ident "String" "length") [result];
+                 int max_length ])
+            result
+            (Some
+               (apply
+                  (qualified_ident "String" "sub")
+                  [result; int 0; int max_length])))
+    | Assert_false ->
+      Ast_helper.Exp.assert_ (Ast_helper.Exp.construct (lid "false") None)
+    | Let { name; expr; body } ->
+      bind name (to_code expr) (fun _ -> to_code body)
+    | If { condition; if_true; if_false } ->
+      Ast_helper.Exp.ifthenelse (to_code condition) (to_code if_true)
+        (Some (to_code if_false))
     | Read place -> place_to_code place
-    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
+    | Array_literal elements ->
+      Ast_helper.Exp.array Mutable (List.map to_code elements)
     | Array_make { dimensions; init_name; init } ->
       bind init_name (to_code init) (fun initial_value ->
           let rec make = function
@@ -404,9 +915,13 @@ module Expr = struct
             | size :: rest ->
               apply
                 (qualified_ident "Array" "init")
-                [int size; function_ [value_param (Pat.any ())] (make rest)]
+                [ int size;
+                  function_ [value_param (Ast_helper.Pat.any ())] (make rest) ]
           in
           make dimensions)
+    | Unboxed_tuple components ->
+      Ast_helper.Exp.unboxed_tuple
+        (List.map (fun expr -> None, to_code expr) components)
     | Record (record, values) ->
       if List.length record.fields <> List.length values
       then Misc.fatal_errorf "Record: incorrect number of fields";
@@ -432,48 +947,112 @@ module Expr = struct
               from.fields
           in
           record_code target fields None)
-    | Construct { variant; constructor; args } ->
+    | Construct { sum; constructor; args } ->
       if List.length args <> List.length constructor.args
       then Misc.fatal_errorf "Constructor: incorrect number of arguments";
-      let values =
-        List.map (fun (name, _) -> ident (Name.to_string name)) args
-      in
+      let values = List.map to_code args in
       let arg =
         match values with
         | [] -> None
         | [value] -> Some value
         | values ->
-          Some (Exp.tuple (List.map (fun value -> None, value) values))
+          Some
+            (Ast_helper.Exp.tuple (List.map (fun value -> None, value) values))
       in
-      let body =
-        Exp.construct (lid (Ty.constructor_name variant constructor)) arg
-      in
-      (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
-      (* Payload expressions can have effects: explicitly sequence their
-         evaluation. *)
-      List.fold_right
-        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
-        args body
-    | Match { variant; scrutinee; cases } ->
-      Exp.match_
-        (constrain (Ty.Variant variant) (to_code scrutinee))
+      Ast_helper.Exp.construct (lid (Sum.constructor_name sum constructor)) arg
+    | Match { sum; scrutinee; cases } ->
+      Ast_helper.Exp.match_
+        (constrain (Sum.ty sum) (to_code scrutinee))
         (List.map
            (fun { constructor; bindings; body } ->
              let names =
                List.map (fun (binding : Binding.t) -> binding.name) bindings
              in
-             Exp.case
-               (Ty.constructor_pattern variant constructor names)
+             Ast_helper.Exp.case
+               (Sum.constructor_pattern sum constructor names)
                (to_code body))
            cases)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
+    | Un_op { ty; op; arg } -> Un_op.to_code ty op ~arg:(to_code arg)
     | Bin_op { ty; op; lhs; rhs } ->
       Bin_op.to_code ty op ~lhs:(to_code lhs) ~rhs:(to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
       let args = match args with [] -> [unit_] | _ -> List.map to_code args in
       apply (ident (Name.to_string fun_name)) args
+    | Raise raise -> raise_to_code raise
+    | Try { ty; body; handlers } ->
+      if List.is_empty handlers then Misc.fatal_errorf "Try: no handlers";
+      constrain ty
+        (Ast_helper.Exp.try_ (to_code body)
+           (List.map (Handler.to_case to_code) handlers))
+    | Lambda { params; inline; body; result_ty } ->
+      if List.is_empty params then Misc.fatal_errorf "Lambda: no parameters";
+      let lambda =
+        function_
+          (List.map typed_param params)
+          (constrain result_ty (to_code body))
+      in
+      { lambda with pexp_attributes = Inline.to_attributes inline }
+    | Apply { func; args } ->
+      if List.is_empty args then Misc.fatal_errorf "Apply: no arguments";
+      apply (to_code func) (List.map to_code args)
+    | Let_rec { functions; body } ->
+      if List.is_empty functions then Misc.fatal_errorf "Let_rec: no functions";
+      let binding (name, lambda) =
+        match lambda with
+        | Lambda _ ->
+          Ast_helper.Vb.mk
+            (Ast_helper.Pat.var (loc (Name.to_string name)))
+            (to_code lambda)
+        | _ -> Misc.fatal_errorf "Let_rec: expected a function"
+      in
+      Ast_helper.Exp.let_ Immutable Recursive
+        (List.map binding functions)
+        (to_code body)
+    | Perform { eff; arg } ->
+      apply
+        (qualified_ident "Effect" "perform")
+        [ Ast_helper.Exp.construct
+            (lid (Eff.constructor_name eff))
+            (Some (to_code arg)) ]
+    | Handle { eff; ty; body; resume } ->
+      constrain ty
+        (apply
+           (ident (Eff.handler_name eff))
+           [ function_
+               [value_param (Ast_helper.Pat.construct (lid "()") None)]
+               (constrain ty (to_code body));
+             to_code resume ])
+    | Let_stack_function { name; lambda; body } -> (
+      match lambda with
+      | Lambda _ ->
+        bind name
+          (Ast_helper.Exp.stack (to_code lambda))
+          (fun _ -> to_code body)
+      | _ -> Misc.fatal_errorf "Let_stack_function: expected a function")
+    | Apply_stack_function { name; args } ->
+      if List.is_empty args
+      then Misc.fatal_errorf "Apply_stack_function: no arguments";
+      let application =
+        apply (ident (Name.to_string name)) (List.map to_code args)
+      in
+      { application with
+        pexp_attributes = [Ast_helper.Attr.mk (loc "nontail") (PStr [])]
+      }
+
+  and raise_to_code { exn; payload; notrace } =
+    let payload =
+      match Exn.payload exn, payload with
+      | None, None -> None
+      | Some _, Some payload -> Some (to_code payload)
+      | Some _, None | None, Some _ ->
+        Misc.fatal_errorf "Raise: payload does not match the exception"
+    in
+    apply
+      (ident (if notrace then "raise_notrace" else "raise"))
+      [Ast_helper.Exp.construct (lid (Exn.name exn)) payload]
 
   and place_to_code = function
     | Variable name -> ident (Name.to_string name)
@@ -483,15 +1062,29 @@ module Expr = struct
       List.fold_left
         (fun array index -> apply (ident "array_get") [array; to_code index])
         (place_to_code parent) indices
+    | Unboxed_tuple_component { tuple; arity; index; name } ->
+      let name = Name.to_string name in
+      let pattern =
+        Ast_helper.Pat.unboxed_tuple
+          (List.init arity (fun i ->
+               ( None,
+                 if i = index
+                 then Ast_helper.Pat.var (loc name)
+                 else Ast_helper.Pat.any () )))
+          Closed
+      in
+      Ast_helper.Exp.let_ Immutable Nonrecursive
+        [Ast_helper.Vb.mk pattern (place_to_code tuple)]
+        (ident name)
 
   let assignment_to_code place value =
     match place with
     | Variable name ->
-      Exp.setinstvar (loc (Name.to_string name)) (to_code value)
+      Ast_helper.Exp.setinstvar (loc (Name.to_string name)) (to_code value)
     | Field (parent, record, field) ->
       if record.unboxed || not field.is_mutable
       then Misc.fatal_errorf "Assign: field is not mutable";
-      Exp.setfield
+      Ast_helper.Exp.setfield
         (constrain (Ty.Record record) (place_to_code parent))
         (lid (Ty.field_name record field))
         (to_code value)
@@ -504,6 +1097,8 @@ module Expr = struct
           set (apply (ident "array_get") [array; to_code index]) rest
       in
       set (place_to_code parent) indices
+    | Unboxed_tuple_component _ ->
+      Misc.fatal_errorf "Assign: unboxed tuple components are immutable"
 end
 
 module Place = struct
@@ -511,6 +1106,12 @@ module Place = struct
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let to_code = Expr.place_to_code
 end
@@ -528,13 +1129,18 @@ module Statement = struct
           stride : int;
           body : t
         }
+    | Raise of Expr.raise
+    | Try of
+        { body : t;
+          handlers : t Handler.t list
+        }
 
   let let_binding ({ name; ty; is_mutable } : Binding.t) expr body =
     let mutability = if is_mutable then Mutable else Immutable in
-    Exp.let_ mutability Nonrecursive
-      [ Vb.mk
-          (Pat.constraint_
-             (Pat.var (loc (Name.to_string name)))
+    Ast_helper.Exp.let_ mutability Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.constraint_
+             (Ast_helper.Pat.var (loc (Name.to_string name)))
              (Some (Ty.to_code ty))
              [])
           expr ]
@@ -557,36 +1163,36 @@ module Statement = struct
           is_mutable = true
         }
         (Expr.to_code init)
-        (Exp.let_ Immutable Nonrecursive
-           [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
-           (* CR-someday hwasilewski: Sometimes emit as a for loop instead. *)
-           (Exp.while_
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [ Ast_helper.Vb.mk
+               (Ast_helper.Pat.var (loc bound_name))
+               (Expr.to_code bound) ]
+           (* CR-someday xclerc: Sometimes emit as a for loop instead. *)
+           (Ast_helper.Exp.while_
               (op comparison [ident name; ident bound_name])
-              (Exp.sequence (to_code body)
-                 (Exp.setinstvar (loc name) (op "+" [ident name; int stride])))))
+              (Ast_helper.Exp.sequence (to_code body)
+                 (Ast_helper.Exp.setinstvar (loc name)
+                    (op "+" [ident name; int stride])))))
     | Let (binding, expr, body) ->
       let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
-      List.fold_right Exp.sequence (List.map to_code statements) unit_
+      (* A trailing [raise] is not followed by [()], as the statement would
+         never be reached. *)
+      let rec sequence = function
+        | [] -> unit_
+        | [Raise raise] -> Expr.raise_to_code raise
+        | statement :: rest ->
+          Ast_helper.Exp.sequence (to_code statement) (sequence rest)
+      in
+      sequence statements
     | If (condition, if_true, if_false) ->
-      Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
+      Ast_helper.Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
         (Some (to_code if_false))
-end
-
-module Inline = struct
-  type t =
-    | Never
-    | Always
-    | Default
-
-  let to_attributes inline =
-    let attribute payload =
-      [Attr.mk (loc "inline") (PStr [Str.eval (ident payload)])]
-    in
-    match inline with
-    | Default -> []
-    | Never -> attribute "never"
-    | Always -> attribute "always"
+    | Raise raise -> Expr.raise_to_code raise
+    | Try { body; handlers } ->
+      if List.is_empty handlers then Misc.fatal_errorf "Try: no handlers";
+      Ast_helper.Exp.try_ (to_code body)
+        (List.map (Handler.to_case to_code) handlers)
 end
 
 module Function = struct
@@ -596,25 +1202,21 @@ module Function = struct
       inline : Inline.t;
       body : Statement.t;
       return_ty : Ty.t;
-      result : Expr.t
+      result : Expr.t;
+      raises : Exn.t list
     }
 
-  let to_code { name; params; inline; body; return_ty; result } =
-    let to_param ({ name; ty; _ } : Binding.t) =
-      value_param
-        (Pat.constraint_
-           (Pat.var (loc (Name.to_string name)))
-           (Some (Ty.to_code ty))
-           [])
-    in
+  let to_code { name; params; inline; body; return_ty; result; raises = _ } =
     let function_params =
       match params with
-      | [] -> [value_param (Pat.construct (lid "()") None)]
-      | _ -> List.map to_param params
+      | [] -> [value_param (Ast_helper.Pat.construct (lid "()") None)]
+      | _ -> List.map typed_param params
     in
     let body =
-      Exp.sequence (Statement.to_code body)
-        (Exp.constraint_ (Expr.to_code result) (Some (Ty.to_code return_ty)) [])
+      Ast_helper.Exp.sequence (Statement.to_code body)
+        (Ast_helper.Exp.constraint_ (Expr.to_code result)
+           (Some (Ty.to_code return_ty))
+           [])
     in
     let body =
       List.fold_right
@@ -624,9 +1226,9 @@ module Function = struct
             body)
         params body
     in
-    Str.value Nonrecursive
-      [ Vb.mk
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
           ~attrs:(Inline.to_attributes inline)
-          (Pat.var (loc (Name.to_string name)))
+          (Ast_helper.Pat.var (loc (Name.to_string name)))
           (function_ function_params body) ]
 end

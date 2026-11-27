@@ -812,7 +812,10 @@ var caml_output_val = (function () {
         writer.size_32 += 1 + (((len + 4) / 4) | 0);
         writer.size_64 += 1 + (((len + 8) / 8) | 0);
       } else {
-        if (v !== (v | 0)) {
+        // If a [-0] is encountered, consider it to be a float instead of an int.
+        // This is safe because OCaml's int operations never return [-0]: they
+        // end in [| 0] or use [Math.imul].
+        if (v !== (v | 0) || (v === 0 && 1 / v < 0)) {
           var type_of_v = typeof v;
           if (type_of_v !== "number")
             caml_failwith("output_value: abstract value (" + type_of_v + ")");
@@ -852,13 +855,13 @@ var caml_output_val = (function () {
   };
 })();
 
-//Provides: caml_output_value_to_string mutable
+//Provides: caml_output_value_to_string
 //Requires: caml_output_val, caml_string_of_uint8_array
 function caml_output_value_to_string(v, flags) {
   return caml_string_of_uint8_array(caml_output_val(v, flags));
 }
 
-//Provides: caml_output_value_to_bytes mutable
+//Provides: caml_output_value_to_bytes
 //Requires: caml_output_val, caml_bytes_of_uint8_array
 function caml_output_value_to_bytes(v, flags) {
   return caml_bytes_of_uint8_array(caml_output_val(v, flags));

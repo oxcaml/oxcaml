@@ -49,7 +49,7 @@ module Lambda = struct
   let maybe_apply_generic ~loc ~binds maybe_arg cases =
     let expr =
       match maybe_arg with
-      | None -> pexp_function ~loc cases
+      | None -> pexp_function_cases ~loc cases
       | Some arg -> pexp_match ~loc arg cases
     in
     with_let ~loc ~binds expr

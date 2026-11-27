@@ -131,7 +131,7 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
-let phrase_static_data : Slambdaeval.CU_data.t Compilation_unit.Tbl.t =
+let phrase_static_data : Slambda.CU_data.t Compilation_unit.Tbl.t =
   Compilation_unit.Tbl.create 16
 
 let cu_static_data cu =
@@ -202,7 +202,7 @@ let rec eval_address = function
       end
 
 let eval_path find env path =
-  match find path env with
+  match find ~loc:Location.none path env with
   | addr -> eval_address addr
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))
@@ -360,10 +360,7 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let (static_data, rawlam) =
-    Slambda.eval ~cu_static_data
-      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
-  in
+  let (static_data, rawlam) = Slambda.eval ~cu_static_data tlam in
   Compilation_unit.Tbl.replace phrase_static_data compilation_unit static_data;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
@@ -438,7 +435,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg sort;
+      val_kind = Val_reg (Representable sort);
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -814,7 +811,7 @@ let set_paths () =
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
-  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
+  let expand_entry (e : Clflags.include_dir) : Clflags.include_dir =
     { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
   in
   let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
@@ -829,7 +826,7 @@ let set_paths () =
     ]
   in
   let hidden = List.concat [
-      List.map expand (List.rev !Clflags.hidden_include_dirs);
+      List.map expand_entry (List.rev !Clflags.hidden_include_dirs);
       hidden
     ]
   in

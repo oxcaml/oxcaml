@@ -138,7 +138,7 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
     false
   | Raise _ -> false
   | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
-  | Call_no_return _ | Call _ | Prim _ -> false
+  | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
  fun block ->
@@ -201,9 +201,10 @@ module Polls_before_prtc_transfer = struct
       Ok dom
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+        | Tls_get | Domain_index | Thread_self_id | Pause | Trace_pc_guard_gate
+        | Trace_pc_guard _ | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Const_mask _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -239,7 +240,8 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+      ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom
@@ -334,20 +336,56 @@ let instr_cfg_with_layout :
       if needs_poll
       then (
         let after = Cfg.get_block_exn cfg src in
+        let unexpected reason =
+          Misc.fatal_errorf
+            "Cfg_polling.instr_cfg_with_layout: unexpected poll on back edge \
+             from block %a to block %a: %s"
+            Label.format src Label.format dst reason
+        in
+        (* The poll is not given the debuginfo of the terminator: whether the
+           terminator has one depends on the optimisation mode, and the message
+           for [@poll error] would vary accordingly. *)
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
             Cfg.desc = Cfg.Op Poll;
             Cfg.arg = [||];
-            Cfg.res = [||]
+            Cfg.res = [||];
+            Cfg.dbg = Debuginfo.none
           }
+        in
+        (* The arguments of a call are moved into their calling-convention
+           locations at the end of the block body, immediately before the
+           terminator. Those locations are not GC roots (the physical registers
+           are typed [Int], and arguments passed in the domain state's
+           extra_params area cannot be described in a frame descriptor), so a
+           poll must not be placed between the moves and the call. For such
+           terminators, the poll is inserted in a new block on the back edge,
+           i.e. after the call. *)
+        let can_append_to_body =
+          match after.terminator.desc with
+          | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+          | Switch _
+          | Prim { op = Probe _; _ } ->
+            true
+          | Call _ | Prim { op = External _; _ } -> false
+          | Tailcall_func _ | Return | Invalid _ ->
+            unexpected "the source block is safe"
+          | Tailcall_self _ ->
+            (* Unreachable since prologue poll covers it. Otherwise, this one
+               could also trigger the bug mentioned above. *)
+            unexpected "tailcall self"
+          | Never | Raise _ | Call_no_return _ | External_call_no_return _ ->
+            unexpected "the source block has no normal successor"
         in
         (match
            ( Label.Set.cardinal
                (Cfg.successor_labels after ~normal:true ~exn:false),
              after.exn )
          with
-        | 1, None -> DLL.add_end after.body poll
+        | 1, None when can_append_to_body ->
+          DLL.add_end after.body poll;
+          Label.Tbl.replace safe_map src true
         | _ ->
           let before = Some (Cfg.get_block_exn cfg dst) in
           let instrs = DLL.of_list [poll] in
@@ -376,7 +414,7 @@ let add_poll_or_alloc_basic :
     | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
     | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
     | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
-    | Pause ->
+    | Thread_self_id | Pause | Trace_pc_guard_gate | Trace_pc_guard _ ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
@@ -395,8 +433,8 @@ let add_calls_terminator :
   | Switch _ | Return | Raise _ ->
     points
   | Tailcall_self _ | Tailcall_func _ -> (Function_call, term.dbg) :: points
-  | Call _ -> (Function_call, term.dbg) :: points
-  | Call_no_return
+  | Call _ | Call_no_return _ -> (Function_call, term.dbg) :: points
+  | External_call_no_return
       { alloc = false;
         func_symbol = _;
         ty_res = _;
@@ -419,7 +457,7 @@ let add_calls_terminator :
         label_after = _
       } ->
     points
-  | Call_no_return
+  | External_call_no_return
       { alloc = true;
         func_symbol = _;
         ty_res = _;

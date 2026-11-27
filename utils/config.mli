@@ -156,9 +156,6 @@ val cms_magic_number: string
 val cmj_magic_number: string
 (** Magic number for Js_of_ocaml IR files *)
 
-val cmja_magic_number: string
-(** Magic number for Js_of_ocaml IR archive files *)
-
 val linear_magic_number: string
 (** Magic number for Linear internal representation files *)
 
@@ -418,6 +415,48 @@ val has_f16c : bool
 
 val has_fma : bool
 (* Whether the compiler was configured on a machine with FMA *)
+
+val has_avx512f : bool
+(* Whether the compiler was configured on a machine with AVX512F *)
+
+val has_avx512dq : bool
+(* Whether the compiler was configured on a machine with AVX512DQ *)
+
+val has_avx512cd : bool
+(* Whether the compiler was configured on a machine with AVX512CD *)
+
+val has_avx512bw : bool
+(* Whether the compiler was configured on a machine with AVX512BW *)
+
+val has_avx512vl : bool
+(* Whether the compiler was configured on a machine with AVX512VL *)
+
+val has_avx512bf16 : bool
+(* Whether the compiler was configured on a machine with AVX512_BF16 *)
+
+val has_vpclmulqdq : bool
+(* Whether the compiler was configured on a machine with VPCLMULQDQ *)
+
+val has_avx512vbmi : bool
+(* Whether the compiler was configured on a machine with AVX512_VBMI *)
+
+val has_avx512vbmi2 : bool
+(* Whether the compiler was configured on a machine with AVX512_VBMI2 *)
+
+val has_vaes : bool
+(* Whether the compiler was configured on a machine with VAES *)
+
+val has_avx512bitalg : bool
+(* Whether the compiler was configured on a machine with AVX512_BITALG *)
+
+val has_avx512vpopcntdq : bool
+(* Whether the compiler was configured on a machine with AVX512_VPOPCNTDQ *)
+
+val has_avx512ifma : bool
+(* Whether the compiler was configured on a machine with AVX512_IFMA *)
+
+val has_gfni : bool
+(* Whether the compiler was configured on a machine with GFNI *)
 
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)

@@ -200,13 +200,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
       @ [ DAH.create_call_file
             (Dwarf_state.get_file_num state
                (Debuginfo.item_file_path caller_item)) ]
-      @ (if caller_item.dinfo_line >= 0
-         then [DAH.create_call_line caller_item.dinfo_line]
-         else [])
-      @
-      if caller_item.dinfo_char_start >= 0
-      then [DAH.create_call_column caller_item.dinfo_char_start]
-      else [])
+      @ DAH.create_call_line_and_column ~line:caller_item.dinfo_line
+          ~column:caller_item.dinfo_char_start)
     ()
 
 let create_range_list_attributes_and_summarise state ~start_of_code_symbol

@@ -303,6 +303,7 @@ module Make_run (R : Reducer) = struct
           else
             Block.create_with_names out_graph ~params ~cold:(Block.cold block)
               ~handler_dbg:(Block.handler_dbg block)
+              ~entry_dbg:(Block.entry_dbg block)
         in
         Block.Tbl.replace block_map block out_block;
         (* Index the output values by the original param index, with

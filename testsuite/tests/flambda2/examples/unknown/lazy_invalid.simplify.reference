@@ -1,7 +1,7 @@
 let code foo_0 deleted in
 let code `fn[lazy_invalid.ml:13,13--29]_1` deleted in
 let $camlLazy_invalid__immstring_0 = "" in
-apply ccall noalloc
+apply ccall noalloc &toplevel
   ($`*extern*`.caml_obj_tag : val -> val)
     ($camlLazy_invalid__immstring_0)
     -> k1 * error
@@ -31,7 +31,7 @@ apply ccall noalloc
                   (Popaque)
                   -> k * error))
   where k (region_return : val) =
-    (apply ccall
+    (apply ccall &toplevel
        ($`*extern*`.caml_alloc_dummy_lazy : val -> val) (0) -> k * error
        where k (t) =
          let code loopify(never) size(1) newer_version_of(foo_0)
@@ -46,7 +46,7 @@ apply ccall noalloc
                `fn[lazy_invalid.ml:13,13--29]_1_1` (param : imm tagged)
                  my_closure &my_alloc_region my_depth
                  -> k * k1 =
-           apply ccall noalloc
+           apply ccall noalloc &my_alloc_region
              ($`*extern*`.caml_obj_tag : val -> val)
                ($camlLazy_invalid__foo_1)
                -> k2 * k1
@@ -83,7 +83,7 @@ apply ccall noalloc
            %lazy.`toplevel`
              ($`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_2`)
          in
-         (apply ccall
+         (apply ccall &toplevel
             ($`*extern*`.caml_update_dummy_lazy : val * val -> val)
               (t, Pmakelazyblock)
               -> k1 * error

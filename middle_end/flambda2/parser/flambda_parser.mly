@@ -137,6 +137,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_END   [@symbol "end"]
 %token KWD_ERROR [@symbol "error"]
 %token KWD_EXN   [@symbol "exn"]
+%token KWD_FAT_PTR [@symbol "fat_ptr"]
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_FLOAT32 [@symbol "float32"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
@@ -160,12 +161,14 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_MASK [@symbol "mask"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
+%token KWD_NEEDED_BY_PHANTOM_LET [@symbol "needed_by_phantom_let"]
 %token KWD_NEVER  [@symbol "never"]
 %token KWD_NEWER_VERSION_OF [@symbol "newer_version_of"]
 %token KWD_NOALLOC [@symbol "noalloc"]
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
+%token KWD_PHANTOM [@symbol "phantom"]
 %token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PRODUCT   [@symbol "product"]
@@ -318,7 +321,9 @@ code:
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
-        code_size; is_tupled; stub; loopify; result_mode; } }
+        code_size; is_tupled; stub; loopify; result_mode;
+        (* CR yusumez: parse FDO annotations *)
+        fdo_entry_annotation = None; } }
 ;
 
 code_header:
@@ -425,8 +430,14 @@ named:
 
 
 switch_case:
-  | i = tag; MINUSGREATER; ac = apply_cont_expr { i, Named_cont ac }
-  | i = tag; MINUSGREATER; b = atomic_body { i, Inlined_goto b }
+  | i = tag; MINUSGREATER; ac = apply_cont_expr
+    (* CR yusumez: parse branch annotations *)
+    { { tag = i; action = Named_cont ac;
+        annotations = Branch_annotations.default } }
+  | i = tag; MINUSGREATER; b = atomic_body
+    (* CR yusumez: parse branch annotations *)
+    { { tag = i; action = Inlined_goto b;
+        annotations = Branch_annotations.default } }
 ;
 
 switch:
@@ -573,7 +584,8 @@ atomic_expr:
 ;
 
 let_(body):
-  | bindings = separated_nonempty_list(KWD_AND, let_binding);
+  | is_phantom = boption(KWD_PHANTOM);
+    bindings = separated_nonempty_list(KWD_AND, let_binding);
 (*  CR lwhite: I think this closure elements stuff is a bit of a hangover from
     when closures definitions contained the code as well. I imagine the closures
     used to look like:
@@ -596,12 +608,13 @@ let_(body):
  *)
     value_slots = with_value_slots_opt;
     KWD_IN body = body;
-    { ({ bindings; value_slots; body } : let_) }
+    { ({ bindings; value_slots; body; is_phantom } : let_) }
 ;
 
 let_binding:
-  | var = variable EQUAL defining_expr = named
-    { { var; defining_expr } }
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
+    var = variable EQUAL defining_expr = named
+    { { var; defining_expr; needed_by_phantom_let } }
 ;
 
 with_value_slots_opt:
@@ -646,6 +659,8 @@ apply_expr:
           inlined;
           inlining_state;
           arities;
+          (* CR yusumez: parse FDO counters *)
+          callsite_counter = None;
      } }
 ;
 
@@ -662,15 +677,13 @@ call_kind:
       alloc = alloc_mode_for_applications;
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
-  | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
-    { (C_call { alloc = not noalloc },
-      (Not_alloc_stack { alloc_region }
-        : region alloc_mode_for_applications)) }
+  | KWD_CCALL; noalloc = boption(KWD_NOALLOC);
+    fat_ptr_arg_starts = loption(fat_ptr_arg_starts);
+    alloc = alloc_mode_for_applications
+    { (C_call { alloc = not noalloc; fat_ptr_arg_starts }, alloc) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
-      AMP; alloc_region = region
-    { (Method { kind; obj },
-        (Not_alloc_stack { alloc_region }
-          : region alloc_mode_for_applications)) }
+      alloc = alloc_mode_for_applications
+    { (Method { kind; obj }, alloc) }
 ;
 
 inline:
@@ -897,6 +910,11 @@ plain_int:
   i = INT { make_plain_int i }
 ;
 
+fat_ptr_arg_starts:
+  | KWD_FAT_PTR; LPAREN; starts = separated_list(COMMA, plain_int); RPAREN
+    { starts }
+;
+
 field_of_block:
   | s = symbol { Symbol s }
   | v = variable { Dynamically_computed v }
@@ -904,7 +922,9 @@ field_of_block:
 ;
 
 kinded_variable:
-  | param = variable; kind = kind_with_subkind_opt { { param; kind } }
+  | needed_by_phantom_let = boption(KWD_NEEDED_BY_PHANTOM_LET);
+    param = variable; kind = kind_with_subkind_opt
+    { { param; kind; needed_by_phantom_let } }
 ;
 
 kind_with_subkind_opt:

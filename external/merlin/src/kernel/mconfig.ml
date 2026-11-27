@@ -5,8 +5,8 @@ open Std
 let { Logger.log } = Logger.for_section "Mconfig"
 
 type ocaml =
-  { include_dirs : Clflags.visible_include list;
-    hidden_dirs : string list;
+  { include_dirs : Clflags.include_dir list;
+    hidden_dirs : Clflags.include_dir list;
     no_std_include : bool;
     unsafe : bool;
     classic : bool;
@@ -39,13 +39,13 @@ let dump_warnings st =
   Warnings.restore st;
   Misc.try_finally Warnings.dump ~always:(fun () -> Warnings.restore st')
 
-let dump_visible_include ({ path; cmx_guaranteed } : Clflags.visible_include) =
+let dump_include_dir ({ path; cmx_guaranteed } : Clflags.include_dir) =
   `Assoc [ ("path", `String path); ("cmx_guaranteed", `Bool cmx_guaranteed) ]
 
 let dump_ocaml x =
   `Assoc
-    [ ("include_dirs", `List (List.map ~f:dump_visible_include x.include_dirs));
-      ("hidden_dirs", `List (List.map ~f:Json.string x.hidden_dirs));
+    [ ("include_dirs", `List (List.map ~f:dump_include_dir x.include_dirs));
+      ("hidden_dirs", `List (List.map ~f:dump_include_dir x.hidden_dirs));
       ("no_std_include", `Bool x.no_std_include);
       ("unsafe", `Bool x.unsafe);
       ("classic", `Bool x.classic);
@@ -62,7 +62,10 @@ let dump_ocaml x =
           (fun (arg : Clflags.open_arg) ->
             match arg with
             | Open md -> `Assoc [ ("open", `String md) ]
-            | Open_cmi file -> `Assoc [ ("open-cmi", `String file) ])
+            | Open_cmi { path; cmx_guaranteed = false } ->
+              `Assoc [ ("open-cmi", `String path) ]
+            | Open_cmi { path; cmx_guaranteed = true } ->
+              `Assoc [ ("open-cmi-x", `String path) ])
           x.open_args );
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
@@ -226,6 +229,12 @@ let dump x =
 
 let arguments_table = Hashtbl.create 67
 
+(* Parametrized compiler flags that are ignored only when they come from the
+   configuration (.merlin, dune's [FLG], [-flags]), not from the command line.
+   They cannot go in [ocaml_ignored_parametrized_flags] because they clash with
+   flags of merlin commands (e.g. [jump -target]). *)
+let config_only_ignored_parametrized_flags = [ "-target" ]
+
 let stdlib =
   let env =
     try Some (Sys.getenv "OCAMLLIB")
@@ -255,12 +264,17 @@ let normalize_step t =
     in
     let failures = ref [] in
     let warning failure = failures := failure :: !failures in
+    let local_spec =
+      List.map
+        ~f:(fun name -> (name, "", Marg.param_ignore))
+        config_only_ignored_parametrized_flags
+    in
     let t =
       List.fold_left
         ~f:(fun t { workdir; workval } ->
           fst
             (let_ref cwd (Some workdir)
-               (Marg.parse_all ~warning arguments_table [] workval t)))
+               (Marg.parse_all ~warning arguments_table local_spec workval t)))
         ~init:t flagss
     in
     { t with
@@ -468,7 +482,6 @@ let ocaml_ignored_flags =
     "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
-    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
@@ -580,6 +593,8 @@ let ocaml_ignored_flags =
     "-no-symbol-visibility-protected";
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
+    "-lto-support";
+    "-no-lto-support";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)
@@ -613,6 +628,8 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-fvpclmulqdq";
+    "-fno-vpclmulqdq";
     "-faes";
     "-fno-aes";
     "-fcssc";
@@ -645,15 +662,16 @@ let ocaml_ignored_flags =
     "-no-vectorize";
     "-dvectorize";
     "-dump-into-csv";
+    "-enable-action-trace";
+    "-debug-action-trace";
     "-no-mach-ir";
     "-flambda2-reaper";
     "-no-flambda2-reaper";
     "-dsimplify";
+    "-dsimplified";
     "-dreaper";
     "-instantiate";
     "-dflambda-heavy-invariants";
-    "-cfg-eliminate-dead-trap-handlers";
-    "-no-cfg-eliminate-dead-trap-handlers";
     "-module-entry-functions-section";
     "-zero-alloc-checker-details-extra";
     "-no-zero-alloc-checker-details-extra";
@@ -671,6 +689,7 @@ let ocaml_ignored_flags =
     "-keep-llvmir";
     "-llvm-backend";
     "-no-llvm-backend";
+    "-fdo-counters";
     "-ddwarf-types";
     "-ocamlcfg";
     "-cfg-eliminate-dead-code-validate";
@@ -703,10 +722,14 @@ let ocaml_ignored_flags =
     "-no-ssa-simplify";
     "-ssa-validate";
     "-no-ssa-validate";
+    "-float-op-fusion";
+    "-no-float-op-fusion";
     "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
+    "-gated-trace-pc-guard";
+    "-gated-trace-pc-guard-define-gate";
     "-probes";
     "-no-probes";
     "-probes-optimized";
@@ -756,6 +779,8 @@ let ocaml_ignored_flags =
     "-no-manual-module-init";
     "-dfexpr-annot";
     "-dfexpr-annot-after";
+    "-fexpr-print-branch-annotations";
+    "-fexpr-print-fdo-counters";
     "-linscan";
     "-clambda-checks";
     "-dasm-comments";
@@ -782,6 +807,22 @@ let ocaml_ignored_flags =
     "-fno-avx512cd";
     "-favx512dq";
     "-fno-avx512dq";
+    "-favx512bf16";
+    "-fno-avx512bf16";
+    "-favx512vbmi";
+    "-fno-avx512vbmi";
+    "-favx512vbmi2";
+    "-fno-avx512vbmi2";
+    "-fvaes";
+    "-fno-vaes";
+    "-favx512bitalg";
+    "-fno-avx512bitalg";
+    "-favx512vpopcntdq";
+    "-fno-avx512vpopcntdq";
+    "-favx512ifma";
+    "-fno-avx512ifma";
+    "-fgfni";
+    "-fno-gfni";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
@@ -807,7 +848,10 @@ let ocaml_ignored_flags =
     "-no-flambda2-simplify-stubs";
     "-flambda2-simplify-stubs";
     "-stubs-forward-inlining";
-    "-no-stubs-forward-inlining"
+    "-no-stubs-forward-inlining";
+    "-djsir";
+    "-link-jsir";
+    "-jsir-inlined-frames"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -847,6 +891,8 @@ let ocaml_ignored_parametrized_flags =
     "-dump-dir";
     "-I-manifest";
     "-H-manifest";
+    "-H-file";
+    "-Hx-file";
     (* flambda-backend specific *)
     "-extension";
     "-extension-universe";
@@ -885,6 +931,7 @@ let ocaml_ignored_parametrized_flags =
     "-zero-alloc-checker-details-cutoff";
     "-zero-alloc-checker-join";
     "-dgranularity";
+    "-dprofile-level";
     "-flambda2-expert-cont-lifting-budget";
     "-vectorize-max-block-size";
     "-save-ir-before";
@@ -917,10 +964,15 @@ let ocaml_ignored_parametrized_flags =
     "-debug-long-frames-threshold";
     "-flambda2-expert-max-function-simplify-run";
     "-llvm-flags";
-    "-reaper-preserve-direct-calls";
     "-save-ir-after";
     "-X";
-    "-dissector-max-linker-parallelism"
+    "-dissector-max-linker-parallelism";
+    "-jsoo-opt";
+    "-jsoo-opt-compile";
+    "-jsoo-opt-archive";
+    "-jsoo-opt-runtime";
+    "-jsoo-opt-link";
+    "-jsoo-effects"
   ]
 
 let ocaml_warnings_spec ~error =
@@ -959,11 +1011,21 @@ let ocaml_flags =
       "<dir> Add <dir> to the list of include directories (Like -I, but \
        indicates that cmx files for modules in <dir> are always available)" );
     ( "-H",
-      marg_path (fun dir ocaml ->
-          { ocaml with hidden_dirs = dir :: ocaml.hidden_dirs }),
+      marg_path (fun path ocaml ->
+          { ocaml with
+            hidden_dirs = { path; cmx_guaranteed = false } :: ocaml.hidden_dirs
+          }),
       "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
       \ (Like -I, but the program can not directly reference these \
        dependencies)" );
+    ( "-Hx",
+      marg_path (fun path ocaml ->
+          { ocaml with
+            hidden_dirs = { path; cmx_guaranteed = true } :: ocaml.hidden_dirs
+          }),
+      "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
+      \ (Like -H, but indicates that cmx files for modules in <dir> are always \
+       available, like -Ix)" );
     ( "-nostdlib",
       Marg.unit (fun ocaml -> { ocaml with no_std_include = true }),
       " Do not add default directory to the list of include directories" );
@@ -1022,9 +1084,22 @@ let ocaml_flags =
       "<module>  Opens the module <module> before typing" );
     ( "-open-cmi",
       Marg.param "file" (fun file ocaml ->
-          { ocaml with open_args = Clflags.Open_cmi file :: ocaml.open_args }),
+          { ocaml with
+            open_args =
+              Clflags.Open_cmi { path = file; cmx_guaranteed = false }
+              :: ocaml.open_args
+          }),
       "<file>  Opens the module whose compiled interface is <file> before \
        typing" );
+    ( "-open-cmi-x",
+      Marg.param "file" (fun file ocaml ->
+          { ocaml with
+            open_args =
+              Clflags.Open_cmi { path = file; cmx_guaranteed = true }
+              :: ocaml.open_args
+          }),
+      "<file>  Same as -open-cmi, but indicates that the cmx file for the \
+       module is always available (like -Ix)" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1265,11 +1340,13 @@ let source_path config =
   |> List.filter_dup
 
 let hidden_source_path config =
-  config.merlin.hidden_source_path @ config.ocaml.hidden_dirs
+  config.merlin.hidden_source_path
+  @ List.map config.ocaml.hidden_dirs ~f:(fun (d : Clflags.include_dir) ->
+      d.path)
 
 let collect_paths ~log_title ~config paths =
   let include_dirs =
-    List.map config.ocaml.include_dirs ~f:(fun (vi : Clflags.visible_include) ->
+    List.map config.ocaml.include_dirs ~f:(fun (vi : Clflags.include_dir) ->
         vi.path)
   in
   let dirs =
@@ -1297,7 +1374,9 @@ let build_path config =
     (config.merlin.cmi_path @ config.merlin.build_path)
 
 let hidden_build_path config =
-  config.merlin.hidden_build_path @ config.ocaml.hidden_dirs
+  config.merlin.hidden_build_path
+  @ List.map config.ocaml.hidden_dirs ~f:(fun (d : Clflags.include_dir) ->
+      d.path)
 
 let cmt_path config =
   collect_paths ~log_title:"cmt_path" ~config

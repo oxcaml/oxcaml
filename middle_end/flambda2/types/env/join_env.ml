@@ -338,11 +338,20 @@ module Int_ids_in_env () = struct
     include module type of Id_in_env (Name) ()
 
     val var : Variable.t -> t
+
+    val pattern_match :
+      t -> var:(Variable.t -> 'a) -> symbol:(Symbol.t -> 'a) -> 'a
   end = struct
     include Id_in_env (Name) ()
 
     let var (var : Variable.t) : t =
       create (Name.var (var :> Int_ids.Variable.t))
+
+    let pattern_match (name : t) ~var:when_var ~symbol:when_symbol =
+      Name.pattern_match
+        (name :> Int_ids.Name.t)
+        ~var:(fun x -> when_var (Variable.create x))
+        ~symbol:(fun symbol -> when_symbol (Symbol.create symbol))
   end
 
   (* CR bclement: In practice, we consider that these must be canonicals in the
@@ -775,13 +784,14 @@ module Joined_envs : sig
 
   val keys : t -> Index.Set.t
 
-  val exists_in_all_joined_envs : t -> _ Index.Map.t -> bool
-
   val get_alias_then_canonical_simple_ignoring_name_mode_exn :
     t -> Type_in_one_joined_env.t Index.Map.t -> Simples_in_joined_envs.t
 
   val find_simples_in_joined_envs :
     t -> Simples_in_joined_envs.t -> K.t -> Type_in_one_joined_env.t Index.Map.t
+
+  val find_simple_in_source_env :
+    t -> Simple_in_source_env.t -> K.t -> Type_in_one_joined_env.t Index.Map.t
 
   val find_imported_var :
     t ->
@@ -813,9 +823,6 @@ end = struct
       Misc.fatal_errorf "Join does not include environment %a" Index.print index
 
   let keys t = Index.Map.keys (envs_and_equations t)
-
-  let exists_in_all_joined_envs t m =
-    Index.Map.subset_domain (envs_and_equations t) m
 
   let get_canonical_simple_ignoring_name_mode typing_env simple =
     Simple_in_one_joined_env.create
@@ -853,6 +860,17 @@ end = struct
             TG.apply_coercion ty coercion)
         |> Type_in_one_joined_env.create)
       simples
+
+  let find_simple_in_source_env t simple kind =
+    Index.Map.map
+      (fun (env, _) ->
+        Simple_in_source_env.pattern_match simple
+          ~const:(fun const -> ET.create_const const |> ET.to_type)
+          ~name:(fun name ~coercion ->
+            let ty = TE.find env (name :> Name.t) (Some kind) in
+            TG.apply_coercion ty coercion)
+        |> Type_in_one_joined_env.create)
+      (envs_and_equations t)
 
   let find_imported_var t var kind =
     let erased_var = (var : Variable_in_one_joined_env.t :> Variable.t) in
@@ -1284,36 +1302,228 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
     | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ->
       Misc.fatal_error "Kind mismatch for output of relation: expected %a")
 
-let add_to_inverse_relations inverse_relations var relation ~scrutinee =
-  Variable.Map.union_total_shared
-    (fun _ inv_rels1 inv_rels2 ->
-      TG.Relation.Map.union_total_shared
-        (fun _ names1 names2 -> Name.Set.union names1 names2)
-        inv_rels1 inv_rels2)
-    inverse_relations
-    (Variable.Map.singleton var
-       (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
+let definition_of_var_in_target_env t (var : Variable_in_target_env.t) :
+    _ Or_unknown.t =
+  match
+    Variable_in_target_env.Map.find_or_null var t.definitions_of_existentials
+  with
+  | This (simples, _) -> Known (Existential_for_these_canonicals simples)
+  | Null -> (
+    let source_env = Bindings_in_target_env.source_env t.bindings in
+    match Source_env.exists_in_source_env source_env (var :> Variable.t) with
+    | Some var -> Known (Canonical_in_source_env (Simple_in_source_env.var var))
+    | None ->
+      if Variable.Set.mem (var :> Variable.t) t.imported_vars
+      then
+        Known
+          (Import_from_all_joined_envs
+             (Variable_in_one_joined_env.create (var :> Variable.t), Coercion.id))
+      else Unknown)
 
-let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
-    ty =
-  (* We can only recover inverse relations if the type we are recovering from is
-     valid in all the joined environments.
+let definition_of_name_in_target_env t name =
+  Name_in_target_env.pattern_match name
+    ~var:(fun var -> definition_of_var_in_target_env t var)
+    ~symbol:(fun symbol : _ Or_unknown.t ->
+      Known
+        (Canonical_in_source_env
+           (Simple_in_source_env.create (Simple.symbol (symbol :> Symbol.t)))))
 
-     If we have a type [x : Variant (is_int = y)] for [x], but [x] only exists
-     in a subset of the joined environments, then the equation [y = %is_int x]
-     is only valid in those environments -- in particular, if [y] exists in more
-     environments than [x], it is unsound to include that equation in the target
-     environment.
+let find_canonical_in_target_env t canonical_in_target_env kind =
+  match canonical_in_target_env with
+  | Canonical_in_source_env simple ->
+    Joined_envs.find_simple_in_source_env t.joined_envs simple kind
+  | Import_from_all_joined_envs (var, coercion) ->
+    let types = Joined_envs.find_imported_var t.joined_envs var kind in
+    if Coercion.is_id coercion
+    then types
+    else
+      Index.Map.map
+        (fun (ty : Type_in_one_joined_env.t) ->
+          Type_in_one_joined_env.create
+            (TG.apply_coercion (ty :> TG.t) coercion))
+        types
+  | Existential_for_these_canonicals simples ->
+    Joined_envs.find_simples_in_joined_envs t.joined_envs simples kind
 
-     We avoid this situation by only recovering relations if the type we are
-     recovering from exists in all the joined environments -- this ensures that
-     the variables mentioned in the type cannot exist in more environments than
-     the type itself.
+(** Checks that the relation [var = relation(scrutinee)] is valid in all the
+    joined environments.
 
-     CR-someday bclement: We could be more precise here by recovering relations
-     if they are valid in all the environments where the involved variables are
-     defined, but it is not clear if that would actually be useful. *)
-  assert exists_in_all_joined_envs;
+    If a [scrutinee_shape] is provided, the relation only needs to be valid when
+    the [scrutinee] is compatible with that shape. In that case, the relation
+    can only be added to an appropriate extension on the scrutinee. *)
+let inverse_relation_is_valid_in_all_joined_envs ?scrutinee_shape t var relation
+    ~scrutinee ~meet_expanded_head =
+  match
+    definition_of_var_in_target_env t (Variable_in_target_env.create var)
+  with
+  | Unknown -> false
+  | Known var_in_joined_envs -> (
+    match
+      definition_of_name_in_target_env t (Name_in_target_env.create scrutinee)
+    with
+    | Unknown -> false
+    | Known scrutinee_in_joined_envs ->
+      let kind = Variable.kind var in
+      let types = find_canonical_in_target_env t var_in_joined_envs kind in
+      Index.Map.for_all
+        (fun env_id (ty : Type_in_one_joined_env.t) ->
+          let env = Joined_envs.get_nth_joined_env t.joined_envs env_id in
+          let scrutinee_in_this_env : _ Or_bottom.t =
+            match scrutinee_in_joined_envs with
+            | Canonical_in_source_env simple -> Ok (simple :> Simple.t)
+            | Import_from_all_joined_envs (var, coercion) ->
+              if TE.mem env (Name.var (var :> Variable.t))
+              then Ok (Simple_in_one_joined_env.var ~coercion var :> Simple.t)
+              else Bottom
+            | Existential_for_these_canonicals simples -> (
+              match Index.Map.find_or_null env_id simples with
+              | Null -> Bottom
+              | This simple -> Ok (simple :> Simple.t))
+          in
+          match scrutinee_in_this_env with
+          | Bottom ->
+            (* Having the equation [var = R(scrutinee)] implies that [scrutinee]
+               exists in all the environments where [var] exists, so we can't
+               add it if [var] exists in more environments. *)
+            false
+          | Ok scrutinee_in_this_env -> (
+            let filtered_env : _ Or_bottom.t =
+              match scrutinee_shape with
+              | None -> Ok env
+              | Some shape ->
+                ME.use_meet_env_strict ~meet_expanded_head env ~f:(fun env ->
+                    ME.add_equation_on_simple ~meet_expanded_head env
+                      scrutinee_in_this_env shape)
+            in
+            match filtered_env with
+            | Bottom ->
+              (* The scrutinee cannot have the right shape: skip this
+                 environment. *)
+              true
+            | Ok env -> (
+              match Expand_head.expand_head env (ty :> TG.t) |> ET.descr with
+              | Unknown | Bottom -> false
+              | Ok (Naked_immediate head) -> (
+                let descr = TG.Head_of_kind_naked_immediate.descr head in
+                match
+                  TG.Relation.Map.find_or_null relation descr.inverse_relations
+                with
+                | Null -> (
+                  (* If we have [x : Variant (get_tag = y)] we can't deduce the
+                     equation [y : (= (%get_tag x))] because [y] might exist in
+                     more runtime paths than [x]: it would be incorrect to
+                     perform a reduction on the type of [x] when learning the
+                     value of [y], because that could propagate arbitrary
+                     equations (e.g. from extensions on the type of [x]) that
+                     would only be valid on the paths where [x] exists.
+
+                     However, if we already know from the type that [x] is a
+                     variant with a known tag [c], and [y] is a variable in the
+                     target environment that is equal to [c] in this joined
+                     environment, then the equation [y : (= (%get_tag x))] is
+                     valid in this joined environment, even though [x] might not
+                     exist in all runtime paths. This is because the type of [x]
+                     cannot contain any conditional information that would leak
+                     from reductions triggered by learning [y = c] (any
+                     information stored on extensions must already hold in the
+                     joined environment by virtue of [x] having a fully
+                     specified shape).
+
+                     (Similar reasoning works for [is_null], [is_int], etc.) *)
+                  match descr.naked_immediates with
+                  | Unknown -> false
+                  | Known naked_immediates -> (
+                    match
+                      Target_ocaml_int.Set.get_singleton naked_immediates
+                    with
+                    | None -> false
+                    | Some naked_immediate -> (
+                      match
+                        Provers.prove_relation env relation
+                          (TG.alias_type_of K.value scrutinee_in_this_env)
+                      with
+                      | Proved known_relation ->
+                        Target_ocaml_int.equal naked_immediate known_relation
+                      | Unknown -> false)))
+                | This names ->
+                  let canonical_scrutinee =
+                    TE.get_canonical_simple_ignoring_name_mode env
+                      scrutinee_in_this_env
+                  in
+                  Name.Set.exists
+                    (fun name ->
+                      let canonical_simple =
+                        TE.get_canonical_simple_ignoring_name_mode env
+                          (Simple.name name)
+                      in
+                      Simple.equal canonical_simple canonical_scrutinee)
+                    names)
+              | Ok
+                  ( Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
+                  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+                  | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
+                  | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ) ->
+                Misc.fatal_errorf
+                  "Kind mismatch for output of relation: expected %a" K.print
+                  K.naked_immediate)))
+        types)
+
+let add_to_inverse_relations_if_valid_in_all_joined_envs t inverse_relations var
+    relation ~scrutinee ~meet_expanded_head =
+  if
+    not
+      (inverse_relation_is_valid_in_all_joined_envs t var relation ~scrutinee
+         ~meet_expanded_head)
+  then inverse_relations
+  else
+    Variable.Map.union_total_shared
+      (fun _ inv_rels1 inv_rels2 ->
+        TG.Relation.Map.union_total_shared
+          (fun _ names1 names2 -> Name.Set.union names1 names2)
+          inv_rels1 inv_rels2)
+      inverse_relations
+      (Variable.Map.singleton var
+         (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
+
+let recover_inverse_relations t inverse_relations name ty ~meet_expanded_head =
+  (* We can only recover inverse relations if they are true in all the joined
+     environments where the target variable exists.
+
+     In the sentence above, "the target variable exists" refers to the target
+     variable existing "at runtime" in a concrete environment, _not_ to the
+     variable being defined in the typing environment at compile time. In
+     particular, variables created through variant unboxing (note that these
+     have a "normal" name mode) or an earlier join may be defined but don't
+     always exist.
+
+     An equation [x : Variant (is_int = y)] means that, in any environment where
+     *[x]* exists:
+
+     - [x] is non null, and
+
+     - [y] exists, and
+
+     - [y] is equal to the result of [%is_int (x)]
+
+     On the other hand, an equation [y : (inverse_relations (%is_int x))] means
+     that, in any environment where *[y]* exists:
+
+     - [x] exists and is non null, and
+
+     - [y] is equal to the result of [%is_int (x)]
+
+     Thus, we cannot deduce an equation [y : (inverse_relations (%is_int x))]
+     from an equation [x : Variant (is_int = y)] if [y] exists in strictly more
+     environments than [x].
+
+     Unfortunately, we can't check that directly: we can check if a variable is
+     defined in an environment, but that doesn't mean it will exist at runtime
+     (see discussion above).
+
+     Instead, before deducing [y : (inverse_relations (%is_int x))], we check
+     that an equivalent (up to aliases) equation is present in all the joined
+     environments where [y] is defined: if the equation is valid in all the
+     joined environments, then it is also valid in the target environment. *)
   match TG.descr ty with
   | Value (Ok (No_alias { is_null = Not_null; non_null = Ok head })) -> (
     match head with
@@ -1322,8 +1532,8 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
       (* If we have no immediates, we can add the inverse relation on [get_tag]
          at the toplevel. *)
       let inverse_relations =
-        add_to_inverse_relations inverse_relations get_tag_var
-          TG.Relation.get_tag ~scrutinee:name
+        add_to_inverse_relations_if_valid_in_all_joined_envs t inverse_relations
+          get_tag_var TG.Relation.get_tag ~scrutinee:name ~meet_expanded_head
       in
       ty, inverse_relations
     | Variant
@@ -1343,13 +1553,16 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
         match is_int with
         | None -> inverse_relations
         | Some is_int_var ->
-          add_to_inverse_relations inverse_relations is_int_var
-            TG.Relation.is_int ~scrutinee:name
+          add_to_inverse_relations_if_valid_in_all_joined_envs t
+            inverse_relations is_int_var TG.Relation.is_int ~scrutinee:name
+            ~meet_expanded_head
       in
       let ty =
         match get_tag with
-        | None -> ty
-        | Some get_tag_var ->
+        | Some get_tag_var
+          when inverse_relation_is_valid_in_all_joined_envs t get_tag_var
+                 TG.Relation.get_tag ~scrutinee:name ~meet_expanded_head
+                 ~scrutinee_shape:MTC.any_block ->
           let when_immediate, when_block =
             match extensions with
             | No_extensions -> TEE.empty, TEE.empty
@@ -1366,6 +1579,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
               ~is_int ~get_tag
           in
           TG.create_from_head_value { is_null = Not_null; non_null = Ok head' }
+        | _ -> ty
       in
       ty, inverse_relations
     | Mutable_block _
@@ -1391,8 +1605,8 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
       match is_null with
       | None -> inverse_relations
       | Some is_null_var ->
-        add_to_inverse_relations inverse_relations is_null_var
-          TG.Relation.is_null ~scrutinee:name
+        add_to_inverse_relations_if_valid_in_all_joined_envs t inverse_relations
+          is_null_var TG.Relation.is_null ~scrutinee:name ~meet_expanded_head
     in
     ty, inverse_relations
   | Value
@@ -1406,8 +1620,8 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
   | Region _ ->
     ty, inverse_relations
 
-let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
-    inverse_relations =
+let n_way_join_round ~(n_way_join_type : n_way_join_type) ~meet_expanded_head t
+    equations_to_join inverse_relations =
   Variable_in_target_env.Map.fold
     (fun var types (inverse_relations, t) ->
       let name = Name_in_target_env.var var in
@@ -1425,9 +1639,6 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
       match n_way_join_type t heads with
       | Unknown, t -> inverse_relations, t
       | Known ty, t ->
-        let exists_in_all_joined_envs =
-          Joined_envs.exists_in_all_joined_envs t.joined_envs types
-        in
         if
           Flambda_features.check_light_invariants ()
           && Option.is_some (TG.get_alias_opt ty)
@@ -1438,13 +1649,9 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
             TG.print ty (Index.Map.print TG.print)
             (types : Type_in_one_joined_env.t Index.Map.t :> TG.t Index.Map.t);
         let ty, inverse_relations =
-          if exists_in_all_joined_envs
-          then
-            recover_inverse_relations ~exists_in_all_joined_envs
-              inverse_relations
-              (name :> Name.t)
-              ty
-          else ty, inverse_relations
+          recover_inverse_relations t inverse_relations
+            (name :> Name.t)
+            ty ~meet_expanded_head
         in
         let ty = Type_in_target_env.create ty in
         inverse_relations, add_equation_in_target_env t name ty)
@@ -1718,8 +1925,8 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       then inverse_relations, env_this_round
       else
         let inverse_relations, env_next_round =
-          n_way_join_round ~n_way_join_type env_this_round equations_this_round
-            inverse_relations
+          n_way_join_round ~n_way_join_type ~meet_expanded_head env_this_round
+            equations_this_round inverse_relations
         in
         n_way_join_delayed_equations env_next_round inverse_relations
           (new_equations_in_joined_envs env_next_round ~since:env_this_round)
@@ -1808,7 +2015,13 @@ module Analysis = struct
         Index.Map.print Simple_in_one_joined_env.print ppf simples)
       ppf definitions_in_joined_envs
 
-  let create ~external_ids ~joined_envs definitions_in_joined_envs =
+  let create ~external_ids ~joined_envs ~params definitions_in_joined_envs =
+    let param_simples =
+      List.fold_left
+        (fun params bound_param ->
+          Simple.Set.add (Bound_parameter.simple bound_param) params)
+        Simple.Set.empty params
+    in
     let canonical_definitions_at_normal_mode =
       Variable_in_target_env.Map.filter_map
         (fun _name (simples, kind) ->
@@ -1822,9 +2035,15 @@ module Analysis = struct
                     Misc.fatal_errorf "Join does not include environment %a"
                       Index.print env_id
                 in
-                TE.get_canonical_simple_exn typing_env simple
-                  ~min_name_mode:Name_mode.normal
-                |> Simple_in_one_joined_env.create)
+                let canonical_simple =
+                  TE.get_canonical_simple_exn typing_env simple
+                    ~min_name_mode:Name_mode.normal
+                in
+                (* The parameters are bound at normal mode but don't actually
+                   exist at the use! *)
+                if Simple.Set.mem canonical_simple param_simples
+                then raise Not_found;
+                Simple_in_one_joined_env.create canonical_simple)
               (simples : Simples_in_joined_envs.t :> Simple.t Index.Map.t)
           with
           | exception Not_found -> None
@@ -1949,7 +2168,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
   target_env
 
 let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
-    ~cut_after source_tenv joined_envs =
+    ~cut_after ~params source_tenv joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -1980,7 +2199,9 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
       symbol_projections_to_join
   in
   let target_env = ME.final_typing_env ~meet_expanded_head target_env in
-  let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
+  let join_analysis =
+    Analysis.create ~external_ids ~joined_envs ~params bindings
+  in
   target_env, join_analysis
 
 (* Exposed to the outside world with a different type *)

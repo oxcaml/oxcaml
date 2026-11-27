@@ -45,14 +45,19 @@ open Arch
 
 let types_are_compatible left right =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | ( (Int | Val | Addr | Static_block | Code_pointer
+       | Out_of_heap_data_pointer),
+      (Int | Val | Addr | Static_block | Code_pointer
+       | Out_of_heap_data_pointer) )
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
   | (Vec256 | Vec512 | Mask), _ | _, (Vec256 | Vec512 | Mask) ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
+  | ( (Int | Val | Addr | Static_block | Code_pointer | Out_of_heap_data_pointer
+      | Float | Float32 | Vec128 | Valx2), _ ) ->
+    false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -78,7 +83,7 @@ let precolored_regs =
 let phys_reg typ phys_reg =
   let index_in_class = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Addr | Val ->
+  | Int | Addr | Val | Static_block | Code_pointer | Out_of_heap_data_pointer ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -112,7 +117,8 @@ let calling_conventions
     let ty : Cmm.machtype_component = arg.(i) in
     let registers, size =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
+      | Val | Int | Addr | Static_block | Code_pointer
+      | Out_of_heap_data_pointer -> int_registers, size_int
       | Float | Float32 -> float_registers, Arch.size_float
       | Vec128 -> float_registers, Arch.size_vec128
       | Vec256 | Vec512 | Mask ->
@@ -182,7 +188,7 @@ let loc_results_return res =
      remaining args on stack.
    macOS/iOS peculiarities: scalars passed on stack occupy only their size in
    bytes, while the AAPCS64 pads them to 8 bytes.
-   Return values in r0...r1 or d0. *)
+   Return values in r0...r1 or d0...d3. *)
 
 let external_calling_conventions
     int_registers float_registers make_stack ty_args =
@@ -200,18 +206,53 @@ let external_calling_conventions
       | XFloat -> Float, float_registers, 1, size_float
       | XFloat32 -> Float32, float_registers, 2, size_float
       | XVec128 -> Vec128, float_registers, 1, size_vec128
+      | XFat_pointer -> Val, int_registers, 1, size_int
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
+      | XDummy_int -> Int, int_registers, 1, size_int
+      | XDummy_float -> Float, float_registers, 1, size_float
     in
     match !registers with
     | reg :: regs ->
       registers := regs;
-      loc.(i) <- [| phys_reg ty reg |]
+      loc.(i) <- (if Cmm.is_dummy_exttype ty_arg then [||]
+                  else [| phys_reg ty reg |])
     | [] ->
+      if Cmm.is_dummy_exttype ty_arg then
+        Misc.fatal_error
+          "Proc.loc_external_arguments: no register left for a dummy";
+      (match ty_arg with
+       | XFat_pointer ->
+         Misc.fatal_error
+           "Fat-pointer external arguments passed on the stack are not \
+            supported (too many integer arguments)"
+       | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+       | XVec128 | XVec256 | XVec512 | XDummy_int | XDummy_float -> ());
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
       ofs := !ofs + size)
+    ty_args;
+  (* Second pass: offsets of fat-pointer arguments, from the integer argument
+     registers the real signature left unused. *)
+  List.iteri (fun i (ty_arg : Cmm.exttype) ->
+    match ty_arg with
+    | XFat_pointer ->
+      let offset_loc =
+        match !int_registers with
+        | reg :: regs ->
+          int_registers := regs;
+          phys_reg Int reg
+        | [] ->
+          (* offset on stack after the real stack arguments. *)
+          ofs := Misc.align !ofs size_int;
+          let slot = stack_slot (make_stack !ofs) Int in
+          ofs := !ofs + size_int;
+          slot
+      in
+      loc.(i) <- [| loc.(i).(0); offset_loc |]
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
+    | XVec256 | XVec512 | XDummy_int | XDummy_float -> ())
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
@@ -222,7 +263,9 @@ let loc_external_arguments ty_args =
      outgoing ty_args
 
 let loc_external_results res =
-  let (loc, _) = calling_conventions [X0; X1] [D0; D1] not_supported 0 res in
+  let (loc, _) =
+    calling_conventions [X0; X1] [D0; D1; D2; D3] not_supported 0 res
+  in
   loc
 
 let loc_exn_bucket = phys_reg Int X0
@@ -279,6 +322,21 @@ let destroyed_at_pushtrap = [| |]
 
 let destroyed_at_alloc_or_poll = [| reg_x8 |]
 
+let may_be_destroyed_by_c_function (r : Reg.t) =
+  match r.loc with
+  | Reg
+      ( X0 | X1 | X2 | X3 | X4 | X5 | X6 | X7 | X8 | X9 | X10 | X11 | X12 | X13
+      | X14 | X15 | X16 | X17 ) ->
+    true
+  | Reg (X19 | X20 | X21 | X22 | X23 | X24 | X25 | X26 | X27 | X28) -> false
+  | Reg
+      ( D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | D10 | D11 | D12 | D13
+      | D14 | D15 | D16 | D17 | D18 | D19 | D20 | D21 | D22 | D23 | D24 | D25
+      | D26 | D27 | D28 | D29 | D30 | D31 ) ->
+    (* C functions preserve at most the low half of a vector register. *)
+    true
+  | Stack _ | Unknown -> false
+
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
@@ -296,13 +354,17 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Load
           {memory_chunk=(Byte_unsigned|Byte_signed|Sixteen_unsigned|
                          Sixteen_signed|Thirtytwo_unsigned|Thirtytwo_signed|
-                         Word_int|Word_mask|Word_val|Double|
+                         Word_int|Word_static_block|Word_code_pointer|
+                         Word_out_of_heap_data_pointer|Word_mask|Word_val|
+                         Double|
                          Onetwentyeight_unaligned|Onetwentyeight_aligned);
            _ })
   | Op (Store
           ((Byte_unsigned|Byte_signed|Sixteen_unsigned|Sixteen_signed|
-            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_mask|Word_val|
-            Double|Onetwentyeight_unaligned|Onetwentyeight_aligned),
+            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_static_block|
+            Word_code_pointer|Word_out_of_heap_data_pointer|
+            Word_mask|Word_val|Double|
+            Onetwentyeight_unaligned|Onetwentyeight_aligned),
            _, _))
     -> [||]
   | Op (Static_cast
@@ -317,7 +379,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
       else
         destroy_neon_reg7
   | Op (Intop (Iadd  | Isub | Imul | Idiv _ | Imod _ |Iand|Ior|Ixor|Ilsl
-              |Ilsr|Iasr|Imulh _|Iclz|Ictz|Icomp _))
+              |Ilsr|Iasr|Imulh _|Inot|Iclz|Ictz|Icomp _))
   | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
         | Move | Spill | Reload | Floatop _
@@ -328,7 +390,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-        | Begin_region | End_region | Dls_get | Tls_get | Domain_index)
+        | Trace_pc_guard_gate | Trace_pc_guard _
+        | Begin_region | End_region | Dls_get | Tls_get | Domain_index
+        | Thread_self_id)
   | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
@@ -360,13 +424,15 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Never ->
     Misc.fatal_error
       "Proc.destroyed_at_terminator: unexpected Never terminator"
+  | Call_no_return _
   | Call {op = { desc = Indirect _ | Direct _; _ }; _} ->
     all_phys_regs
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     [||]
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs; _ }; _} ->
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_noalloc_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
@@ -382,14 +448,15 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Never ->
     Misc.fatal_error
       "Proc.is_destruction_point: unexpected Never terminator"
+  | Call_no_return _
   | Call {op = { desc = Indirect _ | Direct _; _ }; _} ->
     true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
-                     stack_ofs; _ }
+  | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                              stack_ofs; _ }
   | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                            stack_ofs; _ }; _ } ->
     if more_destruction_points then
@@ -513,18 +580,19 @@ let operation_supported : Cmm.operation -> bool = function
   | Cclz | Cctz | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
   | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |

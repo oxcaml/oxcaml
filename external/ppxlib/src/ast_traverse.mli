@@ -3,8 +3,8 @@
 
     {1 Link to the tutorial}
 
-    For a detailed explanation on this module, refer to the {{!"ast-traversal"}
-    relevant} part of the manual.
+    For a detailed explanation on this module, refer to the
+    {{!"ast-traversal"} relevant} part of the manual.
 
     {1 API} *)
 
@@ -35,35 +35,30 @@ open! Import
       let string_constants_of_structure = string_constants_of#structure
     ]} *)
 
-class map :
-  object
-    inherit Ppxlib_traverse_builtins.map
-    inherit Ast.map
-  end
+class map : object
+  inherit Ppxlib_traverse_builtins.map
+  inherit Ast.map
+end
 
-class iter :
-  object
-    inherit Ppxlib_traverse_builtins.iter
-    inherit Ast.iter
-  end
+class iter : object
+  inherit Ppxlib_traverse_builtins.iter
+  inherit Ast.iter
+end
 
-class ['acc] fold :
-  object
-    inherit ['acc] Ppxlib_traverse_builtins.fold
-    inherit ['acc] Ast.fold
-  end
+class ['acc] fold : object
+  inherit ['acc] Ppxlib_traverse_builtins.fold
+  inherit ['acc] Ast.fold
+end
 
-class ['acc] fold_map :
-  object
-    inherit ['acc] Ppxlib_traverse_builtins.fold_map
-    inherit ['acc] Ast.fold_map
-  end
+class ['acc] fold_map : object
+  inherit ['acc] Ppxlib_traverse_builtins.fold_map
+  inherit ['acc] Ast.fold_map
+end
 
-class ['ctx] map_with_context :
-  object
-    inherit ['ctx] Ppxlib_traverse_builtins.map_with_context
-    inherit ['ctx] Ast.map_with_context
-  end
+class ['ctx] map_with_context : object
+  inherit ['ctx] Ppxlib_traverse_builtins.map_with_context
+  inherit ['ctx] Ast.map_with_context
+end
 
 class map_with_path : [string] map_with_context
 
@@ -79,33 +74,28 @@ val do_not_enter_module_type_declaration :
 
 val do_not_enter_let_module : (expression, unit) Attribute.t
 
-class virtual ['res] lift :
-  object
-    inherit ['res] Ppxlib_traverse_builtins.lift
-    inherit ['res] Ast.lift
-  end
+class virtual ['res] lift : object
+  inherit ['res] Ppxlib_traverse_builtins.lift
+  inherit ['res] Ast.lift
+end
 
-class virtual ['ctx, 'res] lift_map_with_context :
-  object
-    inherit ['ctx, 'res] Ppxlib_traverse_builtins.lift_map_with_context
-    inherit ['ctx, 'res] Ast.lift_map_with_context
-  end
+class virtual ['ctx, 'res] lift_map_with_context : object
+  inherit ['ctx, 'res] Ppxlib_traverse_builtins.lift_map_with_context
+  inherit ['ctx, 'res] Ast.lift_map_with_context
+end
 
-class map_with_expansion_context_and_errors :
-  object
-    inherit
-      [Expansion_context.Base.t, Location.Error.t list] Ppxlib_traverse_builtins
-                                                        .std_lift_mappers_with_context
+class map_with_expansion_context_and_errors : object
+  inherit
+    [Expansion_context.Base.t, Location.Error.t list] Ppxlib_traverse_builtins
+                                                      .std_lift_mappers_with_context
 
-    inherit
-      [Expansion_context.Base.t, Location.Error.t list] Ast
-                                                        .lift_map_with_context
-  end
+  inherit
+    [Expansion_context.Base.t, Location.Error.t list] Ast.lift_map_with_context
+end
 
-class sexp_of :
-  object
-    inherit [Sexp.t] Ppxlib_traverse_builtins.std_lifters
-    inherit [Sexp.t] Ast.lift
-  end
+class sexp_of : object
+  inherit [Sexp.t] Ppxlib_traverse_builtins.std_lifters
+  inherit [Sexp.t] Ast.lift
+end
 
 val sexp_of : sexp_of

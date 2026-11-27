@@ -33,7 +33,7 @@ type pinpoint_desc =
   | Return  (** A function return *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
-  | Functor_parameter  (** A functor parameter *)
+  | Functor_return  (** A functor return *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
@@ -57,11 +57,16 @@ type pinpoint = Location.t * pinpoint_desc
 type mutable_part =
   | Record_field of string
   | Array_elements
+  | Address_contents
 
 type always_dynamic =
   | Application
   | Try_with
   | Generative_functor
+  | Generative_functor_application
+  | Non_template_functor
+  | Non_template_functor_application
+  | Recursive_module
 
 type legacy =
   | Compilation_unit
@@ -70,7 +75,10 @@ type legacy =
   | Quoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
-type region_desc = Borrow
+type region_desc =
+  | Borrow
+  | Try_body
+  | Match_with_exception
 
 type region = Location.t * region_desc
 
@@ -89,6 +97,7 @@ type containing =
   | Tuple
   | Record of string * modality
   | Array of modality
+  | Address of modality
   | Constructor of string * modality
   | Structure of structure_item * modality
 (* Some structure items (such as classes) don't have modalities. We gloss over
@@ -134,6 +143,7 @@ type 'd const =
       -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
   | Lpoly_inst : (disallowed * 'r) neg const
+  | Template_inst : (disallowed * 'r) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
@@ -178,7 +188,6 @@ type allocation_desc =
   | Optional_argument
   | Function_coercion
   | Float_projection
-  | Lpoly_captured_environment
   | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
@@ -202,19 +211,6 @@ type 'd morph =
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
   | Crossing : ('l * 'r) morph
-  | Functor_to_parameter : Location.t -> ('l * 'r) morph
-      (** The identity morphism connecting a functor's staticity to its
-          parameter's. Carries the functor's location. *)
-  | Parameter_to_functor : Location.t -> ('l * 'r) morph
-      (** The identity morphism connecting a parameter's staticity to the
-          functor's. Carries the parameter's location. *)
-  | Functor_to_application : Location.t -> ('l * disallowed) neg morph
-      (** The identity morphism from a functor's staticity to its application
-          result's staticity (a monadic axis, hence [neg]). Carries the
-          functor's location. *)
-  | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
-      (** The dual of [Functor_to_application]: from the result's staticity back
-          to the functor's. Carries the application's location. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Allocation : allocation -> ('l * 'r) morph

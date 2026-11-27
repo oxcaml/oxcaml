@@ -37,6 +37,15 @@ type ext =
   | AVX512BW
   | AVX512VL
   | AES
+  | AVX512_BF16
+  | VPCLMULQDQ
+  | AVX512_VBMI
+  | AVX512_VBMI2
+  | VAES
+  | AVX512_BITALG
+  | AVX512_VPOPCNTDQ
+  | AVX512_IFMA
+  | GFNI
 
 (* Fixed machine register location *)
 type reg =
@@ -189,6 +198,14 @@ let instr_expects_mask instr =
       | RM_r | RM_rm | Vex_v | Implicit | Immediate -> false)
     instr.args
 
+(* Whether the masked output merge perserves lanes from the destination,
+   implying the destination is an input. VBLENDM/VPBLENDM instead take lanes
+   from their first source. *)
+let merge_reads_dst mnemonic =
+  not
+    (String.starts_with ~prefix:"vblendm" mnemonic
+    || String.starts_with ~prefix:"vpblendm" mnemonic)
+
 let instr_is_evex (instr : _ instr) =
   match instr.enc.prefix with Evex _ -> true | Legacy _ | Vex _ -> false
 
@@ -214,11 +231,22 @@ let equal_ext ext0 ext1 =
   | AVX512DQ, AVX512DQ
   | AVX512CD, AVX512CD
   | AVX512BW, AVX512BW
-  | AVX512VL, AVX512VL ->
+  | AVX512VL, AVX512VL
+  | AVX512_BF16, AVX512_BF16
+  | VPCLMULQDQ, VPCLMULQDQ
+  | AVX512_VBMI, AVX512_VBMI
+  | AVX512_VBMI2, AVX512_VBMI2
+  | VAES, VAES
+  | AVX512_BITALG, AVX512_BITALG
+  | AVX512_VPOPCNTDQ, AVX512_VPOPCNTDQ
+  | AVX512_IFMA, AVX512_IFMA
+  | GFNI, GFNI ->
     true
   | ( ( SSE | SSE2 | SSE3 | SSSE3 | SSE4_1 | SSE4_2 | POPCNT | LZCNT | PCLMULQDQ
       | AES | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F | AVX512DQ
-      | AVX512CD | AVX512BW | AVX512VL ),
+      | AVX512CD | AVX512BW | AVX512VL | AVX512_BF16 | VPCLMULQDQ | AVX512_VBMI
+      | AVX512_VBMI2 | VAES | AVX512_BITALG | AVX512_VPOPCNTDQ | AVX512_IFMA
+      | GFNI ),
       _ ) ->
     false
 
@@ -417,6 +445,17 @@ let loc_allows_mem = function
   | Pin _ -> false
   | Temp temps -> Array.exists (fun temp -> not (temp_is_reg temp)) temps
 
+let instr_allows_temp (instr : _ instr) temp =
+  Array.exists
+    (fun (arg : arg) ->
+      match arg.loc with
+      | Temp temps -> Array.exists (equal_temp temp) temps
+      | Pin _ -> false)
+    instr.args
+
+let instr_allows_gpr instr =
+  List.exists (instr_allows_temp instr) [R8; R16; R32; R64]
+
 let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 
 let loc_reg_count = function
@@ -457,6 +496,15 @@ let ext_to_string : ext -> string = function
   | AVX512CD -> "AVX512CD"
   | AVX512BW -> "AVX512BW"
   | AVX512VL -> "AVX512VL"
+  | AVX512_BF16 -> "AVX512_BF16"
+  | VPCLMULQDQ -> "VPCLMULQDQ"
+  | AVX512_VBMI -> "AVX512_VBMI"
+  | AVX512_VBMI2 -> "AVX512_VBMI2"
+  | VAES -> "VAES"
+  | AVX512_BITALG -> "AVX512_BITALG"
+  | AVX512_VPOPCNTDQ -> "AVX512_VPOPCNTDQ"
+  | AVX512_IFMA -> "AVX512_IFMA"
+  | GFNI -> "GFNI"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
@@ -536,3 +584,89 @@ let loc_memory_width = function
         | R8 | R16 | R32 | R64 | MM | XMM | YMM | ZMM | K -> ())
       temps;
     Option.get !width
+
+(* Generated intrinsic definitions used in [amd64_simd_intrins.ml]. *)
+module Intrin = struct
+  type 'id bind =
+    | Instr of 'id instr
+    | Zeroing of (z:bool -> 'id instr) * bool
+
+  type 'id rnd_bind =
+    | Rnd of (rnd:evex_rounding -> 'id instr)
+    | Rnd_zeroing of (rnd:evex_rounding -> z:bool -> 'id instr) * bool
+
+  type 'id sae_bind =
+    | Sae of (sae:unit -> 'id instr)
+    | Sae_zeroing of (sae:unit -> z:bool -> 'id instr) * bool
+
+  type imm =
+    | No_imm
+    | Imm of int (* one constant in [0, max] *)
+    | Getmant of int * int
+      (* two constants (interval, sign), packed as [sign lsl 2 lor interval] *)
+    | Fixed of int
+
+  type flag =
+    | Zf
+    | Cf
+
+  type operand =
+    | Value of int
+    | All_ones_mask
+    | Zero_vec128
+    | Zero_vec256
+    | Zero_vec512
+
+  type ('instr, 'bind, 'rnd_bind, 'sae_bind) spec =
+    | Default of
+        { arity : int;
+          imm : imm;
+          bind : 'bind;
+          args : operand array
+        }
+    | With_round of
+        { arity : int;
+          bind : 'rnd_bind;
+          cur : 'bind option;
+          args : operand array
+        }
+    | With_sae of
+        { arity : int;
+          imm : imm;
+          bind : 'sae_bind;
+          cur : 'bind option;
+          args : operand array
+        }
+    | With_sae_imm of
+        { arity : int;
+          bind : 'sae_bind;
+          cur : 'bind;
+          args : operand array
+        }
+    | Flag of
+        { flag : flag;
+          instr : 'instr
+        }
+    | Load of
+        { arity : int;
+          bind : 'bind;
+          args : operand array
+        }
+    | Store of
+        { arity : int;
+          bind : 'bind;
+          args : operand array
+        }
+    | Gather of
+        { arity : int;
+          instr : 'instr;
+          args : operand array
+        }
+    | Scatter of
+        { arity : int;
+          instr : 'instr;
+          args : operand array
+        }
+
+  type 'id t = ('id instr, 'id bind, 'id rnd_bind, 'id sae_bind) spec
+end

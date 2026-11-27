@@ -9,13 +9,13 @@ module Encoded : sig
 
     val encode :
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t Component.t) ->
+        Relevant_components_by_argument_index.t Allocation_source.t Component.t) ->
       t
 
     val decode :
       t ->
       Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t Component.t)
+        Relevant_components_by_argument_index.t Allocation_source.t Component.t)
   end
 
   module Components : sig
@@ -33,20 +33,20 @@ module Encoded : sig
 
     val all_top : t
 
-    val ( = ) : t -> t -> bool
+    val equal : t -> t -> bool
   end
 end
 
 val encode :
   Zero_alloc_utils.(
-    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Relevant_components_by_argument_index.t Allocation_source.t Component.t
     Components.t) ->
   Encoded.Components.t
 
 val decode :
   Encoded.Components.t ->
   Zero_alloc_utils.(
-    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Relevant_components_by_argument_index.t Allocation_source.t Component.t
     Components.t)
 
 type t
@@ -58,7 +58,7 @@ val reset : t -> unit
 (** [merge_checks t ~into] modifies [into] by adding information from [t]. *)
 val merge : t -> into:t -> unit
 
-(** [get_value t fun_name] returns None if [fun_name] is not associated with any
+(** [get t fun_name] returns None if [fun_name] is not associated with any
     value. *)
 val get : t -> string -> Encoded.Components.t option
 
@@ -69,7 +69,7 @@ val iter : f:(string -> Encoded.Components.t -> unit) -> t -> unit
 module Raw : sig
   type t
 
-  val print : t -> unit
+  val print : Format.formatter -> t -> unit
 end
 
 val to_raw : t -> Raw.t

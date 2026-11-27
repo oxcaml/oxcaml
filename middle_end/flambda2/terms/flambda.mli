@@ -131,6 +131,8 @@ module Invalid : sig
     | Application_never_returns of Apply_expr.t
     | Over_application_never_returns of Apply_expr.t
     | Message of string
+
+  val to_string : t -> string
 end
 
 module Expr : sig
@@ -165,6 +167,8 @@ module Named : sig
   type t = named
 
   include Expr_std.S with type t := t
+
+  val ids_for_export : t -> Ids_for_export.t
 
   (** Convert a register-width value into the defining expression of a [Let]. *)
   val create_simple : Simple.t -> t
@@ -250,7 +254,8 @@ module Let_expr : sig
     t ->
     f:
       (Bound_pattern.t ->
-      num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
+      num_occurrences_of_bound_vars:
+        Num_occurrences.By_name_mode.t Variable.Map.t ->
       body:expr ->
       'a) ->
     'a
@@ -310,7 +315,7 @@ module Continuation_handler : sig
     t ->
     f:
       (Bound_parameters.t ->
-      num_normal_occurrences_of_params:Num_occurrences.t Variable.Map.t ->
+      num_occurrences_of_params:Num_occurrences.By_name_mode.t Variable.Map.t ->
       handler:expr ->
       'a) ->
     'a
@@ -423,11 +428,15 @@ module Let_cont_expr : sig
     free_names_of_body:Name_occurrences.t Or_unknown.t ->
     expr
 
-  (** Create a definition of a set of possibly-recursive continuations. *)
+  (** Create a definition of a set of possibly-recursive continuations.
+      [free_names_of_handlers] are the free names of the handlers (so includes
+      the invariant parameters, but not the parameters of the individual
+      handlers). *)
   val create_recursive :
     invariant_params:Bound_parameters.t ->
     Continuation_handler.t Continuation.Lmap.t ->
     body:expr ->
+    free_names_of_handlers:Name_occurrences.t Or_unknown.t ->
     expr
 end
 
@@ -465,6 +474,19 @@ module Recursive_let_cont_handlers : sig
     t ->
     f:
       (invariant_params:Bound_parameters.t ->
+      body:expr ->
+      Continuation_handlers.t ->
+      'a) ->
+    'a
+
+  (** Like [pattern_match], but also returns the numbers of occurrences of the
+      invariant parameters within the handlers. *)
+  val pattern_match' :
+    t ->
+    f:
+      (invariant_params:Bound_parameters.t ->
+      num_occurrences_of_invariant_params:
+        Num_occurrences.By_name_mode.t Variable.Map.t ->
       body:expr ->
       Continuation_handlers.t ->
       'a) ->

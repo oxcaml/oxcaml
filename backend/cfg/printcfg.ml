@@ -122,19 +122,21 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
       done;
       let i = label_count - 1 in
       fprintf ppf "case %d: goto %a" i Label.format labels.(i))
-  | Call_no_return { func_symbol; _ } ->
-    fprintf ppf "call_no_return %s%a" func_symbol print_args args
+  | Call_no_return call ->
+    dump_linear_call_op ppf
+      (match call.desc with
+      | Indirect _ -> Linear.Lcall_ind
+      | Direct func -> Linear.Lcall_imm { func });
+    fprintf ppf " (no return)"
+  | External_call_no_return { func_symbol; _ } ->
+    fprintf ppf "external_call_no_return %s%a" func_symbol print_args args
   | Return -> fprintf ppf "return%a" print_args args
   | Raise _ -> fprintf ppf "raise%a" print_args args
   | Tailcall_self { destination; _ } ->
-    dump_linear_call_op ppf
-      (Linear.Ltailcall_imm
-         { func =
-             { sym_name =
-                 Printf.sprintf "self(%s)" (Label.to_string destination);
-               sym_global = Local
-             }
-         })
+    fprintf ppf "tailcall \"self(%s)\" %a"
+      (Label.to_string destination)
+      (Printreg.regs' ~print_reg)
+      args
   | Tailcall_func call ->
     (* CR ncourant: here and below, maybe the callees should be printed when
        they are known *)

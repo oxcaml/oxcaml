@@ -135,11 +135,12 @@ let arity (a : [`Unarized] Flambda_arity.t) : Fexpr.arity =
 let arity_opt (a : [`Unarized] Flambda_arity.t) : Fexpr.arity option =
   if is_default_arity a then None else Some (arity a)
 
-let kinded_parameter env (kp : Bound_parameter.t) :
+let kinded_parameter ~needed_by_phantom_let env (kp : Bound_parameter.t) :
     Fexpr.kinded_parameter * Env.t =
   let k = Bound_parameter.kind kp |> kind_with_subkind_opt in
+  let needed_by_phantom_let = needed_by_phantom_let (Bound_parameter.var kp) in
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
-  { param; kind = k }, env
+  { param; kind = k; needed_by_phantom_let }, env
 
 let const c : Fexpr.const =
   match Reg_width_const.descr c with
@@ -343,17 +344,41 @@ let rec expr env e =
   | Invalid _ -> Fexpr.Invalid
 
 and let_expr env le =
-  Flambda.Let_expr.pattern_match le ~f:(fun bound ~body : Fexpr.expr ->
+  Flambda.Let_expr.pattern_match' le
+    ~f:(fun bound ~num_occurrences_of_bound_vars ~body : Fexpr.expr ->
       let defining_expr = Flambda.Let_expr.defining_expr le in
       match bound with
-      | Singleton var -> dynamic_let_expr env [var] defining_expr body
+      | Singleton var ->
+        dynamic_let_expr env [var] ~num_occurrences_of_bound_vars defining_expr
+          body
       | Set_of_closures value_slots ->
-        dynamic_let_expr env value_slots defining_expr body
+        dynamic_let_expr env value_slots ~num_occurrences_of_bound_vars
+          defining_expr body
       | Static bound_static ->
         static_let_expr env bound_static defining_expr body)
 
-and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
-    Fexpr.expr =
+and dynamic_let_expr env vars ~num_occurrences_of_bound_vars
+    (defining_expr : Flambda.Named.t) body : Fexpr.expr =
+  (* All bound variables of a pattern have the same name mode (enforced by
+     [Bound_pattern.set_of_closures]), so testing the first suffices. Note that
+     a multi-binding let, i.e. one binding a whole set of closures, can itself
+     be phantom. *)
+  let is_phantom =
+    match vars with
+    | [] -> false
+    | var :: _ -> Name_mode.is_phantom (Bound_var.name_mode var)
+  in
+  let vars_needed_by_phantom_let =
+    List.map
+      (fun var ->
+        let var = Bound_var.var var in
+        (not is_phantom)
+        && Num_occurrences.By_name_mode.needed_by_phantom_let
+             (Option.value ~default:Num_occurrences.By_name_mode.zero
+                (Variable.Map.find_opt var num_occurrences_of_bound_vars))
+             var)
+      vars
+  in
   let vars, body_env = map_accum_left Env.bind_bound_var env vars in
   let body = expr body_env body in
   let defining_exprs, value_slots =
@@ -373,11 +398,12 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
   if List.compare_lengths vars defining_exprs <> 0
   then Misc.fatal_error "Mismatched vars vs. values";
   let bindings =
-    List.map2
-      (fun var defining_expr -> { Fexpr.var; defining_expr })
-      vars defining_exprs
+    Misc.Stdlib.List.map3
+      (fun var defining_expr needed_by_phantom_let ->
+        { Fexpr.var; defining_expr; needed_by_phantom_let })
+      vars defining_exprs vars_needed_by_phantom_let
   in
-  Let { bindings; value_slots; body }
+  Let { bindings; value_slots; body; is_phantom }
 
 and static_let_expr env bound_static defining_expr body : Fexpr.expr =
   let static_consts =
@@ -459,6 +485,12 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       in
       let is_tupled = Code.is_tupled code in
       let stub = Code.stub code in
+      let fdo_entry_annotation =
+        let annotation = Code.fdo_entry_annotation code in
+        if Flambda_features.fexpr_print_fdo_counters ()
+        then Some annotation
+        else None
+      in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
@@ -471,7 +503,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ~is_my_closure_used:_
               ~my_alloc_mode
               ~my_depth
-              ~free_names_of_body:_
+              ~free_names_of_body
               :
               Fexpr.params_and_body
             ->
@@ -481,8 +513,16 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let exn_cont, env =
               Env.bind_named_continuation env exn_continuation
             in
+            let needed_by_phantom_let var =
+              match (free_names_of_body : _ Or_unknown.t) with
+              | Unknown -> false
+              | Known free_names ->
+                Name_occurrences.variable_needed_by_phantom_let free_names var
+            in
             let params, env =
-              map_accum_left kinded_parameter env
+              map_accum_left
+                (kinded_parameter ~needed_by_phantom_let)
+                env
                 (Bound_parameters.to_list params)
             in
             let closure_var, env = Env.bind_var env my_closure in
@@ -533,7 +573,8 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
           code_size;
           is_tupled;
           stub;
-          result_mode
+          result_mode;
+          fdo_entry_annotation
         }
     | Code code_id, Deleted_code ->
       Deleted_code (code_id |> Env.find_code_id_exn env)
@@ -583,10 +624,23 @@ and let_cont_expr env (lc : Flambda.Let_cont_expr.t) =
         let body = expr body_env body in
         Fexpr.Let_cont { recursive = Nonrecursive; bindings = [binding]; body })
   | Recursive handlers ->
-    Flambda.Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params ~body handlers ->
+    Flambda.Recursive_let_cont_handlers.pattern_match' handlers
+      ~f:(fun
+          ~invariant_params
+          ~num_occurrences_of_invariant_params
+          ~body
+          handlers
+        ->
+        let needed_by_phantom_let var =
+          Num_occurrences.By_name_mode.needed_by_phantom_let
+            (Option.value ~default:Num_occurrences.By_name_mode.zero
+               (Variable.Map.find_opt var num_occurrences_of_invariant_params))
+            var
+        in
         let params, env =
-          map_accum_left kinded_parameter env
+          map_accum_left
+            (kinded_parameter ~needed_by_phantom_let)
+            env
             (Bound_parameters.to_list invariant_params)
         in
         let env =
@@ -623,10 +677,25 @@ and cont_handler env cont_id (sort : Continuation.Sort.t) h =
       Some Define_root_symbol
     | Return | Toplevel_return -> assert false
   in
-  Flambda.Continuation_handler.pattern_match h
-    ~f:(fun params ~handler : Fexpr.continuation_binding ->
+  Flambda.Continuation_handler.pattern_match' h
+    ~f:(fun
+        params
+        ~num_occurrences_of_params
+        ~handler
+        :
+        Fexpr.continuation_binding
+      ->
+      let needed_by_phantom_let var =
+        Num_occurrences.By_name_mode.needed_by_phantom_let
+          (Option.value ~default:Num_occurrences.By_name_mode.zero
+             (Variable.Map.find_opt var num_occurrences_of_params))
+          var
+      in
       let params, env =
-        map_accum_left kinded_parameter env (Bound_parameters.to_list params)
+        map_accum_left
+          (kinded_parameter ~needed_by_phantom_let)
+          env
+          (Bound_parameters.to_list params)
       in
       let handler = expr env handler in
       { name = cont_id; params; sort; handler })
@@ -662,7 +731,8 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     | Function
         { function_call = Indirect_unknown_arity | Indirect_known_arity _ } ->
       Function Indirect
-    | C_call { needs_caml_c_call; _ } -> C_call { alloc = needs_caml_c_call }
+    | C_call { needs_caml_c_call; fat_ptr_arg_starts; _ } ->
+      C_call { alloc = needs_caml_c_call; fat_ptr_arg_starts }
     | Method { kind; obj } -> Method { kind; obj = simple env obj }
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in
@@ -707,6 +777,11 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       | Never_inlined -> Some Never_inlined
   in
   let inlining_state = inlining_state (Apply_expr.inlining_state app) in
+  let callsite_counter =
+    if Flambda_features.fexpr_print_fdo_counters ()
+    then Apply_expr.callsite_counter app
+    else None
+  in
   Apply
     { func;
       continuation;
@@ -716,7 +791,8 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       alloc_mode;
       inlined;
       inlining_state;
-      arities
+      arities;
+      callsite_counter
     }
 
 and apply_cont_expr env app_cont : Fexpr.expr =
@@ -753,8 +829,13 @@ and switch_expr env switch : Fexpr.expr =
           |> Target_ocaml_int.to_targetint machine_width
           |> Targetint_32_64.to_int
         in
-        let app_cont = apply_cont env app_cont in
-        tag, Fexpr.Named_cont app_cont)
+        let action = Fexpr.Named_cont (apply_cont env app_cont) in
+        let annotations =
+          if Flambda_features.fexpr_print_branch_annotations ()
+          then Switch_arm.annotations arm
+          else Branch_annotations.default
+        in
+        ({ tag; action; annotations } : Fexpr.switch_case))
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }

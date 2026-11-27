@@ -14,11 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module For_one_variety_of_names (N : sig
-  include Container_types.S
-
-  val apply_renaming : t -> Renaming.t -> t
-end) : sig
+module For_one_variety_of_names_not_renamable (N : Container_types.S) : sig
   type t
 
   val print : Format.formatter -> t -> unit
@@ -33,15 +29,13 @@ end) : sig
 
   val add : t -> N.t -> Name_mode.t -> t
 
-  val apply_renaming : t -> Renaming.t -> t
-
-  val affected_by_renaming : t -> Renaming.t -> bool
-
   val diff : t -> t -> t
 
   val union : t -> t -> t
 
   val keys : t -> N.Set.t
+
+  val map_keys : (N.t -> N.t) -> t -> t
 
   val subset_domain : t -> t -> bool
 
@@ -54,6 +48,8 @@ end) : sig
   val count : t -> N.t -> Num_occurrences.t
 
   val count_normal : t -> N.t -> Num_occurrences.t
+
+  val count_by_name_mode : t -> N.t -> Num_occurrences.By_name_mode.t
 
   val greatest_name_mode : t -> N.t -> Name_mode.Or_absent.t
 
@@ -84,6 +80,8 @@ end = struct
     val num_occurrences : t -> int
 
     val num_occurrences_normal : t -> int
+
+    val num_occurrences_phantom : t -> int
 
     val downgrade_occurrences_at_strictly_greater_name_mode :
       t -> Name_mode.t -> t
@@ -225,16 +223,6 @@ end = struct
         | Some for_one_name -> Some (For_one_name.add for_one_name name_mode))
       t
 
-  let apply_renaming t renaming =
-    N.Map.map_keys (fun name -> N.apply_renaming name renaming) t
-
-  let affected_by_renaming t renaming =
-    (* CR lmaurer: This is ultimately just [N.Map.inter_domain_is_not_equal]. *)
-    N.Map.exists
-      (fun name _name_mode ->
-        not (N.equal name (N.apply_renaming name renaming)))
-      t
-
   let diff t1 t2 = N.Map.diff_domains t1 t2
 
   let union t1 t2 =
@@ -244,6 +232,8 @@ end = struct
       t1 t2
 
   let keys t = N.Map.keys t
+
+  let map_keys = N.Map.map_keys
 
   let subset_domain t1 t2 =
     (* CR lmaurer: Add this operation to [Patricia_tree]. ([N.Map.keys] being
@@ -279,6 +269,20 @@ end = struct
       else if num_occurrences = 1
       then One
       else More_than_one
+
+  let count_by_name_mode t name : Num_occurrences.By_name_mode.t =
+    match N.Map.find name t with
+    | exception Not_found -> Num_occurrences.By_name_mode.zero
+    | for_one_name ->
+      let num_occurrences n : Num_occurrences.t =
+        assert (n >= 0);
+        if n = 0 then Zero else if n = 1 then One else More_than_one
+      in
+      { normal =
+          num_occurrences (For_one_name.num_occurrences_normal for_one_name);
+        phantom =
+          num_occurrences (For_one_name.num_occurrences_phantom for_one_name)
+      }
 
   let greatest_name_mode t name : Name_mode.Or_absent.t =
     match N.Map.find name t with
@@ -326,6 +330,25 @@ end = struct
 end
 [@@inline always]
 
+module For_one_variety_of_names (N : sig
+  include Container_types.S
+
+  val apply_renaming : t -> Renaming.t -> t
+end) =
+struct
+  include For_one_variety_of_names_not_renamable (N)
+
+  let affected_by_renaming t renaming =
+    (* CR lmaurer: This is ultimately just [N.Map.inter_domain_is_not_equal]. *)
+    not
+      (for_all ~f:(fun name -> N.equal name (N.apply_renaming name renaming)) t)
+
+  let apply_renaming t renaming =
+    if affected_by_renaming t renaming
+    then map_keys (fun name -> N.apply_renaming name renaming) t
+    else t
+end
+
 module For_names = For_one_variety_of_names (struct
   include Name
 
@@ -338,21 +361,9 @@ module For_continuations = For_one_variety_of_names (struct
   let apply_renaming t renaming = Renaming.apply_continuation renaming t
 end)
 
-module For_function_slots = For_one_variety_of_names (struct
-  include Function_slot
-
-  (* We never bind [Function_slot]s using [Name_abstraction] and they do not
-     participate in [Ids_for_export]. *)
-  let apply_renaming t _renaming = t
-end)
-
-module For_value_slots = For_one_variety_of_names (struct
-  include Value_slot
-
-  (* We never bind [Value_slot]s using [Name_abstraction] and they do not
-     participate in [Ids_for_export]. *)
-  let apply_renaming t _renaming = t
-end)
+module For_function_slots =
+  For_one_variety_of_names_not_renamable (Function_slot)
+module For_value_slots = For_one_variety_of_names_not_renamable (Value_slot)
 
 module For_code_ids = For_one_variety_of_names (struct
   include Code_id
@@ -420,6 +431,14 @@ let count_variable t var = For_names.count t.names (Name.var var)
 
 let count_variable_normal_mode t var =
   For_names.count_normal t.names (Name.var var)
+
+let count_variable_by_name_mode t var =
+  For_names.count_by_name_mode t.names (Name.var var)
+
+let variable_needed_by_phantom_let t var =
+  Num_occurrences.By_name_mode.needed_by_phantom_let
+    (count_variable_by_name_mode t var)
+    var
 
 let singleton_variable var name_mode =
   { empty with names = For_names.singleton (Name.var var) name_mode }
@@ -794,6 +813,28 @@ let inter_domain_is_non_empty t1 t2 =
 
 let union_list ts = List.fold_left union empty ts
 
+let no_free_names _ = empty
+
+let free_names_set ~fold ~add_key set =
+  fold (fun key free_names -> add_key free_names key) set empty
+
+let free_names_map ~fold ~add_key ~free_names_value map =
+  fold
+    (fun key value free_names ->
+      union free_names (add_key (free_names_value value) key))
+    map empty
+
+let free_names_code_id_set code_ids name_mode =
+  free_names_set ~fold:Code_id.Set.fold
+    ~add_key:(fun free_names code_id ->
+      add_code_id free_names code_id name_mode)
+    code_ids
+
+let free_names_name_map free_names_value map name_mode =
+  free_names_map ~fold:Name.Map.fold
+    ~add_key:(fun free_names name -> add_name free_names name name_mode)
+    ~free_names_value map
+
 let function_slots_in_normal_projections t =
   For_function_slots.fold_with_mode t.function_slots_in_projections
     ~init:Function_slot.Set.empty ~f:(fun acc function_slot name_mode ->
@@ -1050,53 +1091,54 @@ let apply_renaming
        continuations;
        continuations_with_traps;
        continuations_in_trap_actions;
-       function_slots_in_projections;
-       value_slots_in_projections;
-       function_slots_in_declarations;
-       value_slots_in_declarations;
+       function_slots_in_projections =
+         function_slots_in_projections_never_renamed;
+       value_slots_in_projections = value_slots_in_projections_never_renamed;
+       function_slots_in_declarations =
+         function_slots_in_declarations_never_renamed;
+       value_slots_in_declarations = value_slots_in_declarations_never_renamed;
        code_ids;
        newer_version_of_code_ids
      } as t) renaming =
   if Renaming.is_identity renaming
   then t
   else
-    let names = For_names.apply_renaming names renaming in
-    let continuations =
+    let names' = For_names.apply_renaming names renaming in
+    let continuations' =
       For_continuations.apply_renaming continuations renaming
     in
-    let continuations_with_traps =
+    let continuations_with_traps' =
       For_continuations.apply_renaming continuations_with_traps renaming
     in
-    let continuations_in_trap_actions =
+    let continuations_in_trap_actions' =
       For_continuations.apply_renaming continuations_in_trap_actions renaming
     in
-    let function_slots_in_projections =
-      For_function_slots.apply_renaming function_slots_in_projections renaming
-    in
-    let value_slots_in_projections =
-      For_value_slots.apply_renaming value_slots_in_projections renaming
-    in
-    let function_slots_in_declarations =
-      For_function_slots.apply_renaming function_slots_in_declarations renaming
-    in
-    let value_slots_in_declarations =
-      For_value_slots.apply_renaming value_slots_in_declarations renaming
-    in
-    let code_ids = For_code_ids.apply_renaming code_ids renaming in
-    let newer_version_of_code_ids =
+    let code_ids' = For_code_ids.apply_renaming code_ids renaming in
+    let newer_version_of_code_ids' =
       For_code_ids.apply_renaming newer_version_of_code_ids renaming
     in
-    { names;
-      continuations;
-      continuations_with_traps;
-      continuations_in_trap_actions;
-      function_slots_in_projections;
-      value_slots_in_projections;
-      function_slots_in_declarations;
-      value_slots_in_declarations;
-      code_ids;
-      newer_version_of_code_ids
-    }
+    if
+      names == names'
+      && continuations == continuations'
+      && continuations_with_traps == continuations_with_traps'
+      && continuations_in_trap_actions == continuations_in_trap_actions'
+      && code_ids == code_ids'
+      && newer_version_of_code_ids == newer_version_of_code_ids'
+    then t
+    else
+      { names = names';
+        continuations = continuations';
+        continuations_with_traps = continuations_with_traps';
+        continuations_in_trap_actions = continuations_in_trap_actions';
+        function_slots_in_projections =
+          function_slots_in_projections_never_renamed;
+        value_slots_in_projections = value_slots_in_projections_never_renamed;
+        function_slots_in_declarations =
+          function_slots_in_declarations_never_renamed;
+        value_slots_in_declarations = value_slots_in_declarations_never_renamed;
+        code_ids = code_ids';
+        newer_version_of_code_ids = newer_version_of_code_ids'
+      }
 
 let affected_by_renaming
     { names;

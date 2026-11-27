@@ -760,6 +760,70 @@ let () =
     (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
 
+(* References: [:=] goes through [%setfield0_singleton], which is a
+   layout-polymorphic primitive, not record modification as already tested
+*)
+
+let () =
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref 1 in
+      r := 2;
+      ignore (Sys.opaque_identity r))
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref "a" in
+      r := "b";
+      ignore (Sys.opaque_identity r))
+
+(* Check both [:=] and [<-] and make sure they agree *)
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref #(#1L, "a", true) in
+      r := #(#2L, "b", false);
+      ignore (Sys.opaque_identity r))
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref #(#1L, "a", true) in
+      r.contents <- #(#2L, "b", false);
+      ignore (Sys.opaque_identity r))
+
+(* Contents of unknown type must still be treated as pointers, including the
+   components of an unboxed product *)
+let () =
+  let[@inline never] set (type a : value & value) (r : a ref) (x : a) =
+    r := x
+  in
+  test ~expect_caml_modifies:2
+    (fun () ->
+      let r = ref #(1, 2) in
+      set r #(3, 4);
+      ignore (Sys.opaque_identity r))
+
+(* Contents with no values at all need no barrier, whether or not the type is
+   known *)
+let () =
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref #(#1L, #1.0) in
+      r := #(#2L, #2.0);
+      ignore (Sys.opaque_identity r))
+
+let () =
+  let[@inline never] set (type a : bits64 & float64) (r : a ref) (x : a) =
+    r := x
+  in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref #(#1L, #1.0) in
+      set r #(#2L, #2.0);
+      ignore (Sys.opaque_identity r))
+
 (* Unboxed GADT: the existential component's immediacy is only visible in the
    declared [immediate & immediate] field shape *)
 let () =

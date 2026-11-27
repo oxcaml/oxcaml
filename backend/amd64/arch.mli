@@ -42,6 +42,15 @@ module Extension : sig
     | AVX512BW
     | AVX512VL
     | AES
+    | AVX512_BF16
+    | VPCLMULQDQ
+    | AVX512_VBMI
+    | AVX512_VBMI2
+    | VAES
+    | AVX512_BITALG
+    | AVX512_VPOPCNTDQ
+    | AVX512_IFMA
+    | GFNI
 
   val name : t -> string
 
@@ -51,6 +60,9 @@ module Extension : sig
   val enabled_vec256 : unit -> bool
   val enabled_vec512 : unit -> bool
   val enabled_instruction : Amd64_simd_instrs.instr -> bool
+
+  (* Raised when the code being compiled requires a disabled extension. *)
+  exception Disabled of string
 end
 
 val trap_notes : bool ref

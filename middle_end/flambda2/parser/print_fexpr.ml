@@ -513,7 +513,9 @@ let prim ppf ((op, args) : prim) =
     (simple_args ~space:Before ~omit_if_empty:false)
     args
 
-let parameter ppf { param; kind = k } = kinded_variable ppf (param, k)
+let parameter ppf { param; kind = k; needed_by_phantom_let } =
+  if needed_by_phantom_let then Format.fprintf ppf "needed_by_phantom_let ";
+  kinded_variable ppf (param, k)
 
 let kinded_parameters ~space ppf = function
   | [] -> ()
@@ -605,15 +607,30 @@ let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
       cl
       (alloc_mode_for_applications region ~space:Before)
       alloc_mode
-  | C_call { alloc } ->
+  | C_call { alloc; fat_ptr_arg_starts } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
-    pp_spaced ~space ppf "ccall%a"
+    let pp_fat_ptr_arg_starts ppf starts =
+      Format.fprintf ppf "fat_ptr(%a)"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_int)
+        starts
+    in
+    pp_spaced ~space ppf "ccall%a%a%a"
       (pp_option ~space:Before Format.pp_print_string)
       noalloc_kwd
+      (pp_option ~space:Before pp_fat_ptr_arg_starts)
+      (match fat_ptr_arg_starts with
+      | [] -> None
+      | _ :: _ -> Some fat_ptr_arg_starts)
+      (alloc_mode_for_applications region ~space:Before)
+      alloc_mode
   | Method { kind; obj } ->
-    pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
+    pp_spaced ~space ppf "mcall(%a%a)%a" method_kind kind
       (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)
       obj
+      (alloc_mode_for_applications region ~space:Before)
+      alloc_mode
 
 let inline_attribute ~space ppf (i : Inline_attribute.t) =
   let str =
@@ -718,9 +735,15 @@ let rec expr scope ppf = function
     parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
         let_symbol_expr scope ppf l)
   | Switch { scrutinee; cases } ->
+    let scale =
+      Branch_annotations.likelihood_printing_scale
+        (List.map
+           (fun ({ annotations; _ } : Fexpr.switch_case) -> annotations)
+           cases)
+    in
     Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop simple scrutinee
-      (pp_list ~sep:"" switch_case)
+      (pp_list ~sep:"" (switch_case ~scale))
       cases
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
@@ -732,20 +755,29 @@ let rec expr scope ppf = function
         exn_continuation = ek;
         args;
         func;
-        arities
+        arities;
+        callsite_counter
       } ->
     let pp_inlining_state ppf () =
       pp_option ~space:Before
         (pp_like "inlining_state(%a)" inlining_state)
         ppf is
     in
+    let pp_callsite_counter ppf () =
+      pp_option ~space:Before
+        (fun ppf counter ->
+          Format.fprintf ppf "callsite_counter(%s)"
+            (Fdo_counter.to_string counter))
+        ppf callsite_counter
+    in
     Format.fprintf ppf
-      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
+      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ \
+       %a@]@]@]"
       Flambda_colours.expr_keyword Flambda_colours.pop Flambda_colours.elide
       (call_kind_and_alloc_mode ~space:Before)
       (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
-      inlined pp_inlining_state () Flambda_colours.pop
+      inlined pp_inlining_state () pp_callsite_counter () Flambda_colours.pop
       func_name_with_optional_arities (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
@@ -767,19 +799,26 @@ and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
   | Named_cont ac -> apply_cont ppf ac
   | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
 
-and switch_case ppf (v, c) =
-  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
+and switch_case ~scale ppf ({ tag; action; annotations } : Fexpr.switch_case) =
+  Format.fprintf ppf "@;@[<hov 2>| %i%a ->@ %a@]" tag
+    (Branch_annotations.print scale)
+    annotations apply_or_inlined_cont action
 
 and let_expr scope ppf : let_ -> unit = function
-  | { bindings = first :: rest; body; value_slots = ces } ->
-    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%t %a =@ %a@]"
-      Flambda_colours.expr_keyword Flambda_colours.pop variable first.var named
-      first.defining_expr;
+  | { bindings = first :: rest; body; value_slots = ces; is_phantom } ->
+    let binding_var ppf ({ var; needed_by_phantom_let; _ } : let_binding) =
+      if needed_by_phantom_let then Format.fprintf ppf "needed_by_phantom_let ";
+      variable ppf var
+    in
+    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%s%t %a =@ %a@]"
+      Flambda_colours.expr_keyword
+      (if is_phantom then " phantom" else "")
+      Flambda_colours.pop binding_var first named first.defining_expr;
     List.iter
-      (fun ({ var; defining_expr } : let_binding) ->
+      (fun ({ defining_expr; _ } as binding : let_binding) ->
         Format.fprintf ppf "@ @[<hv2>%tand%t %a =@ %a@]"
-          Flambda_colours.expr_keyword Flambda_colours.pop variable var named
-          defining_expr)
+          Flambda_colours.expr_keyword Flambda_colours.pop binding_var binding
+          named defining_expr)
       rest;
     Format.fprintf ppf "%a@ %tin%t@]@ %a@]"
       (value_slots Flambda_colours.expr_keyword)
@@ -850,11 +889,12 @@ and code_binding ppf
        is_tupled;
        stub;
        loopify;
-       result_mode
+       result_mode;
+       fdo_entry_annotation
      } :
       code) =
   Format.fprintf ppf
-    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
+    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
     Flambda_colours.static_keyword Flambda_colours.pop Flambda_colours.elide
     (recursive ~space:Before) rec_
     (inline_attribute_opt ~space:Before)
@@ -866,7 +906,10 @@ and code_binding ppf
     (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")
     is_tupled
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
-    stub Flambda_colours.pop code_id id;
+    stub
+    (pp_option ~space:Before
+       (pp_like "fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print))
+    fdo_entry_annotation Flambda_colours.pop code_id id;
   let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
       =
     params_and_body

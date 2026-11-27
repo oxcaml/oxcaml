@@ -296,7 +296,6 @@ AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER])
 AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
 AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER])
 AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER])
-AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
 AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
@@ -3479,6 +3478,184 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
+
+AC_SUBST([has_avx512f])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512f")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512F]) has_avx512f=yes, [])
+
+AC_SUBST([has_avx512dq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512dq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512DQ]) has_avx512dq=yes, [])
+
+AC_SUBST([has_avx512cd])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512cd")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512CD]) has_avx512cd=yes, [])
+
+AC_SUBST([has_avx512bw])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512bw")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BW]) has_avx512bw=yes, [])
+
+AC_SUBST([has_avx512vl])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vl")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VL]) has_avx512vl=yes, [])
+
+AC_SUBST([has_avx512bf16])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+  unsigned int eax, ebx, ecx, edx;
+  __builtin_cpu_init ();
+  // Old versions of gcc don't accept "avx512bf16" in __builtin_cpu_supports
+  if (__builtin_cpu_supports("avx512f")
+      && __get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx)
+      && (eax & (1u << 5))) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BF16]) has_avx512bf16=yes, [])
+
+AC_SUBST([has_vpclmulqdq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("vpclmulqdq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_VPCLMULQDQ]) has_vpclmulqdq=yes, [])
+
+AC_SUBST([has_avx512vbmi])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vbmi")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VBMI]) has_avx512vbmi=yes, [])
+
+AC_SUBST([has_avx512vbmi2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vbmi2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VBMI2]) has_avx512vbmi2=yes, [])
+
+AC_SUBST([has_vaes])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+  unsigned int eax, ebx, ecx, edx;
+  __builtin_cpu_init ();
+  // Old versions of gcc don't accept "vaes" in __builtin_cpu_supports
+  if (__builtin_cpu_supports("avx")
+      && __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx)
+      && (ecx & (1u << 9))) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_VAES]) has_vaes=yes, [])
+
+AC_SUBST([has_avx512bitalg])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512bitalg")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BITALG]) has_avx512bitalg=yes, [])
+
+AC_SUBST([has_avx512vpopcntdq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vpopcntdq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VPOPCNTDQ]) has_avx512vpopcntdq=yes, [])
+
+AC_SUBST([has_avx512ifma])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512ifma")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512IFMA]) has_avx512ifma=yes, [])
+
+AC_SUBST([has_gfni])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("gfni")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_GFNI]) has_gfni=yes, [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

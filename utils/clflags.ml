@@ -41,7 +41,7 @@ end)
 
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
 
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
@@ -49,7 +49,7 @@ and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
 
 let cmi_file = ref None
 
-type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
+type profile_column = [ `Time | `Alloc | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
@@ -70,17 +70,31 @@ type gdwarf_fidelity =
   | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
   | Fidelity_unlimited
 
-type visible_include =
+type include_dir =
   { path : string;
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { basename : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ basename; actual_path ] ->
+    Ok { basename; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<basename>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
-and hidden_include_dirs = ref ([] : string list) (* -H *)
+and include_dirs = ref ([] : include_dir list)  (* -I, -Ix *)
+and hidden_include_dirs = ref ([] : include_dir list) (* -H, -Hx *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -158,7 +172,7 @@ and noprompt = ref false                (* -noprompt *)
 and nopromptcont = ref false            (* -nopromptcont *)
 and init_file = ref (None : string option)   (* -init *)
 and noinit = ref false                  (* -noinit *)
-and open_args = ref ([] : open_arg list) (* -open / -open-cmi *)
+and open_args = ref ([] : open_arg list) (* -open / -open-cmi(-x) *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
 and plugin = ref false                  (* -plugin ... *)
@@ -191,7 +205,6 @@ let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
 and dump_tlambda = ref false            (* -dtlambda *)
-and dump_slambda = ref false            (* -dslambda *)
 and dump_matchcomp = ref false          (* -dmatchcomp *)
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
@@ -226,8 +239,21 @@ let ikinds = ref true                   (* -no-ikinds *)
 let ikinds_debug = ref false            (* -ikinds-debug *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
+let all_profile_columns : profile_column list = [ `Time; `Alloc; `Counters ]
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
+let profile_level = ref 0 (* -dprofile-level *)
 let profile_granularity : profile_granularity_level ref = ref File_level (* -dgranularity *)
+
+(* Profiling is on iff [profile_level > 0] iff [profile_columns <> []] *)
+let set_profile_columns columns =
+  profile_columns := columns;
+  if columns = [] then profile_level := 0
+  else if !profile_level = 0 then profile_level := max_int
+
+let set_profile_level level =
+  profile_level := level;
+  if level = 0 then profile_columns := []
+  else if !profile_columns = [] then profile_columns := all_profile_columns
 let profile_output_name : string option ref = ref None (* -dprofile-output *)
 
 let profile_granularity_level_mapping = [
@@ -248,6 +274,17 @@ module Target = struct
     | Bytecode
     | Native
     | Js_of_ocaml
+    | Wasm_of_ocaml
+end
+
+module Jsir_target = struct
+  type t =
+    | Js
+    | Wasm
+
+  let program_name = function
+    | Js -> "js_of_ocaml"
+    | Wasm -> "wasm_of_ocaml"
 end
 
 let target = ref Target.Bytecode
@@ -257,12 +294,95 @@ let set_target t = target := t
 let[@inline] target_is_native () =
   match !target with
   | Native -> true
-  | Bytecode | Js_of_ocaml -> false
+  | Bytecode | Js_of_ocaml | Wasm_of_ocaml -> false
+
+let[@inline] target_is_bytecode () =
+  match !target with
+  | Bytecode -> true
+  | Native | Js_of_ocaml | Wasm_of_ocaml -> false
 
 let[@inline] target_is_jsir () =
   match !target with
-  | Js_of_ocaml -> true
+  | Js_of_ocaml | Wasm_of_ocaml -> true
   | Bytecode | Native -> false
+
+let jsir_target () : Jsir_target.t option =
+  match !target with
+  | Js_of_ocaml -> Some Js
+  | Wasm_of_ocaml -> Some Wasm
+  | Bytecode | Native -> None
+
+let jsir_target_exn () : Jsir_target.t =
+  match jsir_target () with
+  | Some target -> target
+  | None ->
+    Misc.fatal_error
+      "Clflags.jsir_target_exn: the target is not js_of_ocaml or wasm_of_ocaml"
+
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
+
+module Jsoo_effects = struct
+  type t = Disabled | Cps | Double_translation | Jspi | Native
+
+  let all = [Disabled; Cps; Double_translation; Jspi; Native]
+
+  let to_string = function
+    | Disabled -> "disabled"
+    | Cps -> "cps"
+    | Double_translation -> "double-translation"
+    | Jspi -> "jspi"
+    | Native -> "native"
+
+  let of_string s = List.find_opt (fun t -> String.equal (to_string t) s) all
+
+  let supported_by (target : Jsir_target.t) =
+    match target with
+    | Js -> [Disabled; Cps; Double_translation]
+    | Wasm -> [Disabled; Cps; Jspi; Native]
+
+  let default (target : Jsir_target.t) =
+    match target with
+    | Js -> Double_translation
+    | Wasm -> Jspi
+end
+
+let link_jsir = ref false               (* -link-jsir *)
+let jsir_inlined_frames = ref false     (* -jsir-inlined-frames *)
+
+let jsoo_effects_flag = ref (None : Jsoo_effects.t option) (* -jsoo-effects *)
+
+let set_jsoo_effects effects = jsoo_effects_flag := Some effects
+
+let jsoo_effects () =
+  match jsir_target () with
+  | None -> None
+  | Some target ->
+    match !jsoo_effects_flag with
+    | Some effects -> Some effects
+    | None -> Some (Jsoo_effects.default target)
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -308,6 +428,9 @@ let inlining_report = ref false    (* -inlining-report *)
 
 let afl_instrument = ref Config.afl_instrument (* -afl-instrument *)
 let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
+let gated_trace_pc_guard = ref false   (* -gated-trace-pc-guard *)
+let gated_trace_pc_guard_define_gate = ref false
+                                    (* -gated-trace-pc-guard-define-gate *)
 
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
@@ -599,6 +722,8 @@ let set_dumped_pass s enabled =
 let dump_into_file = ref false (* -dump-into-file *)
 let dump_into_csv = ref false (* -dump-into-csv *)
 let dump_dir: string option ref = ref None (* -dump-dir *)
+let enable_action_trace = ref false (* -enable-action-trace *)
+let debug_action_trace = ref false (* -debug-action-trace *)
 
 type 'a env_reader = {
   parse : string -> 'a option;
@@ -746,13 +871,14 @@ module Compiler_pass = struct
      - the manpages in man/ocaml{c,opt}.m
      - the manual manual/src/cmds/unified-options.etex
   *)
-  type t = Parsing | Typing | Lambda | Middle_end
+  type t = Parsing | Typing | Transl | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
          | Register_allocation | Llvmize
 
   let to_string = function
     | Parsing -> "parsing"
     | Typing -> "typing"
+    | Transl -> "transl"
     | Lambda -> "lambda"
     | Middle_end -> "middle_end"
     | Linearization -> "linearization"
@@ -765,6 +891,7 @@ module Compiler_pass = struct
   let of_string = function
     | "parsing" -> Some Parsing
     | "typing" -> Some Typing
+    | "transl" -> Some Transl
     | "lambda" -> Some Lambda
     | "middle_end" -> Some Middle_end
     | "linearization" -> Some Linearization
@@ -778,8 +905,9 @@ module Compiler_pass = struct
   let rank = function
     | Parsing -> 0
     | Typing -> 1
-    | Lambda -> 2
-    | Middle_end -> 3
+    | Transl -> 2
+    | Lambda -> 3
+    | Middle_end -> 4
     | Selection -> 20
     | Llvmize -> 25
     | Register_allocation -> 30
@@ -790,6 +918,7 @@ module Compiler_pass = struct
   let passes = [
     Parsing;
     Typing;
+    Transl;
     Lambda;
     Middle_end;
     Linearization;
@@ -807,7 +936,7 @@ module Compiler_pass = struct
     | Simplify_cfg -> true
     | Selection -> true
     | Register_allocation -> true
-    | Parsing | Typing | Lambda -> false
+    | Parsing | Typing | Transl | Lambda -> false
     | Llvmize -> true
 
   let enabled is_native t = not (is_native_only t) || is_native
@@ -816,13 +945,14 @@ module Compiler_pass = struct
     | Simplify_cfg -> true
     | Selection -> true
     | Register_allocation -> false
-    | Parsing | Typing | Lambda | Middle_end | Emit -> false
+    | Parsing | Typing | Transl | Lambda | Middle_end | Emit -> false
     | Llvmize -> true
 
     let can_save_ir_before = function
     | Register_allocation -> true
     | Linearization | Simplify_cfg | Selection
-    | Parsing | Typing | Lambda | Middle_end | Emit | Llvmize -> false
+    | Parsing | Typing | Transl | Lambda | Middle_end | Emit | Llvmize ->
+      false
 
   let available_pass_names ~filter ~native =
     passes
@@ -840,7 +970,8 @@ module Compiler_pass = struct
     | Selection -> prefix ^ Compiler_ir.(extension Cfg) ^ "-sel"
     | Register_allocation ->  prefix ^ Compiler_ir.(extension Cfg) ^ "-regalloc"
     | Llvmize -> prefix ^ Compiler_ir.(extension Llvmir)
-    | Emit | Parsing | Typing | Lambda | Middle_end -> Misc.fatal_error "Not supported"
+    | Emit | Parsing | Typing | Transl | Lambda | Middle_end ->
+      Misc.fatal_error "Not supported"
 
   let of_input_filename name =
     match Compiler_ir.extract_extension_with_pass name with
@@ -1078,24 +1209,28 @@ let parse_keyword_edition s =
 module String = Misc.Stdlib.String
 
 let arg_spec = ref []
-let arg_names = ref String.Map.empty
+let arg_names = String.Tbl.create 1024
 
 let reset_arguments () =
   arg_spec := [];
-  arg_names := String.Map.empty
+  String.Tbl.reset arg_names
 
 let add_arguments loc args =
-  List.iter (function (arg_name, _, _) as arg ->
-    try
-      let loc2 = String.Map.find arg_name !arg_names in
-      Printf.eprintf
-        "Warning: compiler argument %s is already defined:\n" arg_name;
-      Printf.eprintf "   First definition: %s\n" loc2;
-      Printf.eprintf "   New definition: %s\n" loc;
-    with Not_found ->
-      arg_spec := !arg_spec @ [ arg ];
-      arg_names := String.Map.add arg_name loc !arg_names
-  ) args
+  let added_rev =
+    List.fold_left (fun added_rev ((arg_name, _, _) as arg) ->
+      match String.Tbl.find_opt arg_names arg_name with
+      | Some loc2 ->
+        Printf.eprintf
+          "Warning: compiler argument %s is already defined:\n" arg_name;
+        Printf.eprintf "   First definition: %s\n" loc2;
+        Printf.eprintf "   New definition: %s\n" loc;
+        added_rev
+      | None ->
+        String.Tbl.add arg_names arg_name loc;
+        arg :: added_rev
+    ) [] args
+  in
+  arg_spec := !arg_spec @ List.rev added_rev
 
 let create_usage_msg program =
   Printf.sprintf "Usage: %s <options> <files>\n\

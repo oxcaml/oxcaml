@@ -187,16 +187,16 @@ let print_cmt_infos cmt =
           (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
     printf "Compilation flags:";
     Array.iter print_spaced_string cmt.cmt_args;
+    let print_include_dir (dir : Clflags.include_dir) =
+      if dir.cmx_guaranteed then
+        printf " %s(cmx guaranteed)" dir.path
+      else
+        print_spaced_string dir.path
+    in
     printf "\nLoad path:\n  Visible:";
-    List.iter
-      (fun (dir : Clflags.visible_include) ->
-        if dir.cmx_guaranteed then
-          printf " %s(cmx guaranteed)" dir.path
-        else
-          print_spaced_string dir.path)
-      cmt.cmt_loadpath.visible;
+    List.iter print_include_dir cmt.cmt_loadpath.visible;
     printf "\n  Hidden:";
-    List.iter print_spaced_string cmt.cmt_loadpath.hidden;
+    List.iter print_include_dir cmt.cmt_loadpath.hidden;
     printf "\n";
     printf "cmt interface digest: %s\n"
       (match cmt.cmt_interface_digest with
@@ -376,13 +376,15 @@ let print_cmx_infos (uir, sections, crc) =
       let cmx = Flambda2_cmx.Flambda_cmx_format.from_raw cmx ~sections in
       Format.printf "%a\n%!" (Flambda2_cmx.Flambda_cmx_format.print ~print_typing_env ~print_code ~print_offsets) cmx
   end;
+  if Option.is_some uir.uir_lto_info then
+    printf "Flambda 2 unit with LTO information\n";
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
-    (Format_doc.compat Slambdaeval.CU_data.print)
-    (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
+    (Format_doc.compat Slambda.CU_data.print)
+    (Slambda.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
-    Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
+    Format.printf "%a%!" Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
   end
 
 let print_cmxa_infos (lib : Cmx_format.library_infos) =

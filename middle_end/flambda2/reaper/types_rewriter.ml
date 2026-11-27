@@ -150,7 +150,10 @@ let prepare_rewrite_context result all_sets_of_closures =
    impossible).
 
    - the usages, if provided, correspond to a **subset** of the possible usages
-   computed by the reaper of any possible source for that value. *)
+   **computed by the reaper** of any possible source for that value. In
+   particular, if a possible source has [any_usage], it can be included, even if
+   it is not among the [sources] computed by the reaper of that usage. This is
+   crucial for correctness of [join_metadata] below. *)
 
 type rewrite_metadata =
   | No_source
@@ -702,12 +705,13 @@ module Rewriter = struct
           Function_slot.print current_function_slot
       | Some (source, _) -> source
     in
-    let[@local] for_known_sources sources =
+    let[@local] for_known_sources ~include_any_usage sources =
       let must_be_erased set_of_closures =
         let candidate_source =
           get_source_of_current_function_slot set_of_closures
         in
         Code_id_or_name.Map.mem candidate_source sources
+        || (include_any_usage && PTA.any_usage context.db candidate_source)
       in
       List.filter must_be_erased candidates, Must_be_local
     in
@@ -764,9 +768,14 @@ module Rewriter = struct
         for_any_source_with_usages (Some (Usages s))
       else
         let possible_sources = inter_many usages_sources in
-        for_known_sources possible_sources
+        (* If a source has [any_usage], it is considered to be compatible with
+           [Many_sources_usages (Usages s)], even if it not a source of some
+           values of [s]. If this happens, we must make sure to include it in
+           the result. *)
+        for_known_sources ~include_any_usage:true possible_sources
     | Single_source source ->
-      for_known_sources (Code_id_or_name.Map.singleton source ())
+      for_known_sources ~include_any_usage:false
+        (Code_id_or_name.Map.singleton source ())
 
   let get_set_of_closures_changed_representation context set_of_closures =
     if
@@ -801,13 +810,13 @@ module Rewriter = struct
       in
       List.iter
         (function
-          | UA.Closure_representation (vs, fs, _) ->
+          | UA.Changed_representation.Closure_representation (vs, fs, _) ->
             if vs != value_slots_reprs || fs != function_slots_reprs
             then
               Misc.fatal_errorf
                 "In set of closures, all closures do not have the same \
                  representation changes."
-          | UA.Block_representation _ ->
+          | UA.Changed_representation.Block_representation _ ->
             Misc.fatal_errorf
               "Changed representation of a closure with [Block_representation]")
         changed_representation;
@@ -869,6 +878,14 @@ module Rewriter = struct
         | Known_result
             (current_function_slot, alloc_mode, closures_entry, _function_type)
           ->
+          (* If the original type was nullable, preserve it. CR ncourant: if we
+             were [Single_source], maybe we could erase nullability because we
+             knew the result was never null? *)
+          let maybe_null expr =
+            match Flambda2_types.prove_is_null typing_env flambda_type with
+            | Proved false -> expr
+            | Proved true | Unknown -> Expr.nullable expr
+          in
           let value_slot_types =
             Flambda2_types.Closures_entry.value_slot_types closures_entry
           in
@@ -1142,7 +1159,7 @@ module Rewriter = struct
                   ~at_least_these_function_slots ~at_least_these_closure_types
                   ~at_least_these_value_slots alloc_mode
               in
-              Rule.rewrite (Pattern.closure !all_patterns) expr
+              Rule.rewrite (Pattern.closure !all_patterns) (maybe_null expr)
           end
           else if
             List.compare_length_with local_sets_of_closures 1 > 0
@@ -1247,9 +1264,10 @@ module Rewriter = struct
               Function_slot.Map.find current_function_slot function_slots_reprs
             in
             Rule.rewrite pat
-              (Expr.exactly_this_closure new_function_slot
-                 ~all_function_slots_in_set ~all_closure_types_in_set
-                 ~all_value_slots_in_set alloc_mode)))
+              (maybe_null
+                 (Expr.exactly_this_closure new_function_slot
+                    ~all_function_slots_in_set ~all_closure_types_in_set
+                    ~all_value_slots_in_set alloc_mode))))
 
   let block_slot ?tag:_ (context, t) index _typing_env flambda_type =
     let r =
@@ -1257,13 +1275,17 @@ module Rewriter = struct
       let field = Field.block (Target_ocaml_int.to_int index) field_kind in
       follow_field context t field
     in
-    context, r
+    match r with
+    | At_least_one_source_no_usages -> Or_unknown.Unknown
+    | No_source | Single_source _ | Many_sources_any_usage
+    | Many_sources_usages _ ->
+      Or_unknown.Known (context, r)
 
   let array_slot (context, _t) _index _typing_env _flambda_type =
     (* Array primitives are opaque. Thus, anything put inside the array when it
        was created has been treated as escaping, thus giving a
        [Many_sources_any_usage] context. *)
-    context, Many_sources_any_usage
+    Or_unknown.Known (context, Many_sources_any_usage)
 
   let set_of_closures _t _function_slot _typing_env _closures_entry =
     Misc.fatal_error

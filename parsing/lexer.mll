@@ -50,6 +50,8 @@ let all_keywords =
   let always = None in
   let oxcaml = None in
   [
+    "addr_", ADDR, oxcaml;
+    "addr_imm_", ADDR_IMM, oxcaml;
     "and", AND, always;
     "as", AS, always;
     "assert", ASSERT, v1_6;
@@ -73,12 +75,14 @@ let all_keywords =
     "functor", FUNCTOR, always;
     "global_", GLOBAL, oxcaml;
     "if", IF, always;
+    "implies_", IMPLIES, oxcaml;
     "in", IN, always;
     "include", INCLUDE, always;
     "inherit", INHERIT, v1_0;
     "initializer", INITIALIZER, v1_0;
     "kind_", KIND, oxcaml;
     "kind_of_", KIND_OF, oxcaml;
+    "law_", LAW, oxcaml;
     "layout_", LAYOUT, oxcaml;
     "lazy", LAZY, v1_6;
     "let", LET, always;

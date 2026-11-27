@@ -127,6 +127,9 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
   | Dls_get -> fprintf ppf "dls_get"
   | Tls_get -> fprintf ppf "tls_get"
   | Domain_index -> fprintf ppf "domain_index"
+  | Thread_self_id -> fprintf ppf "thread_self_id"
+  | Trace_pc_guard_gate -> fprintf ppf "trace_pc_guard_gate"
+  | Trace_pc_guard n -> fprintf ppf "trace_pc_guard %d" n
   | Poll -> fprintf ppf "poll call"
   | Pause -> fprintf ppf "pause"
   | Probe_is_enabled { name; enabled_at_init } ->

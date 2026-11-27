@@ -156,7 +156,8 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
   match memory_chunk_of_kind kind with
   | Word_val -> Word_int
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_static_block
+    | Word_code_pointer | Word_out_of_heap_data_pointer | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned
     | Word_mask ) as mem ->
@@ -356,19 +357,39 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, free_vars, env, res, effs
 
-let bound_parameters_aux ~f env l =
-  let flambda_vars = Bound_parameters.vars_and_uids l in
+let bound_parameters_aux ~f ~needed_by_phantom_let env l =
+  let flambda_vars =
+    List.map
+      (fun bp ->
+        let var, debug_uid = Bound_parameter.var_and_uid bp in
+        var, debug_uid, ~needed_by_phantom_let:(needed_by_phantom_let var))
+      (Bound_parameters.to_list l)
+  in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
   let vars =
     List.map2 (fun v v' -> v, f v') cmm_vars (Bound_parameters.to_list l)
   in
   env, vars
 
-let continuation_bound_parameters env l =
-  bound_parameters_aux ~f:param_machtype_of_kinded_parameter env l
+let continuation_bound_parameters env l ~num_occurrences_of_params =
+  let needed_by_phantom_let var =
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_params))
+      var
+  in
+  bound_parameters_aux ~f:param_machtype_of_kinded_parameter
+    ~needed_by_phantom_let env l
 
-let function_bound_parameters env l =
-  bound_parameters_aux ~f:machtype_of_kinded_parameter env l
+let function_bound_parameters env l ~free_names_of_body =
+  let needed_by_phantom_let var =
+    match (free_names_of_body : _ Or_unknown.t) with
+    | Unknown -> false
+    | Known free_names ->
+      Name_occurrences.variable_needed_by_phantom_let free_names var
+  in
+  bound_parameters_aux ~f:machtype_of_kinded_parameter ~needed_by_phantom_let
+    env l
 
 let invalid res ~message =
   let message_sym, res =
@@ -577,3 +598,12 @@ let alloc_mode_for_allocations_to_cmm t =
   | Alloc_mode.For_allocations.Local _ ->
     assert (Flambda_features.stack_allocation_enabled ());
     Cmm.Alloc_mode.Local
+
+let fail_if_apply_with_probe apply =
+  match Flambda.Apply.probe apply with
+  | None -> ()
+  | Some _ ->
+    Misc.fatal_errorf
+      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
+       always be direct applications of an OCaml function:@ %a"
+      Flambda.Apply.print apply

@@ -13,6 +13,7 @@
 (cram
  (enabled_if false)
  (applies_to
+  enclosing-and-let-ppx
   expand_node
   issue1647-cache-invalidation
   issue1660-deriving-compare

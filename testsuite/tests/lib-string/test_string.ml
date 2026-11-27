@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 open Printf
 
 let rec build_string f n accu =

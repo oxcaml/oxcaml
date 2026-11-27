@@ -111,7 +111,7 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
     not
       (!Clflags.debug
       && ((not !Clflags.restrict_to_upstream_dwarf)
-         || !Dwarf_flags.dwarf_inlined_frames))
+         || Dwarf_flags.emit_dwarf_inlined_frames ()))
   then { fun_end_label; fundecl }
   else
     let available_ranges_vars, fundecl =

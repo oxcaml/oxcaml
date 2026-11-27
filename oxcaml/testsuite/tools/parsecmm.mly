@@ -74,6 +74,9 @@ let access_array base numelt size =
 %token BYTE
 %token CASE
 %token CATCH
+%token STATIC_BLOCK
+%token CODE_POINTER
+%token OUT_OF_HEAP_DATA_POINTER
 %token COLON
 %token DATA
 %token DIVF
@@ -191,8 +194,8 @@ fundecl:
          fun_ret_type = Cmm.typ_val } }
 ;
 fun_name:
-    STRING              { Cmm.global_symbol $1 }
-  | IDENT               { Cmm.global_symbol $1 }
+    STRING              { Cmm.global_symbol ~ty:typ_code_pointer $1 }
+  | IDENT               { Cmm.global_symbol ~ty:typ_code_pointer $1 }
 params:
     oneparam params     { $1 :: $2 }
   | /**/                { [] }
@@ -208,6 +211,9 @@ component:
     VAL                         { Val }
   | ADDR                        { Addr }
   | INT                         { Int }
+  | STATIC_BLOCK                { Static_block }
+  | CODE_POINTER                { Code_pointer }
+  | OUT_OF_HEAP_DATA_POINTER    { Out_of_heap_data_pointer }
   | FLOAT                       { Float }
 ;
 componentlist:
@@ -220,7 +226,11 @@ traps:
 expr:
     INTCONST    { Cconst_int ($1, debuginfo ()) }
   | FLOATCONST  { Cconst_float (float_of_string $1, debuginfo ()) }
-  | STRING      { Cconst_symbol (Cmm.global_symbol $1, debuginfo ()) }
+  | STRING      { Cconst_symbol
+                    (Cmm.global_symbol ~ty:typ_out_of_heap_data_pointer $1,
+                     debuginfo ()) }
+  | STRING COLON machtype
+                { Cconst_symbol (Cmm.global_symbol ~ty:$3 $1, debuginfo ()) }
   | IDENT       { Cvar(find_ident $1) }
   | LBRACKET RBRACKET { Ctuple [] }
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }
@@ -229,7 +239,8 @@ expr:
                         result_type = $6;
                         region = Lambda.Rc_normal;
                         callees = None;
-                        known_arguments = []
+                        known_arguments = [];
+                        returns = true
                       },
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
   | LPAREN EXTCALL STRING exprlist machtype RPAREN
@@ -379,6 +390,9 @@ chunk:
   | UNSIGNED INT32              { Thirtytwo_unsigned }
   | SIGNED INT32                { Thirtytwo_signed }
   | INT                         { Word_int }
+  | STATIC_BLOCK                { Word_static_block }
+  | CODE_POINTER                { Word_code_pointer }
+  | OUT_OF_HEAP_DATA_POINTER    { Word_out_of_heap_data_pointer }
   | ADDR                        { Word_val }
   | FLOAT32                     { Single { reg = Float64 } }
   | FLOAT64                     { Double }
@@ -463,13 +477,19 @@ datalist:
   | /**/                        { [] }
 ;
 dataitem:
-    STRING COLON                { Cdefine_symbol (Cmm.global_symbol $1) }
+    STRING COLON                { Cdefine_symbol
+                                    (Cmm.global_symbol
+                                       ~ty:typ_out_of_heap_data_pointer $1) }
   | BYTE INTCONST               { Cint8 $2 }
   | HALF INTCONST               { Cint16 $2 }
   | INT INTCONST                { Cint(Nativeint.of_int $2) }
   | FLOAT FLOATCONST            { Cdouble (float_of_string $2) }
-  | ADDR STRING                 { Csymbol_address (Cmm.global_symbol $2) }
-  | VAL STRING                 { Csymbol_address (Cmm.global_symbol $2) }
+  | ADDR STRING                 { Csymbol_address
+                                    (Cmm.global_symbol
+                                       ~ty:typ_out_of_heap_data_pointer $2) }
+  | VAL STRING                  { Csymbol_address
+                                    (Cmm.global_symbol
+                                       ~ty:typ_out_of_heap_data_pointer $2) }
   | KSTRING STRING              { Cstring $2 }
   | SKIP INTCONST               { Cskip $2 }
   | ALIGN INTCONST              { Calign $2 }

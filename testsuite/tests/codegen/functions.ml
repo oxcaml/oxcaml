@@ -150,3 +150,67 @@ just_one_allocation:
   addq  $8, %rsp
   ret
 |}]
+
+
+let catch_exit =
+  let[@inline never] exit () = raise Exit in
+  fun () -> try exit () with _ -> ()
+[%%expect_asm X86_64{|
+catch_exit.exit:
+  subq  $8, %rsp
+  movq  camlStdlib__Exit1460_42@GOTPCREL(%rip), %rax
+  call  caml_reraise_exn@PLT
+.L0:
+
+catch_exit.(fun):
+  subq  $8, %rsp
+  movq  64(%r14), %rax
+  movq  %rax, (%rsp)
+.L0:
+  leaq  <hidden PC-relative offset>(%rip), %r11
+  pushq %r11
+  pushq 48(%r14)
+  movq  %rsp, 48(%r14)
+  movl  $1, %eax
+  call  camlTOP7__exit_11_24_code@PLT
+.L1:
+.L2:
+  movq  (%rsp), %rax
+  movq  %rax, 64(%r14)
+  movl  $1, %eax
+  addq  $8, %rsp
+  ret
+|}]
+
+let nontail_exit =
+  let[@inline never] exit () = raise Exit in
+  fun () -> exit () [@nontail]
+[%%expect_asm X86_64{|
+nontail_exit.exit:
+  subq  $8, %rsp
+  movq  camlStdlib__Exit1460_42@GOTPCREL(%rip), %rax
+  call  caml_reraise_exn@PLT
+.L0:
+
+nontail_exit.(fun):
+  subq  $8, %rsp
+  movl  $1, %eax
+  call  camlTOP8__exit_13_28_code@PLT
+.L0:
+|}]
+
+type p = #(int * int * int * int * int)
+type q = #(p * p * p * p * p)
+
+let tailcall_nonreturning_large_result =
+  let[@inline never] rec loop () : #(q * q * q) = loop () in
+  fun () -> loop ()
+[%%expect_asm X86_64{|
+tailcall_nonreturning_large_result.loop:
+.L0:
+  jmp   .L0
+
+tailcall_nonreturning_large_result.(fun):
+  movl  $1, %eax
+  jmp   camlTOP11__loop_15_32_code@PLT
+|}]

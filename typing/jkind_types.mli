@@ -93,9 +93,9 @@ module Sort : sig
   val instance_with :
     new_var:(unit -> var) -> var list -> (unit -> 'a) -> var list * 'a
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
 
-  val constrain_addressable : allow_mutation:bool -> t -> bool
+  val constrain_addressable : allow_mutation:bool -> t -> (unit, error) result
 
   val strip_head_addressable : t -> t
 
@@ -113,7 +113,7 @@ module Sort : sig
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
-  val decompose_into_product : t -> int -> t list option
+  val decompose_into_product : t -> int -> (t list, error) result
 
   module Flat : sig
     type t =
@@ -208,9 +208,15 @@ module Layout : sig
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
+
+      (** The layout of arrows, tuples, objects and first-class modules. *)
+      val scannable_non_null_non_float : t
     end
 
     val equal : t -> t -> bool
+
+    (** Unlike [Jkind.Layout.sub], this never mutates anything. *)
+    val less_or_equal : t -> t -> Misc.Le_result.t
 
     val max : t
 

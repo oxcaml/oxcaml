@@ -71,6 +71,7 @@ module IR = struct
       exn_continuation : exn_continuation;
       loc : Lambda.scoped_location;
       region_close : Lambda.region_close;
+      yielding : Lambda.yielding_kind;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
       mode : Lambda.return_mode;
@@ -802,6 +803,7 @@ module Function_decls = struct
         free_idents_of_body : Ident.Set.t;
         attr : Lambda.function_attribute;
         loc : Lambda.scoped_location;
+        fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
         recursive : Recursive.t;
         closure_alloc_mode : Lambda.locality_mode;
         first_complex_local_param : int;
@@ -812,7 +814,7 @@ module Function_decls = struct
         ~params_arity ~removed_params ~return ~calling_convention
         ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
         ~my_ghost_region ~body ~(attr : Lambda.function_attribute) ~loc
-        ~free_idents_of_body recursive ~closure_alloc_mode
+        ~fdo_entry_annotation ~free_idents_of_body recursive ~closure_alloc_mode
         ~first_complex_local_param ~result_mode =
       let let_rec_ident =
         match let_rec_ident with
@@ -849,6 +851,7 @@ module Function_decls = struct
         free_idents_of_body;
         attr;
         loc;
+        fdo_entry_annotation;
         recursive;
         closure_alloc_mode;
         first_complex_local_param;
@@ -908,6 +911,8 @@ module Function_decls = struct
     let stub t = t.attr.stub
 
     let loc t = t.loc
+
+    let fdo_entry_annotation t = t.fdo_entry_annotation
 
     let recursive t = t.recursive
 
@@ -1179,14 +1184,17 @@ module Let_cont_with_acc = struct
     acc, expr
 
   let create_recursive acc ~invariant_params handlers ~body
-      ~cost_metrics_of_handlers =
+      ~free_names_of_handlers ~cost_metrics_of_handlers =
     let acc =
       Acc.increment_metrics
         (Cost_metrics.increase_due_to_let_cont_recursive
            ~cost_metrics_of_handlers)
         acc
     in
-    let expr = Let_cont.create_recursive ~invariant_params handlers ~body in
+    let expr =
+      Let_cont.create_recursive ~invariant_params handlers ~body
+        ~free_names_of_handlers:(Known free_names_of_handlers)
+    in
     let acc =
       Continuation.Lmap.fold
         (fun cont _ acc -> Acc.remove_continuation_from_free_names cont acc)
@@ -1220,7 +1228,7 @@ module Let_cont_with_acc = struct
         acc
     in
     create_recursive acc ~invariant_params handlers ~body
-      ~cost_metrics_of_handlers
+      ~free_names_of_handlers:handlers_free_names ~cost_metrics_of_handlers
 
   let build_non_recursive acc cont ~handler_params ~handler ~body
       ~is_exn_handler ~is_cold =

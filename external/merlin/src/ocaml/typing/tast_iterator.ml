@@ -325,7 +325,7 @@ let pat
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
-  | Tpat_lazy p -> sub.pat sub p
+  | Tpat_addr (_, _, p) | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
   | Tpat_or (p1, p2, _) ->
@@ -636,7 +636,7 @@ let open_declaration sub {open_loc; open_expr; open_env; open_attributes; _} =
 
 let module_coercion sub = function
   | Tcoerce_none -> ()
-  | Tcoerce_functor (c1,c2,_) ->
+  | Tcoerce_functor (c1,c2,_,_) ->
       sub.module_coercion sub c1;
       sub.module_coercion sub c2
   | Tcoerce_alias (env, _, c1) ->

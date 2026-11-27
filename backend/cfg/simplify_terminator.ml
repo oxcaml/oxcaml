@@ -89,6 +89,13 @@ type known_value =
   | Const_float32 of int32
   | Const_float of int64
 
+let eval_unary_int_op op (x : nativeint) : nativeint option =
+  match (op : Operation.integer_operation) with
+  | Inot -> Some (Nativeint.lognot x)
+  | Iadd | Isub | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Imul | Imulh _
+  | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ ->
+    None
+
 let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   let is_valid_shift =
     Nativeint.compare right 0n >= 0
@@ -116,7 +123,8 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      in the future; care is needed as some may clobber registers beyond
      [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
      writing only to the destination). *)
-  | Imul | Imulh _ | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ -> None
+  | Imul | Imulh _ | Idiv _ | Imod _ | Inot | Iclz | Ictz | Ipopcnt | Icomp _ ->
+    None
 
 let eval_float_op op (left : float) (right : float option) : float option =
   match (op : Operation.float_operation) with
@@ -221,9 +229,12 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         let result_opt =
           match find_opt instr.arg.(0) with
           | Some (Const_int left) -> (
-            match right_opt with
-            | Some right -> eval_int_op op left right
-            | None -> None)
+            if Operation.is_unary_integer_operation op
+            then eval_unary_int_op op left
+            else
+              match right_opt with
+              | Some right -> eval_int_op op left right
+              | None -> None)
           | Some (Const_float32 _ | Const_float _) | None -> None
         in
         (match result_opt with
@@ -296,8 +307,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index )
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Trace_pc_guard_gate
+          | Trace_pc_guard _ | Alloc _ | Tls_get | Domain_index | Thread_self_id
+            )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
@@ -430,7 +442,8 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     Misc.fatal_error
       "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+    ->
     None
 
 let block_known_values (cfg : Cfg.t) (block : C.basic_block)
@@ -525,7 +538,8 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+          | Tailcall_func _ | Call_no_return _ | External_call_no_return _
+          | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -553,7 +567,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

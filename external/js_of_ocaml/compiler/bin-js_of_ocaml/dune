@@ -5,7 +5,7 @@
  (libraries
   jsoo_cmdline
   js_of_ocaml-compiler
-  cmdliner
+  oxcaml_private_cmdliner
   compiler-libs.common
   js_of_ocaml-compiler.runtime-files
   (select
@@ -18,7 +18,7 @@
   byte
   (best exe))
  (flags
-  (:standard -safe-string)))
+  (:standard -safe-string -open Oxcaml_private_cmdliner)))
 
 ;; Generate and install runtime.js for compatibility reasons
 

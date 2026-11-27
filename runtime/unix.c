@@ -444,7 +444,12 @@ uint64_t caml_time_counter(void)
 #endif
 }
 
-
+double caml_gettimeofday(void)
+{
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  return ((double) tp.tv_sec + (double) tp.tv_usec / USEC_PER_SEC);
+}
 
 int caml_num_rows_fd(int fd)
 {

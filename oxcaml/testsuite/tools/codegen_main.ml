@@ -77,8 +77,8 @@ let main() =
      "-dcmm", Arg.Set dump_cmm, "";
      "-dcse", Arg.Set dump_cse, "";
      "-dlinear", Arg.Set dump_linear, "";
-     "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";
-     "-dcounters", Arg.Unit (fun () -> profile_columns := [ `Counters ]), "";
+     "-dtimings", Arg.Unit (fun () -> set_profile_columns [ `Time ]), "";
+     "-dcounters", Arg.Unit (fun () -> set_profile_columns [ `Counters ]), "";
      ( "-dgranularity",
         Arg.Symbol
           (Clflags.all_profile_granularity_levels, Clflags.set_profile_granularity),

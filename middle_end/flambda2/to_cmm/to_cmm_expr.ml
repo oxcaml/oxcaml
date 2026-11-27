@@ -17,7 +17,6 @@
 open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
-module K = Flambda_kind
 
 module C = struct
   include Cmm_helpers
@@ -34,10 +33,10 @@ end
 (* Bind a Cmm variable to the result of translating a [Simple] into Cmm. *)
 
 let bind_var_to_simple ~dbg_with_inlined:dbg env res v
-    ~num_normal_occurrences_of_bound_vars s =
+    ~num_occurrences_of_bound_vars s =
   match Simple.must_be_var s with
   | Some (alias_of, _coercion) ->
-    Env.add_alias env res ~var:v ~num_normal_occurrences_of_bound_vars ~alias_of
+    Env.add_alias env res ~var:v ~num_occurrences_of_bound_vars ~alias_of
   | None ->
     let To_cmm_env.
           { env;
@@ -53,7 +52,7 @@ let bind_var_to_simple ~dbg_with_inlined:dbg env res v
     let env, res =
       Env.bind_variable env res v ~effects_and_coeffects_of_defining_expr
         ~defining_expr ~free_vars_of_defining_expr
-        ~num_normal_occurrences_of_bound_vars
+        ~num_occurrences_of_bound_vars
     in
     env, res
 
@@ -73,159 +72,6 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
     Location.prerr_warning
       (Debuginfo.to_location dbg_with_inlined)
       (Warnings.Inlining_impossible reason)
-
-let fail_if_probe apply =
-  match Apply.probe apply with
-  | None -> ()
-  | Some _ ->
-    Misc.fatal_errorf
-      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
-       always be direct applications of an OCaml function:@ %a"
-      Apply.print apply
-
-let translate_external_call env res ~free_vars apply ~callee_simple ~args
-    ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-    ~coeffects =
-  fail_if_probe apply;
-  let callee =
-    match callee_simple with
-    | None ->
-      Misc.fatal_errorf
-        "Application expression did not provide callee for C call:@ %a"
-        Apply.print apply
-    | Some callee_simple -> (
-      match Simple.must_be_symbol callee_simple with
-      | Some (sym, _) -> (To_cmm_result.symbol res sym).sym_name
-      | None ->
-        Misc.fatal_errorf "Expected a function symbol instead of:@ %a"
-          Simple.print callee_simple)
-  in
-  let returns = Apply.returns apply in
-  let return_ty = C.Extended_machtype.to_machtype return_ty in
-  let component_tys =
-    (* Two notes:
-
-       1. void has been erased in return arities by this point
-
-       2. All of the [machtype_component]s are singleton arrays. *)
-    Array.map (fun machtype -> [| machtype |]) return_ty
-  in
-  let ty_args =
-    List.map C.exttype_of_kind
-      (Flambda_arity.unarize (Apply.args_arity apply)
-      |> List.map K.With_subkind.kind)
-  in
-  let effects = To_cmm_effects.transl_c_call_effects effects in
-  let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
-  let { extcall; builtin_sign_extends } : Cmm_builtins.t =
-    C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
-      ~returns ~ty_args callee return_ty args
-  in
-  (* Returned small integer values need to be sign-extended because it's not
-     clear whether C code that returns a small integer returns one that is sign
-     extended or not. There is no need to wrap other return arities. *)
-  let maybe_sign_extend kind dbg cmm =
-    if builtin_sign_extends
-    then cmm
-    else
-      match Flambda_kind.With_subkind.kind kind with
-      | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
-      | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
-      | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
-      | Naked_number
-          ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask
-          | Naked_float32 )
-      | Value | Rec_info | Region ->
-        cmm
-  in
-  let wrap return_values =
-    let kinds = Flambda_arity.unarize return_arity in
-    (* As per the comment above, [return_arity] does not mention void
-       components. (Unlike parameter arities; see the phantom type parameters on
-       the arity fields in [Apply_expr.t], for example.) *)
-    assert (List.compare_length_with kinds (Array.length component_tys) = 0);
-    match kinds with
-    | [] ->
-      (* CR mshinwell: this statement would seem to be wrong if we permit void
-         returns from extcalls *)
-      (* Extcalls of arity 0 are allowed (these never return). *)
-      return_values
-    | [kind] -> maybe_sign_extend kind dbg return_values
-    | [_; _] as kinds ->
-      (* CR xclerc: we currently support only pairs as unboxed return values. *)
-      (* CR mshinwell: we also currently only support 64 bit integer and float
-         values (in addition to things of kind [Value] which count as 64-bit
-         integers for this purpose), since on (at least) x86-64 the calling
-         convention differs for smaller widths. *)
-      List.iter
-        (fun kind ->
-          match Flambda_kind.With_subkind.kind kind with
-          | Value
-          | Naked_number
-              (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
-            ()
-          | Naked_number (Naked_float32 | Naked_vec128) -> (
-            match Target_system.architecture () with
-            | AArch64 -> ()
-            | X86_64 ->
-              Misc.fatal_errorf
-                "Cannot compile unboxed product return from external C call \
-                 with a component of kind %a"
-                Flambda_kind.With_subkind.print kind
-            | IA32 | ARM | POWER | Z | Riscv ->
-              Misc.fatal_error "Only x86-64 and arm64 are supported")
-          | Naked_number
-              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
-              | Naked_vec512 | Naked_mask )
-          | Region | Rec_info ->
-            Misc.fatal_errorf
-              "Cannot compile unboxed product return from external C call with \
-               a component of kind %a"
-              Flambda_kind.With_subkind.print kind)
-        kinds;
-      (* CR mshinwell: Digest page 35 of this doc:
-
-         https://github.com/ARM-software/abi-aa/releases/download/2024Q3/aapcs64.pdf
-
-         and figure out what happens for mixed int/float struct returns (it
-         looks like the floats may be returned in int regs)
-
-         jvanburen: that seems to be what clang does:
-         https://godbolt.org/z/snzEoME9h *)
-      (match Target_system.architecture () with
-      | X86_64 -> ()
-      | AArch64 ->
-        let kinds = Flambda_kind.With_subkind.Set.of_list kinds in
-        if Flambda_kind.With_subkind.Set.cardinal kinds <> 1
-        then
-          Misc.fatal_errorf
-            "Cannot compile unboxed product return from external C call on \
-             arm64 unless the components of the product are of the same kind:@ \
-             %a"
-            Apply.print apply
-      | IA32 | ARM | POWER | Z | Riscv ->
-        Misc.fatal_error "Only x86-64 and arm64 are supported");
-      let get_unarized_return_value exp n =
-        C.tuple_field exp ~component_tys n dbg
-      in
-      C.make_tuple
-        (List.mapi
-           (fun i kind ->
-             maybe_sign_extend kind dbg
-               (get_unarized_return_value return_values i))
-           kinds)
-    | _ ->
-      Misc.fatal_errorf
-        "C functions are currently limited to a single return value or a pair \
-         of return values"
-  in
-  let extcall_ident = Ident.create_local "extcall" in
-  let extcall_var = Backend_var.With_provenance.create extcall_ident in
-  let cmm =
-    C.letin extcall_var ~defining_expr:extcall ~body:(wrap (Cvar extcall_ident))
-  in
-  cmm, free_vars, env, res, Ece.all
 
 let check_known_argument env res : Simple.t -> Cmm.callee option =
   Simple.pattern_match
@@ -298,6 +144,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     check_known_argument env res
     |> Option.bind callee_simple |> Option.map List.singleton
   in
+  let returns = Apply.returns apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -334,7 +181,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg
+      ( C.direct_call ~dbg ~returns
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym arguments,
         free_vars,
@@ -350,7 +197,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all ))
   | Function { function_call = Indirect_unknown_arity } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
@@ -359,7 +206,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg ~returns return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()) ~callees:arguments_possibly_being_called,
       free_vars,
@@ -367,7 +214,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       res,
       Ece.all )
   | Function { function_call = Indirect_known_arity callees } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
@@ -395,17 +242,24 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg ~returns return_ty pos callee ~callees args_ty
+          args,
         free_vars,
         env,
         res,
         Ece.all )
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
-    translate_external_call env res ~free_vars apply ~callee_simple ~args
-      ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-      ~coeffects
+  | C_call
+      { needs_caml_c_call;
+        is_c_builtin;
+        effects;
+        coeffects;
+        fat_ptr_arg_starts
+      } ->
+    To_cmm_extcall.translate_external_call env res ~free_vars apply
+      ~callee_simple ~args ~return_arity ~return_ty dbg ~needs_caml_c_call
+      ~is_c_builtin ~effects ~coeffects ~fat_ptr_arg_starts
   | Method { kind; obj } ->
-    fail_if_probe apply;
+    C.fail_if_apply_with_probe apply;
     let callee =
       match callee with
       | Some callee -> callee
@@ -427,7 +281,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
-        dbg,
+        ~returns dbg,
       free_vars,
       env,
       res,
@@ -441,7 +295,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       let { env; res; expr = { cmm = eff; free_vars; effs = _ } } =
         simple env res eff
       in
-      C.perform ~dbg eff, free_vars, env, res, Ece.all
+      C.perform ~dbg ~returns eff, free_vars, env, res, Ece.all
     | Reperform { eff; cont; last_fiber } ->
       let { env; res; expr = { cmm = eff; free_vars = fv0; effs = _ } } =
         simple env res eff
@@ -453,7 +307,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res last_fiber
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.reperform ~dbg ~eff ~cont ~last_fiber, free_vars, env, res, Ece.all
+      ( C.reperform ~dbg ~returns ~eff ~cont ~last_fiber,
+        free_vars,
+        env,
+        res,
+        Ece.all )
     | With_stack { valuec; exnc; effc; f; arg } ->
       let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
         simple env res valuec
@@ -475,7 +333,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           (BV.Set.union fv0 (BV.Set.union fv1 fv2))
           (BV.Set.union fv3 fv4)
       in
-      ( C.with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg,
+      ( C.with_stack ~dbg ~returns ~valuec ~exnc ~effc ~f ~arg,
         free_vars,
         env,
         res,
@@ -505,7 +363,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           (BV.Set.union fv0 (BV.Set.union fv1 fv2))
           (BV.Set.union fv3 (BV.Set.union fv4 fv5))
       in
-      ( C.with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg,
+      ( C.with_stack_preemptible ~dbg ~returns ~valuec ~exnc ~effc ~handle_tick
+          ~f ~arg,
         free_vars,
         env,
         res,
@@ -518,7 +377,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res value
       in
       let free_vars = BV.Set.union fv0 fv1 in
-      C.continue ~dbg ~cont ~value, free_vars, env, res, Ece.all
+      C.continue ~dbg ~returns ~cont ~value, free_vars, env, res, Ece.all
     | Discontinue { cont; exn } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont
@@ -527,7 +386,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res exn
       in
       let free_vars = BV.Set.union fv0 fv1 in
-      C.discontinue ~dbg ~cont ~exn, free_vars, env, res, Ece.all
+      C.discontinue ~dbg ~returns ~cont ~exn, free_vars, env, res, Ece.all
     | Discontinue_with_backtrace { cont; exn; bt } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont
@@ -539,7 +398,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res bt
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      ( C.discontinue_with_backtrace ~dbg ~cont ~exn ~bt,
+      ( C.discontinue_with_backtrace ~dbg ~returns ~cont ~exn ~bt,
         free_vars,
         env,
         res,
@@ -742,15 +601,22 @@ let rec expr env res e :
   | Switch e' -> switch env res e'
   | Invalid { message } -> invalid env res ~message
 
-and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
+and let_prim env res ~num_occurrences_of_bound_vars v p dbg body =
   let dbg = Env.add_inlined_debuginfo env dbg in
   let effects_and_coeffects_of_prim =
     Flambda_primitive.effects_and_coeffects p
   in
   let inline =
     To_cmm_effects.classify_let_binding (Bound_var.var v)
-      ~num_normal_occurrences_of_bound_vars
+      ~num_occurrences_of_bound_vars
       ~effects_and_coeffects_of_defining_expr:effects_and_coeffects_of_prim
+  in
+  let needed_by_phantom_let =
+    let var = Bound_var.var v in
+    Num_occurrences.By_name_mode.needed_by_phantom_let
+      (Option.value ~default:Num_occurrences.By_name_mode.zero
+         (Variable.Map.find_opt var num_occurrences_of_bound_vars))
+      var
   in
   let simple_case (inline : Env.simple Env.inline) =
     let defining_expr, extra, env, res, args_effs =
@@ -761,7 +627,8 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
     in
     let env, res =
       Env.bind_variable_to_primitive ?extra env res v ~inline
-        ~effects_and_coeffects_of_defining_expr ~defining_expr
+        ~needed_by_phantom_let ~effects_and_coeffects_of_defining_expr
+        ~defining_expr
     in
     expr env res body
   in
@@ -773,7 +640,7 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
       Ece.join args_effs effects_and_coeffects_of_prim
     in
     let env, res =
-      Env.bind_variable_to_primitive env res v ~inline
+      Env.bind_variable_to_primitive env res v ~inline ~needed_by_phantom_let
         ~effects_and_coeffects_of_defining_expr ~defining_expr
     in
     expr env res body
@@ -787,7 +654,7 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
   | Must_inline_and_duplicate -> complex_case Must_inline_and_duplicate
 
 and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
-    ~num_normal_occurrences_of_bound_vars ~body =
+    ~num_occurrences_of_bound_vars ~body =
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton v, Simple s ->
     (* CR mshinwell: Try to get a proper [dbg] here (although the majority of
@@ -797,7 +664,7 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     let dbg_with_inlined = Debuginfo.none in
     let env, res =
       bind_var_to_simple ~dbg_with_inlined env res v
-        ~num_normal_occurrences_of_bound_vars s
+        ~num_occurrences_of_bound_vars s
     in
     expr env res body
   | Singleton _, Prim (p, _)
@@ -822,15 +689,15 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       Env.flush_delayed_lets ~mode:Flush_everything env res
     in
     let cmm, free_vars, symbol_inits, res =
-      let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
+      let_prim env res ~num_occurrences_of_bound_vars v p dbg body
     in
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
-    let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
+    let_prim env res ~num_occurrences_of_bound_vars v p dbg body
   | Set_of_closures bound_vars, Set_of_closures (soc, alloc_mode) ->
     To_cmm_set_of_closures.let_dynamic_set_of_closures env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
+      ~num_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
   | Static bound_static, Static_consts consts -> (
     let env, res, update_opt =
       To_cmm_static.static_consts env res
@@ -859,11 +726,11 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
 
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
-    ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
+    ~f:(fun bound_pattern ~num_occurrences_of_bound_vars ~body ->
       match Bound_pattern.name_mode bound_pattern with
       | Normal ->
-        let_expr0 env res let_expr bound_pattern
-          ~num_normal_occurrences_of_bound_vars ~body
+        let_expr0 env res let_expr bound_pattern ~num_occurrences_of_bound_vars
+          ~body
       | Phantom -> expr env res body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
@@ -886,23 +753,25 @@ and let_cont env res (let_cont : Flambda.Let_cont.t) =
         | May_inline -> let_cont_inlined env res k handler body
         | Regular -> let_cont_not_inlined env res k handler body)
   | Recursive handlers ->
-    Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params ~body conts ->
+    Recursive_let_cont_handlers.pattern_match' handlers
+      ~f:(fun
+          ~invariant_params ~num_occurrences_of_invariant_params ~body conts ->
         if Continuation_handlers.contains_exn_handler conts
         then
           Misc.fatal_errorf
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print let_cont;
-        let_cont_rec env res invariant_params conts body)
+        let_cont_rec env res invariant_params
+          ~num_occurrences_of_invariant_params conts body)
 
 (* The bound continuation [k] will be inlined. *)
 and let_cont_inlined env res k handler body =
   Continuation_handler.pattern_match' handler
-    ~f:(fun handler_params ~num_normal_occurrences_of_params ~handler ->
+    ~f:(fun handler_params ~num_occurrences_of_params ~handler ->
       let env =
         Env.add_inline_cont env k ~handler_params
-          ~handler_params_occurrences:num_normal_occurrences_of_params
+          ~handler_params_occurrences:num_occurrences_of_params
           ~handler_body:handler
       in
       expr env res body)
@@ -997,7 +866,8 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
     symbol_inits,
     res )
 
-and let_cont_rec env res invariant_params conts body =
+and let_cont_rec env res invariant_params ~num_occurrences_of_invariant_params
+    conts body =
   (* Flush the env now to avoid inlining something inside of a recursive
      continuation (aka a loop), as it would increase the number of times the
      computation is performed (even if there is only one syntactic
@@ -1012,7 +882,7 @@ and let_cont_rec env res invariant_params conts body =
       (fun k handler acc ->
         let continuation_arg_tys =
           Continuation_handler.pattern_match' handler
-            ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler:_ ->
+            ~f:(fun params ~num_occurrences_of_params:_ ~handler:_ ->
               List.map C.param_machtype_of_kinded_parameter
                 (Bound_parameters.to_list
                    (Bound_parameters.append invariant_params params)))
@@ -1023,6 +893,7 @@ and let_cont_rec env res invariant_params conts body =
   (* Generate variables for the invariant params *)
   let env, invariant_vars =
     C.continuation_bound_parameters env invariant_params
+      ~num_occurrences_of_params:num_occurrences_of_invariant_params
   in
   (* Translate each continuation handler *)
   let conts_to_handlers, res =
@@ -1069,9 +940,11 @@ and let_cont_rec env res invariant_params conts body =
 
 and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
-    ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
+    ~f:(fun params ~num_occurrences_of_params ~handler ->
       let arity = Bound_parameters.arity params in
-      let env, vars = C.continuation_bound_parameters env params in
+      let env, vars =
+        C.continuation_bound_parameters env params ~num_occurrences_of_params
+      in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
       in
@@ -1157,7 +1030,7 @@ and apply_expr env res apply =
           Env.bind_variable env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
             ~free_vars_of_defining_expr:free_vars
-            ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
+            ~num_occurrences_of_bound_vars:handler_params_occurrences
         in
         let env =
           Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
@@ -1172,7 +1045,17 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map
+               (fun bp ->
+                 let var, debug_uid = Bound_parameter.var_and_uid bp in
+                 let needed_by_phantom_let =
+                   Num_occurrences.By_name_mode.needed_by_phantom_let
+                     (Option.value ~default:Num_occurrences.By_name_mode.zero
+                        (Variable.Map.find_opt var handler_params_occurrences))
+                     var
+                 in
+                 var, debug_uid, ~needed_by_phantom_let)
+               params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
@@ -1254,8 +1137,7 @@ and apply_cont env res apply_cont =
                   Bound_var.create param_var param_uid Name_mode.normal
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
-                  ~num_normal_occurrences_of_bound_vars:
-                    handler_params_occurrences arg)
+                  ~num_occurrences_of_bound_vars:handler_params_occurrences arg)
             (env, res) handler_params args
         in
         let env =
@@ -1331,11 +1213,31 @@ and switch env res switch =
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
+    (* The debuginfo of an arm is that of the code of its [Apply_cont]. There is
+       no such code when the handler is substituted for the [Apply_cont]: the
+       arm is then the code of the handler, which has its own debuginfo (and
+       maybe a different stack of inlined frames). *)
+    let arm_dbg =
+      let k = Apply_cont.continuation action in
+      let handler_is_inlined =
+        (not (Env.is_exn_handler env k))
+        &&
+        match Env.get_continuation env k with
+        | Inline _ -> true
+        | Return _ | Jump _ -> false
+      in
+      let action_dbg = Apply_cont.debuginfo action in
+      if handler_is_inlined
+      then Debuginfo.none
+      else if Debuginfo.is_none action_dbg
+      then dbg
+      else Env.add_inlined_debuginfo env action_dbg
+    in
     ( ( d,
         cmm_action,
         action_free_vars,
         action_symbol_inits,
-        Env.add_inlined_debuginfo env (Apply_cont.debuginfo action),
+        arm_dbg,
         Switch_arm.annotations arm ),
       res )
   in
@@ -1409,7 +1311,7 @@ and switch env res switch =
                   cmm_action,
                   action_free_vars,
                   action_symbol_inits,
-                  _dbg,
+                  arm_dbg,
                   annotations ),
                 res ) =
             make_arm ~must_tag_discriminant env res (discriminant, action)
@@ -1426,7 +1328,7 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- Some (cmm_action, annotations);
+          cases.(i) <- Some (cmm_action, arm_dbg, annotations);
           index.(d) <- i;
           i + 1, res, free_vars, symbol_inits)
         arms
@@ -1440,7 +1342,7 @@ and switch env res switch =
         let unreachable, res =
           C.invalid res ~message:"unreachable switch case"
         in
-        cases.(n) <- Some (unreachable, Branch_annotations.cold);
+        cases.(n) <- Some (unreachable, dbg, Branch_annotations.cold);
         cases, res
     in
     (* CR-someday poechsel: Put a more precise value kind here *)

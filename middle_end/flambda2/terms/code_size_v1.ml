@@ -393,6 +393,7 @@ let nullary_prim_size prim =
   | Dls_get -> 1
   | Tls_get -> 1
   | Domain_index -> 1
+  | Thread_self_id -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =
@@ -420,7 +421,7 @@ let unary_prim_size ~machine_width prim =
   | Int_arith (kind, op) -> unary_int_prim_size ~machine_width kind op
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
-  | Boolean_not -> 1
+  | Boolean_not _ -> 1
   | Reinterpret_boxed_vector -> 0
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with

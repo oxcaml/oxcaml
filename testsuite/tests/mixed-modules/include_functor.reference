@@ -29,3 +29,7 @@ Actual:   30 test_modified 15.0 15
 Test: Mixed input with value-only functor
 Expected: 99.0 24 data_processed
 Actual:   99.0 24 data_processed
+
+Test: Generative include functor with mixed input
+Expected: 2.5 7.5 input_gen
+Actual:   2.5 7.5 input_gen

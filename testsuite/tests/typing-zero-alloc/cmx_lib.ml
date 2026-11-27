@@ -1,3 +1,4 @@
+[@@@flambda_o3]
 let[@inline never] catch_and_discard_exceptions f = try f () with _ -> ()
 
 let[@inline never] either f g x b = if b then f x else g x
@@ -36,3 +37,14 @@ let[@inline never] fail () = raise Exit
 let[@inline never] diverge () = while true do () done
 let[@inline never] iter_fail xs = iter_rec ~f:fail xs
 let[@inline never] iter_diverge xs = iter_rec ~f:diverge xs
+
+let[@inline never] call_twice_with_catch f x =
+  f x;
+  try f x with _ -> ()
+
+let[@inline never] call_optional_callback f x =
+  match f with None -> () | Some f -> f x
+
+let[@inline never] partially_apply_then_fully_apply f x y =
+  let (_ : _ -> unit) = f x in
+  f x y

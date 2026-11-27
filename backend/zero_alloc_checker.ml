@@ -26,6 +26,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
+open! Zero_alloc_utils
 
 let debug = false
 
@@ -150,8 +151,7 @@ module Witnesses : sig
 
   val cutoff : t -> n:int -> t
 
-  val simplify :
-    t Zero_alloc_utils.Components.t -> t Zero_alloc_utils.Components.t
+  val simplify : t Components.t -> t Components.t
 end = struct
   include Set.Make (Witness)
 
@@ -187,8 +187,8 @@ end = struct
 
   let iter t ~f = iter f t
 
-  let simplify { Zero_alloc_utils.Components.nor; exn; div } =
-    { Zero_alloc_utils.Components.nor;
+  let simplify { Components.nor; exn; div } =
+    { Components.nor;
       (* only print the exn witnesses that are not also nor witnesses. *)
       exn = diff exn nor;
       div =
@@ -200,15 +200,11 @@ end
 module Var : sig
   type t
 
-  val create :
-    string ->
-    Zero_alloc_utils.Tag.t ->
-    known_arguments:Cmm.callee option list ->
-    t
+  val create : string -> Tag.t -> known_arguments:Cmm.callee option list -> t
 
   val name : t -> string
 
-  val tag : t -> Zero_alloc_utils.Tag.t
+  val tag : t -> Tag.t
 
   val known_arguments : t -> Cmm.callee option list
 
@@ -225,7 +221,7 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Zero_alloc_utils.Tag.t;
+        tag : Tag.t;
         known_arguments : Cmm.callee option list
       }
 
@@ -235,7 +231,7 @@ end = struct
       if c <> 0
       then c
       else
-        let c = Zero_alloc_utils.Tag.compare tag1 tag2 in
+        let c = Tag.compare tag1 tag2 in
         if c <> 0
         then c
         else
@@ -259,48 +255,43 @@ end = struct
   let create name tag ~known_arguments = { name; tag; known_arguments }
 
   let print ppf { name; tag; known_arguments = _ } =
-    Format.fprintf ppf "%s.%s@ " name (Zero_alloc_utils.Tag.print tag)
+    Format.fprintf ppf "%s.%a@ " name Tag.print tag
 end
 
 module Top = struct
   type t =
-    { allocation_sources :
-        Zero_alloc_utils.Relevant_components_by_argument_index.t
-        Zero_alloc_utils.Allocation_sources.t;
+    { allocation_source :
+        Relevant_components_by_argument_index.t Allocation_source.t;
       witnesses : Witnesses.t
     }
 
-  let compare { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
+  let compare { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
     let c =
-      Zero_alloc_utils.Allocation_sources.compare
-        ~compare_args_only:
-          Zero_alloc_utils.Relevant_components_by_argument_index.compare a1 a2
+      Allocation_source.compare
+        ~compare_args:Relevant_components_by_argument_index.compare a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
 
-  let lessequal { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    Zero_alloc_utils.Allocation_sources.lessequal
-      ~lessequal_args_only:
-        Zero_alloc_utils.Relevant_components_by_argument_index.lessequal a1 a2
+  let lessequal { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    Allocation_source.lessequal
+      ~lessequal_args:Relevant_components_by_argument_index.lessequal a1 a2
     && Witnesses.lessequal w1 w2
 
-  let join { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    { allocation_sources =
-        Zero_alloc_utils.Allocation_sources.join
-          ~join_args_only:
-            Zero_alloc_utils.Relevant_components_by_argument_index.join a1 a2;
+  let join { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    { allocation_source =
+        Allocation_source.join
+          ~join_args:Relevant_components_by_argument_index.join a1 a2;
       witnesses = Witnesses.join w1 w2
     }
 
-  let meet { allocation_sources = a1; witnesses = w1 }
-      { allocation_sources = a2; witnesses = w2 } =
-    { allocation_sources =
-        Zero_alloc_utils.Allocation_sources.meet
-          ~meet_args_only:
-            Zero_alloc_utils.Relevant_components_by_argument_index.meet a1 a2;
+  let meet { allocation_source = a1; witnesses = w1 }
+      { allocation_source = a2; witnesses = w2 } =
+    { allocation_source =
+        Allocation_source.meet
+          ~meet_args:Relevant_components_by_argument_index.meet a1 a2;
       witnesses = Witnesses.meet w1 w2
     }
 
@@ -347,9 +338,8 @@ module V : sig
   val safe : t
 
   val top :
-    allocation_sources:
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) ->
+    allocation_source:
+      Relevant_components_by_argument_index.t Allocation_source.t ->
     witnesses:Witnesses.t ->
     t
 
@@ -359,10 +349,7 @@ module V : sig
   val compare : t -> t -> int
 
   val match_with :
-    resolved:(Top.t Zero_alloc_utils.Component.t -> 'a) ->
-    unresolved:(unit -> 'a) ->
-    t ->
-    'a
+    resolved:(Top.t Component.t -> 'a) -> unresolved:(unit -> 'a) -> t -> 'a
 end = struct
   let pp_w ~witnesses ppf w =
     if witnesses then Format.fprintf ppf "@, (%a)" Witnesses.print w else ()
@@ -370,7 +357,10 @@ end = struct
   let pp_var ~witnesses ppf var w =
     Format.fprintf ppf "(%a%a)@," Var.print var (pp_w ~witnesses) w
 
-  let pp_top ~witnesses ppf w = Format.fprintf ppf "(top%a)" (pp_w ~witnesses) w
+  let pp_top ~witnesses ppf ({ allocation_source; witnesses = w } : Top.t) =
+    Format.fprintf ppf "(top %a%a)"
+      (Allocation_source.print Relevant_components_by_argument_index.print)
+      allocation_source (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
   module Vars : sig
@@ -582,8 +572,8 @@ end = struct
       | Args vars ->
         Format.fprintf ppf "(transform:@.%a)@." (Vars.print ~witnesses) vars
       | Args_with_top { top; vars } ->
-        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses)
-          top.witnesses (Vars.print ~witnesses) vars
+        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses) top
+          (Vars.print ~witnesses) vars
   end
 
   module Transforms : sig
@@ -909,8 +899,8 @@ end = struct
     let args_with_top (top : Top.t) args =
       if
         (not (Args.has_witnesses args))
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-             top.allocation_sources
+        && Allocation_source.is_allocation_other_than_calling_arguments
+             top.allocation_source
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
@@ -919,8 +909,8 @@ end = struct
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
         if
-          Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-            top.allocation_sources
+          Allocation_source.is_allocation_other_than_calling_arguments
+            top.allocation_source
         then
           Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
             top.witnesses
@@ -1119,14 +1109,14 @@ end = struct
       | Args_with_safe args ->
         Format.fprintf ppf "(join:@.Safe@.%a)@." (Args.print ~witnesses) args
       | Args_with_top { top; args } ->
-        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top.witnesses
+        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top
           (Args.print ~witnesses) args
       | Args args ->
         Format.fprintf ppf "(join:@.%a)@." (Args.print ~witnesses) args
   end
 
   type t =
-    | Resolved of Top.t Zero_alloc_utils.Component.t
+    | Resolved of Top.t Component.t
     (* unresolved *)
     | Var of
         { var : Var.t;
@@ -1141,8 +1131,8 @@ end = struct
 
   let safe = Resolved Safe
 
-  let top ~allocation_sources ~witnesses =
-    Resolved (Top { allocation_sources; witnesses })
+  let top ~allocation_source ~witnesses =
+    Resolved (Top { allocation_source; witnesses })
 
   let is_resolved t =
     match t with Resolved _ -> true | Var _ | Join _ | Transform _ -> false
@@ -1157,10 +1147,7 @@ end = struct
   let print ~witnesses ppf t =
     match t with
     | Resolved component ->
-      Zero_alloc_utils.Component.print
-        ~print_top:(fun ppf ({ witnesses = w; _ } : Top.t) ->
-          pp_top ~witnesses ppf w)
-        ppf component
+      Component.print ~print_top:(pp_top ~witnesses) ppf component
     | Var { var; witnesses = w } -> pp_var ~witnesses ppf var w
     | Join j -> Format.fprintf ppf "(join %a)@," (Join.print ~witnesses) j
     | Transform tr ->
@@ -1181,7 +1168,7 @@ end = struct
   let compare t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.compare ~compare_top:Top.compare c1 c2
+      Component.compare ~compare_top:Top.compare c1 c2
     | Resolved _, (Var _ | Transform _ | Join _) -> -1
     | (Var _ | Transform _ | Join _), Resolved _ -> 1
     | Var { var = v1; witnesses = w1 }, Var { var = v2; witnesses = w2 } ->
@@ -1206,16 +1193,16 @@ end = struct
     try Join (f ())
     with Transforms.Widen witnesses ->
       Resolved
-        (Zero_alloc_utils.Component.Top
+        (Component.Top
            { witnesses;
-             allocation_sources = Allocation_other_than_calling_arguments
+             allocation_source = Allocation_other_than_calling_arguments
            })
 
   (* Keep [join] and [lessequal] in sync. *)
   let join t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Resolved (Zero_alloc_utils.Component.join ~join_top:Top.join c1 c2)
+      Resolved (Component.join ~join_top:Top.join c1 c2)
     | Resolved Bot, (Var _ | Transform _ | Join _) -> t2
     | (Var _ | Transform _ | Join _), Resolved Bot -> t1
     | Resolved Safe, Transform tr | Transform tr, Resolved Safe ->
@@ -1227,8 +1214,8 @@ end = struct
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
       if
         Witnesses.is_empty witnesses
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-             w.allocation_sources
+        && Allocation_source.is_allocation_other_than_calling_arguments
+             w.allocation_source
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1259,16 +1246,16 @@ end = struct
       if
         Transform.has_witnesses tr
         || not
-             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-                w.allocation_sources)
+             (Allocation_source.is_allocation_other_than_calling_arguments
+                w.allocation_source)
       then Join (Join.tr_with_top tr w)
       else top
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
       if
         Join.has_witnesses j
         || not
-             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-                w.allocation_sources)
+             (Allocation_source.is_allocation_other_than_calling_arguments
+                w.allocation_source)
       then Join (Join.add_top j w)
       else top
     | Resolved Safe, Join j | Join j, Resolved Safe -> Join (Join.add_safe j)
@@ -1283,7 +1270,7 @@ end = struct
   let lessequal t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1 c2
+      Component.lessequal ~lessequal_top:Top.lessequal c1 c2
     | Resolved Bot, (Var _ | Transform _ | Join _) -> true
     | (Var _ | Transform _ | Join _), Resolved Bot -> false
     | (Resolved Safe | Resolved (Top _) | Var _ | Transform _ | Join _), _ ->
@@ -1327,8 +1314,8 @@ end = struct
       if
         (Join.has_safe j || Option.is_some (Join.get_top j))
         && (not (Join.has_witnesses j))
-        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
-             w.allocation_sources
+        && Allocation_source.is_allocation_other_than_calling_arguments
+             w.allocation_source
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
@@ -1344,8 +1331,8 @@ end = struct
 
   let replace_witnesses witnesses t =
     match t with
-    | Resolved (Top { allocation_sources; _ }) ->
-      Resolved (Top { allocation_sources; witnesses })
+    | Resolved (Top { allocation_source; witnesses = _ }) ->
+      Resolved (Top { allocation_source; witnesses })
     | Resolved (Bot | Safe) -> t
     | Join j -> Join (Join.replace_witnesses j witnesses)
     | Transform tr -> Transform (Transform.replace_witnesses tr witnesses)
@@ -1355,10 +1342,8 @@ end = struct
      figure out what this means for the allocation sources of [g]. *)
   let transfer_allocation_sources_from_callee_to_caller
       ~(caller_witnesses : Witnesses.t)
-      ~(callee_contract :
-         Zero_alloc_utils.Relevant_components_by_argument_index.t)
+      ~(callee_contract : Relevant_components_by_argument_index.t)
       ~(arguments_passed : Cmm.callee option list) : t =
-    let open Zero_alloc_utils in
     (* We're analyzing e.g. [g x = f x], so we have a *caller* ([g]) and a
        *callee* ([f]). The callee ([f]) has a conditional contract, or else we
        wouldn't have reached this function. Specifically, [callee_contract]
@@ -1368,21 +1353,21 @@ end = struct
        do this, we fold over the callee ([f])'s relevant argument indices (see
        the last line of this function). *)
     let fold (callee_argument_index : int)
-        (relevant_components : bool Components.t) (acc : t) : t =
+        (relevant_components : Tag.Nonempty_set.t) (acc : t) : t =
       begin match List.nth_opt arguments_passed callee_argument_index with
       | None ->
         (* This is a partial application, and there is no nth argument. *)
         (* CR wsturgeon for wsturgeon: this doesn't always allocate (work for
            the next PR) *)
-        top ~allocation_sources:Allocation_other_than_calling_arguments
+        top ~allocation_source:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
       | Some None ->
         (* We don't statically know what's passed here, so it could allocate. *)
-        top ~allocation_sources:Allocation_other_than_calling_arguments
+        top ~allocation_source:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
       | Some (Some (Argument { argument_index = caller_argument_index })) ->
         top
-          ~allocation_sources:
+          ~allocation_source:
             (No_allocation_other_than_calling_arguments
                (Numbers.Int.Map.singleton caller_argument_index
                   relevant_components))
@@ -1390,7 +1375,7 @@ end = struct
       | Some (Some (Symbol _)) ->
         (* CR wsturgeon for wsturgeon: look up this symbol's summary (work for
            the next PR) *)
-        top ~allocation_sources:Allocation_other_than_calling_arguments
+        top ~allocation_source:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
       end
       |> join acc
@@ -1400,10 +1385,10 @@ end = struct
   let attribute_to_call_site ~(caller_witnesses : Witnesses.t)
       ~(callee_contract : t) ~(arguments_passed : Cmm.callee option list) =
     match callee_contract with
-    | Resolved (Top { allocation_sources; witnesses = _ }) ->
-      begin match allocation_sources with
+    | Resolved (Top { allocation_source; witnesses = _ }) ->
+      begin match allocation_source with
       | Allocation_other_than_calling_arguments ->
-        Resolved (Top { allocation_sources; witnesses = caller_witnesses })
+        Resolved (Top { allocation_source; witnesses = caller_witnesses })
       | No_allocation_other_than_calling_arguments callee_contract ->
         transfer_allocation_sources_from_callee_to_caller ~caller_witnesses
           ~callee_contract ~arguments_passed
@@ -1434,7 +1419,7 @@ end = struct
   let meet t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Resolved (Zero_alloc_utils.Component.meet ~meet_top:Top.meet c1 c2)
+      Resolved (Component.meet ~meet_top:Top.meet c1 c2)
     | (Var _ | Transform _ | Join _), _ | _, (Var _ | Transform _ | Join _) ->
       Misc.fatal_error
         "Meet of unresolved is not implemented and shouldn't be needed."
@@ -1502,27 +1487,22 @@ end = struct
     aux t
 end
 
-module Allocation_sources :
-  Zero_alloc_utils.Allocation_sources
-    with type t =
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) = struct
-  type t =
-    Zero_alloc_utils.(
-      Relevant_components_by_argument_index.t Allocation_sources.t)
+module Allocation_source :
+  Allocation_source
+    with type t = Relevant_components_by_argument_index.t Allocation_source.t =
+struct
+  type t = Relevant_components_by_argument_index.t Allocation_source.t
 
-  let top =
-    Zero_alloc_utils.Allocation_sources.Allocation_other_than_calling_arguments
+  let top = Allocation_source.Allocation_other_than_calling_arguments
 
   let argument ~argument_index ~tag :
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) =
-    Zero_alloc_utils.(
-      Allocation_sources.No_allocation_other_than_calling_arguments
-        (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
+      Relevant_components_by_argument_index.t Allocation_source.t =
+    Allocation_source.No_allocation_other_than_calling_arguments
+      (Numbers.Int.Map.singleton argument_index
+         (Tag.Nonempty_set.singleton tag))
 end
 
-module T = Zero_alloc_utils.Make_value (Allocation_sources) (Witnesses) (V)
+module T = Make_value (Allocation_source) (Witnesses) (V)
 
 module Value : sig
   include module type of T
@@ -1539,63 +1519,62 @@ module Value : sig
 
   val get_unresolved_names : t -> String.Set.t
 
-  val get_witnesses : t -> Witnesses.t Zero_alloc_utils.Components.t
+  val get_witnesses : t -> Witnesses.t Components.t
 
-  val diff_witnesses :
-    expected:t -> actual:t -> Witnesses.t Zero_alloc_utils.Components.t
+  val diff_witnesses : expected:t -> actual:t -> Witnesses.t Components.t
 
   val unresolved :
     string -> Witnesses.t -> known_arguments:Cmm.callee option list -> t
 
   val is_resolved : t -> bool
 
-  val get_component : t -> Zero_alloc_utils.Tag.t -> V.t
+  val get_component : t -> Tag.t -> V.t
 
   val apply : t -> (Var.t -> V.t option) -> t
 end = struct
   include T
 
   let unresolved name w ~known_arguments =
-    Zero_alloc_utils.Components.create (fun tag ->
+    Components.create (fun tag ->
         Var.create name tag ~known_arguments |> V.unresolved w)
 
-  let is_resolved (t : _ Zero_alloc_utils.Components.t) =
+  let is_resolved (t : _ Components.t) =
     V.is_resolved t.nor && V.is_resolved t.exn && V.is_resolved t.div
 
-  let get_unresolved_names (t : _ Zero_alloc_utils.Components.t) =
+  let get_unresolved_names (t : _ Components.t) =
     String.Set.(
       union
         (V.get_unresolved_names t.nor)
         (union (V.get_unresolved_names t.exn) (V.get_unresolved_names t.div)))
 
-  let get_component (t : t) (tag : Zero_alloc_utils.Tag.t) =
-    match tag with N -> t.nor | E -> t.exn | D -> t.div
+  let get_component (t : t) (tag : Tag.t) =
+    match tag with
+    | NormalReturn -> t.nor
+    | Exception -> t.exn
+    | Diverge -> t.div
 
-  let apply t env =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.apply ~env) t
+  let apply t env = Components.map ~f:(fun _ignore_tag -> V.apply ~env) t
 
   let transform effect_ =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.transform effect_)
+    Components.map ~f:(fun _ignore_tag -> V.transform effect_)
 
   let replace_witnesses w =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
-        V.replace_witnesses w)
+    Components.map ~f:(fun _ignore_tag -> V.replace_witnesses w)
 
   let attribute_to_call_site ~caller_witnesses ~callee_contract
       ~arguments_passed =
-    Zero_alloc_utils.Components.map
+    Components.map
       ~f:(fun _ignore_tag callee_contract ->
         V.attribute_to_call_site ~caller_witnesses ~callee_contract
           ~arguments_passed)
       callee_contract
 
   let diff_witnesses ~expected ~actual =
-    Zero_alloc_utils.Components.map2
+    Components.map2
       ~f:(fun _ignore_tag expected actual -> V.diff_witnesses ~expected ~actual)
       expected actual
 
-  let get_witnesses =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.get_witnesses)
+  let get_witnesses = Components.map ~f:(fun _ignore_tag -> V.get_witnesses)
 end
 
 (** Representation of user-provided annotations as abstract values *)
@@ -1618,7 +1597,7 @@ module Annotation : sig
 
   val valid : t -> Value.t -> bool
 
-  val diff_witnesses : t -> Value.t -> Witnesses.t Zero_alloc_utils.Components.t
+  val diff_witnesses : t -> Value.t -> Witnesses.t Components.t
 
   val is_assume : t -> bool
 
@@ -1772,22 +1751,22 @@ end = struct
      be used in Assume_info due to cyclic dependencies. The witnesses in
      Assume_info are always empty and the translation is trivial. Is there a
      better way to avoid duplicating [Zero_alloc_utils]? *)
-  let transl witnesses (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
+  let transl witnesses (v : Assume_info.V.t) : V.t =
     match v with
     | Top () ->
-      V.top ~allocation_sources:Allocation_other_than_calling_arguments
+      V.top ~allocation_source:Allocation_other_than_calling_arguments
         ~witnesses
     | Safe -> V.safe
     | Bot -> V.bot
 
-  let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
+  let transl w (v : Assume_info.Value.t) : Value.t =
     { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
 
   let assume_value dbg ~can_raise w =
     (* [loc] can be obtained by [Debuginfo.to_location dbg], For now just return
        [Location.none] because it is not used. *)
     let a = Debuginfo.assume_zero_alloc dbg in
-    match Zero_alloc_utils.Assume_info.get_value a with
+    match Assume_info.get_value a with
     | None -> None
     | Some v ->
       let v = transl w v in
@@ -1795,8 +1774,7 @@ end = struct
       Some v
 
   let assume_value_unless_inferred dbg w =
-    if
-      Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+    if Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
     then None
     else assume_value dbg ~can_raise:false w
 end
@@ -1806,7 +1784,7 @@ module Report : sig
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.t Zero_alloc_utils.Components.t
+      witnesses : Witnesses.t Components.t
     }
 
   exception Fail of t list
@@ -1817,7 +1795,7 @@ end = struct
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.t Zero_alloc_utils.Components.t
+      witnesses : Witnesses.t Components.t
     }
 
   exception Fail of t list
@@ -1997,7 +1975,7 @@ end = struct
       Location.error_of_printer ~loc ~sub pp ()
     in
     let print_witnesses ws : Location.error list =
-      let { nor; exn; div } : Witnesses.t Zero_alloc_utils.Components.t =
+      let { nor; exn; div } : Witnesses.t Components.t =
         Witnesses.simplify ws
       in
       let f ws component =
@@ -2238,15 +2216,13 @@ end = struct
   let encode (v : V.t) =
     V.match_with v
       ~resolved:
-        Zero_alloc_utils.(
-          Component.map ~f:(fun ({ allocation_sources; _ } : Top.t) ->
-              allocation_sources))
+        (Component.map ~f:(fun ({ allocation_source; witnesses = _ } : Top.t) ->
+             allocation_source))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
           (V.print ~witnesses:false) v)
     |> Zero_alloc_info.Encoded.Component.encode
-  [@@warning "-44"]
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2256,8 +2232,8 @@ end = struct
 
   let decode v =
     match Zero_alloc_info.Encoded.Component.decode v with
-    | Top allocation_sources ->
-      V.top ~allocation_sources ~witnesses:decoded_witnesses
+    | Top allocation_source ->
+      V.top ~allocation_source ~witnesses:decoded_witnesses
     | Safe -> V.safe
     | Bot -> V.bot
 
@@ -2269,13 +2245,12 @@ end = struct
     (* Artifact-size optimization: if this summary is all [Top] (the most common
        case), then leave it out, and let readers infer that a missing summary is
        all [Top]. *)
-    if[@ocaml.warning "-44"]
-      Zero_alloc_info.Encoded.Components.(encoded = all_top)
+    if Zero_alloc_info.Encoded.Components.(equal encoded all_top)
     then None
     else Some encoded
 
   let decode i =
-    if[@ocaml.warning "-44"] Zero_alloc_info.Encoded.Components.(i = all_top)
+    if Zero_alloc_info.Encoded.Components.(equal i all_top)
     then Misc.fatal_error "Zero_alloc_checker: unexpected all-Top encoding"
     else Zero_alloc_info.Encoded.Components.decode ~decode_component:decode i
 
@@ -2430,7 +2405,7 @@ end = struct
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
-      let v = Value.top ~allocation_sources:Allocation_sources.top ~witnesses in
+      let v = Value.top ~allocation_source:Allocation_source.top ~witnesses in
       let msg = Printf.sprintf "conservative %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v
@@ -2500,7 +2475,7 @@ end = struct
     let effect_ =
       match Metadata.assume_value dbg ~can_raise:true witnesses with
       | Some v -> v
-      | None -> Value.top ~allocation_sources:Allocation_sources.top ~witnesses
+      | None -> Value.top ~allocation_source:Allocation_source.top ~witnesses
     in
     transform t ~next ~exn ~effect_ desc dbg
 
@@ -2532,14 +2507,14 @@ end = struct
         (* Conservatively assume that operation can return normally. *)
         let nor =
           if Arch.operation_allocates s
-          then V.top ~allocation_sources:Allocation_sources.top ~witnesses
+          then V.top ~allocation_source:Allocation_source.top ~witnesses
           else V.safe
         in
         (* Specific operations cannot raise *)
         let exn = V.bot in
         (* Assume that the operation does not diverge. *)
         let div = V.bot in
-        ({ nor; exn; div } : _ Zero_alloc_utils.Components.t)
+        ({ nor; exn; div } : _ Components.t)
     in
     transform t ~next ~exn ~effect_ desc dbg
 
@@ -2738,7 +2713,7 @@ end = struct
         report t res ~msg:"finished" ~desc:"fundecl" fun_dbg;
         if (not t.keep_witnesses) && Value.is_resolved res
         then begin
-          Zero_alloc_utils.Components.iter
+          Components.iter
             ~f:(fun _tag component -> assert (Witnesses.is_empty component))
             (Value.get_witnesses res)
         end;
@@ -2752,7 +2727,7 @@ end = struct
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
           Unit_info.record unit_info fun_name
-            (Value.top ~allocation_sources:Allocation_sources.top
+            (Value.top ~allocation_source:Allocation_source.top
                ~witnesses:Witnesses.empty)
             fun_dbg a
         else really_check ()
@@ -2799,10 +2774,10 @@ end = struct
                 | Symbol { sym_name; _ } ->
                   find_callee t sym_name ~desc dbg k ~known_arguments
                 | Argument { argument_index } ->
-                  Zero_alloc_utils.Components.create (fun tag ->
+                  Components.create (fun tag ->
                       V.top
-                        ~allocation_sources:
-                          (Allocation_sources.argument ~argument_index ~tag)
+                        ~allocation_source:
+                          (Allocation_source.argument ~argument_index ~tag)
                         ~witnesses)
               in
               let effect_ =
@@ -2824,6 +2799,21 @@ end = struct
           ~desc:("direct tailcall to " ^ func)
           dbg ~known_arguments
 
+      let transform_func_call t ~next ~exn
+          ({ desc; known_arguments } : Cfg.func_call_operation) dbg =
+        match desc with
+        | Indirect None ->
+          let w = create_witnesses t (Indirect_call { callee = None }) dbg in
+          transform_top t ~next ~exn w "indirect call" dbg
+        | Indirect (Some callees) ->
+          transform_call_indirect t ~next ~exn callees
+            (fun callee -> Witness.Indirect_call { callee = Some callee })
+            ~desc:"indirect call" dbg ~known_arguments
+        | Direct { sym_name = func; _ } ->
+          let k = Witness.Direct_call { callee = func } in
+          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
+            dbg ~known_arguments
+
       let operation t ~next (op : Operation.t) dbg =
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
@@ -2831,11 +2821,12 @@ end = struct
         | Const_mask _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
-              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz
+              | Icomp _ ),
               _ )
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
@@ -2855,7 +2846,8 @@ end = struct
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
+        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause
+        | Trace_pc_guard_gate | Trace_pc_guard _ ->
           next
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,
@@ -2865,19 +2857,18 @@ end = struct
         | Alloc { mode = Local; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let witnesses = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
-          let effect_ : _ Zero_alloc_utils.Components.t =
+          let effect_ : V.t Components.t =
             match Metadata.assume_value_unless_inferred dbg witnesses with
             | Some effect_ -> effect_
             | None ->
-              { nor =
-                  V.top ~allocation_sources:Allocation_sources.top ~witnesses;
+              { nor = V.top ~allocation_source:Allocation_source.top ~witnesses;
                 exn = V.bot;
                 div = V.bot
               }
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
-        | Dls_get | Tls_get | Domain_index -> next
+        | Dls_get | Tls_get | Domain_index | Thread_self_id -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =
@@ -2925,11 +2916,11 @@ end = struct
           in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
-        | Call_no_return { alloc = false; _ } ->
+        | External_call_no_return { alloc = false; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
           Value.bot
-        | Call_no_return { alloc = true; func_symbol = func; _ } ->
+        | External_call_no_return { alloc = true; func_symbol = func; _ } ->
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func }) dbg in
@@ -2953,21 +2944,9 @@ end = struct
             dbg
             (* CR-someday wsturgeon for wsturgeon: propagate probe arguments *)
             ~known_arguments:[]
-        | Call { op = { desc = Indirect None; _ }; _ } ->
-          let w = create_witnesses t (Indirect_call { callee = None }) dbg in
-          transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = { desc = Indirect (Some callees); known_arguments }; _ }
-          ->
-          transform_call_indirect t ~next ~exn callees
-            (fun callee -> Witness.Indirect_call { callee = Some callee })
-            ~desc:"indirect call" dbg ~known_arguments
-        | Call
-            { op = { desc = Direct { sym_name = func; _ }; known_arguments };
-              _
-            } ->
-          let k = Witness.Direct_call { callee = func } in
-          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
-            dbg ~known_arguments
+        | Call { op; _ } -> transform_func_call t ~next ~exn op dbg
+        | Call_no_return op ->
+          transform_func_call t ~next:Value.normal_return ~exn op dbg
         | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
@@ -2999,7 +2978,7 @@ end = struct
       | Aborted _ -> Misc.fatal_errorf "Analyzing function %s" fd.fun_name ()
       | Max_iterations_reached ->
         let res =
-          Value.top ~allocation_sources:Allocation_sources.top
+          Value.top ~allocation_source:Allocation_source.top
             ~witnesses:Witnesses.empty
         in
         report t res
@@ -3050,7 +3029,8 @@ let drop_invalid_successors cfg_with_layout =
         | Invalid { label_after = None; _ }
         | Prim _ | Never | Always _ | Parity_test _ | Truth_test _
         | Float_test _ | Int_test _ | Switch _ | Return | Raise _
-        | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _ ->
+        | Tailcall_self _ | Tailcall_func _ | Call_no_return _
+        | External_call_no_return _ | Call _ ->
           ());
     if not !modified
     then cfg_with_layout
@@ -3070,8 +3050,7 @@ let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
   Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
-type iter_witnesses =
-  (string -> Witnesses.t Zero_alloc_utils.Components.t -> unit) -> unit
+type iter_witnesses = (string -> Witnesses.t Components.t -> unit) -> unit
 
 let iter_witnesses f =
   Unit_info.iter unit_info ~f:(fun func_info ->

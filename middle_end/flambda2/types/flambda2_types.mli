@@ -606,10 +606,20 @@ val immutable_block_with_size_at_least :
 
 val mutable_block : Alloc_mode.For_types.t -> t
 
+type variant_extensions =
+  | No_extensions
+  | Ext of
+      { when_immediate : typing_env_extension;
+        when_block : typing_env_extension
+      }
+
 val variant :
   machine_width:Target_system.Machine_width.t ->
   const_ctors:t ->
   non_const_ctors:(Flambda_kind.Block_shape.t * t list) Tag.Scannable.Map.t ->
+  is_int:Variable.t option ->
+  get_tag:Variable.t option ->
+  extensions:variant_extensions ->
   Alloc_mode.For_types.t ->
   t
 
@@ -797,6 +807,8 @@ val prove_unique_fully_constructed_immutable_heap_block :
   proof_of_property
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
+
+val prove_is_null : Typing_env.t -> t -> bool proof_of_property
 
 (* Either a tagged integer or a null poitner. *)
 val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
@@ -1056,6 +1068,8 @@ module Rewriter : sig
 
     val tag_immediate : 'a t -> 'a t
 
+    val nullable : 'a t -> 'a t
+
     val immutable_block :
       is_unique:bool ->
       Tag.t ->
@@ -1106,14 +1120,22 @@ module Rewriter : sig
         [ofs] of a block with abstraction [t]. [ty] is the type of the field.
 
         If a [tag] is provided, the block is guaranteed to have the
-        corresponding tag; otherwise, it could have any tag. *)
+        corresponding tag; otherwise, it could have any tag.
+
+        If [Unknown] is returned, the type of the field will be forgotten. *)
     val block_slot :
-      ?tag:Tag.t -> t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
+      ?tag:Tag.t ->
+      t ->
+      Target_ocaml_int.t ->
+      typing_env ->
+      flambda_type ->
+      t Or_unknown.t
 
     (** [array_slot t ofs env ty] returns the abstraction of an array field at
         offset [ofs] of an array with abstraction [t]. [ty] is the type of the
         field. *)
-    val array_slot : t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
+    val array_slot :
+      t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t Or_unknown.t
 
     type set_of_closures
 
@@ -1126,13 +1148,21 @@ module Rewriter : sig
       Function_slot.t ->
       Code_id.t ->
       flambda_type ->
-      t
+      t Or_unknown.t
 
     val value_slot :
-      set_of_closures -> Value_slot.t -> typing_env -> flambda_type -> t
+      set_of_closures ->
+      Value_slot.t ->
+      typing_env ->
+      flambda_type ->
+      t Or_unknown.t
 
     val function_slot :
-      set_of_closures -> Function_slot.t -> typing_env -> flambda_type -> t
+      set_of_closures ->
+      Function_slot.t ->
+      typing_env ->
+      flambda_type ->
+      t Or_unknown.t
   end) : sig
     val rewrite : typing_env -> (Symbol.t -> X.t) -> typing_env
 

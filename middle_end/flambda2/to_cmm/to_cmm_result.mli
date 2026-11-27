@@ -37,7 +37,8 @@ val symbol_of_code_id :
   t -> Code_id.t -> currently_in_inlined_body:bool -> Cmm.symbol
 
 (** Create a Cmm symbol, not arising from a [Symbol.t]. *)
-val raw_symbol : t -> global:Cmm.is_global -> string -> t * Cmm.symbol
+val raw_symbol :
+  t -> global:Cmm.is_global -> ty:Cmm.machtype -> string -> t * Cmm.symbol
 
 (** Archive the current data into the list of already-translated data. *)
 val archive_data : t -> t

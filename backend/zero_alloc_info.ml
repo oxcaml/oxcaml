@@ -18,15 +18,17 @@ module Encoded = struct
     }
 
   module Component = struct
-    type t = int list Allocation_sources.t Component.t
+    type t = int list Allocation_source.t Component.t
 
-    let pack_relevant_components (relevant : bool Components.t) =
-      pack ~bits_per_component:1
-        (Components.map relevant ~f:(fun _tag -> Bool.to_int))
+    let pack_relevant_components (relevant : Tag.Nonempty_set.t) =
+      Components.of_nonempty_set relevant
+      |> Components.map ~f:(fun _tag -> Bool.to_int)
+      |> pack ~bits_per_component:1
 
-    let unpack_relevant_components packed : bool Components.t =
-      Components.map (unpack ~bits_per_component:1 packed) ~f:(fun _tag bit ->
-          bit <> 0)
+    let unpack_relevant_components packed : Tag.Nonempty_set.t option =
+      unpack ~bits_per_component:1 packed
+      |> Components.map ~f:(fun _tag bit -> bit <> 0)
+      |> Components.to_nonempty_set
 
     let encode_arguments
         (relevant_components_by_argument_index :
@@ -47,20 +49,18 @@ module Encoded = struct
 
     let decode_arguments arguments : Relevant_components_by_argument_index.t =
       arguments
-      |> List.mapi (fun i bits -> i, bits)
-      |> List.filter (fun (_, bits) -> bits <> 0)
-      |> List.map (fun (i, bits) -> i, unpack_relevant_components bits)
+      |> List.mapi (fun i bits -> i, unpack_relevant_components bits)
+      |> List.filter_map (fun (i, opt) -> Option.map (fun set -> i, set) opt)
       |> Numbers.Int.Map.of_list
 
-    let encode = Component.map ~f:(Allocation_sources.map ~f:encode_arguments)
+    let encode = Component.map ~f:(Allocation_source.map ~f:encode_arguments)
 
-    let decode = Component.map ~f:(Allocation_sources.map ~f:decode_arguments)
+    let decode = Component.map ~f:(Allocation_source.map ~f:decode_arguments)
 
     let compare =
       Component.compare
         ~compare_top:
-          (Allocation_sources.compare
-             ~compare_args_only:(List.compare Int.compare))
+          (Allocation_source.compare ~compare_args:(List.compare Int.compare))
   end
 
   module Components = struct
@@ -97,8 +97,8 @@ module Encoded = struct
         Unconditional (pack ~bits_per_component:2 { nor; exn; div })
       | _, _, _ -> Conditional encoded
 
-    let decode ~(decode_component : Component.t -> 'a) (t : t) :
-        'a Zero_alloc_utils.Components.t =
+    let decode ~(decode_component : Component.t -> 'a) (t : t) : 'a Components.t
+        =
       let encoded : Component.t Components.t =
         match t with
         | Unconditional tags ->
@@ -110,14 +110,12 @@ module Encoded = struct
           decode_component component)
 
     let all_top : t =
-      Zero_alloc_utils.(
-        Components.create (fun _ignore_tag ->
-            Component.Top
-              Allocation_sources.Allocation_other_than_calling_arguments))
+      Components.create (fun _ignore_tag ->
+          Zero_alloc_utils.Component.Top
+            Allocation_source.Allocation_other_than_calling_arguments)
       |> encode ~encode_component:Component.encode
-    [@@ocaml.warning "-44"]
 
-    let ( = ) (t1 : t) (t2 : t) =
+    let equal (t1 : t) (t2 : t) =
       match t1, t2 with
       | Unconditional tags1, Unconditional tags2 -> Int.equal tags1 tags2
       | Conditional encoded1, Conditional encoded2 ->
@@ -163,31 +161,21 @@ module Raw = struct
   let entries_to_map (e : entries) =
     List.fold_left (fun acc (k, v) -> String.Map.add k v acc) String.Map.empty e
 
-  let bits ~width n =
-    String.init width (fun i ->
-        if n land (1 lsl (width - 1 - i)) <> 0 then '1' else '0')
+  let print_summary =
+    Components.print
+      (Component.print
+         ~print_top:
+           (Allocation_source.print Relevant_components_by_argument_index.print))
 
-  let describe_component : Encoded.Component.t -> string = function
-    | Bot -> "bot"
-    | Safe -> "safe"
-    | Top Allocation_other_than_calling_arguments -> "top"
-    | Top (No_allocation_other_than_calling_arguments arguments) ->
-      "[" ^ String.concat "; " (List.map (bits ~width:3) arguments) ^ "]"
-
-  let print t =
-    let print (name, (components : Encoded.Components.t)) =
-      match components with
-      | Unconditional tags -> Printf.printf "\t\t%s = %#x\n" name tags
-      | Conditional { nor; exn; div } ->
-        Printf.printf "\t\t%s = nor=%s exn=%s div=%s\n" name
-          (describe_component nor) (describe_component exn)
-          (describe_component div)
+  let print ppf t =
+    let print (name, components) =
+      Format.fprintf ppf "\t\t%s = %a@\n" name print_summary (decode components)
     in
     (* CR gyorsh: move encode/decode here somehow for noalloc *)
-    Printf.printf "Function summaries for static checks:\n";
+    Format.fprintf ppf "Function summaries for static checks:@\n";
     List.iter print t
 
-  let print = function None -> () | Some t -> print t
+  let print ppf = function None -> () | Some t -> print ppf t
 end
 
 let to_raw (t : t) : Raw.t =

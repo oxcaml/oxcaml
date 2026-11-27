@@ -44,55 +44,149 @@ type t =
     current_blocks : partial_block list;
     next_addr : Jsir.Addr.t;
     reserved_addrs : Jsir.Addr.Set.t;
-    invalid_switch_block : Jsir.Addr.t option;
-    next_method_cache_id : int;
-        (** JSOO has a similar variable which is incremented for every method
-            call; we mimic this here. *)
     imported_compilation_units : Compilation_unit.Set.t;
-    global_data_var : Jsir.Var.t option
+    entry_prelude : Jsir.instr list;
+        (** Instructions to put at the start of the entry block, in reverse
+            order. Used for the fetching of external symbols. *)
+    external_symbols : Jsir.Var.t Symbol.Map.t;
+        (** The variables bound in [entry_prelude] to symbols from other
+            compilation units. *)
+    symbol_exports : (Symbol.t * Jsir.Var.t) list;
+        (** The symbols of this unit that other compilation units may refer to,
+            with the variables holding their values (before the resolution of
+            [var_aliases]), most recent first. *)
+    var_aliases : Jsir.Var.t Jsir.Var.Map.t;
+        (** A mapping of variables created ahead of their definition to their
+            materialised variables. *)
+    call_events : call_events option;
+        (** The events to put around the calls added by [add_call_exn], set by
+            [with_debuginfo_exn]. *)
+    reachable_names : Name_occurrences.t
+        (** The names of this unit that other compilation units may refer to.
+            Only these symbols need to be in the global symbol table. *)
   }
 
-let create () =
+and call_events =
+  { start : Parse_info.t;
+    end_ : Parse_info.t option
+  }
+
+let create ~reachable_names =
   { complete_blocks = Jsir.Addr.Map.empty;
     current_blocks = [];
     next_addr = Jsir.Addr.zero;
     reserved_addrs = Jsir.Addr.Set.empty;
-    invalid_switch_block = None;
-    next_method_cache_id = 1;
     imported_compilation_units = Compilation_unit.Set.empty;
-    global_data_var = None
+    entry_prelude = [];
+    external_symbols = Symbol.Map.empty;
+    symbol_exports = [];
+    var_aliases = Jsir.Var.Map.empty;
+    call_events = None;
+    reachable_names
   }
 
-let add_instr_exn t instr =
+let map_top_current_block_exn t ~f =
   let top_current_block, rest_current_blocks =
     match t.current_blocks with
-    | [] ->
-      Misc.fatal_error
-        "To_jsir_result.add_instr_exn: expected nonempty current_blocks"
+    | [] -> Misc.fatal_error "To_jsir_result: expected nonempty current_blocks"
     | hd :: tl -> hd, tl
   in
   let top_current_block =
-    { top_current_block with body = instr :: top_current_block.body }
+    { top_current_block with body = f top_current_block.body }
   in
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
-let maybe_add_debuginfo_exn t dbg ~pos =
-  if Debuginfo.is_none dbg
-  then t
+let add_instr_exn t instr =
+  map_top_current_block_exn t ~f:(fun body -> instr :: body)
+
+(* An event supersedes an event immediately preceding it, so that there are
+   never two consecutive events (which JSOO rejects). *)
+let push_event parse_info (body : Jsir.instr list) : Jsir.instr list =
+  match body with
+  | Event _ :: body -> Event parse_info :: body
+  | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) :: _ | [] ->
+    Event parse_info :: body
+
+let inlined_frames dbg ~file =
+  if not !Clflags.jsir_inlined_frames
+  then ""
+  else
+    match List.rev (Debuginfo.to_items dbg) with
+    | [] | [_] -> ""
+    | _ :: call_sites ->
+      String.concat ""
+        (List.map
+           (fun (call_site : Debuginfo.item) ->
+             Printf.sprintf "<-%s:%d:%d" (file call_site) call_site.dinfo_line
+               call_site.dinfo_char_start)
+           call_sites)
+
+(* The locations of a unit repeat a few file names, which are only stored once
+   in its JSIR file if they are physically equal. *)
+let shared_file_names : (string, string) Hashtbl.t = Hashtbl.create 16
+
+let share_file_name file =
+  match Hashtbl.find_opt shared_file_names file with
+  | Some file -> file
+  | None ->
+    Hashtbl.add shared_file_names file file;
+    file
+
+let parse_info_of_debuginfo dbg ~pos =
+  if not (Flambda_features.debug ())
+  then None
   else
     let loc = Debuginfo.to_location dbg in
-    let parse_info =
-      match pos with
-      | `Start -> Parse_info.t_of_pos loc.loc_start
-      | `End -> Parse_info.t_of_pos loc.loc_end
-    in
-    add_instr_exn t (Event parse_info)
+    if Location.is_none loc
+    then None
+    else
+      let (pos : Lexing.position) =
+        match pos with `Start -> loc.loc_start | `End -> loc.loc_end
+      in
+      let name =
+        share_file_name
+          (pos.pos_fname
+          ^ inlined_frames dbg ~file:(fun (item : Debuginfo.item) ->
+              item.dinfo_file))
+      in
+      let src =
+        Option.map
+          (fun file ->
+            share_file_name
+              (file ^ inlined_frames dbg ~file:Debuginfo.item_file_path))
+          (Debuginfo.to_file_path dbg)
+      in
+      Some { (Parse_info.t_of_pos { pos with pos_fname = name }) with src }
 
-let with_debuginfo_exn t dbg ~f =
-  let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
-  let x, t = f t in
-  let t = maybe_add_debuginfo_exn t dbg ~pos:`End in
-  x, t
+let add_event_at_exn t parse_info =
+  map_top_current_block_exn t ~f:(push_event parse_info)
+
+let add_event_exn t dbg ~pos =
+  match parse_info_of_debuginfo dbg ~pos with
+  | None -> t
+  | Some parse_info -> add_event_at_exn t parse_info
+
+let add_call_exn t instr =
+  match t.call_events with
+  | None -> add_instr_exn t instr
+  | Some { start; end_ } ->
+    map_top_current_block_exn t ~f:(fun body ->
+        let body = instr :: push_event start body in
+        match end_ with None -> body | Some end_ -> push_event end_ body)
+
+let with_debuginfo_exn t dbg ~event_after ~f =
+  let call_events =
+    match parse_info_of_debuginfo dbg ~pos:`Start with
+    | None -> None
+    | Some start ->
+      let end_ =
+        if event_after then parse_info_of_debuginfo dbg ~pos:`End else None
+      in
+      Some { start; end_ }
+  in
+  let outer_call_events = t.call_events in
+  let x, t = f { t with call_events } in
+  x, { t with call_events = outer_call_events }
 
 let new_block t ~params =
   let new_block = { params; body = []; addr = t.next_addr } in
@@ -137,34 +231,29 @@ let end_block_with_last_exn t last =
   let complete_blocks = Jsir.Addr.Map.add addr new_block t.complete_blocks in
   { t with complete_blocks; current_blocks = rest_current_blocks }
 
-let invalid_switch_block t =
-  match t.invalid_switch_block with
-  | Some addr -> t, addr
-  | None ->
-    let t, addr = new_block t ~params:[] in
-    let t =
-      add_instr_exn t
-        (Let
-           ( Jsir.Var.fresh (),
-             Prim (Extern ("caml_invalid_switch_arm", None), []) ))
-    in
-    let t = end_block_with_last_exn t Stop in
-    { t with invalid_switch_block = Some addr }, addr
+let new_invalid_switch_block t =
+  let t, addr = new_block t ~params:[] in
+  let var = Jsir.Var.fresh () in
+  let t =
+    add_instr_exn t
+      (Let (var, Prim (Extern ("caml_invalid_switch_arm", None), [])))
+  in
+  (* [caml_invalid_switch_arm] raises. We do not end the block with [Stop],
+     which wasm_of_ocaml translates as returning unit, which is ill-typed in
+     functions whose results it unboxes. *)
+  let t = end_block_with_last_exn t (Raise (var, `Normal)) in
+  t, addr
 
 let get_public_method t ~obj ~field =
-  let method_cache_id = t.next_method_cache_id in
   let f = Jsir.Var.fresh () in
+  (* As for [GETDYNMET] in bytecode: the runtimes take no method cache, and
+     wasm_of_ocaml checks the number of arguments when linking. *)
   let t =
     add_instr_exn t
       (Let
-         ( f,
-           Prim
-             ( Extern ("caml_get_public_method", None),
-               [ Pv obj;
-                 Pv field;
-                 Pc (Int (Targetint.of_int_exn method_cache_id)) ] ) ))
+         (f, Prim (Extern ("caml_get_public_method", None), [Pv obj; Pv field])))
   in
-  { t with next_method_cache_id = method_cache_id + 1 }, f
+  t, f
 
 let import_compilation_unit t compilation_unit =
   match Compilation_unit.equal compilation_unit Compilation_unit.predef_exn with
@@ -178,16 +267,151 @@ let import_compilation_unit t compilation_unit =
         Compilation_unit.Set.add compilation_unit t.imported_compilation_units
     }
 
-let global_data_var t =
-  match t.global_data_var with
+let add_var_alias_exn t ~bound_var ~defining_var =
+  if Jsir.Var.Map.mem bound_var t.var_aliases
+  then
+    Misc.fatal_errorf
+      "JSIR variable %a is bound twice. This usually means that a function or \
+       value slot appears in more than one set of closures, which the JSIR \
+       translation does not support."
+      Jsir.Var.print bound_var;
+  { t with var_aliases = Jsir.Var.Map.add bound_var defining_var t.var_aliases }
+
+type var_binding =
+  { bound_var : Jsir.Var.t;
+    defining_var : Jsir.Var.t
+  }
+
+let add_var_aliases_exn t bindings =
+  List.fold_left
+    (fun t { bound_var; defining_var } ->
+      add_var_alias_exn t ~bound_var ~defining_var)
+    t bindings
+
+(* Follow the chain of aliases to find the variable that defines an alias. *)
+let resolve_var_aliases var_aliases =
+  let rec resolve ~visiting resolved var =
+    match Jsir.Var.Map.find_opt var resolved with
+    | Some defining_var -> resolved, defining_var
+    | None -> (
+      match Jsir.Var.Map.find_opt var var_aliases with
+      | None -> resolved, var
+      | Some defining_var ->
+        if Jsir.Var.Set.mem var visiting
+        then
+          Misc.fatal_errorf "Cycle of JSIR variable aliases through %a"
+            Jsir.Var.print var;
+        let resolved, defining_var =
+          resolve
+            ~visiting:(Jsir.Var.Set.add var visiting)
+            resolved defining_var
+        in
+        Jsir.Var.Map.add var defining_var resolved, defining_var)
+  in
+  Jsir.Var.Map.fold
+    (fun var _ resolved ->
+      resolve ~visiting:Jsir.Var.Set.empty resolved var |> fst)
+    var_aliases Jsir.Var.Map.empty
+
+let add_entry_prelude_instr t instr =
+  { t with entry_prelude = instr :: t.entry_prelude }
+
+let symbol_to_name_constants symbol : Jsir.constant * Jsir.constant =
+  ( Symbol.compilation_unit symbol
+    |> Compilation_unit.name |> Compilation_unit.Name.to_string
+    |> To_jsir_target.name_constant,
+    Symbol.linkage_name_as_string symbol |> To_jsir_target.name_constant )
+
+let symbol_is_for_compilation_unit symbol =
+  let compilation_unit = Symbol.compilation_unit symbol in
+  Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
+
+let register_symbol t ?loc symbol var =
+  if symbol_is_for_compilation_unit symbol
+  then
+    (* We don't need to add this symbol to our symbol table, because it is
+       registered with [caml_register_global] and fetched with [caml_get_global]
+       instead (see [external_symbol_lookup]). The linker still needs to know
+       which variable holds the module block. *)
+    { t with symbol_exports = (symbol, var) :: t.symbol_exports }
+  else if not (Name_occurrences.mem_symbol t.reachable_names symbol)
+  then
+    (* No other compilation unit can refer to this symbol, as it is not
+       exported *)
+    t
+  else
+    let compilation_unit_name, symbol_name = symbol_to_name_constants symbol in
+    let t = { t with symbol_exports = (symbol, var) :: t.symbol_exports } in
+    let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
+    add_instr_exn t
+      (Let
+         ( Jsir.Var.fresh (),
+           Prim
+             ( Extern ("caml_register_symbol", None),
+               [Pc compilation_unit_name; Pc symbol_name; Pv var] ) ))
+
+let predef_exception_lookup symbol : Jsir.expr =
+  let symbol_name = Symbol.linkage_name_as_string symbol in
+  (* Chop off caml_exn_ *)
+  let caml_exn_ = "caml_exn_" in
+  if not (String.starts_with ~prefix:caml_exn_ symbol_name)
+  then
+    Misc.fatal_errorf
+      "Predefined exception symbol %a doesn't start with \"caml_exn_\""
+      Symbol.print symbol;
+  let symbol_name =
+    String.sub symbol_name (String.length caml_exn_)
+      (String.length symbol_name - String.length caml_exn_)
+  in
+  (* js_of_ocaml registers these with [caml_register_global_predef] *)
+  Prim
+    ( Extern ("caml_get_global_predef", None),
+      [Pc (To_jsir_target.name_constant symbol_name)] )
+
+let external_symbol_lookup t symbol : t * Jsir.expr =
+  match Symbol.is_predefined_exception symbol with
+  | true -> t, predef_exception_lookup symbol
+  | false -> (
+    match symbol_is_for_compilation_unit symbol with
+    | true ->
+      let compilation_unit = Symbol.compilation_unit symbol in
+      let t = import_compilation_unit t compilation_unit in
+      let compilation_unit_name =
+        Compilation_unit.name_as_string compilation_unit
+      in
+      ( t,
+        Prim
+          ( Extern ("caml_get_global", None),
+            [Pc (To_jsir_target.name_constant compilation_unit_name)] ) )
+    | false ->
+      (* The unit defining the symbol must be linked (and initialised) before
+         this one, so record it as an import too. *)
+      let t = import_compilation_unit t (Symbol.compilation_unit symbol) in
+      let compilation_unit_name, symbol_name =
+        symbol_to_name_constants symbol
+      in
+      ( t,
+        Prim
+          ( Extern ("caml_get_symbol", None),
+            [Pc compilation_unit_name; Pc symbol_name] ) ))
+
+(* Symbols from other compilation units are fetched once at the start of the
+   entry block. *)
+let external_symbol_var t symbol =
+  match Symbol.Map.find_opt symbol t.external_symbols with
   | Some var -> t, var
   | None ->
+    let t, expr = external_symbol_lookup t symbol in
     let var = Jsir.Var.fresh () in
-    { t with global_data_var = Some var }, var
+    let t = add_entry_prelude_instr t (Let (var, expr)) in
+    ( { t with external_symbols = Symbol.Map.add symbol var t.external_symbols },
+      var )
 
 type program =
   { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
+    imported_compilation_units : Compilation_unit.Set.t;
+    symbol_imports : (Jsir.Var.t * Symbol.t) list;
+    symbol_exports : (Symbol.t * Jsir.Var.t) list
   }
 
 let to_program_exn
@@ -195,10 +419,13 @@ let to_program_exn
       current_blocks;
       next_addr = _;
       reserved_addrs;
-      invalid_switch_block = _;
-      next_method_cache_id = _;
       imported_compilation_units;
-      global_data_var
+      entry_prelude;
+      external_symbols;
+      symbol_exports;
+      var_aliases;
+      call_events = _;
+      reachable_names = _
     } =
   if List.length current_blocks <> 0
   then
@@ -212,18 +439,30 @@ let to_program_exn
       "To_jsir_result.to_program_exn: expected all reserved addresses to be \
        used";
   let complete_blocks =
-    match global_data_var with
-    | None -> complete_blocks
-    | Some var ->
+    match entry_prelude with
+    | [] -> complete_blocks
+    | _ :: _ ->
       let entry_block = Jsir.Addr.Map.find Jsir.Addr.zero complete_blocks in
-      let body : Jsir.instr list =
-        Let (var, Prim (Extern ("caml_get_global_data", None), []))
-        :: entry_block.body
-      in
+      let body = List.rev_append entry_prelude entry_block.body in
       Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
   in
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
   let program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
   in
-  { program; imported_compilation_units }
+  let resolve = Jsir_subst.from_map (resolve_var_aliases var_aliases) in
+  let program = Jsir_subst.Excluding_Binders.program resolve program in
+  (* Predefined exceptions come from the runtime, not from a unit that could be
+     linked. *)
+  let symbol_imports =
+    Symbol.Map.fold
+      (fun symbol var imports ->
+        if Symbol.is_predefined_exception symbol
+        then imports
+        else (var, symbol) :: imports)
+      external_symbols []
+  in
+  let symbol_exports =
+    List.rev_map (fun (symbol, var) -> symbol, resolve var) symbol_exports
+  in
+  { program; imported_compilation_units; symbol_imports; symbol_exports }

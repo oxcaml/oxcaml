@@ -45,29 +45,37 @@ let create ~module_symbol ~reachable_names =
 
    These functions are there to ensure that a given symbol is: 1) given an
    appropriate locality, and 2) **always** given the same locality *)
-let raw_symbol res ~global:sym_global sym_name : t * Cmm.symbol =
+let raw_symbol res ~global:(sym_global : Cmm.is_global) ~ty sym_name :
+    t * Cmm.symbol =
   match String.Map.find_opt sym_name res.symbols with
   | None ->
-    let sym : Cmm.symbol = { sym_name; sym_global } in
+    let sym : Cmm.symbol =
+      match sym_global with
+      | Local -> Cmm.local_symbol ~ty sym_name
+      | Global -> Cmm.global_symbol ~ty sym_name
+    in
     let symbols = String.Map.add sym_name sym res.symbols in
     { res with symbols }, sym
   | Some sym ->
-    if Cmm.equal_is_global sym_global sym.sym_global
-    then res, sym
-    else
+    if not (Cmm.equal_is_global sym_global sym.sym_global)
+    then
       Misc.fatal_errorf "The symbol %s is declared as both local and global"
-        sym_name
+        sym_name;
+    if not (Cmm.equal_machtype ty sym.sym_type)
+    then
+      Misc.fatal_errorf "The symbol %s is declared with types %a and %a"
+        sym_name Printcmm.machtype sym.sym_type Printcmm.machtype ty;
+    res, sym
 
 let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
-  let sym_global =
+  let s : Cmm.symbol =
     if
       Current_unit.is_current (Symbol.compilation_unit sym)
       && not (Name_occurrences.mem_symbol res.reachable_names sym)
-    then Cmm.Local
-    else Cmm.Global
+    then Cmm.local_symbol ~ty:Cmm.typ_static_block sym_name
+    else Cmm.global_symbol ~ty:Cmm.typ_static_block sym_name
   in
-  let s : Cmm.symbol = { sym_name; sym_global } in
   s
 
 let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
@@ -82,14 +90,11 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
     then Compilenv.require_global (Code_id.get_compilation_unit code_id)
     else ()
   in
-  let sym_global =
-    if
-      Current_unit.is_current (Code_id.get_compilation_unit code_id)
-      && not (Name_occurrences.mem_code_id res.reachable_names code_id)
-    then Cmm.Local
-    else Cmm.Global
-  in
-  { sym_name; sym_global }
+  if
+    Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    && not (Name_occurrences.mem_code_id res.reachable_names code_id)
+  then Cmm.local_symbol ~ty:Cmm.typ_code_pointer sym_name
+  else Cmm.global_symbol ~ty:Cmm.typ_code_pointer sym_name
 
 (* *)
 
@@ -159,7 +164,7 @@ let define_module_symbol_if_missing r =
     let linkage_name =
       Linkage_name.to_string (Symbol.linkage_name r.module_symbol)
     in
-    let sym : Cmm.symbol = { sym_name = linkage_name; sym_global = Global } in
+    let sym = Cmm.global_symbol ~ty:Cmm.typ_static_block linkage_name in
     let l = C.emit_block sym (C.black_block_header 0 0) [] in
     set_data r l
 

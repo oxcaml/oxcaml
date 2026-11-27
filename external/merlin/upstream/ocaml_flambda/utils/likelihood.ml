@@ -84,3 +84,14 @@ let is_uniform l =
   List.for_all
     (fun t -> is_cold t || Float.equal t.logit max_logit)
     l
+
+type printing_scale = { total : t; uniform : bool }
+
+let printing_scale l = { total = sum_list l; uniform = is_uniform l }
+
+let worth_printing { total = _; uniform } t = is_cold t || not uniform
+
+let print { total; uniform = _ } ppf t =
+  match classify (rescale ~total t) with
+  | Cold -> Format.pp_print_string ppf "cold"
+  | Weight p -> Format.fprintf ppf "%f" p

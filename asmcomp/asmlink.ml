@@ -53,12 +53,19 @@ let runtime_lib () =
 
 (* Second pass: generate the startup file and link it with everything else *)
 
+(* The startup file contains only generated code (entry point, generic
+   functions, tables), which is not worth recording coverage for. *)
+let without_trace_pc_guard f =
+  Misc.protect_refs [Misc.R (Clflags.gated_trace_pc_guard, false)] f
+
 let named_startup_file () =
   !Clflags.keep_startup_file || !Emitaux.binary_backend_available
 
 let force_linking_of_startup ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
-    (Cmm.Cdata [Cmm.Csymbol_address (Cmm.global_symbol "caml_startup")])
+    (Cmm.Cdata
+       [ Cmm.Csymbol_address
+           (Cmm.global_symbol ~ty:Cmm.typ_code_pointer "caml_startup") ])
 
 let sourcefile_for_dwarf ~named_startup_file filename =
   (* Ensure the name emitted into the DWARF is stable, for build reproducibility
@@ -69,8 +76,21 @@ let emit_ocamlrunparam ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
     (Cmm.Cdata
        [ Cmm.Cdefine_symbol
-           { sym_name = "caml_ocamlrunparam"; sym_global = Global };
+           (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+              "caml_ocamlrunparam");
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
+
+(* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate
+   of [Cfg_trace_pc_guard]. This definition takes precedence over the weak ones
+   of instrumented units. *)
+let emit_trace_pc_guard_gate () =
+  if !Clflags.gated_trace_pc_guard_define_gate
+  then (
+    if !Clflags.llvm_backend
+    then
+      Misc.fatal_error
+        "-gated-trace-pc-guard-define-gate is not supported with -llvm-backend";
+    Emit_sancov_common.emit_gate_definition ~weak:false)
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
@@ -148,6 +168,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   in
   compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
+  emit_trace_pc_guard_gate ();
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
   else Emit.end_assembly ()
@@ -191,6 +212,7 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
     else []
   in
   compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
+  emit_trace_pc_guard_gate ();
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)
@@ -237,6 +259,7 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_shared_startup_file" (fun () ->
+          without_trace_pc_guard @@ fun () ->
           make_shared_startup_file unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink));
@@ -438,6 +461,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_startup_file" (fun () ->
+          without_trace_pc_guard @@ fun () ->
           make_startup_file linkenv unix ~ppf_dump
             ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
             units_tolink cached_genfns_imports));

@@ -20,3 +20,7 @@
   findlib.dynload))
 
 (ocamllex expect_lexer)
+
+(cinaps
+ (files expect_test.ml)
+ (libraries ppxlib_cinaps_helpers))

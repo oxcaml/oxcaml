@@ -230,7 +230,7 @@ let prove_is_null_generic env t : _ generic_proof =
   | Region _ ->
     wrong_kind "Value" t (Invalid : _ generic_proof)
 
-let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
+let prove_is_null env t = as_property (prove_is_null_generic env t)
 
 let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
     =
@@ -1622,3 +1622,21 @@ let prove_physical_equality env t1 t2 =
     in
     Simple.pattern_match' s1 ~const ~symbol ~var
   | None, Some _ | Some _, None | None, None -> check_heads ()
+
+let bool_to_target_ocaml_int_proof env (bool_proof : bool proof_of_property) :
+    Target_ocaml_int.t proof_of_property =
+  match bool_proof with
+  | Proved b -> Proved (Target_ocaml_int.bool (TE.machine_width env) b)
+  | Unknown -> Unknown
+
+let prove_relation env relation ty : _ proof_of_property =
+  match TG.Relation.descr relation with
+  | Is_null -> bool_to_target_ocaml_int_proof env (prove_is_null env ty)
+  | Is_int -> bool_to_target_ocaml_int_proof env (prove_is_int env ty)
+  | Get_tag -> (
+    match prove_get_tag env ty with
+    | Proved tags -> (
+      match Tag.Set.get_singleton tags with
+      | None -> Unknown
+      | Some tag -> Proved (Tag.to_targetint_31_63 (TE.machine_width env) tag))
+    | Unknown -> Unknown)

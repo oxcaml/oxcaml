@@ -72,13 +72,19 @@ val from_cma :
 
 type jsir_unit =
   { name : string
+  ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
+  ; whole_program : bool
+        (** Whether [program] is a whole program, to compile to an executable,
+            rather than a compilation unit (see {!Code.jsir_file}). It then
+            starts by registering the predefined exceptions. *)
   }
 
-val from_cmj : in_channel -> jsir_unit
-
-val from_cmja : in_channel -> jsir_unit list
+val from_jsir_channel :
+  target:Code.jsir_target -> filename:string -> in_channel -> jsir_unit
+(** Read a JSIR file ([.cm-jsir-js] or [.cm-jsir-wasm]), including its magic number and version.
+    Fails if the unit was not compiled for [target]. *)
 
 val from_channel :
      in_channel

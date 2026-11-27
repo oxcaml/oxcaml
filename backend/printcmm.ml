@@ -36,6 +36,9 @@ let machtype_component ppf (ty : machtype_component) =
   | Val -> fprintf ppf "val"
   | Addr -> fprintf ppf "addr"
   | Int -> fprintf ppf "int"
+  | Static_block -> fprintf ppf "static_block"
+  | Code_pointer -> fprintf ppf "code_pointer"
+  | Out_of_heap_data_pointer -> fprintf ppf "out_of_heap_data_pointer"
   | Float -> fprintf ppf "float"
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
@@ -64,6 +67,9 @@ let exttype ppf = function
   | XVec128 -> fprintf ppf "vec128"
   | XVec256 -> fprintf ppf "vec256"
   | XVec512 -> fprintf ppf "vec512"
+  | XDummy_int -> fprintf ppf "dummy_int"
+  | XDummy_float -> fprintf ppf "dummy_float"
+  | XFat_pointer -> fprintf ppf "fat_pointer"
 
 let extcall_signature ppf (ty_res, ty_args) =
   (match ty_args with
@@ -161,6 +167,9 @@ let chunk = function
   | Fivetwelve_unaligned -> "unaligned vec512"
   | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
+  | Word_static_block -> "static_block"
+  | Word_code_pointer -> "code_pointer"
+  | Word_out_of_heap_data_pointer -> "out_of_heap_data_pointer"
   | Word_mask -> "mask"
   | Word_val -> "val"
   | Single { reg = Float64 } -> "float32_as_float64"
@@ -268,8 +277,13 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _; known_arguments = _ }
-    ->
+  | Capply
+      { result_type = _ty;
+        region = _;
+        callees = _;
+        known_arguments = _;
+        returns = _
+      } ->
     "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
@@ -299,6 +313,7 @@ let operation d = function
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
+  | Cnot -> "not"
   | Clsl -> "<<"
   | Clsr -> ">>u"
   | Casr -> ">>s"
@@ -343,13 +358,14 @@ let operation d = function
       is_write
       (temporal_locality locality)
   | Catomic { op; size = _ } -> Printf.sprintf "atomic %s" (atomic_op op)
-  | Copaque -> "opaque"
+  | Copaque ty -> to_string "opaque %a" machtype ty
   | Cbeginregion -> "beginregion"
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
   | Ctls_get -> "tls_get"
   | Cdomain_index -> "domain_index"
+  | Cthread_self_id -> "thread_self_id"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
@@ -373,7 +389,8 @@ let rec expr ppf = function
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->
-    fprintf ppf "%a:\"%s\"" is_global s.sym_global s.sym_name
+    fprintf ppf "%a:\"%s\":%a" is_global s.sym_global s.sym_name machtype
+      s.sym_type
   | Cvar id -> V.print ppf id
   | Clet (id, def, (Clet (_, _, _) as body)) ->
     let print_binding id ppf def =
@@ -424,7 +441,9 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = mty; returns; _ } ->
+          fprintf ppf "@ %a" machtype mty;
+          if not returns then fprintf ppf "@ ->."
         | Cextcall
             { ty;
               ty_args;
@@ -560,9 +579,9 @@ let fundecl ppf f =
         sequence f.fun_body)
 
 let data_item ppf = function
-  | Cdefine_symbol { sym_name; sym_global = Local } ->
+  | Cdefine_symbol { sym_name; sym_global = Local; _ } ->
     fprintf ppf "\"%s\":" sym_name
-  | Cdefine_symbol { sym_name; sym_global = Global } ->
+  | Cdefine_symbol { sym_name; sym_global = Global; _ } ->
     fprintf ppf "global \"%s\":" sym_name
   | Cint8 n -> fprintf ppf "byte %i" n
   | Cint16 n -> fprintf ppf "int16 %i" n

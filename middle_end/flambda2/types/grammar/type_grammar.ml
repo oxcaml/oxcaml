@@ -548,13 +548,11 @@ and free_names_head_of_kind_value_non_null ~follow_value_slots head =
       fields
 
 and free_names_inverse_relations0 ~follow_value_slots:_ inverse_relations =
-  Relation.Map.fold
-    (fun _ names free_names ->
-      Name.Set.fold
-        (fun name free_names ->
-          Name_occurrences.add_name free_names name Name_mode.in_types)
-        names free_names)
-    inverse_relations Name_occurrences.empty
+  Name_occurrences.free_names_map ~fold:Relation.Map.fold
+    ~add_key:(fun free_names _relation -> free_names)
+    ~free_names_value:(fun names ->
+      Name_occurrences.create_names names Name_mode.in_types)
+    inverse_relations
 
 and free_names_head_of_kind_naked_immediate0 ~follow_value_slots head =
   free_names_inverse_relations0 ~follow_value_slots (inverse_relations head)
@@ -702,13 +700,9 @@ and free_names_function_type ~follow_value_slots
       code_id Name_mode.normal
 
 and free_names_env_extension ~follow_value_slots { equations } =
-  Name.Map.fold
-    (fun name t acc ->
-      let acc =
-        Name_occurrences.union acc (free_names0 ~follow_value_slots t)
-      in
-      Name_occurrences.add_name acc name Name_mode.in_types)
-    equations Name_occurrences.empty
+  Name_occurrences.free_names_name_map
+    (free_names0 ~follow_value_slots)
+    equations Name_mode.in_types
 
 and free_names_variant_extensions ~follow_value_slots
     (extensions : variant_extensions) =
@@ -970,19 +964,7 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
         }
 
 and apply_renaming_inverse_relations inverse_relations renaming =
-  Relation.Map.map_sharing
-    (fun names ->
-      let changed = ref false in
-      let names' =
-        Name.Set.fold
-          (fun name names ->
-            let name' = Renaming.apply_name renaming name in
-            if name' != name then changed := true;
-            Name.Set.add name' names)
-          names Name.Set.empty
-      in
-      if !changed then names' else names)
-    inverse_relations
+  Relation.Map.map_sharing (Renaming.apply_name_set renaming) inverse_relations
 
 and apply_renaming_head_of_kind_naked_immediate head renaming =
   let inverse_relations = inverse_relations head in
@@ -1182,17 +1164,8 @@ and apply_renaming_function_type ({ code_id; rec_info } as function_type)
   else { code_id = code_id'; rec_info = rec_info' }
 
 and apply_renaming_env_extension ({ equations } as env_extension) renaming =
-  let changed = ref false in
-  let equations' =
-    Name.Map.fold
-      (fun name ty acc ->
-        let ty' = apply_renaming ty renaming in
-        let name' = Renaming.apply_name renaming name in
-        if not (ty == ty' && name == name') then changed := true;
-        Name.Map.add name' ty' acc)
-      equations Name.Map.empty
-  in
-  if !changed then { equations = equations' } else env_extension
+  let equations' = Renaming.apply_name_map apply_renaming renaming equations in
+  if equations == equations' then env_extension else { equations = equations' }
 
 and apply_renaming_variant_extensions extensions renaming =
   match extensions with
@@ -1680,12 +1653,10 @@ and ids_for_export_head_of_kind_value_non_null head =
       (ids_for_export length) fields
 
 and ids_for_export_inverse_relations inverse_relations =
-  Relation.Map.fold
-    (fun _ names ids_for_export ->
-      Name.Set.fold
-        (fun name ids_for_export -> Ids_for_export.add_name ids_for_export name)
-        names ids_for_export)
-    inverse_relations Ids_for_export.empty
+  Ids_for_export.ids_for_export_map ~fold:Relation.Map.fold
+    ~add_ids_key:(fun ids _relation -> ids)
+    ~ids_for_export_value:Ids_for_export.ids_for_export_name_set
+    inverse_relations
 
 and ids_for_export_head_of_kind_naked_immediate head =
   ids_for_export_inverse_relations (inverse_relations head)
@@ -1803,10 +1774,7 @@ and ids_for_export_function_type { code_id; rec_info } =
     (ids_for_export rec_info)
 
 and ids_for_export_env_extension { equations } =
-  Name.Map.fold
-    (fun name t ids ->
-      Ids_for_export.add_name (Ids_for_export.union ids (ids_for_export t)) name)
-    equations Ids_for_export.empty
+  Ids_for_export.ids_for_export_name_map ids_for_export equations
 
 and ids_for_export_variant_extensions ext =
   match ext with
@@ -3386,7 +3354,13 @@ and project_head_of_kind_naked_mask ~to_project:_ ~expand:_ head = head
 
 and project_head_of_kind_rec_info ~to_project ~expand head =
   match (head : head_of_kind_rec_info) with
-  | Const _ | Succ _ | Unroll_to _ -> head
+  | Const _ -> head
+  | Succ rec_info ->
+    Rec_info_expr.succ
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
+  | Unroll_to (n, rec_info) ->
+    Rec_info_expr.unroll_to n
+      (project_head_of_kind_rec_info ~to_project ~expand rec_info)
   | Var var -> (
     if not (Variable.Set.mem var to_project)
     then head
@@ -3611,8 +3585,8 @@ let kind t =
 let non_null_value non_null =
   Value (TD.create { non_null = Ok non_null; is_null = Not_null })
 
-let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
-    =
+let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~is_int
+    ~get_tag ~extensions =
   (match immediates with
   | Unknown -> ()
   | Known immediates ->
@@ -3623,14 +3597,7 @@ let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
          [Naked_immediate]:@ %a"
         print immediates);
   non_null_value
-    (Variant
-       { is_int = None;
-         get_tag = None;
-         immediates;
-         blocks;
-         extensions;
-         is_unique
-       })
+    (Variant { is_int; get_tag; immediates; blocks; extensions; is_unique })
 
 let mutable_block alloc_mode = non_null_value (Mutable_block { alloc_mode })
 
@@ -4416,6 +4383,25 @@ let null : t =
   Value
     (TD.create { non_null = Bottom; is_null = Maybe_null { is_null = None } })
 
+let nullable t : t =
+  match t with
+  | Value descr -> (
+    match TD.descr descr with
+    | Ok (Equals _) ->
+      Misc.fatal_errorf
+        "Cannot represent alias-or-null types: [nullable] must be called on a \
+         concrete type, but got %a"
+        print t
+    | Unknown | Ok (No_alias { non_null = _; is_null = Maybe_null _ }) -> t
+    | Bottom -> null
+    | Ok (No_alias { non_null; is_null = Not_null }) ->
+      Value (TD.create { non_null; is_null = Maybe_null { is_null = None } }))
+  | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
+    Misc.fatal_errorf "Type of wrong kind for [nullable]: %a" print t
+
 let any_non_null_value : t =
   Value (TD.create { non_null = Unknown; is_null = Not_null })
 
@@ -4636,16 +4622,10 @@ module Head_of_kind_value = struct
 
   let mk_non_null non_null = { non_null = Ok non_null; is_null = Not_null }
 
-  let create_variant ~is_unique ~blocks ~immediates ~extensions =
+  let create_variant ~is_unique ~blocks ~immediates ~is_int ~get_tag ~extensions
+      =
     mk_non_null
-      (Variant
-         { is_int = None;
-           get_tag = None;
-           is_unique;
-           blocks;
-           immediates;
-           extensions
-         })
+      (Variant { is_int; get_tag; is_unique; blocks; immediates; extensions })
 
   let create_mutable_block alloc_mode =
     mk_non_null (Mutable_block { alloc_mode })

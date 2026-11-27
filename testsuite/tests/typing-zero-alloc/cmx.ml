@@ -11,14 +11,14 @@ open Zero_alloc_utils;;
 
 type summary =
   Relevant_components_by_argument_index.t
-  Allocation_sources.t
+  Allocation_source.t
   Component.t
   Components.t
 ;;
 [%%expect{|
 type summary =
     Zero_alloc_utils.Relevant_components_by_argument_index.t
-    Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+    Zero_alloc_utils.Allocation_source.t Zero_alloc_utils.Component.t
     Zero_alloc_utils.Components.t
 |}]
 
@@ -47,14 +47,14 @@ val read_cmx_lib : string -> summary = <fun>
 |}]
 
 let print_allocation_sources =
-  Allocation_sources.print Relevant_components_by_argument_index.print
+  Allocation_source.print Relevant_components_by_argument_index.print
 ;;
 
 [%%expect{|
 val print_allocation_sources :
   Format.formatter ->
   Zero_alloc_utils.Relevant_components_by_argument_index.t
-  Zero_alloc_utils.Allocation_sources.t -> unit = <fun>
+  Zero_alloc_utils.Allocation_source.t -> unit = <fun>
 |}]
 
 #install_printer print_allocation_sources;;
@@ -258,6 +258,43 @@ Exception: Failure "no such summary found".
 
 (* Passing constant symbols to conditionally zero-alloc functions: *)
 read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_diverge_"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* Note that the diverging component involves [f]'s *normal* component, since
+   [f] could be a stateful function that allocates on its first call and then
+   diverges on its second call. On the other hand, this is not the case for
+   exceptions, since any exceptions from the second call are caught. *)
+read_cmx_lib "call_twice_with_catch"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+
+(* This is correct: [zero_alloc conditional] is not a mode, and it is not deep,
+   so the call to [f] inside the option is seen as a call to an un-tracked
+   arbitrary function and thus [Top] everywhere. Then, as a long-standing
+   optimization, all-[Top] summaries are dropped during serialization, so
+   nothing is found. *)
+read_cmx_lib "call_optional_callback"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* CR wsturgeon: fix (arity, work for later PRs) *)
+read_cmx_lib "partially_apply_then_fully_apply"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;

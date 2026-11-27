@@ -1,0 +1,52 @@
+(executable
+ (name main)
+ (modes byte)
+ (link_flags (-linkall))
+ (libraries js_of_ocaml-compiler.dynlink js_of_ocaml-toplevel js_of_ocaml))
+
+(rule
+ (target main.cmis.js)
+ (action
+  (run
+   jsoo_mkcmis
+   %{ocaml_where}/stdlib.cma
+   %{ocaml_where}/compiler-libs/outcometree.cmi
+   %{ocaml_where}/compiler-libs/topdirs.cmi
+   %{ocaml_where}/compiler-libs/toploop.cmi
+   -o
+   %{target})))
+
+(rule
+ (target main.export)
+ (action
+  (run jsoo_listunits %{ocaml_where}/stdlib.cma -o %{target})))
+
+(rule
+ (target main.js)
+ (action
+  (run
+   js_of_ocaml
+   --toplevel
+   --no-cmis
+   --export
+   %{dep:main.export}
+   -w
+   no-missing-effects-backend
+   ; Memprof primitives of the bytecode compiler libraries, unused here.
+   -w
+   no-missing-primitive
+   +toplevel.js
+   +dynlink.js
+   %{dep:main.bc}
+   -o
+   %{target})))
+
+(rule
+ (alias runtest)
+ (deps main.cmis.js)
+ (action
+  (progn
+   (with-stdout-to
+    main.actual
+    (run node %{dep:main.js}))
+   (diff main.expected main.actual))))

@@ -25,13 +25,7 @@ external ext_void_return : unit -> void = "foo" "bar"
 
 external ext_void_in_product_arg : #(string * void) -> unit = "foo" "bar"
 [%%expect{|
-Line 1, characters 35-59:
-1 | external ext_void_in_product_arg : #(string * void) -> unit = "foo" "bar"
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_void_in_product_arg : #(string * void) -> unit = "foo" "bar"
 |}]
 
 external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
@@ -41,13 +35,7 @@ external ext_void_in_product_return : unit -> #(string * void) = "foo" "bar"
 
 external ext_all_void_arg : r -> unit = "foo" "bar"
 [%%expect{|
-Line 1, characters 28-37:
-1 | external ext_all_void_arg : r -> unit = "foo" "bar"
-                                ^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_all_void_arg : r -> unit = "foo" "bar"
 |}]
 external ext_all_void_return : unit -> r = "foo" "bar"
 [%%expect{|
