@@ -484,99 +484,166 @@ let binding instr =
   let variants = Hashtbl.find all_mnemonics base in
   if variants > 1 then mangled () else base
 
-let print_iarray elements = "(Iarray.of_array [|" ^ elements ^ "|])"
+module Top_level_decl : sig
+  module Identifier : sig
+    type t
+
+    val print : t -> string
+  end
+
+  val declare : name:string -> value:string -> Identifier.t
+
+  val get_declarations : unit -> (Identifier.t * string) list
+end = struct
+  module Identifier = struct
+    type t = string
+
+    let print t = t
+
+    let id_counter = ref 0
+
+    let create ~name =
+      let id = sprintf "%s_%d" name !id_counter in
+      incr id_counter;
+      id
+  end
+
+  let declarations = ref []
+
+  let declare ~name ~value =
+    let id = Identifier.create ~name in
+    declarations := (id, value) :: !declarations;
+    id
+
+  let get_declarations () = List.rev !declarations
+end
+
+let make_array_memoizer (type t) ~prefix ~equal_element ~print_element =
+  let module Array_table = Hashtbl.Make (struct
+    type nonrec t = t iarray
+
+    let equal a b = Iarray.equal equal_element a b
+
+    let hash t = Hashtbl.hash t
+  end) in
+  let arrays = Array_table.create 512 in
+  let print_array array =
+    let elements =
+      Iarray.map print_element array |> Iarray.to_list |> String.concat ";"
+    in
+    "[|" ^ elements ^ "|]"
+  in
+  fun array ->
+    match Array_table.find_opt arrays array with
+    | Some name -> name
+    | None ->
+      let name = sprintf "%s_arr" prefix in
+      let value = print_array array in
+      let id = Top_level_decl.declare ~name ~value in
+      Array_table.add arrays array id;
+      id
+
+let print_id = Top_level_decl.Identifier.print
+
+let memoize_and_print memoize v = print_id (memoize v)
+
+let print_ext : ext -> string = function
+  | SSE -> "SSE"
+  | SSE2 -> "SSE2"
+  | SSE3 -> "SSE3"
+  | SSSE3 -> "SSSE3"
+  | SSE4_1 -> "SSE4_1"
+  | SSE4_2 -> "SSE4_2"
+  | POPCNT -> "POPCNT"
+  | LZCNT -> "LZCNT"
+  | PCLMULQDQ -> "PCLMULQDQ"
+  | AES -> "AES"
+  | BMI -> "BMI"
+  | BMI2 -> "BMI2"
+  | AVX -> "AVX"
+  | AVX2 -> "AVX2"
+  | F16C -> "F16C"
+  | FMA -> "FMA"
+  | AVX512F -> "AVX512F"
+  | AVX512DQ -> "AVX512DQ"
+  | AVX512CD -> "AVX512CD"
+  | AVX512BW -> "AVX512BW"
+  | AVX512VL -> "AVX512VL"
+  | AVX512_BF16 -> "AVX512_BF16"
+  | VPCLMULQDQ -> "VPCLMULQDQ"
+  | AVX512_VBMI -> "AVX512_VBMI"
+  | AVX512_VBMI2 -> "AVX512_VBMI2"
+  | VAES -> "VAES"
+  | AVX512_BITALG -> "AVX512_BITALG"
+  | AVX512_VPOPCNTDQ -> "AVX512_VPOPCNTDQ"
+  | AVX512_IFMA -> "AVX512_IFMA"
+  | GFNI -> "GFNI"
+
+let print_temp : temp -> string = function
+  | R8 -> "R8"
+  | R16 -> "R16"
+  | R32 -> "R32"
+  | R64 -> "R64"
+  | M8 -> "M8"
+  | M16 -> "M16"
+  | M32 -> "M32"
+  | M64 -> "M64"
+  | M128 -> "M128"
+  | M256 -> "M256"
+  | M512 -> "M512"
+  | MM -> "MM"
+  | XMM -> "XMM"
+  | YMM -> "YMM"
+  | ZMM -> "ZMM"
+  | K -> "K"
+  | VM32X -> "VM32X"
+  | VM32Y -> "VM32Y"
+  | VM32Z -> "VM32Z"
+  | VM64X -> "VM64X"
+  | VM64Y -> "VM64Y"
+  | VM64Z -> "VM64Z"
+
+let memoize_temp_array =
+  make_array_memoizer ~prefix:"temp" ~equal_element:equal_temp
+    ~print_element:print_temp
+
+let print_loc : loc -> string = function
+  | Pin RAX -> "Pin RAX"
+  | Pin RDI -> "Pin RDI"
+  | Pin RCX -> "Pin RCX"
+  | Pin RDX -> "Pin RDX"
+  | Pin XMM0 -> "Pin XMM0"
+  | Temp temps -> "Temp " ^ memoize_and_print memoize_temp_array temps
+
+let print_arg_enc = function
+  | RM_r -> "RM_r"
+  | RM_rm -> "RM_rm"
+  | Vex_v -> "Vex_v"
+  | Mask -> "Mask"
+  | Implicit -> "Implicit"
+  | Immediate -> "Immediate"
+
+let memoize_args =
+  make_array_memoizer ~prefix:"arg" ~equal_element:equal_arg
+    ~print_element:(fun (arg : arg) ->
+      sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
+        (print_arg_enc arg.enc))
+
+let memoize_idxs =
+  make_array_memoizer ~prefix:"idx" ~equal_element:Int.equal
+    ~print_element:Int.to_string
+
+let memoize_exts =
+  make_array_memoizer ~prefix:"ext" ~equal_element:equal_ext
+    ~print_element:print_ext
 
 let print_one bind instr =
-  let print_ext : ext -> string = function
-    | SSE -> "SSE"
-    | SSE2 -> "SSE2"
-    | SSE3 -> "SSE3"
-    | SSSE3 -> "SSSE3"
-    | SSE4_1 -> "SSE4_1"
-    | SSE4_2 -> "SSE4_2"
-    | POPCNT -> "POPCNT"
-    | LZCNT -> "LZCNT"
-    | PCLMULQDQ -> "PCLMULQDQ"
-    | AES -> "AES"
-    | BMI -> "BMI"
-    | BMI2 -> "BMI2"
-    | AVX -> "AVX"
-    | AVX2 -> "AVX2"
-    | F16C -> "F16C"
-    | FMA -> "FMA"
-    | AVX512F -> "AVX512F"
-    | AVX512DQ -> "AVX512DQ"
-    | AVX512CD -> "AVX512CD"
-    | AVX512BW -> "AVX512BW"
-    | AVX512VL -> "AVX512VL"
-    | AVX512_BF16 -> "AVX512_BF16"
-    | VPCLMULQDQ -> "VPCLMULQDQ"
-    | AVX512_VBMI -> "AVX512_VBMI"
-    | AVX512_VBMI2 -> "AVX512_VBMI2"
-    | VAES -> "VAES"
-    | AVX512_BITALG -> "AVX512_BITALG"
-    | AVX512_VPOPCNTDQ -> "AVX512_VPOPCNTDQ"
-    | AVX512_IFMA -> "AVX512_IFMA"
-    | GFNI -> "GFNI"
-  in
-  let print_temp : temp -> string = function
-    | R8 -> "R8"
-    | R16 -> "R16"
-    | R32 -> "R32"
-    | R64 -> "R64"
-    | M8 -> "M8"
-    | M16 -> "M16"
-    | M32 -> "M32"
-    | M64 -> "M64"
-    | M128 -> "M128"
-    | M256 -> "M256"
-    | M512 -> "M512"
-    | MM -> "MM"
-    | XMM -> "XMM"
-    | YMM -> "YMM"
-    | ZMM -> "ZMM"
-    | K -> "K"
-    | VM32X -> "VM32X"
-    | VM32Y -> "VM32Y"
-    | VM32Z -> "VM32Z"
-    | VM64X -> "VM64X"
-    | VM64Y -> "VM64Y"
-    | VM64Z -> "VM64Z"
-  in
-  let print_loc : loc -> string = function
-    | Pin RAX -> "Pin RAX"
-    | Pin RDI -> "Pin RDI"
-    | Pin RCX -> "Pin RCX"
-    | Pin RDX -> "Pin RDX"
-    | Pin XMM0 -> "Pin XMM0"
-    | Temp temps ->
-      let temps =
-        Iarray.map print_temp temps |> Iarray.to_list |> String.concat ";"
-      in
-      "Temp " ^ print_iarray temps
-  in
-  let print_arg_enc = function
-    | RM_r -> "RM_r"
-    | RM_rm -> "RM_rm"
-    | Vex_v -> "Vex_v"
-    | Mask -> "Mask"
-    | Implicit -> "Implicit"
-    | Immediate -> "Immediate"
-  in
   let print_imm = function
     | Imm_none -> "Imm_none"
     | Imm_reg -> "Imm_reg"
     | Imm_spec -> "Imm_spec"
   in
-  let print_args args =
-    Iarray.map
-      (fun (arg : arg) ->
-        sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
-          (print_arg_enc arg.enc))
-      args
-    |> Iarray.to_list |> String.concat ";"
-  in
-  let print_register_args args =
+  let register_args args =
     Iarray.map
       (fun ({ loc; _ } as arg : arg) ->
         match loc with
@@ -588,14 +655,13 @@ let print_one bind instr =
           if Iarray.length temps = 0 then failwith instr.mnemonic;
           { arg with loc = Temp temps })
       args
-    |> print_args
   in
   (* A result written straight to its spill slot must overwrite the whole slot:
      the register form of e.g. [vpmovqb xmm1/m64, zmm2] zeroes the upper lanes
      of [xmm1], but the memory form writes only 64 bits, leaving the rest of a
      128-bit slot stale. Drop memory from result locations whose memory width is
      narrower than the register (GPR results zero-extend to 64 bits). *)
-  let print_result_args args =
+  let result_args args =
     let reg_width = function
       | R8 | R16 | R32 | R64 | MM | K -> 64
       | XMM -> 128
@@ -634,15 +700,11 @@ let print_one bind instr =
             { arg with loc = Temp regs }
           else arg)
       args
-    |> print_args
-  in
-  let print_idxs idxs =
-    Iarray.map Int.to_string idxs |> Iarray.to_list |> String.concat ";"
   in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
-    | Arg rr -> "Arg " ^ print_iarray (print_idxs rr)
-    | Res rr -> "Res " ^ print_iarray (print_result_args rr)
+    | Arg rr -> "Arg " ^ memoize_and_print memoize_idxs rr
+    | Res rr -> "Res " ^ memoize_and_print memoize_args (result_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -718,31 +780,29 @@ let print_one bind instr =
       (print_rm_reg r) opcode
   in
   let constructor = String.capitalize_ascii bind in
-  let ext =
-    Iarray.map print_ext instr.ext
-    |> Iarray.to_list |> String.concat ";" |> print_iarray
-  in
+  let ext = memoize_and_print memoize_exts instr.ext in
   let args, res =
     match instr.res with
     | Res rr when instr.flags.z && merge_reads_dst instr.mnemonic ->
       (* Without zeroing, masked-off lanes of the destination are preserved, so
          the destination must also be an input operand (restricted like a
-         result, see [print_result_args]). With zeroing, the destination must be
-         a register because EVEX.z is invalid with a memory destination. *)
-      let args = print_args instr.args in
-      let res_args = print_result_args rr in
-      let zeroing_res_args = print_register_args rr in
-      let idxs = print_idxs (Iarray.init (Iarray.length rr) (fun i -> i)) in
-      ( sprintf "(if z then %s else %s)" (print_iarray args)
-          (print_iarray (res_args ^ ";" ^ args)),
+         result, see [result_args]). With zeroing, the destination must be a
+         register because EVEX.z is invalid with a memory destination. *)
+      let args = instr.args in
+      let res_args = result_args rr in
+      let zeroing_res_args = memoize_args (register_args rr) in
+      let idxs = memoize_idxs (Iarray.init (Iarray.length rr) (fun i -> i)) in
+      ( sprintf "(if z then %s else %s)"
+          (memoize_and_print memoize_args args)
+          (memoize_and_print memoize_args (Iarray.append res_args args)),
         sprintf "(if z then Res %s else Arg %s)"
-          (print_iarray zeroing_res_args)
-          (print_iarray idxs) )
+          (print_id zeroing_res_args)
+          (print_id idxs) )
     | Res rr when instr.flags.z ->
-      ( print_iarray (print_args instr.args),
-        "Res " ^ print_iarray (print_register_args rr) )
+      ( memoize_and_print memoize_args instr.args,
+        "Res " ^ memoize_and_print memoize_args (register_args rr) )
     | (Res_none | Arg _ | Res _) as res ->
-      print_iarray (print_args instr.args), print_res res
+      memoize_and_print memoize_args instr.args, print_res res
   in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
@@ -757,7 +817,7 @@ let print_one bind instr =
     (List.filter (fun s -> String.length s > 0)) [bind; b; z]
     |> String.concat " "
   in
-  printf
+  sprintf
     {|
 let %s = {
     id = %s
@@ -791,8 +851,17 @@ let print_all () =
   Bind_map.iter
     (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind))
     all;
-  print_endline "\ntype nonrec instr = id instr";
-  Bind_map.iter (fun bind instr -> print_one bind instr) all
+  print_endline "\ntype nonrec instr = id instr\n";
+  let instrs =
+    Bind_map.to_list all |> List.map (fun (bind, instr) -> print_one bind instr)
+  in
+  List.iter
+    (fun (name, literal) ->
+      printf "let %s : _ iarray = %s\n"
+        (Top_level_decl.Identifier.print name)
+        literal)
+    (Top_level_decl.get_declarations ());
+  List.iter print_string instrs
 
 let parse_ext = function
   | "SSE" -> Some SSE
