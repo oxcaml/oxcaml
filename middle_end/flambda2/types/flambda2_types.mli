@@ -1066,6 +1066,8 @@ module Rewriter : sig
 
     val tag_immediate : 'a t -> 'a t
 
+    val nullable : 'a t -> 'a t
+
     val immutable_block :
       is_unique:bool ->
       Tag.t ->
