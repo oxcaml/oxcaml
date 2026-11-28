@@ -250,6 +250,7 @@ val as_merlin : unit -> bool
 val map_structure : structure -> structure
 val map_signature : signature -> signature
 val enable_checks : unit -> unit
+val stop_after_exception : unit -> unit
 val enable_location_check : unit -> unit
 val disable_location_check : unit -> unit
 

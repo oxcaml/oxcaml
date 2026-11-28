@@ -6,13 +6,6 @@ let set_input_lexbuf lexbuf_opt = input_lexbuf := lexbuf_opt
 module Error = struct
   [@@@warning "-37"]
 
-  type old_t (*IF_NOT_AT_LEAST 408 = Ocaml_common.Location.error *) = {
-    loc: t;
-    msg: string;
-    sub: old_t list;
-    if_highlight: string;
-  }
-
   type location_report_kind = Ocaml_common.Location.report_kind =
   | Report_error
   | Report_warning of string

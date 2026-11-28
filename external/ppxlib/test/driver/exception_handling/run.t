@@ -55,7 +55,7 @@ caught, so no AST is produced.
 
 
  when the -embed-errors flag is  passed
-  $ ./extender.exe -embed-errors impl.ml
+  $ ./extender.exe -embed-errors -continue-after-exception -no-check impl.ml
   let x = 1 + 1.
   let _ = [%ocaml.error "A raised located error"]
   let _ = [%ocaml.error "A second raised located error"]
@@ -73,7 +73,7 @@ caught, so no AST is produced.
   [1]
 
  when the -embed-errors flag is  passed
-  $ ./deriver.exe -embed-errors impl.ml
+  $ ./deriver.exe -embed-errors -continue-after-exception -no-check impl.ml
   type a = int
   type b = int[@@deriving deriver_located_error]
   [%%ocaml.error "A raised located error"]
@@ -104,7 +104,7 @@ when the -embed-errors flag is not passed
   [1]
 
  when the -embed-errors flag is  passed 
-  $ ./extender.exe -embed-errors impl.ml
+  $ ./extender.exe -embed-errors -continue-after-exception -no-check impl.ml
   let x = 1 + 1.
   let _ = [%ocaml.error "A raised located error"]
   let _ = [%ocaml.error "A second raised located error"]
@@ -123,7 +123,7 @@ when the -embed-errors flag is not passed
   [1]
 
  when the -embed-errors flag is passed 
-  $ ./deriver.exe -embed-errors impl.ml
+  $ ./deriver.exe -embed-errors -continue-after-exception -no-check impl.ml
   let x = 1 + 1.
   type a = int
   type b = int[@@deriving deriver_located_error]
@@ -134,7 +134,7 @@ when the -embed-errors flag is not passed
  In the case of whole file transformations:
 
   $ echo "let x = 1+1. " > impl.ml
-  $ ./whole_file_located_error.exe -embed-errors impl.ml
+  $ ./whole_file_located_error.exe -embed-errors -continue-after-exception -no-check impl.ml
   [%%ocaml.error "A located error in a whole file transform"]
   let x = 1 + 1.
 
@@ -146,7 +146,7 @@ when the -embed-errors flag is not passed
   $ ./extender.exe impl.ml
   Fatal error: exception Failure("A raised exception")
   [2]
-  $ ./extender.exe -embed-errors impl.ml
+  $ ./extender.exe -embed-errors -continue-after-exception -no-check impl.ml
   Fatal error: exception Failure("A raised exception")
   [2]
 
@@ -155,7 +155,7 @@ when the -embed-errors flag is not passed
   $ echo "type a = int" > impl.ml
   $ echo "type b = int [@@deriving deriver_raised_exception]" >> impl.ml
   $ echo "type b = int [@@deriving deriver_raised_exception2]" >> impl.ml
-  $ ./deriver.exe -embed-errors impl.ml
+  $ ./deriver.exe -embed-errors -continue-after-exception -no-check impl.ml
   Fatal error: exception Failure("A raised exception")
   [2]
 
@@ -171,7 +171,7 @@ when the -embed-errors flag is not passed
   [1]
 
  When embed-errors is not passed
-  $ ./constant_type.exe -embed-errors impl.ml
+  $ ./constant_type.exe -embed-errors -continue-after-exception -no-check impl.ml
   let x =
     ([%ocaml.error
        "A raised located error in the constant rewriting transformation."])
@@ -196,7 +196,7 @@ when the -embed-errors flag is not passed
   [1]
 
  When embed-errors is not passed
-  $ ./special_functions.exe -embed-errors impl.ml
+  $ ./special_functions.exe -embed-errors -continue-after-exception -no-check impl.ml
   let x1 = [%ocaml.error "error special function"]
   let x2 = [%ocaml.error "second error special function"]
 
@@ -206,7 +206,7 @@ when the -embed-errors flag is not passed
   $ ./whole_file_exception.exe impl.ml
   Fatal error: exception Failure("An exception in a whole file transform")
   [2]
-  $ ./whole_file_exception.exe -embed-errors impl.ml
+  $ ./whole_file_exception.exe -embed-errors -continue-after-exception -no-check impl.ml
   Fatal error: exception Failure("An exception in a whole file transform")
   [2]
 
@@ -221,7 +221,7 @@ When the `-embed-error` flag is not set, exceptions stop the rewriting process. 
 
 When the `-embed-error` flag is set, located exceptions thrown during the rewriting process are caught, and collected. The "throwing transformations" are ignored. After all transformations have been applied, the collected errors are appended at the beginning of the AST.
   $ echo 'let () = print_endline "Hello, World!" ' > impl.ml
-  $ ./whole_file_multiple_errors.exe -embed-errors impl.ml
+  $ ./whole_file_multiple_errors.exe -embed-errors -continue-after-exception -no-check impl.ml
   [%%ocaml.error
     "Raising a located exception during the first instrumentation phase"]
   [%%ocaml.error

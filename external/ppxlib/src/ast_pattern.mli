@@ -287,9 +287,6 @@ val elist : (expression, 'a -> 'a, 'b) t -> (expression, 'b list -> 'c, 'c) t
 val esequence :
   (expression, 'a -> 'a, 'b) t -> (expression, 'b list -> 'c, 'c) t
 
-val fail : Location.t -> string -> _
-(** Raises the exception that [Ast_pattern] recognizes as a matching failure. *)
-
 type context
 
 val of_func : (context -> Location.t -> 'a -> 'b -> 'c) -> ('a, 'b, 'c) t

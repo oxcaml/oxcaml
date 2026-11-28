@@ -252,7 +252,8 @@ module Str = Make (struct
     Utils.update_locs_to_include_doc_comments#structure
 end)
 
-
+(* TODO: share code between [Sig] and [Str] when they become
+  symmetric again. *)
 module Sig = Make (struct
   type t = signature_item
   type compiler_t = Ppxlib_ast.Compiler_version.Ast.Parsetree.signature_item

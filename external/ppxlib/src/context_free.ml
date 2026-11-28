@@ -1,4 +1,3 @@
-(*$ open Ppxlib_cinaps_helpers $*)
 open! Import
 open Common
 open With_errors
@@ -223,11 +222,6 @@ module Rule = struct
     let attr_multiple_replace name kind attributes expand =
       T (Attr_replace kind, T { name; attributes; expand })
   end
-
-  module Attribute_list = Attr_multiple_replace.Attribute_list
-  module Parsed_payload_list = Attr_multiple_replace.Parsed_payload_list
-
-  let attr_multiple_replace = Attr_multiple_replace.attr_multiple_replace
 
   let attr_str_type_decl attribute expand =
     T (Attr_str_type_decl, T { attribute; expand; expect = false })
@@ -1204,6 +1198,8 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       in
       loop st ~in_generated_code:false
 
+    (* TODO: unify code once [signature] and [structure] becomes
+    symmetric again. *)
     method! signature_items base_ctxt psg_items =
       let convert_exn = exn_to_sigi in
       let rec with_extra_items item ~extra_items ~expect_items ~rest

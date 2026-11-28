@@ -13,15 +13,15 @@ module Forcable_bool = struct
             | _ -> assert false )
 end
 
-let default_allow_unused_code_warnings : Forcable_bool.t = False
+let default_allow_unused_code_warnings : Forcable_bool.t = True
 let default_allow_unused_type_warnings : Forcable_bool.t = False
-let perform_checks = false
+let perform_checks = true
 
 (* The checks on extensions are only to get better error messages
    since the compiler will choke on unknown extensions. We disable
    them externally to make it easier to use non ppxlib based
    rewriters with ppxlib *)
-let perform_checks_on_extensions = false
+let perform_checks_on_extensions = true
 let perform_locations_check = true
 let fail_on_duplicate_derivers = false
 let diff_command = None
@@ -30,4 +30,4 @@ let diff_command = None
    error takes the place of the code the rewriter was to generate, and the
    other rewriters and the checks still run. Otherwise the first exception
    stops it, and is reported with the code as it was before any rewriting. *)
-let continue_after_exception = true
+let continue_after_exception = false

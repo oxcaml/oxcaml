@@ -7,7 +7,7 @@ Class expressions
   $ cat > test.ml << EOF
   > class class_ = c [@test.clx "suffix"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   class class_ = c__suffix
 
 Class fields
@@ -17,7 +17,7 @@ Class fields
   >     val foo = () [@@alert "-1"] [@@test.clf "suffix"] [@@alert "-2"]
   >   end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   class class_field =
     object val foo__suffix = ()[@@alert "-1"][@@alert "-2"] end
 
@@ -25,7 +25,7 @@ Class types
   $ cat > test.ml << EOF
   > class type class_type = ct[@test.clt "suffix"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   class type class_type = ct__suffix
 
 Class type fields
@@ -34,7 +34,7 @@ Class type fields
   >   val x : int [@@alert "-1"] [@@test.ctf "suffix"] [@@alert "-2"]
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   class type class_type_field =
     object val  x__suffix : int[@@alert "-1"][@@alert "-2"] end
 
@@ -44,14 +44,14 @@ Types
   >   val _e : (t[@alert "-1"] [@test.typ "suffix"] [@alert "-2"])
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   module type S  = sig val _e : ((t__suffix)[@alert "-1"][@alert "-2"]) end
 
 Expressions
   $ cat > test.ml << EOF
   > let _ = foo [@alert "-1"] [@test.exp "suffix"] [@alert "-2"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   let _ = ((foo__suffix)[@alert "-1"][@alert "-2"])
 
 Explicit test for the ident in a function application because it acts differently due to
@@ -59,28 +59,28 @@ Explicit test for the ident in a function application because it acts differentl
   $ cat > test.ml << EOF
   > let _ = (foo [@alert "-1"] [@test.exp "suffix"] [@alert "-2"]) ()
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   let _ = ((foo__suffix)[@alert "-1"][@alert "-2"]) ()
 
 Module expressions
   $ cat > test.ml << EOF
   > include M [@alert "-1"] [@test.mod_exp "suffix"] [@alert "-2"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   include ((M__suffix)[@alert "-1"][@alert "-2"])
 
 Module types
   $ cat > test.ml << EOF
   > module F : S [@alert "-1"] [@test.mod_typ "suffix"] [@alert "-2"] = struct end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   module F : ((S__suffix)[@alert "-1"][@alert "-2"]) = struct  end 
 
 Patterns
   $ cat > test.ml << EOF
   > let _ = match () with (a [@test.pat "suffix"]) -> ignore a__suffix
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   let _ = match () with | a__suffix -> ignore a__suffix
 
 Extension signature item
@@ -89,7 +89,7 @@ Extension signature item
   >   [%%foo] [@@test.sig.ext "suffix"]
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   module type S  = sig [%%foo__suffix ] end
 
 Extension structure item
@@ -98,7 +98,7 @@ Extension structure item
   >   [%%foo] [@@test.str.ext "suffix"]
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   module S = struct [%%foo__suffix ] end
 
 Eval structure item 
@@ -107,7 +107,7 @@ Eval structure item
   >   ident [@@test.str.evl "suffix"]
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   module _ = struct ;;ident__suffix end
 
 
@@ -121,7 +121,7 @@ Test that the "attr_multiple_replace" infrastructure works.
   >   [@prefix "prefix_"]
   >   [@alert "-3"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   let _ = ((prefix_foo_suffix)[@alert "-1"][@alert "-2"][@alert "-3"])
 
 A malformed payload is reported as an embedded error, and does not prevent the
@@ -134,7 +134,7 @@ rest of the file from being expanded.
   >   [%%foo] [@@test.str.ext "suffix"]
   > end
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   [%%ocaml.error "string expected"]
   let _ = foo__suffix
   let _ = ((bar)[@test.exp 42])
@@ -149,7 +149,7 @@ Demonstrate error when multiple instances of one attribute are passed.
   >   [@suffix "_suffix"]
   >   [@suffix "_again"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   [%%ocaml.error "Duplicated attribute"]
   [%%ocaml.error "Duplicated attribute"]
   let _ = ((prefix_foo)
@@ -163,6 +163,6 @@ no other attributes are available.
   >   [@suffix "_suffix"]
   >   [@suffix "_again"]
   > EOF
-  $ ./driver.exe test.ml
+  $ ./driver.exe -no-check test.ml
   [%%ocaml.error "Duplicated attribute"]
   let _ = ((foo)[@suffix "_suffix"][@suffix "_again"])

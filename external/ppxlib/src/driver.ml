@@ -12,6 +12,7 @@ let loc_fname = ref None
 let perform_checks = ref Options.perform_checks
 let perform_checks_on_extensions = ref Options.perform_checks_on_extensions
 let perform_locations_check = ref Options.perform_locations_check
+let continue_after_exception = ref Options.continue_after_exception
 let debug_attribute_drop = ref false
 let apply_list = ref None
 let preprocessor = ref None
@@ -1073,7 +1074,7 @@ let process_ast (ast : Intf_or_impl.t) ~input_name ~tool_name ~hook
     ~expect_mismatch_handler ~embed_errors =
   (* If we shouldn't continue after an exception, don't embed errors inside the
      rewriters: let the first exception escape, then catch it later below. *)
-  let stop = embed_errors && not Options.continue_after_exception in
+  let stop = embed_errors && not !continue_after_exception in
   let embed_errors = embed_errors && not stop in
   match ast with
   | Intf x ->
@@ -1348,6 +1349,13 @@ let shared_args =
     ( "-check-on-extensions",
       Arg.Set perform_checks_on_extensions,
       " Enable checks on extension point only" );
+    ( "-continue-after-exception",
+      Arg.Set continue_after_exception,
+      " When embedding errors, carry on after a rewriter raises" );
+    ( "-stop-after-exception",
+      Arg.Clear continue_after_exception,
+      " When embedding errors, stop at the first rewriter which raises, and \
+       report its error with the code as it was before any rewriting (default)" );
     ( "-no-locations-check",
       Arg.Clear perform_locations_check,
       " Disable locations check only" );
@@ -1627,6 +1635,7 @@ let enable_checks () =
   perform_checks := true;
   perform_checks_on_extensions := true
 
+let stop_after_exception () = continue_after_exception := false
 let enable_location_check () = perform_locations_check := true
 let disable_location_check () = perform_locations_check := false
 let map_structure st = map_structure st

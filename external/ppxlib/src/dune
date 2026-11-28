@@ -13,6 +13,8 @@
   ppxlib_ast.stdppx
   sexp_type
   oxcaml_private_lrgrep)
+ ; TODO ceastlund: clean up warning 68 (match-on-mutable-state-prevent-uncurry),
+ ; which this library triggers.
  (flags
   (:standard -safe-string -open Oxcaml_private_compiler_libs -open Ocaml_shadow))
  (ppx.driver

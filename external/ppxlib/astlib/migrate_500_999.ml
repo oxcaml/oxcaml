@@ -549,7 +549,9 @@ and copy_value_binding :
     | `Desugared_locally_abstract (p, ty_vars, typ, e) ->
         (p, e, with_constraint ty_vars typ)
     | `Desugared_locally_abstract_jkinded (inner_pat, canonical_poly) ->
-        (* [Pvc_constraint.locally_abstract_univars] can't carry jkind
+        (* FIXME: See dra27-js's is_desugared_gadt attempt
+
+           [Pvc_constraint.locally_abstract_univars] can't carry jkind
            annotations, so this binding has to keep its desugared encoding.
            We canonicalise the pattern's annotation to be exactly the tree
            that the compiler's [Pprintast.is_desugared_gadt] computes from

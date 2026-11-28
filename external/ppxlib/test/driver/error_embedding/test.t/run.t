@@ -7,7 +7,7 @@ With the `-embed-errors` options, if a PPX raises, the first such exception
 is caught and prepended to the last valid AST
 
   $ echo "let _ = [%raise]" > impl.ml
-  $ ../raiser.exe -embed-errors impl.ml
+  $ ../raiser.exe -embed-errors -continue-after-exception impl.ml
   let _ = [%ocaml.error "Raising inside the rewriter"]
 
 The same is true when using the `-as-ppx` mode (note that the error is reported
@@ -22,7 +22,7 @@ Also exceptions raised in a preprocessor get embedded into an AST(while the
 error from the preprocessor's stderr also gets reported on the driver's stderr)
 
   $ touch file.ml
-  $ ../raiser.exe -embed-errors -pp ../pp.exe file.ml | sed "s/> '.*'/> tmpfile/"
+  $ ../raiser.exe -embed-errors -continue-after-exception -pp ../pp.exe file.ml | sed "s/> '.*'/> tmpfile/"
   Fatal error: exception Raising inside the preprocessor
   [%%ocaml.error
     "Error while running external preprocessor\nCommand line: ../pp.exe 'file.ml' > tmpfile\n"]
@@ -30,7 +30,7 @@ error from the preprocessor's stderr also gets reported on the driver's stderr)
 Also `unknown version` errors are embedded into an AST when using the
 main standalone
 
-  $ ../raiser.exe -embed-errors -intf unknown_version_binary_ast
+  $ ../raiser.exe -embed-errors -continue-after-exception -intf unknown_version_binary_ast
   [%%ocaml.error
     "File is a binary ast for an unknown version of OCaml with magic number 'Caml1999N012'"]
 
@@ -43,7 +43,7 @@ main standalone
 
 Similar for 'input doesn't exist' errors: they get embedded by the main standalone...
 
-  $ ../raiser.exe -embed-errors -impl non_existing_file
+  $ ../raiser.exe -embed-errors -continue-after-exception -impl non_existing_file
   [%%ocaml.error "I/O error: non_existing_file: No such file or directory"]
 
 ... but not by the `-as-ppx` standalone
