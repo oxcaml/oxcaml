@@ -39,18 +39,10 @@ let rec v : 'a. 'a t = { f = v }
 let () = require_immutable_data v
 (* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
-val v : 'a t = {f = <cycle>}
-Line 2, characters 32-33:
-2 | let () = require_immutable_data v
-                                    ^
-Error: The value "v" has type "'a t" but an expression was expected of type
-         "('b : immutable_data)"
-       The kind of 'a t is immutable_data with 'b. 'b t
-         because of the definition of t at line 1, characters 0-28.
-       But the kind of 'a t must be a subkind of immutable_data
-         because of the definition of require_immutable_data at line 2, characters 27-58.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+Line 1, characters 23-32:
+1 | let rec v : 'a. 'a t = { f = v }
+                           ^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
@@ -59,7 +51,7 @@ type 'a t : immutable_data = { f : 'b. 'b t }
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = { f : 'b. 'b t }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'b. 'b t/2
+Error: The kind of type "t" is immutable_data with 'b. 'b t
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.

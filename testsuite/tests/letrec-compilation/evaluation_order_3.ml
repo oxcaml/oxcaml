@@ -1,6 +1,6 @@
 (* TEST *)
 
-type t = { x : t; y : t }
+type t = { mutable x : t; mutable y : t }
 
 let p = print_endline
 

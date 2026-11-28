@@ -422,7 +422,10 @@ let _ =
   assert (recursive_rec == fst recursive_rec.r)
 [%%expect{|
 type rec_record = { r : rec_record * float#; i : int; }
-- : unit = ()
+Line 4, characters 26-64:
+4 |   let rec recursive_rec = { r = (recursive_rec, #2.0) ; i = 42 } in
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 let _ =
@@ -430,7 +433,10 @@ let _ =
   let fst (x, _) = x in
   assert (recursive_tup == (fst recursive_tup).r)
 [%%expect{|
-- : unit = ()
+Line 2, characters 26-64:
+2 |   let rec recursive_tup = ({ r = recursive_tup ; i = 42 }, #2.0) in
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 type rec_constr = C of (#(rec_constr option * float#) * int)
@@ -441,7 +447,10 @@ let _ =
   assert (recursive == get recursive)
 [%%expect{|
 type rec_constr = C of (#(rec_constr option * float#) * int)
-- : unit = ()
+Line 3, characters 22-54:
+3 |   let rec recursive = C ( #(Some recursive, #4.0), 2 ) in
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* Tuple elements must be representable *)

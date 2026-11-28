@@ -156,7 +156,10 @@ Error: The value "a" has type "int * lbl:(int * lbl:'a)"
 
 let rec l = ~lbl: 5, ~lbl2: 10 :: l
 [%%expect{|
-val l : (lbl:int * lbl2:int) list = [(~lbl:5, ~lbl2:10); <cycle>]
+Line 1, characters 12-35:
+1 | let rec l = ~lbl: 5, ~lbl2: 10 :: l
+                ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* Tuple containing labeled tuples *)

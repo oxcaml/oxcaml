@@ -319,11 +319,11 @@ val w_arg : int * string = (7, "seven")
 
 (* Recursive definitions, whose sizes are computed by [Value_rec_compiler] *)
 
-type self = { s : self_inner }
+type self = { mutable s : self_inner }
 
 and self_inner = #{ me : self; k : int }
 
-type self_mixed = { sm : self_mixed_inner }
+type self_mixed = { mutable sm : self_mixed_inner }
 
 and self_mixed_inner = #{ me_m : self_mixed; f : float# }
 
@@ -340,6 +340,17 @@ let y =
   y
 
 let y_props = size y, y.sm.#me_m == y, Float_u.to_float y.sm.#f
+[%%expect{|
+type self = { mutable s : self_inner; }
+and self_inner = #{ me : self; k : int; }
+type self_mixed = { mutable sm : self_mixed_inner; }
+and self_mixed_inner = #{ me_m : self_mixed; f : float#; }
+type cyc = Cyc of #(cyc * int)
+val x : self = {s = #{me = <cycle>; k = 1}}
+val x_props : int * bool * int = (2, true, 1)
+val y : self_mixed = {sm = #{me_m = <cycle>; f = <abstr>}}
+val y_props : int * bool * float = (2, true, 2.)
+|}]
 
 let z =
   let rec z = Cyc #(z, 3) in
@@ -347,17 +358,10 @@ let z =
 
 let z_props = size z, match z with Cyc #(z', i) -> z' == z, i
 [%%expect{|
-type self = { s : self_inner; }
-and self_inner = #{ me : self; k : int; }
-type self_mixed = { sm : self_mixed_inner; }
-and self_mixed_inner = #{ me_m : self_mixed; f : float#; }
-type cyc = Cyc of #(cyc * int)
-val x : self = {s = #{me = <cycle>; k = 1}}
-val x_props : int * bool * int = (2, true, 1)
-val y : self_mixed = {sm = #{me_m = <cycle>; f = <abstr>}}
-val y_props : int * bool * float = (2, true, 2.)
-val z : cyc = Cyc <unboxed product>
-val z_props : int * (bool * int) = (2, (true, 3))
+Line 2, characters 14-25:
+2 |   let rec z = Cyc #(z, 3) in
+                  ^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* Modules whose only binding is an unboxed product *)

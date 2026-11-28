@@ -157,19 +157,28 @@ val l : unit# list = [<void>; <void>]
 let rec l = 1 :: l
 
 [%%expect {|
-val l : int list = [1; <cycle>]
+Line 1, characters 12-18:
+1 | let rec l = 1 :: l
+                ^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 let rec l = #1.0 :: l
 
 [%%expect {|
-val l : float# list = [<abstr>; <cycle>]
+Line 1, characters 12-21:
+1 | let rec l = #1.0 :: l
+                ^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 let rec l = #() :: l
 
 [%%expect {|
-val l : unit# list = [<void>; <cycle>]
+Line 1, characters 12-20:
+1 | let rec l = #() :: l
+                ^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 (* Regression test: void field of a record with an [any] parameter *)

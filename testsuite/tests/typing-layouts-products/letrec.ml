@@ -39,12 +39,18 @@ and ubx = #{ ubx : bx; }
 
 let rec t = #{ ubx = { bx = t } }
 [%%expect{|
-val t : ubx = #{ubx = {bx = <cycle>}}
+Line 1, characters 12-33:
+1 | let rec t = #{ ubx = { bx = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 let rec t = { bx = #{ ubx = t } }
 [%%expect{|
-val t : bx = {bx = <cycle>}
+Line 1, characters 12-33:
+1 | let rec t = { bx = #{ ubx = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 type bx = { bx : bx2# }
@@ -56,12 +62,18 @@ and bx2 = { bx2 : bx; }
 
 let rec t = #{ bx2 = { bx = t } }
 [%%expect{|
-val t : bx2# = #{bx2 = {bx = <cycle>}}
+Line 1, characters 12-33:
+1 | let rec t = #{ bx2 = { bx = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 let rec t = { bx = #{ bx2 = t } }
 [%%expect{|
-val t : bx = {bx = <cycle>}
+Line 1, characters 12-33:
+1 | let rec t = { bx = #{ bx2 = t } }
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* The cycle-finding algorithm in genprintval does not store non-values in its
@@ -118,7 +130,13 @@ let rec a =
 [%%expect{|
 type a = { a : b; }
 and b = X of a | Y
-val a : a = {a = X <cycle>}
+Lines 5-9, characters 2-10:
+5 | ..{a=
+6 |     (if Sys.opaque_identity true then
+7 |        X a
+8 |      else
+9 |        Y)}..
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
 type a = #{ a: b }
