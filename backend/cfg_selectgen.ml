@@ -134,10 +134,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (* The remaining operations are simple if their args are *)
       | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
       | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
-      | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt
-      | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-      | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _
-      | Ccmpf _ | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id ->
+      | Casr | Ccmpi _ | Caddv | Cadda | Cadd_pointer | Cnegf _ | Cclz | Cctz
+      | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+      | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
+      | Ctuple_field _ | Ccmpf _ | Cdls_get | Ctls_get | Cdomain_index
+      | Cthread_self_id ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
@@ -205,8 +206,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
-        | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-        | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
+        | Cadda | Cadd_pointer | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+        | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -477,6 +478,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccmpi comp -> select_arith_comp comp args
     | Caddv -> select_arith_comm Iadd args
     | Cadda -> select_arith_comm Iadd args
+    | Cadd_pointer -> select_arith_comm Iadd args
     | Ccmpf (w, comp) -> SU.basic_op (Floatop (w, Icompf comp)), args
     | Ccsel _ ->
       let cond, ifso, ifnot = three_args () in
@@ -935,11 +937,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
            | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
            | Cbswap _ | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _
-           | Catomic _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _
-           | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
-           | Cstatic_cast _ | Ccmpf _ | Cprobe _ | Cprobe_is_enabled _
-           | Copaque _ | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get
-           | Ctls_get | Cdomain_index | Cthread_self_id | Cpoll | Cpause ) as op),
+           | Catomic _ | Ccmpi _ | Caddv | Cadda | Cadd_pointer | Cnegf _
+           | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+           | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Cprobe _
+           | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
+           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+           | Cthread_self_id | Cpoll | Cpause ) as op),
           args,
           dbg ) ->
       emit_expr_op env sub_cfg bound_name op args dbg
@@ -1004,11 +1007,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
           | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _ | Ccsel _
           | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv
-          | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-          | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _
-          | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
-          | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
-          | Cthread_self_id | Cpoll | Cpause ),
+          | Cadda | Cadd_pointer | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+          | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
+          | Ccmpf _ | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _
+          | Cbeginregion | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get
+          | Cdomain_index | Cthread_self_id | Cpoll | Cpause ),
           _,
           _ )
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _

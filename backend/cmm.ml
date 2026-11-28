@@ -672,6 +672,7 @@ type operation =
   | Ccmpi of integer_comparison
   | Caddv
   | Cadda
+  | Cadd_pointer
   | Cnegf of float_width
   | Cabsf of float_width
   | Caddf of float_width
@@ -876,9 +877,9 @@ let iter_shallow_tail f = function
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
         | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
-        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
-        | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
+        | Cpopcnt | Caddv | Cadda | Cadd_pointer | Cpackf32 | Copaque _
+        | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cdomain_index
+        | Cthread_self_id | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
         | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -914,9 +915,9 @@ let map_shallow_tail f = function
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
-          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
-          | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
+          | Cpopcnt | Caddv | Cadda | Cadd_pointer | Cpackf32 | Copaque _
+          | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cdomain_index
+          | Cthread_self_id | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
           | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _

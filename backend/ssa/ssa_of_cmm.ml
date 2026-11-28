@@ -314,9 +314,9 @@ and emit env c (exp : Cmm.expression) ~tail : result =
     | Cop
         ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
            | Caddi128 | Csubi128 | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-           | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
-           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cthread_self_id
-           | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
+           | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cadd_pointer | Cpackf32
+           | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cdomain_index
+           | Cthread_self_id | Cpoll | Cpause | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
            | Cstore (_, _)
            | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
