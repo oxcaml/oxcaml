@@ -747,6 +747,7 @@ val transl_switch_clambda :
       any way for the frontend to generate any arguments other than the cache
       and cache position) *)
 val send :
+  callsite_counter:Fdo_counter.t option ->
   Lambda.meth_kind ->
   expression ->
   expression ->
@@ -1101,6 +1102,7 @@ val caml_modify_local :
 val direct_call :
   dbg:Debuginfo.t ->
   returns:bool ->
+  callsite_counter:Fdo_counter.t option ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1111,6 +1113,7 @@ val direct_call :
 val indirect_call :
   dbg:Debuginfo.t ->
   returns:bool ->
+  callsite_counter:Fdo_counter.t option ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
@@ -1124,6 +1127,7 @@ val indirect_call :
 val indirect_full_call :
   dbg:Debuginfo.t ->
   returns:bool ->
+  callsite_counter:Fdo_counter.t option ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
@@ -1198,6 +1202,7 @@ val fundecl :
   expression ->
   codegen_option list ->
   Debuginfo.t ->
+  fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   Lambda.poll_attribute ->
   machtype ->
   fundecl

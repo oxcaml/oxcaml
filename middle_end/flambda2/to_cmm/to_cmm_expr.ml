@@ -130,6 +130,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   let returns = Apply.returns apply in
+  let callsite_counter = Apply.callsite_counter apply in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -157,7 +158,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg ~returns
+      ( C.direct_call ~dbg ~returns ~callsite_counter
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym args,
         free_vars,
@@ -165,6 +166,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
     | Some { name; enabled_at_init } ->
+      Fdo_dropped_counters.register ~reason:Probe_handler_call
+        (Fdo_annotation.of_list (Option.to_list callsite_counter));
       assert (Flambda_arity.cardinal_unarized return_arity = 0);
       ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
           ~enabled_at_init,
@@ -182,7 +185,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg ~returns return_ty pos
+    ( C.indirect_call ~dbg ~returns ~callsite_counter return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -216,8 +219,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg ~returns return_ty pos callee ~callees args_ty
-          args,
+      ( C.indirect_full_call ~dbg ~returns ~callsite_counter return_ty pos
+          callee ~callees args_ty args,
         free_vars,
         env,
         res,
@@ -254,8 +257,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let alloc_mode =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
-    ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
-        ~returns dbg,
+    ( C.send ~callsite_counter kind callee obj (split_args ()) args_ty return_ty
+        (pos, alloc_mode) ~returns dbg,
       free_vars,
       env,
       res,

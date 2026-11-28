@@ -632,7 +632,11 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
     |> C.Extended_machtype.to_machtype
   in
-  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
+  let fdo_entry_annotation =
+    Env.get_code_metadata env code_id |> Code_metadata.fdo_entry_annotation
+  in
+  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg
+      ~fdo_entry_annotation fun_poll fun_ret_type,
     res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg
