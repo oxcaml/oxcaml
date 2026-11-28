@@ -139,6 +139,30 @@ let xs = [|2;7;18;28|] in
 - : int array = [|0|]
 |}];;
 
+(* Ranges ending at the extremal integers must not overflow and loop forever *)
+
+[|i for i = Int.max_int to Int.max_int|];;
+[%%expect{|
+- : int array = [|4611686018427387903|]
+|}];;
+
+[|i for i = Int.max_int - 2 to Int.max_int|];;
+[%%expect{|
+- : int array =
+[|4611686018427387901; 4611686018427387902; 4611686018427387903|]
+|}];;
+
+[|i for i = Int.min_int downto Int.min_int|];;
+[%%expect{|
+- : int array = [|-4611686018427387904|]
+|}];;
+
+[|i for i = Int.min_int + 2 downto Int.min_int|];;
+[%%expect{|
+- : int array =
+[|-4611686018427387902; -4611686018427387903; -4611686018427387904|]
+|}];;
+
 (* This would take ~forever if the empty array were iterated over later;
    however, for arrays, using [and] lets us get more flexibility (see below). *)
 [|i,j,k for i in [||] for j = 0 to Int.max_int for k = 0 downto Int.min_int|];;
