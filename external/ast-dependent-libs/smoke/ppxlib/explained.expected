@@ -1,0 +1,4 @@
+File "explained.ml", line 1, characters 13-14:
+1 | function C a a -> ()
+                 ^
+Error: Syntax Error. LRGrep analysis: Arguments of n-ary constructors should be put between parentheses, e.g. C (..., a)

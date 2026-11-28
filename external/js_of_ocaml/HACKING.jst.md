@@ -21,12 +21,12 @@ part of this repository are provided by Nix; Nix also supplies the Menhir,
 Node.js and Binaryen tools. `make ppxlib-build` builds only the ppxlib stack.
 
 The libraries that are only there as dependencies (yojson, menhirLib, sedlex,
-gen, cmdliner) are private: Make links them into `oxcaml-private/`, where they
-join this project, and each one is a wrapped library with a unique name
-(`oxcaml_private_yojson`, ...), installed as a sub-library such as
-`js_of_ocaml-compiler.private.yojson`. Its compilation units are
-`Oxcaml_private_yojson__*`, so they can't clash with a user's own copy. The
-libraries using them see the usual module names through
+gen, cmdliner here; lrgrep for ppxlib) are private: Make links them into
+`oxcaml-private/`, where they join this project, and each one is a wrapped
+library with a unique name (`oxcaml_private_yojson`, ...), installed as a
+sub-library such as `js_of_ocaml-compiler.private.yojson`. Its compilation
+units are `Oxcaml_private_yojson__*`, so they can't clash with a user's own
+copy. The libraries using them see the usual module names through
 `-open Oxcaml_private_yojson` (and so on) in their dune flags. default.nix
 rewrites the upstream dune files accordingly (see `joinConsumingProject`).
 The sedlex PPX and sedlex.utils are only needed while building, and are not
