@@ -169,7 +169,7 @@ let multi_setting s =
   try StrTbl.find settings_table s with Not_found -> []
 
 (* The per-variant build records written by Makefile.upstream, one line per
-   NON-default codegen variant in the configure-computed list:
+   codegen variant in the configure-computed list (base is not in it):
      "codegen_variant: <name>|<ocamlopt>|<cc>|<aspp>|<OCAMLPARAM>"
    gen.ml consumes the flag fields verbatim: the name->flag derivation
    lives in Makefile.codegen-variants (the Makefile-side encoding of
@@ -228,18 +228,6 @@ let codegen_variant_records () =
          cv_cc_flags = words cc;
          cv_aspp_flags = words aspp }
     | _ -> failwith ("Malformed codegen_variant record: " ^ line))
-
-let codegen_default_variant () =
-  match setting "codegen_default_variant" with
-  | [name] ->
-     (match Codegen_variant_name.of_string name with
-      | Some n -> n
-      | None ->
-         failwith (sprintf "Invalid codegen_default_variant %S" name))
-  | v ->
-     failwith
-       (sprintf "codegen_default_variant should be a single name, got: %s"
-          (String.concat " " v))
 
 let module_deps_table filename =
   parse_table filename
@@ -357,17 +345,17 @@ let[@inline never] [@local never] write_stdlib_dune ~variant ppf =
   end;
   (* The runtime archives of the tree: those of the bytecode runtime, and
      the native ones of the tree's variant (suffixed as described in
-     write_runtime_dune; "" for the default tree and for a variant that
-     shares the default's archives).  No other archive of runtime/ may have
+     write_runtime_dune; "" for the tree of base and for a variant that
+     shares the archives of base).  No other archive of runtime/ may have
      a copy rule here: the tree is installed as it is found, with whatever
      an earlier build left in it, and an unsuffixed archive in a variant's
-     tree would be the default variant's runtime. *)
+     tree would be the runtime of base. *)
   let codegen_suff =
     match record with
     | None -> ""
     | Some r ->
        Codegen_variant_name.runtime_archive_suffix r.cv_name
-         ~default:(codegen_default_variant ())
+         ~default:Codegen_variant_name.base
   in
   let runtime_archives =
     [ "libcamlrun.a"; "libcamlrund.a"; "libcamlrun_pic.a";
@@ -526,22 +514,18 @@ let default_codegen =
 let write_runtime_dune ppf =
   (* Codegen-variant dimension of the native runtime archives. THE NAMING
      RULE LIVES HERE: the unsuffixed archive names (libasmrun.a,
-     libasmrund.a, ...) always serve the configure-time default codegen
-     variant, and a non-default variant's archives are suffixed with
-     "_" ^ the ABSOLUTE name of the variant's projection onto the
-     runtime axes, with '-' mapped to '_' (variants whose projection
-     equals the default's share the default archives). The default is
-     base wherever variants are built (no configure option selects
-     another), so a build with the fp variant additionally builds
-     libasmrun_fp.a etc., and none builds libasmrun_base.a. The names
+     libasmrund.a, ...) are those of the base variant, and the archives of
+     another variant are suffixed with "_" ^ the name of the variant's
+     projection onto the runtime axes, with '-' mapped to '_'
+     (libasmrun_fp.a, libasmrun_fp_sc.a). A variant whose projection is
+     base, such as poll, shares the unsuffixed archives. The names
      must agree with
      Codegen_variant.runtime_archive_suffix (utils/codegen_variant.ml,
      via the copied utils/codegen_variant_name.ml) and with the
      archive-name composition in asmcomp/asmlink.ml (runtime_lib), which
      resolves these archives at link time. gen.ml is a standalone
-     generator that cannot depend on compilerlibs, so the configure
-     default and the per-variant flags reach it through build_settings.txt
-     (the codegen_default_variant key and the codegen_variant record
+     generator that cannot depend on compilerlibs, so the per-variant
+     flags reach it through build_settings.txt (the codegen_variant record
      lines, written by Makefile.upstream from Makefile.config).
 
      The per-record cc/aspp flags state the variant in full:
@@ -558,11 +542,11 @@ let write_runtime_dune ppf =
     match codegen_variant_records () with
     | [] -> []
     | records ->
-       let default = codegen_default_variant () in
        List.filter_map
          (fun r ->
            let suffix =
-             Codegen_variant_name.runtime_archive_suffix r.cv_name ~default
+             Codegen_variant_name.runtime_archive_suffix r.cv_name
+               ~default:Codegen_variant_name.base
            in
            if suffix = "" then None
            else

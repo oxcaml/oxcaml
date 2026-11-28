@@ -208,11 +208,8 @@ done
 
 # The variables that select a codegen variant for a run are for that run:
 # the test that starts a make does not find them in its environment. The
-# variant named here is the default one, which every tree can test.
-default=$(sed -n 's/^CODEGEN_DEFAULT_VARIANT=//p' \
-            "$testsuite/../Makefile.config" 2> /dev/null)
-must_pass one TEST="$tests/runs_one.ml" VARIANT_ONLY=1 \
-  ${default:+CODEGEN_VARIANT="$default"}
+# variant named here is base, which every tree can test.
+must_pass one TEST="$tests/runs_one.ml" VARIANT_ONLY=1 CODEGEN_VARIANT=base
 
 # A variable given on the command line of the testsuite's make does not
 # replace, in a make that a test starts, the value that the test has for

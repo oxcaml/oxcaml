@@ -188,7 +188,7 @@ boot-minimizer:
 # compiler` builds it.
 .PHONY: minimizer
 minimizer: check-codegen-variant \
-  $(if $(tested_codegen_variant_is_default),boot-compiler,compiler)
+  $(if $(tested_codegen_variant_is_base),boot-compiler,compiler)
 	cp chamelon/compat/dune.ox chamelon/compat/dune
 	$(dune) build $(tested_codegen_variant_workspace) @chamelon/all
 

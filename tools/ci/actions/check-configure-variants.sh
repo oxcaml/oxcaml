@@ -455,10 +455,6 @@ configuration than the list of variants:
 $(diff "$work/control.configuration" "$work/$name.configuration" | head -n 20)"
   fi
 done
-if [ "$(setting control CODEGEN_DEFAULT_VARIANT)" != base ]; then
-  fail control "the variant of the library root is \
-[$(setting control CODEGEN_DEFAULT_VARIANT)], not base"
-fi
 axis_macros='WITH_FRAME_POINTERS|STACK_CHECKS_ENABLED|WITH_ADDRESS_SANITIZER'
 if grep -Eq "^#define ($axis_macros)" "$work/control/runtime/caml/m.h"; then
   fail control "m.h defines the macro of an axis"

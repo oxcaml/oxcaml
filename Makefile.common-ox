@@ -270,22 +270,19 @@ runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom
 # The dune tests can run for any codegen variant this tree builds:
 #   make runtest CODEGEN_VARIANT=fp
 # runs them in the build context of that variant (main-fp) instead of the
-# main context, which is that of the default variant. See "Testing other
-# codegen variants and runtimes" in HACKING.ox.adoc for what such a run
-# covers.
+# main context, which is that of base. See "Testing other codegen variants
+# and runtimes" in HACKING.ox.adoc for what such a run covers.
 #
 # $(call codegen_variant_workspace,<name>): the dune option that selects
 # the build context of variant <name>.
-codegen_variant_workspace = $(if $(filter $(CODEGEN_DEFAULT_VARIANT),$(1)),\
+codegen_variant_workspace = $(if $(filter base,$(1)),\
   $(ws_main),--workspace=duneconf/main-$(1).ws)
 
 # The variant that CODEGEN_VARIANT selects for the targets that build in a
-# variant's context (runtest, minimizer): the default one when the variable
-# is not set.
-tested_codegen_variant = \
-  $(or $(strip $(CODEGEN_VARIANT)),$(CODEGEN_DEFAULT_VARIANT))
-tested_codegen_variant_is_default = \
-  $(filter $(CODEGEN_DEFAULT_VARIANT),$(tested_codegen_variant))
+# variant's context (runtest, minimizer): base when the variable is not
+# set.
+tested_codegen_variant = $(or $(strip $(CODEGEN_VARIANT)),base)
+tested_codegen_variant_is_base = $(filter base,$(tested_codegen_variant))
 tested_codegen_variant_workspace = \
   $(call codegen_variant_workspace,$(tested_codegen_variant))
 
@@ -307,7 +304,7 @@ check-llvmize-variant:
 	  echo "error: runtest-llvmize runs in the build context of the" \
 	    "codegen variant fp (the LLVM backend requires frame pointers)," \
 	    "which this tree does not build" >&2; \
-	  echo "  it builds: $(CODEGEN_DEFAULT_VARIANT) (the default)" \
+	  echo "  it builds: base (the default)" \
 	    "$(codegen_variant_names)" >&2; \
 	  echo "  configure with --enable-frame-pointers" >&2; \
 	  exit 1; }
@@ -377,10 +374,9 @@ _build/_bootinstall: Makefile.config Makefile.common-ox \
 	$(foreach n,$(codegen_variant_names),echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,) $(call codegen_variant_ocamlopt_flags,$(n)))' > duneconf/ocamlopt_flags_main-$(n).sexp; )
 
 # Per-context host-variant constants modules for otherlibs/dynlink (see the
-# dynlink_host_variant rule there): the default variant's values for the
-# default and main contexts, each variant's values for its main-<name>
-# context.
-	echo '$(call codegen_variant_dynlink_consts,$(CODEGEN_DEFAULT_VARIANT))' > duneconf/dynlink_host_variant_default.ml
+# dynlink_host_variant rule there): the values of base for the default and
+# main contexts, each variant's values for its main-<name> context.
+	echo '$(call codegen_variant_dynlink_consts,base)' > duneconf/dynlink_host_variant_default.ml
 	cp duneconf/dynlink_host_variant_default.ml duneconf/dynlink_host_variant_main.ml
 	$(foreach n,$(codegen_variant_names),echo '$(call codegen_variant_dynlink_consts,$(n))' > duneconf/dynlink_host_variant_main-$(n).ml; )
 	{ for flag in $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,); do \
@@ -895,13 +891,13 @@ CODEGEN_VARIANT ?=
 
 # $(call check_codegen_variants,<names>): fail, before anything is built or
 # run, if one of <names> is not a codegen variant this tree builds.
-built_codegen_variants = $(CODEGEN_DEFAULT_VARIANT) $(codegen_variant_names)
+built_codegen_variants = base $(codegen_variant_names)
 define check_codegen_variants
 	@unbuilt="$(filter-out $(built_codegen_variants),$(1))"; \
 	if [ -n "$$unbuilt" ]; then \
 	  echo "error: this tree does not build the codegen variant(s):" \
 	    "$$unbuilt" >&2; \
-	  echo "  it builds: $(CODEGEN_DEFAULT_VARIANT) (the default)" \
+	  echo "  it builds: base (the default)" \
 	    "$(codegen_variant_names)" >&2; \
 	  echo "  name one of those, or configure with" \
 	    "--with-codegen-variants=<comma-separated list>" >&2; \
@@ -926,7 +922,7 @@ check-test-tree: check-codegen-variant
 	@test -d _runtest/testsuite || { \
 	  echo "error: no test tree in _runtest; run make install_for_test" >&2; \
 	  exit 1; }
-	@test -z "$(filter-out $(CODEGEN_DEFAULT_VARIANT),$(CODEGEN_VARIANT))" \
+	@test -z "$(filter-out base,$(CODEGEN_VARIANT))" \
 	  || test -x $(variant_test_hosts) || { \
 	  echo "error: the test tree in _runtest has no test hosts for the" \
 	    "codegen variant $(CODEGEN_VARIANT) ($(variant_test_hosts) is" \

@@ -30,8 +30,8 @@
 #
 # Variant names are the '-'-joined, sorted names of the enabled axis tokens
 # ("base" when all are off); $(CODEGEN_VARIANTS) (from Makefile.config) is
-# the space-separated list of non-default variants to build, and
-# $(CODEGEN_DEFAULT_VARIANT) is the configure default's own name.
+# the space-separated list of the variants to build besides base, which
+# every build has.
 
 codegen_variant_names := $(strip $(CODEGEN_VARIANTS))
 
