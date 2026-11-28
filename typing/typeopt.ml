@@ -215,7 +215,7 @@ let rec classify ~classify_product env ty layout : _ classification =
       | Some (`String | `Bytes
              | `Int32 | `Int64 | `Nativeint
              | `Extension_constructor | `Continuation
-             | `Array | `Floatarray | `Iarray
+             | `Local_array | `Array | `Floatarray | `Iarray
              | `Atomic_loc
              | `Float32
              | `Int8x16
@@ -397,7 +397,9 @@ let array_kind_of_elt env loc elt_ty =
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
   | Some (Tconstr(p, [elt_ty], _))
-    when Path.same p Predef.path_array || Path.same p Predef.path_iarray ->
+    when Path.same p Predef.path_local_array
+         || Path.same p Predef.path_array
+         || Path.same p Predef.path_iarray ->
       array_kind_of_elt env loc elt_ty
   | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
       Pfloatarray
@@ -718,7 +720,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   | Tconstr(p, _, _) when Path.same p Predef.path_mask ->
     num_nodes_visited, non_nullable Pboxedmaskval
   | Tconstr(p, [arg], _)
-    when (Path.same p Predef.path_array
+    when (Path.same p Predef.path_local_array
+          || Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
     (* We don't eagerly check for representability here (e.g. we allow abstract
        kinds), and instead fall back when we don't know. Any functions that

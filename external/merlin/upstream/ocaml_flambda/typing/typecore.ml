@@ -1456,16 +1456,6 @@ let extract_option_type env ty =
     Tconstr(path, [ty], _) when Path.same path Predef.path_option -> ty
   | _ -> assert false
 
-let is_floatarray_type env ty =
-  match get_desc (expand_head env ty) with
-    Tconstr(path, [], _) -> Path.same path Predef.path_floatarray
-  | _ -> false
-
-let is_iarray_type env ty =
-  match get_desc (expand_head env ty) with
-  | Tconstr(path, [_], _) -> Path.same path Predef.path_iarray
-  | _ -> false
-
 let is_unboxed_unit_type env ty =
   match get_desc (expand_head env ty) with
   | Tconstr(path, [], _) -> Path.same path Predef.path_unboxed_unit
@@ -1813,19 +1803,38 @@ let check_disambiguation_principality ~loc ~name ty =
    disambiguation. *)
 type array_info =
   { ty_elt : (type_expr * Jkind.sort) option;
-    mut : mutable_flag }
+    array_flavor : array_flavor }
+
+let array_flavor_type (array_flavor : array_flavor) ty_elt =
+  match array_flavor with
+  | `Local_array -> Predef.type_local_array ty_elt
+  | `Array -> Predef.type_array ty_elt
+  | `Iarray -> Predef.type_iarray ty_elt
+  | `Floatarray -> Predef.type_floatarray
+
+let array_flavor_mutability : array_flavor -> mutability = function
+  | `Local_array | `Array | `Floatarray -> Mutable {
+      mode = With_regionality.Comonadic.legacy;
+      (* CR aspsmith: Revisit once we support atomic arrays *)
+      atomic = Nonatomic
+    }
+  | `Iarray -> Immutable
 
 let disambiguate_array_literal ~loc env expected_ty =
-  let return (ty_elt : (type_expr * Jkind.sort) option) (mut : mutable_flag) =
+  let return (ty_elt : (type_expr * Jkind.sort) option) array_flavor =
     check_disambiguation_principality ~loc ~name:"array" expected_ty;
-    { ty_elt; mut }
+    { ty_elt; array_flavor }
   in
-  if is_floatarray_type env expected_ty then
-    return (Some (instance Predef.type_float, Jkind.Sort.scannable)) Mutable
-  else if is_iarray_type env expected_ty then
-    return None Immutable
-  else
-    { ty_elt = None; mut = Mutable }
+  let default = { ty_elt = None; array_flavor = `Array } in
+  match get_desc (expand_head env expected_ty) with
+  | Tconstr (path, _, _) -> (
+    match Predef.find_type_constr path with
+    | Some `Floatarray ->
+      return (Some (instance Predef.type_float, Jkind.Sort.scannable))
+        `Floatarray
+    | Some (`Local_array | `Iarray as array_flavor) -> return None array_flavor
+    | _ -> default)
+  | _ -> default
 
 (* Typing of patterns *)
 
@@ -2788,7 +2797,7 @@ let solve_Ppat_record_field loc penv label label_lid record_ty
   |> fst
 
 let solve_Ppat_array loc env (mutability : mutable_flag) expected_ty
-  : _ * _ * mutable_flag =
+  : _ * _ * array_flavor =
   let expected_ty = generic_instance expected_ty in
   match mutability with
   | Immutable ->
@@ -2797,21 +2806,19 @@ let solve_Ppat_array loc env (mutability : mutable_flag) expected_ty
     in
     let ty_elt = newgenvar jkind in
     unify_pat_types_penv loc env (Predef.type_iarray ty_elt) expected_ty;
-    ty_elt, arg_sort, Immutable
+    ty_elt, arg_sort, `Iarray
   | Mutable ->
     match disambiguate_array_literal ~loc !!env expected_ty with
-    | { ty_elt = Some (ty_elt, sort); mut } -> ty_elt, sort, mut
-    | { ty_elt = None; mut } ->
-        let array_type = match mut with
-          | Immutable -> Predef.type_iarray
-          | Mutable -> Predef.type_array
-        in
+    | { ty_elt = Some (ty_elt, sort); array_flavor } ->
+      ty_elt, sort, array_flavor
+    | { ty_elt = None; array_flavor } ->
         let jkind, arg_sort =
           Jkind.for_array_element_sort ~level:(Ctype.get_current_level ())
         in
         let ty_elt = newgenvar jkind in
-        unify_pat_types_penv loc env (array_type ty_elt) expected_ty;
-        ty_elt, arg_sort, mut
+        unify_pat_types_penv loc env (array_flavor_type array_flavor ty_elt)
+          expected_ty;
+        ty_elt, arg_sort, array_flavor
 
 let solve_Ppat_lazy loc env expected_ty =
   let nv = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
@@ -4332,19 +4339,11 @@ and type_pat_aux
       | Asttypes.Mutable -> ()
       | Asttypes.Immutable ->
         Language_extension.assert_enabled ~loc Immutable_arrays ());
-      let ty_elt, arg_sort, mutability =
+      let ty_elt, arg_sort, array_flavor =
         solve_Ppat_array loc penv mut expected_ty
       in
-      let mutability =
-        match mutability with
-        | Mutable  -> Mutable {
-          mode = With_regionality.Comonadic.legacy;
-          (* CR aspsmith: Revisit once we support atomic arrays *)
-          atomic = Nonatomic
-        }
-        | Immutable -> Immutable
-      in
-      let modalities = Typemode.mutable_modalities mutability in
+      let mutability = array_flavor_mutability array_flavor in
+      let modalities = Typemode.array_implied_modalities array_flavor in
       check_project_mutability ~loc ~env:!!penv Array_elements mutability
         pat_mode.mode;
       let is_contained_by : Mode.Hint.is_contained_by =
@@ -8538,7 +8537,7 @@ and type_expect_
       | Mutable -> ()
       | Immutable ->
         Language_extension.assert_enabled ~loc Immutable_arrays ());
-      let ty_elt, elt_sort, mutability =
+      let ty_elt, elt_sort, array_flavor =
         let ty_expected = generic_instance ty_expected in
         match mutability with
         | Immutable ->
@@ -8548,36 +8547,25 @@ and type_expect_
           let ty_elt = newgenvar jkind in
           with_explanation (fun () ->
             unify_exp_types loc env (Predef.type_iarray ty_elt) ty_expected);
-          ty_elt, elt_sort, Asttypes.Immutable
+          ty_elt, elt_sort, `Iarray
         | Mutable ->
           match disambiguate_array_literal ~loc env ty_expected with
-          | { ty_elt = Some (ty_elt, sort); mut } -> ty_elt, sort, mut
-          | { ty_elt = None; mut } ->
+          | { ty_elt = Some (ty_elt, sort); array_flavor } ->
+            ty_elt, sort, array_flavor
+          | { ty_elt = None; array_flavor } ->
             let jkind, elt_sort =
               Jkind.for_array_element_sort ~level:(Ctype.get_current_level ())
             in
             let ty_elt = newgenvar jkind in
-            let to_unify =
-              match mut with
-              | Mutable -> Predef.type_array ty_elt
-              | Immutable -> Predef.type_iarray ty_elt
-            in
             with_explanation (fun () ->
-                unify_exp_types loc env to_unify ty_expected);
-            ty_elt, elt_sort, mut
+                unify_exp_types loc env (array_flavor_type array_flavor ty_elt)
+                  ty_expected);
+            ty_elt, elt_sort, array_flavor
       in
-      let mutability =
-        match mutability with
-        | Mutable -> Mutable {
-          mode = With_regionality.Comonadic.legacy;
-          (* CR aspsmith: Revisit once we support atomic arrays *)
-          atomic = Nonatomic;
-        }
-        | Immutable -> Immutable
-      in
+      let mutability = array_flavor_mutability array_flavor in
       let locality_mode, array_mode = register_allocation ~loc expected_mode in
       let locality_mode = Typedtree.create_locality_mode_r locality_mode in
-      let modalities = Typemode.mutable_modalities mutability in
+      let modalities = Typemode.array_implied_modalities array_flavor in
       let is_contained_by : Mode.Hint.is_contained_by =
         {containing = Array Modality; container = (loc, Expression)}
       in
@@ -10718,7 +10706,7 @@ and type_label_access
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
         lbl_mut;
-        lbl_modalities = Typemode.mutable_modalities lbl_mut;
+        lbl_modalities = Typemode.default_mutable_modalities lbl_mut;
         lbl_pos = 0;
         lbl_all = [||];
         lbl_repres =

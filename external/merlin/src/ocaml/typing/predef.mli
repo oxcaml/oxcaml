@@ -26,14 +26,11 @@ type abstract_type_constr = [
   | `Bytes
   | `Float
   | `Continuation
-  | `Array
   | `Nativeint
   | `Int32
   | `Int64
   | `Lazy_t
   | `Extension_constructor
-  | `Floatarray
-  | `Iarray
   | `Atomic_loc
   | `Lexing_position
   | `Expr
@@ -42,6 +39,7 @@ type abstract_type_constr = [
   | `Float32
   | `Int8
   | `Int16
+  | Types.array_flavor
 ]
 type abstract_non_value_type_constr = [
   | `Nativeint_u
@@ -109,6 +107,7 @@ val type_unit: type_expr
 val type_exn: type_expr
 val type_eff: type_expr -> type_expr
 val type_continuation: type_expr -> type_expr -> type_expr
+val type_local_array: type_expr -> type_expr
 val type_array: type_expr -> type_expr
 val type_iarray: type_expr -> type_expr
 val type_list: type_expr -> type_expr
@@ -204,6 +203,7 @@ val path_bool: Path.t
 val path_unit: Path.t
 val path_exn: Path.t
 val path_eff: Path.t
+val path_local_array: Path.t
 val path_array: Path.t
 val path_iarray: Path.t
 val path_list: Path.t

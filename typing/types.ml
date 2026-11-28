@@ -114,6 +114,8 @@ type mutability =
       ; atomic : atomic
       }
 
+type array_flavor = [ `Local_array | `Array | `Iarray | `Floatarray ]
+
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
