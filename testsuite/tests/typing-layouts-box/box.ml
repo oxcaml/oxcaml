@@ -1504,16 +1504,9 @@ Lines 3-5, characters 6-3:
 4 |   let f (x : 'a box) : 'c = Obj.magic x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : any) 'c. 'a box -> 'c end
-       is not included in
-         sig val f : 'b -> 'c end
-       Values do not match:
-         val f : ('a : any) 'c. 'a box -> 'c
-       is not included in
-         val f : 'b -> 'c
-       The type "'a box -> 'b" is not compatible with the type "'c -> 'd"
-       Type "'a box" is not compatible with type "'c"
+       The value "f" does not match its expected declaration
+       The type "'a box -> ..." is not compatible with the type "'b -> ..."
+       Type "'a box" is not compatible with type "'b"
 |}]
 
 (* [box] is covariant *)

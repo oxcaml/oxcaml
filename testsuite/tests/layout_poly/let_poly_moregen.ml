@@ -28,12 +28,8 @@ Lines 1-3, characters 8-3:
 2 |   let id x = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match: sig val id : 'a -> 'a end is not included in Id
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -47,12 +43,8 @@ Lines 1-3, characters 8-3:
 2 |   let id (x : (_ : value)) = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match: sig val id : 'a -> 'a end is not included in Id
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of id at line 4, characters 2-25.
        But the kind of 'a must be a subkind of value
@@ -86,16 +78,9 @@ Lines 1-4, characters 8-3:
 3 |   let poly_ k x y = ignore x; x
 4 | end.....
 Error: Signature mismatch:
-       Modules do not match:
-         sig val ignore : 'a -> unit val poly_ k : 'a. 'a -> 'b -> 'a end
-       is not included in
-         K
-       Values do not match:
-         val poly_ k : 'a. 'a -> 'b -> 'a
-       is not included in
-         val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The value "k" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -110,17 +95,11 @@ Lines 1-4, characters 8-3:
 3 |   let poly_ k x y = ignore y; x
 4 | end.....
 Error: Signature mismatch:
-       Modules do not match:
-         sig val ignore : 'a -> unit val poly_ k : 'b. 'a -> 'b -> 'a end
-       is not included in
-         K
-       Values do not match:
-         val poly_ k : 'b. 'a -> 'b -> 'a
-       is not included in
-         val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'a -> 'c -> 'a"
-       The type "'c" is layout polymorphic,
-       but "'b" is not layout polymorphic.
+       The value "k" does not match its expected declaration
+       The type "... -> 'a -> ..." is not compatible with the type
+         "... -> 'b -> ..."
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
 |}];;
 
 (module struct
@@ -132,16 +111,9 @@ Lines 1-3, characters 8-3:
 2 |   let k x y = x
 3 | end.....
 Error: Signature mismatch:
-       Modules do not match:
-         sig val k : 'a -> 'b -> 'a end
-       is not included in
-         K
-       Values do not match:
-         val k : 'a -> 'b -> 'a
-       is not included in
-         val poly_ k : 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The value "k" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -179,16 +151,9 @@ Lines 1-4, characters 8-3:
 3 |   let poly_ k x y = ignore x; x
 4 | end.....
 Error: Signature mismatch:
-       Modules do not match:
-         sig val ignore : 'a -> unit val poly_ k : 'a. 'a -> 'b -> 'a end
-       is not included in
-         K
-       Values do not match:
-         val poly_ k : 'a. 'a -> 'b -> 'a
-       is not included in
-         val poly_ k : 'b. 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The value "k" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -209,16 +174,9 @@ Lines 1-3, characters 8-3:
 2 |   let k x y = x
 3 | end.....
 Error: Signature mismatch:
-       Modules do not match:
-         sig val k : 'a -> 'b -> 'a end
-       is not included in
-         K
-       Values do not match:
-         val k : 'a -> 'b -> 'a
-       is not included in
-         val poly_ k : 'b. 'a -> 'b -> 'a
-       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The type "'c" is layout polymorphic,
+       The value "k" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
+       The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
 
@@ -258,21 +216,8 @@ Lines 1-3, characters 8-3:
 2 |   let id x = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val id :
-             ('a : '_representable_layout_4 & '_representable_layout_5).
-               'a -> 'a
-         end
-       is not included in
-         Id
-       Values do not match:
-         val id :
-           ('a : '_representable_layout_4 & '_representable_layout_5).
-             'a -> 'a
-       is not included in
-         val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -322,12 +267,8 @@ Lines 1-3, characters 8-3:
 2 |   let id x = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match: sig val id : 'a -> 'a end is not included in Id
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val id : layout_ l l0. ('a : l & l0). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -365,15 +306,8 @@ Lines 1-3, characters 8-3:
 2 |   let poly_ id (x : (_ : any & value)) = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig val id : layout_ l. ('a : l & value). 'a -> 'a end
-       is not included in
-         Id
-       Values do not match:
-         val id : layout_ l. ('a : l & value). 'a -> 'a
-       is not included in
-         val id : layout_ l. ('a : value & l). 'a -> 'a @@ stateless
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value & value_or_null
          because of the definition at line 4, characters 15-42.
        But the layout of 'a must be a sublayout of value_or_null & value
@@ -419,22 +353,8 @@ Lines 1-3, characters 8-3:
 2 |   let id x = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val id :
-             ('a : '_representable_layout_7 & '_representable_layout_8).
-               'a -> 'a
-         end
-       is not included in
-         Id
-       Values do not match:
-         val id :
-           ('a : '_representable_layout_7 & '_representable_layout_8).
-             'a -> 'a
-       is not included in
-         val poly_ id : #('a * int) -> #('a * int)
-       The type "'a -> 'a" is not compatible with the type
-         "#('b * int) -> #('b * int)"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "#('b * int) -> ..."
        The type "#('b * int)" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;
@@ -498,12 +418,8 @@ Line 4, characters 12-63:
 4 | module M = (struct let id (x : ('a : any mod portable)) = x end : Id)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match: sig val id : 'a -> 'a end is not included in Id
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val poly_ id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The type "'b" is layout polymorphic,
        but "'a" is not layout polymorphic.
 |}];;

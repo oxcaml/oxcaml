@@ -118,10 +118,6 @@ Lines 3-5, characters 6-3:
 4 |   type s = t
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type s = t end
-       is not included in
-         sig type s = private [ `Bar of int | `Foo of 'a -> int ] as 'a end
        Type declarations do not match:
          type s = t
        is not included in

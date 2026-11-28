@@ -871,18 +871,7 @@ Lines 3-9, characters 6-3:
 8 |   let x = f (assert false)
 9 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : immediate) t = 'a
-           val f : ('a : immediate). 'a t -> 'a
-           val x : ('a : immediate). 'a
-         end
-       is not included in
-         sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "('a : immediate)" is not compatible with the type "string"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -914,18 +903,7 @@ Lines 3-9, characters 6-3:
 8 |   let x = f (assert false)
 9 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('a : immediate) t = 'a
-           val f : ('a : immediate). 'a t -> 'a t
-           val x : ('a : immediate). 'a t
-         end
-       is not included in
-         sig val x : string end
-       Values do not match:
-         val x : ('a : immediate). 'a t
-       is not included in
-         val x : string
+       The value "x" does not match its expected declaration
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
        The layout of string is value non_float
@@ -2016,15 +1994,8 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val f : ('a : any). 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
        But the layout of 'a must be representable
@@ -2072,15 +2043,8 @@ Line 1, characters 33-34:
 1 | module F (X : S_value) : S_any = X
                                      ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         S_any
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 2, characters 2-30.
        But the layout of 'a must be a value layout
@@ -2094,15 +2058,8 @@ Line 1, characters 37-38:
 1 | module F (X : S_value) : S_float64 = X
                                          ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         S_float64
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : ('a : float64). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is float64
          because of the definition of f at line 10, characters 2-34.
        But the layout of 'a must be a value layout
@@ -2121,10 +2078,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value) t = 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type ('a : any) t = 'a end
        Type declarations do not match:
          type 'a t = 'a
        is not included in
@@ -2148,10 +2101,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = 'a -> 'a
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a -> 'a end
-       is not included in
-         sig type ('a : any) t = 'a -> 'a end
        Type declarations do not match:
          type 'a t = 'a -> 'a
        is not included in
@@ -2175,10 +2124,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { f : 'a. 'a -> 'a }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { f : 'a. 'a -> 'a; } end
-       is not included in
-         sig type t = { f : ('a : any). 'a -> 'a; } end
        Type declarations do not match:
          type t = { f : 'a. 'a -> 'a; }
        is not included in
@@ -2203,10 +2148,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { f : ('a : any). 'a -> 'a }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { f : ('a : any). 'a -> 'a; } end
-       is not included in
-         sig type t = { f : 'a. 'a -> 'a; } end
        Type declarations do not match:
          type t = { f : ('a : any). 'a -> 'a; }
        is not included in
@@ -2233,16 +2174,9 @@ Lines 3-6, characters 6-3:
 5 |     ignore (g (Stdlib_upstream_compatible.Float_u.of_float 3.14)); ignore (g "hello"); ignore (g 5); ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (('a : any). 'a -> unit) -> unit end
-       is not included in
-         sig val f : ('a. 'a -> unit) -> unit end
-       Values do not match:
-         val f : (('a : any). 'a -> unit) -> unit
-       is not included in
-         val f : ('a. 'a -> unit) -> unit
-       The type "(('a : any). 'a -> unit) -> unit"
-       is not compatible with the type "('a. 'a -> unit) -> unit"
+       The value "f" does not match its expected declaration
+       The type "(('a : any). 'a -> ...) -> ..."
+       is not compatible with the type "('a. 'a -> ...) -> ..."
        Type "'a" is not compatible with type "'a0"
 |}]
 
@@ -2260,16 +2194,9 @@ Lines 3-6, characters 6-3:
 5 |     ignore (g "hello"); ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a. 'a -> 'a) -> unit end
-       is not included in
-         sig val f : (('a : any). 'a -> 'a) -> unit end
-       Values do not match:
-         val f : ('a. 'a -> 'a) -> unit
-       is not included in
-         val f : (('a : any). 'a -> 'a) -> unit
-       The type "('a. 'a -> 'a) -> unit" is not compatible with the type
-         "(('a : any). 'a -> 'a) -> unit"
+       The value "f" does not match its expected declaration
+       The type "('a. 'a -> ...) -> ..." is not compatible with the type
+         "(('a : any). 'a -> ...) -> ..."
        Type "'a" is not compatible with type "'a0"
 |}]
 
@@ -2285,10 +2212,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = K of ('a -> 'a)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = K of ('a -> 'a) end
-       is not included in
-         sig type ('a : any) t = K of ('a -> 'a) end
        Type declarations do not match:
          type 'a t = K of ('a -> 'a)
        is not included in

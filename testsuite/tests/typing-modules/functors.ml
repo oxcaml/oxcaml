@@ -59,8 +59,7 @@ module M = F(W)
 Line 1, characters 11-15:
 1 | module M = F(W)
                ^^^^
-Error: Modules do not match: sig type w = W.w end is not included in
-       x
+Error: Modules do not match: W is not included in x
      The type "x" is required but not provided
 |}]
 
@@ -90,7 +89,7 @@ Error: This application of the functor "F" is ill-typed.
          (X : x) (Y : y) -> ...
        1. Module X matches the expected module type x
        2. Modules do not match:
-            W : w
+            W
           is not included in
             y
           The type "y" is required but not provided
@@ -141,17 +140,13 @@ Lines 2-4, characters 2-5:
 3 |     module F(X:sig type t end) = struct end
 4 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module F : functor (X : sig type t end) -> sig end end
-       is not included in
-         sig module F : functor (X : sig end) -> sig end end
        In module "F":
        Modules do not match:
          (X : $S1) -> ...
        is not included in
          (X : sig end) -> ...
        Module types do not match:
-         $S1 = sig type t end
+         $S1
        does not include
          sig end
        The type "t" is required but not provided
@@ -164,8 +159,8 @@ module F : functor (X : sig type t end) -> sig end
 Line 2, characters 11-31:
 2 | module M = F(struct type x end)
                ^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig type x end is not included in sig type t end
-     The type "t" is required but not provided
+Error: Signature mismatch:
+       The type "t" is required but not provided
 |}]
 
 module F(X:sig type x end)(Y:sig type y end)(Z:sig type z end) = struct
@@ -217,13 +212,6 @@ Lines 3-5, characters 6-3:
 4 |  module F(X:sig type y end) = struct end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module F : functor (X : sig type y end) -> sig end end
-       is not included in
-         sig
-           module F :
-             functor (X : sig type x end) (X : sig type y end) -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S2) -> ...
@@ -341,9 +329,9 @@ Error: This application of the functor "F" is ill-typed.
        1. Module $S1 matches the expected module type
        2. Module $S2 matches the expected module type
        3. Modules do not match:
-            $S3 : sig type yy = K.y end
+            $S3
           is not included in
-            $T3 = sig type y = A.y end
+            $T3
           The type "y" is required but not provided
 |}]
 
@@ -495,20 +483,11 @@ Lines 5-7, characters 6-3:
 6 |   module type S = sig type s type t end
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type S = sig type s type t end end
-       is not included in
-         sig module type S = sig type t end end
        Module type declarations do not match:
          module type S = sig type s type t end
        does not match
          module type S = sig type t end
        The second module type is not included in the first
-       At position "module type S = <here>"
-       Module types do not match:
-         sig type t end
-       is not equal to
-         sig type s type t end
        At position "module type S = <here>"
        The type "s" is required but not provided
 |}]
@@ -524,20 +503,11 @@ Lines 3-5, characters 6-3:
 4 |   module type S = sig type t end
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type S = sig type t end end
-       is not included in
-         sig module type S = sig type t type u end end
        Module type declarations do not match:
          module type S = sig type t end
        does not match
          module type S = sig type t type u end
        The first module type is not included in the second
-       At position "module type S = <here>"
-       Module types do not match:
-         sig type t end
-       is not equal to
-         sig type t type u end
        At position "module type S = <here>"
        The type "u" is required but not provided
 |}]
@@ -608,14 +578,6 @@ Lines 2-6, characters 1-3:
 5 |   module F(X:aa)(Y:a) = struct end
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type aa = a
-           module type a
-           module F : functor (X : aa) (Y : a) -> sig end
-         end
-       is not included in
-         sig module F : functor (X : a) (Y : a) -> sig end end
        In module "F":
        Modules do not match:
          (X : aa) (Y : a/1) -> ...
@@ -689,30 +651,6 @@ Lines 15-27, characters 6-3:
 26 |   = struct end
 27 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type ybb end) ->
-                      sig end)
-               (Z : functor (A : sig type za end) (B : sig type zbb end) ->
-                      sig end)
-               -> sig end
-         end
-       is not included in
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type yb end) ->
-                      sig end)
-               (Z : functor (A : sig type za end) (B : sig type zb end) ->
-                      sig end)
-               -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S1) (Y : $S2) (Z : $S3) -> ...
@@ -731,9 +669,9 @@ Error: Signature mismatch:
             (A : $T1) (B : $T2) -> ...
           1. Module types $S1 and $T1 match
           2. Module types do not match:
-               $S2 = sig type yb end
+               $S2
              does not include
-               $T2 = sig type ybb end
+               $T2
              The type "yb" is required but not provided
        3. Module types do not match:
             $S3 =
@@ -782,28 +720,6 @@ Lines 12-21, characters 6-3:
 20 |   = struct end
 21 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type yb end) ->
-                      sig end)
-               -> sig end
-         end
-       is not included in
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type yb end) ->
-                      sig end)
-               (Z : functor (A : sig type za end) (B : sig type zb end) ->
-                      sig end)
-               -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S1) (Y : $S2) -> ...
@@ -853,30 +769,6 @@ Lines 12-24, characters 6-3:
 23 |   = struct end
 24 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xaa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type ybb end) ->
-                      sig end)
-               (Z : functor (A : sig type za end) (B : sig type zbb end) ->
-                      sig end)
-               -> sig end
-         end
-       is not included in
-         sig
-           module F :
-             functor
-               (X : functor (A : sig type xa end) (B : sig type xz end) ->
-                      sig end)
-               (Y : functor (A : sig type ya end) (B : sig type yb end) ->
-                      sig end)
-               (Z : functor (A : sig type za end) (B : sig type zb end) ->
-                      sig end)
-               -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S1) (Y : $S2) (Z : $S3) -> ...
@@ -893,9 +785,9 @@ Error: Signature mismatch:
           is not included in
             (A : $T1) (B : $T2) -> ...
           1. Module types do not match:
-               $S1 = sig type xa end
+               $S1
              does not include
-               $T1 = sig type xaa end
+               $T1
              The type "xa" is required but not provided
           2. Module types $S2 and $T2 match
        2. Module types do not match:
@@ -956,77 +848,6 @@ Lines 12-23, characters 6-3:
 22 |   end
 23 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module B :
-             sig
-               module C : sig module D : sig module E : sig ... end end end
-             end
-         end
-       is not included in
-         sig
-           module B :
-             sig
-               module C : sig module D : sig module E : sig ... end end end
-             end
-         end
-       In module "B":
-       Modules do not match:
-         sig module C = B.C end
-       is not included in
-         sig
-           module C :
-             sig
-               module D :
-                 sig
-                   module E :
-                     sig
-                       module F :
-                         sig ... end ->
-                           sig ... end ->
-                             sig ... end -> sig ... end -> sig end
-                     end
-                 end
-             end
-         end
-       In module "B.C":
-       Modules do not match:
-         sig module D = B.C.D end
-       is not included in
-         sig
-           module D :
-             sig
-               module E :
-                 sig
-                   module F :
-                     sig type x end ->
-                       sig type y end ->
-                         sig type z end -> sig type w end -> sig end
-                 end
-             end
-         end
-       In module "B.C.D":
-       Modules do not match:
-         sig module E = B.C.D.E end
-       is not included in
-         sig
-           module E :
-             sig
-               module F :
-                 sig type x end ->
-                   sig type y end ->
-                     sig type z end -> sig type w end -> sig end
-             end
-         end
-       In module "B.C.D.E":
-       Modules do not match:
-         sig module F = B.C.D.E.F end
-       is not included in
-         sig
-           module F :
-             sig type x end ->
-               sig type y end -> sig type z end -> sig type w end -> sig end
-         end
        In module "B.C.D.E.F":
        Modules do not match:
          (X : $S1) (Y : $S2) (W : $S4) -> ...
@@ -1034,9 +855,9 @@ Error: Signature mismatch:
          $T1 $T2 $T3 $T4 -> ...
        1. Module types $S1 and $T1 match
        2. Module types do not match:
-            $S2 = sig type y' end
+            $S2
           does not include
-            $T2 = sig type y end
+            $T2
           The type "y'" is required but not provided
        3. An argument appears to be missing with module type
               $T3 = sig type z end
@@ -1158,25 +979,9 @@ Error: Signature mismatch:
          (X : $T1) (Y : $T2) (Z : $T3) (Z : $T4) (W : $T5) (S : $T6)
          (R : $T7) -> ...
        1. Module types do not match:
-            $S1 =
-            sig
-              type when_
-              type shall
-              type we
-              type tree
-              type meet
-              type again
-            end
+            $S1
           does not include
-            $T1 =
-            sig
-              type when_
-              type shall
-              type we
-              type three
-              type meet
-              type again
-            end
+            $T1
           The type "tree" is required but not provided
        2. Module types do not match:
             $S2 =
@@ -1408,23 +1213,6 @@ Lines 14-16, characters 2-3:
 15 |   module F(X:sig type x end)(Z:sig type z end) = struct end
 16 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (X : sig type x end) (Z : sig type z end) -> sig end
-         end
-       is not included in
-         sig
-           module F :
-             functor
-               (X : sig
-                      type x
-                      module type t =
-                        functor (Y : sig type y end) (Z : sig type z end) ->
-                          sig end
-                    end)
-               -> X.t
-         end
        In module "F":
        Modules do not match:
          (X : $S1) (Z : $S3) -> ...
@@ -1461,23 +1249,6 @@ Lines 8-14, characters 6-3:
 13 |        end)  = (X.M : X.t)
 14 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (Wrong : sig type wrong end)
-               (X : sig module type t module M : t end) -> X.t
-         end
-       is not included in
-         sig
-           module F :
-             functor
-               (X : sig
-                      module type T
-                      module type t = T -> T -> T
-                      module M : t
-                    end)
-               -> X.T -> X.T -> X.T
-         end
        In module "F":
        Modules do not match:
          (Wrong : $S1) (X : $S2) X.T X.T -> ...
@@ -1522,40 +1293,13 @@ Lines 17-21, characters 6-3:
 20 |           )(Res: X.T)(Res: X.T)(Res: X.T) = Res
 21 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             sig type wrong end ->
-               functor (X : sig module type T end) (Res : X.T) (Res : X.T)
-                 (Res : X.T) -> (X.T with Res)
-         end
-       is not included in
-         sig
-           module F :
-             sig end ->
-               functor
-                 (X : sig
-                        module type T
-                        module type inner =
-                          sig module type t module M : t end
-                        module F :
-                          functor (X : inner) ->
-                            (T -> T -> T) -> sig module type res = X.t end
-                        module Y :
-                          sig
-                            module type t = T -> T -> T
-                            module M : functor (X : T) (Y : T) -> T
-                          end
-                      end)
-                 -> X.F(X.Y)(X.Y.M).res
-         end
        In module "F":
        Modules do not match:
          (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res : X.T) -> ...
        is not included in
          (sig end) (X : $T2) X.T X.T -> ...
        1. Module types do not match:
-            $S1 = sig type wrong end
+            $S1
           does not include
             sig end
           The type "wrong" is required but not provided
@@ -1594,9 +1338,9 @@ Error: This application of the functor "F" is ill-typed.
          (X : ...) (Y : $T2) (Z : $T3) -> ...
        1. Module X matches the expected module type
        2. Modules do not match:
-            $S2 : sig type t = int end
+            $S2
           is not included in
-            $T2 = sig type t = Y of X/2.t end
+            $T2
           Type declarations do not match:
             type t = int
           is not included in
@@ -1668,7 +1412,7 @@ Error: The functor application "Bar(B)(FiveArgsExt)(B)(AExt)" is ill-typed.
        do not match these parameters:
          (W : A) (X : Ext) (Y : B) (Z : Ext) -> ...
        1. Modules do not match:
-            B : sig type b = B.b end
+            B
           is not included in
             A
           The type "a" is required but not provided
@@ -1690,7 +1434,7 @@ Error: The functor application "Bar(A)(FiveArgsExt)(TY)(TY)(TY)(TY)(TY)" is ill-
        1. Module A matches the expected module type A
        2. Module FiveArgsExt matches the expected module type Ext
        3. Modules do not match:
-            TY : sig type t = TY.t end
+            TY
           is not included in
             B
           The type "b" is required but not provided
@@ -1781,8 +1525,8 @@ module F : functor (X : A) -> sig end
 Line 2, characters 11-40:
 2 | module R = F(struct end[@warning "-73"]);;
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig end is not included in A
-     The type "a" is required but not provided
+Error: Signature mismatch:
+       The type "a" is required but not provided
 |}]
 
 module F()(X:empty)()(Y:A) = struct end
@@ -1862,9 +1606,9 @@ Error: This application of the functor "F" is ill-typed.
        do not match these parameters:
          (A : $T1) (B : $T2) -> ...
        1. Modules do not match:
-            $S1 : sig type t = unit end
+            $S1
           is not included in
-            $T1 = sig type 'a t end
+            $T1
           Type declarations do not match:
             type t = unit
           is not included in
@@ -1902,7 +1646,7 @@ Error: This application of the functor "G" is ill-typed.
        1. Modules do not match:
             (struct end)
           is not included in
-            $T1 = sig type 'a t = 'a * 'a end
+            $T1
           The type "t" is required but not provided
        2. Module $S2 matches the expected module type
 |}]
@@ -2015,21 +1759,17 @@ Error: This application of the functor "H" is ill-typed.
        do not match these parameters:
          (X : $T1) (Y : $T2) -> ...
        1. Modules do not match:
-            $S1 : sig type t type 'a s = 'a end
+            $S1
           is not included in
-            $T1 = sig type 'a t type 'a s end
+            $T1
           Type declarations do not match: type t is not included in type 'a t
           They have different arities.
        2. Modules do not match:
             $S2 : sig val f : 'a -> 'a end
           is not included in
             $T2 = sig val f : 'a X/2.s -> 'a end
-          Values do not match:
-            val f : 'a -> 'a
-          is not included in
-            val f : 'a X.s -> 'a
-          The type "'a X.s -> 'a X.s" is not compatible with the type
-            "'a X.s -> 'a"
+          The value "f" does not match its expected declaration
+          The type "... -> 'a X.s" is not compatible with the type "... -> 'a"
           Type "'a X.s" is not compatible with type "'a"
 Line 5, characters 0-32:
   Definition of module "X/1"
@@ -2050,27 +1790,15 @@ Lines 3-5, characters 6-3:
 4 |   module F(X: sig type 'a t = 'a list end)(Y: sig type 'a t = ('a * 'a) * 'a X.t end) = struct end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (X : sig type 'a t = 'a list end)
-               (Y : sig type 'a t = ('a * 'a) * 'a X.t end) -> sig end
-         end
-       is not included in
-         sig
-           module F :
-             functor (X : sig type 'a t = 'a * 'a end)
-               (Y : sig type 'a t = 'a X.t * 'a list end) -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S1) (Y : $S2) -> ...
        is not included in
          (X : $T1) (Y : $T2) -> ...
        1. Module types do not match:
-            $S1 = sig type 'a t = 'a list end
+            $S1
           does not include
-            $T1 = sig type 'a t = 'a * 'a end
+            $T1
           Type declarations do not match:
             type 'a t = 'a * 'a
           is not included in
@@ -2109,16 +1837,7 @@ Error: The functor application "Set.Make(Set)(A)" is ill-typed.
        do not match these parameters:
          (Ord : Set.OrderedType) -> ...
        1. Modules do not match:
-            Set : (module Set)
-          is not included in
-            Set.OrderedType
-          Modules do not match:
-            sig
-              module type OrderedType = Set.OrderedType
-              module type S = Set.S
-              module Make = Set.Make @@ portable
-              module MakePortable = Set.MakePortable @@ portable
-            end
+            Set
           is not included in
             Set.OrderedType
           The type "t" is required but not provided
@@ -2186,8 +1905,8 @@ module G : functor (X : empty) -> sig end
 Line 3, characters 11-19:
 3 | module A = F(Empty)
                ^^^^^^^^
-Error: Modules do not match: sig end is not included in empty -> empty
-     This module should not be a structure, a functor was expected.
+Error: Signature mismatch:
+       This module should not be a structure, a functor was expected.
 |}]
 
 module B = G(F_empty)
@@ -2195,8 +1914,7 @@ module B = G(F_empty)
 Line 1, characters 11-21:
 1 | module B = G(F_empty)
                ^^^^^^^^^^
-Error: Modules do not match: functor (Arg : empty) -> sig end
-     is not included in empty
+Error: Modules do not match: F_empty is not included in empty
      This module should not be a functor, a structure was expected.
      Hint: Did you forget to apply the functor?
 |}]
@@ -2207,10 +1925,6 @@ Line 1, characters 49-72:
 1 | module F(X:a): sig module F:empty -> empty end = struct module F = X end
                                                      ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module F : (a with X) end
-       is not included in
-         sig module F : empty -> empty end
        In module "F":
        Modules do not match:
          ((a with X) with F)
@@ -2251,37 +1965,17 @@ Lines 7-11, characters 6-3:
 10 |   module F(X:sig val f: t val g: Inner.t val h:int end)= struct end
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             functor (X : sig val f : t val g : Inner.t val h : int end) ->
-               sig end
-         end
-       is not included in
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             functor (X : sig val f : t val g : Inner.t val h : float end) ->
-               sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S1) -> ...
        is not included in
          (X : $T1) -> ...
        Module types do not match:
-         $S1 = sig val f : t val g : Inner.t val h : int end
+         $S1
        does not include
-         $T1 = sig val f : t/2 val g : Inner/2.t val h : float end
-       Values do not match: val h : float is not included in val h : int
+         $T1
+       The value "h" does not match its expected declaration
        The type "float" is not compatible with the type "int"
-Line 8, characters 2-8:
-  Definition of type "t/1"
-Line 9, characters 2-33:
-  Definition of module "Inner/1"
 |}]
 
 module M: sig
@@ -2315,22 +2009,6 @@ Lines 11-19, characters 6-3:
 18 |   = struct end
 19 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             functor (X : sig val f : t val h : int end) (A : a)
-               (Y : sig val f : Inner.t val h : int end) -> sig end
-         end
-       is not included in
-         sig
-           type t
-           module Inner : sig type t end
-           module F :
-             functor (A : a) (X : sig val f : t val h : int end) (A : a)
-               (Y : sig val f : Inner.t val h : int end) -> sig end
-         end
        In module "F":
        Modules do not match:
          (X : $S2) (A : a) (Y : $S4) -> ...

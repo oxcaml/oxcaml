@@ -705,17 +705,10 @@ Lines 1-3, characters 12-3:
 2 |   let f (x : #c) = x
 3 | end......
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : (#c as 'a) -> 'a end
-       is not included in
-         sig val f : #c -> #c end
-       Values do not match:
-         val f : (#c as 'a) -> 'a
-       is not included in
-         val f : #c -> #c
-       The type "(#c as 'a) -> 'a" is not compatible with the type "#c -> #c"
-       Type "#c as 'a" = "< m : 'a; .. >" is not compatible with type
-         "#c as 'b" = "< m : 'b; .. >"
+       The value "f" does not match its expected declaration
+       The type "... -> #c" is not compatible with the type "... -> #c"
+       Type "#c as 'a" = "< m : ...; .. >" is not compatible with type
+         "#c as 'b" = "< m : ...; .. >"
        Type "'a" is not compatible with type "'b"
 |}];;
 

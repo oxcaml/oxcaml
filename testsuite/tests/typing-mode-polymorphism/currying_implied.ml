@@ -182,36 +182,12 @@ Lines 3-5, characters 6-3:
 4 |   let f = aliased_return
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f :
-             (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
-                    'd @ [< global many uncontended forkable unyielding read_write] ->
-                    'a @ [> 'm mod global many forkable unyielding] as 'b >
-              as 'a) @ [< 'm mod aliased] ->
-             'b @ [> close('m) mod many | stateful]
-         end
-       is not included in
-         sig
-           val f :
-             (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
-         end
-       Values do not match:
-         val f :
-           (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
-                  'd @ [< global many uncontended forkable unyielding read_write] ->
-                  'a @ [> 'm mod global many forkable unyielding] as 'b >
-            as 'a) @ [< 'm mod aliased] ->
-           'b @ [> close('m) mod many | stateful]
-       is not included in
-         val f : (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
+       The value "f" does not match its expected declaration
        The type
-         "(< m : 'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                ('d @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                 'a @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+         "(< m : 'c -> 'd -> 'a @ [> 'm mod global many forkable unyielding]
                 as 'b >
           as 'a) @ [< 'm mod aliased & uncontended read_write] ->
-         'b @ [> close('m) mod many | nonportable stateful]"
+         'b @ [> close('m) mod many]"
        is not compatible with the type
          "(< m : 'c -> 'd -> 'e > as 'e) @ contended -> 'c -> 'd -> 'e"
        The argument mode was expected to be "uncontended" but is "contended"
@@ -221,38 +197,12 @@ Lines 3-5, characters 6-3:
 4 |   let f = aliased_return
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f :
-             < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
-                   'c @ [< global many uncontended forkable unyielding read_write] ->
-                   < m : 'a > @ [> 'm mod global many forkable unyielding]
-                   as 'a > @ [< 'm mod aliased] ->
-             'a @ [> close('m) mod many | stateful]
-         end
-       is not included in
-         sig
-           val f :
-             (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
-             'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
-         end
-       Values do not match:
-         val f :
-           < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
-                 'c @ [< global many uncontended forkable unyielding read_write] ->
-                 < m : 'a > @ [> 'm mod global many forkable unyielding]
-                 as 'a > @ [< 'm mod aliased] ->
-           'a @ [> close('m) mod many | stateful]
-       is not included in
-         val f :
-           (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
-           'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
+       The value "f" does not match its expected declaration
        The type
-         "< m : 'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-               ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                < m : 'a > @ [< global uncontended read_write > 'm mod global many forkable unyielding | nonportable stateful dynamic]) @ [< global many forkable unyielding > nonportable stateful dynamic]
+         "< m : 'b ->
+               'c -> < m : 'a > @ [> 'm mod global many forkable unyielding]
                as 'a > @ [< 'm mod aliased & uncontended read_write] ->
-         'a @ [> close('m) mod many | nonportable stateful]"
+         'a @ [> close('m) mod many]"
        is not compatible with the type
          "(< m : 'b -> 'c -> 'd > as 'd) @ contended ->
          'b -> 'c -> (< m : 'b -> 'c -> 'e > as 'e)"

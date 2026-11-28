@@ -95,23 +95,12 @@ Line 3, characters 6-8:
 3 | end = M3
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
-         end
-       is not included in
-         sig
-           val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
-         end
-       Values do not match:
-         val f : unit -> <[($('a) -> unit) * ($('a) -> unit)]> expr @ once
-       is not included in
-         val f : unit -> <[(string -> unit) * (int -> unit)]> expr @ once
-       The type "unit -> <[(string -> unit) * (string -> unit)]> expr @ once"
+       The value "f" does not match its expected declaration
+       The type "... -> <[... * (string -> ...)]> expr"
        is not compatible with the type
-         "unit -> <[(string -> unit) * (int -> unit)]> expr @ once"
-       Type "(string -> unit) * (string -> unit)" is not compatible with type
-         "(string -> unit) * (int -> unit)"
+         "... -> <[... * (int -> ...)]> expr @ once"
+       Type "... * (string -> ...)" is not compatible with type
+         "... * (int -> ...)"
        Type "string" is not compatible with type "int"
 |}]
 
@@ -145,17 +134,10 @@ Line 3, characters 6-8:
 3 | end = M4
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : <[$('a) * $('a)]> expr end
-       is not included in
-         sig val x : <[int * string]> expr end
-       Values do not match:
-         val x : <[$('a) * $('a)]> expr
-       is not included in
-         val x : <[int * string]> expr
+       The value "x" does not match its expected declaration
        The type "<[int * int]> expr" is not compatible with the type
-         "<[int * string]> expr"
-       Type "int * int" is not compatible with type "int * string"
+         "<[... * string]> expr"
+       Type "int * int" is not compatible with type "... * string"
        Type "int" is not compatible with type "string"
 |}]
 
@@ -173,14 +155,7 @@ Lines 3-5, characters 6-3:
 4 |   let e = <[ fun x -> () ]>
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val e : <[$('a) -> unit]> expr end
-       is not included in
-         sig val e : ('a -> unit) expr end
-       Values do not match:
-         val e : <[$('a) -> unit]> expr
-       is not included in
-         val e : ('a -> unit) expr
+       The value "e" does not match its expected declaration
        The type "<[$('a) -> unit]> expr" is not compatible with the type
          "('b -> unit) expr"
        Type "$('a) -> unit" is not compatible with type "$('b -> unit)"
@@ -198,14 +173,7 @@ Lines 3-5, characters 6-3:
 4 |   let e : (_ -> _) expr = Obj.magic <[ fun x -> () ]>
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val e : ('a : any) ('b : any). ('a -> 'b) expr end
-       is not included in
-         sig val e : <[$('a) -> unit]> expr end
-       Values do not match:
-         val e : ('a : any) ('b : any). ('a -> 'b) expr
-       is not included in
-         val e : <[$('a) -> unit]> expr
+       The value "e" does not match its expected declaration
        The type "('a -> 'b) expr" is not compatible with the type
          "<[$('c) -> unit]> expr"
        Type "'a -> 'b" is not compatible with type "<[$('c) -> unit]>"

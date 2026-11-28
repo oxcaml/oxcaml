@@ -726,11 +726,6 @@ Error: Module type declarations do not match:
          module type A = sig module M = F(List) end
        does not match
          module type A = sig module M = F(List) end
-       At position "module type A = <here>"
-       Module types do not match:
-         sig module M = F(List) end
-       is not equal to
-         sig module M = F(List) end
        At position "module type A = sig module M : <here> end"
        Module "F(List)" cannot be aliased
 |}];;
@@ -858,20 +853,11 @@ Lines 4-6, characters 6-3:
 5 |   module type S = module type of struct include X end
 6 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type S = sig module N = X.N @@ stateless end end
-       is not included in
-         sig module type S = sig module N = X.N end end
        Module type declarations do not match:
          module type S = sig module N = X.N @@ stateless end
        does not match
          module type S = sig module N = X.N end
        The second module type is not included in the first
-       At position "module type S = <here>"
-       Module types do not match:
-         sig module N = X.N end
-       is not equal to
-         sig module N = X.N @@ stateless end
        At position "module type S = <here>"
        Modalities on N do not match:
        The second is stateless and the first is not.

@@ -50,10 +50,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of unit# [@immediate_all_void_constructor]
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of unit# [@immediate_all_void_constructor] end
-       is not included in
-         sig type t = A of unit# end
        Type declarations do not match:
          type t = A of unit# [@immediate_all_void_constructor]
        is not included in
@@ -76,10 +72,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of unit#
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of unit# end
-       is not included in
-         sig type t = A of unit# [@immediate_all_void_constructor] end
        Type declarations do not match:
          type t = A of unit#
        is not included in
@@ -165,10 +157,6 @@ Lines 4-7, characters 6-3:
 6 |   and v = unit#
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of v and v = unit# end
-       is not included in
-         sig type t = A of v and v end
        Type declarations do not match:
          type t = A of v
        is not included in

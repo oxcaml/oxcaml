@@ -137,15 +137,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is value_or_null
          because of the definition of f at line 4, characters 2-39.
        But the layout of 'a must be a sublayout of value
@@ -173,15 +166,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of f at line 4, characters 2-58.
        But the kind of 'a must be a subkind of value
@@ -209,15 +195,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : bits64). 'a -> 'a end
-       is not included in
-         sig val poly_ f : 'a -> 'a end
-       Values do not match:
-         val f : ('a : bits64). 'a -> 'a
-       is not included in
-         val poly_ f : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is bits64
          because of the definition of f at line 4, characters 2-39.
        But the kind of 'a must be a subkind of bits64
@@ -235,15 +214,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ f : 'a -> 'a end
-       is not included in
-         sig val f : ('a : any). 'a -> 'a end
-       Values do not match:
-         val poly_ f : 'a -> 'a
-       is not included in
-         val f : ('a : any). 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "f" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The layout of 'a is any
          because of the definition of f at line 4, characters 2-30.
        But the layout of 'a must be a value layout
@@ -389,17 +361,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-         end
-       is not included in
-         sig val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b end
-       Values do not match:
-         val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-       is not included in
-         val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The value "bar" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-50.
        But the kind of 'a must be a subkind of <genvar> mod contended
@@ -428,22 +391,8 @@ Line 5, characters 6-7:
 5 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val bar :
-             layout_ l.
-               ('a : l mod contended) ('b : l mod contended). 'a -> 'b
-         end
-       is not included in
-         sig
-           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-         end
-       Values do not match:
-         val bar :
-           layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
-       is not included in
-         val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The value "bar" does not match its expected declaration
+       The type "... -> 'a" is not compatible with the type "... -> 'b"
        The kind of 'a is <genvar>
          because of the definition of bar at line 4, characters 2-64.
        But the kind of 'a must be a subkind of <genvar> mod contended

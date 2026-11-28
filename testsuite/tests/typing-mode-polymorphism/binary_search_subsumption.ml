@@ -66,76 +66,15 @@ Lines 1-29, characters 15-3:
 28 |     else find_last_satisfying t ~get ~length ~pred:(fun x -> compare x v <= 0)
 29 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val linear_search_first_satisfying :
-             'a @ [< 'm] ->
-             get:('a @ [> 'm] -> 'b @ [> 'n | aliased] -> 'c @ [< 'o]) @ 'p ->
-             lo:'b @ [< 'q & 'n & many uncontended read_write] ->
-             hi:'b @ [< many uncontended read_write] ->
-             pred:('c @ [> 'o | dynamic] -> bool @ 'mm0) @ 'mm1 ->
-             'b option @ [> 'q | local aliased dynamic]
-           val find_first_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ 'p ->
-             length:('a @ [> 'm | aliased] -> int @ 'q) @ 'mm0 ->
-             pred:('b @ [> 'o | dynamic] -> bool @ 'mm1) @ 'mm2 ->
-             int option @ [> local aliased dynamic]
-           val find_last_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             pred:('b @ [> 'o | dynamic] -> bool @ 'p) @ 'q ->
-             get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ 'mm0 ->
-             length:('a @ [> 'm | aliased] ->
-                     int @ [< many uncontended read_write]) @ [< many] ->
-             int option @ [> local dynamic]
-           val binary_search :
-             'a @ [< 'm & 'n & many] ->
-             length:('a @ [> 'n | aliased] ->
-                     int @ [< many uncontended read_write]) @ [< many > local] ->
-             get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-             compare:('b @ [> 'o | dynamic] ->
-                      'c @ [> 'p | aliased] ->
-                      int @ [< many uncontended read_write]) @ [< many > local] ->
-             'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
-         end
-       is not included in
-         S
-       Values do not match:
-         val binary_search :
-           'a @ [< 'm & 'n & many] ->
-           length:('a @ [> 'n | aliased] ->
-                   int @ [< many uncontended read_write]) @ [< many > local] ->
-           get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-           compare:('b @ [> 'o | dynamic] ->
-                    'c @ [> 'p | aliased] ->
-                    int @ [< many uncontended read_write]) @ [< many > local] ->
-           'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
-       is not included in
-         val binary_search :
-           't ->
-           length:('t -> int) @ local ->
-           get:('t -> int -> 'elt) @ local ->
-           compare:('elt -> 'key -> int) @ local -> 'key -> int option
+       The value "binary_search" does not match its expected declaration
        The type
-         "'a @ [< 'm & 'n & global many uncontended forkable unyielding read_write] ->
-         length:('a @ [< global many uncontended forkable unyielding read_write > 'n | aliased] ->
-                 int @ [< many uncontended read_write > dynamic]) @ [< many > local] ->
-         get:('a @ [< global many uncontended forkable unyielding read_write > 'm | aliased] ->
-              (int @ [> aliased] ->
-               'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
-         compare:('b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                  ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-                   int @ [< many uncontended read_write > dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
-         'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-         int option @ [> local aliased dynamic]"
+         "... ->
+         length:... ->
+         get:... ->
+         compare:... -> 'a -> int option @ [> local aliased dynamic]"
        is not compatible with the type
-         "'a ->
-         length:('a -> int) @ local ->
-         get:('a -> int -> 'b) @ local ->
-         compare:('b -> 'c -> int) @ local -> 'c -> int option"
-       Type
-         "'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-         int option @ [> local aliased dynamic]"
-       is not compatible with type "'c -> int option"
+         "... -> length:... -> get:... -> compare:... -> 'a -> int option"
+       Type "'a -> int option @ [> local aliased dynamic]"
+       is not compatible with type "'a -> int option"
        The return mode was expected to be "global" but is "local"
 |}]

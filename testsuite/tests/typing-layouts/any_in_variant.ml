@@ -183,20 +183,6 @@ Lines 12-18, characters 8-5:
 17 |     let expose = T
 18 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type v = unit#
-           type t = A of v [@immediate_all_void_constructor] | B
-           val a : t
-           val expose : ('a : any). ('a, 'a) type_equal
-         end
-       is not included in
-         sig
-           type v : any
-           type t = A of v | B
-           val a : t
-           val expose : (v, unit#) type_equal
-         end
        Type declarations do not match:
          type t = A of v [@immediate_all_void_constructor] | B
        is not included in

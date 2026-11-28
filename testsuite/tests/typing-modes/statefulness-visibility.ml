@@ -1581,14 +1581,7 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ write end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b @ write
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ write -> 'a * 'b @ write"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ write"
@@ -1609,19 +1602,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ immutable end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ immutable
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
-       The type "'a -> 'b @ write -> 'a * 'b @ immutable"
-       is not compatible with the type
-         "'a @ read -> 'b @ write -> 'a * 'b @ read"
-       Type "'b @ write -> 'a * 'b @ immutable" is not compatible with type
-         "'b @ write -> 'a * 'b @ read"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ write -> 'b * 'a @ immutable"
+       is not compatible with the type "... -> 'a @ write -> 'b * 'a @ read"
+       Type "'a @ write -> 'b * 'a @ immutable" is not compatible with type
+         "'a @ write -> 'b * 'a @ read"
        The return mode was expected to be "read" or "read_write" but is "write"
 |}]
 
@@ -1637,18 +1622,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
-       is not included in
-         sig val f : 'a @ read -> 'b @ write -> 'a * 'b end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b
-       The type "'a -> 'b @ write -> 'a * 'b @ write"
-       is not compatible with the type "'a @ read -> 'b @ write -> 'a * 'b"
-       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
-         "'b @ write -> 'a * 'b"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ write -> 'b * 'a @ write"
+       is not compatible with the type "... -> 'a @ write -> 'b * 'a"
+       Type "'a @ write -> 'b * 'a @ write" is not compatible with type
+         "'a @ write -> 'b * 'a"
        The return mode was expected to be "read_write" but is "write"
 |}]
 
@@ -1664,19 +1642,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ immutable end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ immutable
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
-       The type "'a -> 'b @ read -> 'a * 'b @ immutable"
-       is not compatible with the type
-         "'a @ write -> 'b @ read -> 'a * 'b @ write"
-       Type "'b @ read -> 'a * 'b @ immutable" is not compatible with type
-         "'b @ read -> 'a * 'b @ write"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ read -> 'b * 'a @ immutable"
+       is not compatible with the type "... -> 'a @ read -> 'b * 'a @ write"
+       Type "'a @ read -> 'b * 'a @ immutable" is not compatible with type
+         "'a @ read -> 'b * 'a @ write"
        The return mode was expected to be "write" or "read_write" but is "read"
 |}]
 
@@ -1692,14 +1662,7 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ read end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b @ read
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ read -> 'a * 'b @ read"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ read"
@@ -1720,18 +1683,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
-       is not included in
-         sig val f : 'a @ write -> 'b @ read -> 'a * 'b end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b
-       The type "'a -> 'b @ read -> 'a * 'b @ read"
-       is not compatible with the type "'a @ write -> 'b @ read -> 'a * 'b"
-       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
-         "'b @ read -> 'a * 'b"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ read -> 'b * 'a @ read"
+       is not compatible with the type "... -> 'a @ read -> 'b * 'a"
+       Type "'a @ read -> 'b * 'a @ read" is not compatible with type
+         "'a @ read -> 'b * 'a"
        The return mode was expected to be "read_write" but is "read"
 |}]
 
@@ -1764,14 +1720,7 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
-       Values do not match:
-         val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
+       The value "f" does not match its expected declaration
        The type "'a @ stateless -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
@@ -1790,18 +1739,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading end
-       Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ reading -> 'b @ writing -> 'a * 'b @ reading"
-       Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ writing -> 'a * 'b @ reading"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a -> 'b * 'a" is not compatible with the type
+         "... -> 'a @ writing -> 'b * 'a @ reading"
+       Type "'a -> 'b * 'a" is not compatible with type
+         "'a @ writing -> 'b * 'a @ reading"
        The return mode was expected to be "reading" but is "writing"
 |}]
 
@@ -1817,19 +1759,12 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
-       is not included in
-         sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
-       Values do not match:
-         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
-       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ writing -> 'b * 'a @ writing"
        is not compatible with the type
-         "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
-       Type "'b @ writing -> 'a * 'b @ writing" is not compatible with type
-         "'b @ writing -> 'a * 'b @ stateless"
+         "... -> 'a @ writing -> 'b * 'a @ stateless"
+       Type "'a @ writing -> 'b * 'a @ writing" is not compatible with type
+         "'a @ writing -> 'b * 'a @ stateless"
        The return mode was expected to be "stateless" but is "writing"
 |}]
 
@@ -1845,18 +1780,11 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing end
-       Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
-         "'a @ writing -> 'b @ reading -> 'a * 'b @ writing"
-       Type "'b -> 'a * 'b" is not compatible with type
-         "'b @ reading -> 'a * 'b @ writing"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a -> 'b * 'a" is not compatible with the type
+         "... -> 'a @ reading -> 'b * 'a @ writing"
+       Type "'a -> 'b * 'a" is not compatible with type
+         "'a @ reading -> 'b * 'a @ writing"
        The return mode was expected to be "writing" but is "reading"
 |}]
 
@@ -1872,14 +1800,7 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
-       Values do not match:
-         val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
+       The value "f" does not match its expected declaration
        The type "'a @ stateless -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
@@ -1898,19 +1819,12 @@ Lines 3-5, characters 6-3:
 4 |   let f a b = (a, b)
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
-       is not included in
-         sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
-       Values do not match:
-         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
-       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       The value "f" does not match its expected declaration
+       The type "... -> 'a @ reading -> 'b * 'a @ reading"
        is not compatible with the type
-         "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
-       Type "'b @ reading -> 'a * 'b @ reading" is not compatible with type
-         "'b @ reading -> 'a * 'b @ stateless"
+         "... -> 'a @ reading -> 'b * 'a @ stateless"
+       Type "'a @ reading -> 'b * 'a @ reading" is not compatible with type
+         "'a @ reading -> 'b * 'a @ stateless"
        The return mode was expected to be "stateless" but is "reading"
 |}]
 
@@ -1948,14 +1862,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ read -> 'a read * 'b write @ read end
-       is not included in
-         sig val f : 'a * 'b @ read -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ read -> 'a read * 'b write @ read
-       is not included in
-         val f : 'a * 'b @ read -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ read -> 'a read * 'b write @ read"
        is not compatible with the type "'a * 'b @ read -> 'a read * 'b write"
        The return mode was expected to be "read_write" but is "read"
@@ -1978,14 +1885,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ write -> 'a read * 'b write @ write end
-       is not included in
-         sig val f : 'a * 'b @ write -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ write -> 'a read * 'b write @ write
-       is not included in
-         val f : 'a * 'b @ write -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ write -> 'a read * 'b write @ write"
        is not compatible with the type "'a * 'b @ write -> 'a read * 'b write"
        The return mode was expected to be "read_write" but is "write"
@@ -2008,16 +1908,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { read = a }, { write = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
-         end
-       is not included in
-         sig val f : 'a * 'b @ immutable -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
-       is not included in
-         val f : 'a * 'b @ immutable -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ immutable -> 'a read * 'b write @ immutable"
        is not compatible with the type
          "'a * 'b @ immutable -> 'a read * 'b write"
@@ -2061,14 +1952,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b @ reading -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b @ reading -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ reading -> 'a reading * 'b writing"
@@ -2087,14 +1971,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b @ writing -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b @ writing -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ writing -> 'a reading * 'b writing"
@@ -2113,14 +1990,7 @@ Lines 3-5, characters 6-3:
 4 |   let f (a, b) = { reading = a }, { writing = b }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
-       is not included in
-         sig val f : 'a * 'b -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type "'a * 'b -> 'a reading * 'b writing"
        The argument mode was expected to be stronger than "reading" but is "stateful"
@@ -2391,10 +2261,6 @@ Lines 3-6, characters 6-3:
 5 |   let f () = r.contents; r.contents <- ()
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : unit ref val f : unit -> unit end @ stateful
-       is not included in
-         sig val f : unit -> unit @@ stateless end @ stateful
        Values do not match:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in
@@ -2425,15 +2291,6 @@ Lines 3-8, characters 6-3:
 7 |   let f () = get (); set ()
 8 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val r : unit ref
-           val get : unit -> unit
-           val set : unit -> unit
-           val f : unit -> unit
-         end @ stateful
-       is not included in
-         sig val f : unit -> unit @@ stateless end @ stateful
        Values do not match:
          val f : unit -> unit (* in a structure at stateful *)
        is not included in

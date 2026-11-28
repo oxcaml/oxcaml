@@ -594,6 +594,19 @@ let report_primitive_mismatch first second ppf err =
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
+let with_relevant_modes ({trace} : Errortrace.moregen_error) f =
+  match Misc.last trace with
+  | Some (Errortrace.Mode_mismatch { got; expected; _ })
+    when List.exists Mode.With_locality.check_generic [got; expected] ->
+      let got_types =
+        List.concat_map (function
+          | Errortrace.(Diff {got = {ty; expanded}; _}) -> [ty; expanded]
+          | _ -> [])
+          trace
+      in
+      Out_type.with_relevant_modes ~relevant:[got; expected] ~got:got_types f
+  | _ -> f ()
+
 let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
@@ -604,9 +617,10 @@ let report_value_mismatch ~pp first second env ppf err =
       pr "The implementation is not a primitive."
   | Type trace ->
       let msg = Fmt.Doc.msg in
-      Errortrace_report.moregen ppf Type_scheme env trace
-        (msg "The type")
-        (msg "is not compatible with the type")
+      with_relevant_modes trace (fun () ->
+        Errortrace_report.moregen ~spine:true ppf Type_scheme env trace
+          (msg "The type")
+          (msg "is not compatible with the type"))
   | Zero_alloc e -> Zero_alloc.print_error ppf e
   | Modality e -> report_modality_sub_error first second ppf e
   | Mode e ->

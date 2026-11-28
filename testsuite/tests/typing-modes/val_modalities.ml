@@ -134,42 +134,6 @@ Lines 8-12, characters 33-5:
 11 |     let x = fun x -> ignore !y; x
 12 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val y : int ref @@ stateless
-           val z : 'a -> 'a
-           val x : 'a -> 'a
-         end @ stateful
-       is not included in
-         sig
-           val y : int ref @@ stateless
-           val z : 'a -> 'a
-           val x : 'a -> 'a @@ stateless
-         end @ stateful
-       Values do not match:
-         val x : 'a -> 'a (* in a structure at stateful *)
-       is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
-       The first is "stateful"
-         because it contains a usage (of the value "y" at line 11, characters 29-30)
-         which is expected to be "read_write".
-       However, the second is "stateless".
-|}, Principal{|
-Lines 8-12, characters 33-5:
- 8 | .................................struct
- 9 |     let y = ref 42
-10 |     let z = fun x -> ignore !y; x
-11 |     let x = fun x -> ignore !y; x
-12 |   end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end @ stateful
-       is not included in
-         sig
-           val y : int ref
-           val z : 'a -> 'a
-           val x : 'a -> 'a @@ stateless
-         end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
@@ -305,10 +269,6 @@ Lines 4-6, characters 22-5:
 5 |       let x @ contended = ref "hello"
 6 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : string ref @@ stateless contended end @ uncontended
-       is not included in
-         sig val x : string ref end @ uncontended
        Values do not match:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
@@ -321,10 +281,6 @@ Lines 4-6, characters 22-5:
 5 |       let x @ contended = ref "hello"
 6 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val x : string ref @@ contended end @ uncontended
-       is not included in
-         sig val x : string ref end @ uncontended
        Values do not match:
          val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
@@ -470,15 +426,6 @@ Lines 3-6, characters 6-3:
 5 |   external length : string -> int = "%string_length"
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val x : 'a -> 'a @@ stateless nonportable
-           external length : string -> int = "%string_length"
-         end @ nonportable
-       is not included in
-         sig
-           external length : string -> int @@ portable = "%string_length"
-         end @ nonportable
        Values do not match:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
@@ -590,23 +537,6 @@ Lines 13-19, characters 6-3:
 18 |   module type S_plain = S with module M = Plain
 19 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module Plain : sig val f : int -> int end
-           module type S_plain =
-             sig module M : sig val f : int -> int end end
-         end @ nonportable
-       is not included in
-         sig
-           module Plain : sig val f : int -> int @@ portable end
-           module type S_plain =
-             sig module M : sig val f : int -> int @@ portable end end
-         end @ nonportable
-       In module "Plain":
-       Modules do not match:
-         sig val f : int -> int end @ nonportable
-       is not included in
-         sig val f : int -> int @@ portable end @ nonportable
        In module "Plain":
        Values do not match:
          val f : int -> int (* in a structure at nonportable *)
@@ -691,13 +621,6 @@ Lines 3-5, characters 6-3:
 4 |   let t @ nonportable contended = `Foo
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val t : [> `Foo ] @@ stateless nonportable end @ nonportable
-       is not included in
-         sig
-           val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
-             portable
-         end @ nonportable
        Values do not match:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
@@ -810,10 +733,6 @@ Line 9, characters 21-42:
                          ^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M"
        does not match its original definition in the constrained signature:
-       Modules do not match:
-         sig val foo : 'a -> 'a end
-       is not included in
-         sig val foo : 'a -> 'a @@ global many end
        Modalities on foo do not match:
        The second is global and the first is not.
 |}]
@@ -833,10 +752,6 @@ Line 3, characters 21-41:
                          ^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M"
        does not match its original definition in the constrained signature:
-       Modules do not match:
-         sig val foo : 'a -> 'a end
-       is not included in
-         sig val foo : 'a -> 'a @@ global many end
        Modalities on foo do not match:
        The second is global and the first is not.
 |}]
@@ -853,10 +768,6 @@ Line 2, characters 18-66:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this strengthened module type, the type of "M"
        does not match the underlying type
-       Modules do not match:
-         sig val foo : 'a -> 'a end
-       is not included in
-         sig val foo : 'a -> 'a @@ global many end
        Modalities on foo do not match:
        The second is global and the first is not.
 |}]
@@ -875,19 +786,10 @@ Lines 3-5, characters 6-3:
 4 |   module type S = sig val foo : 'a @@ global many end
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type S = sig val foo : 'a @@ global many end end
-       is not included in
-         sig module type S = sig val foo : 'a end end
        Module type declarations do not match:
          module type S = sig val foo : 'a @@ global many end
        does not match
          module type S = sig val foo : 'a end
-       At position "module type S = <here>"
-       Module types do not match:
-         sig val foo : 'a @@ global many end
-       is not equal to
-         sig val foo : 'a end
        At position "module type S = <here>"
        Modalities on foo do not match:
        The second is empty and the first is aliased.
@@ -912,30 +814,11 @@ Lines 5-9, characters 6-3:
 8 |   end
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type N =
-             sig module M : sig val foo : 'a -> 'a @@ global many end end
-         end
-       is not included in
-         sig
-           module type N = sig module M : sig val foo : 'a -> 'a end end
-         end
        Module type declarations do not match:
          module type N =
            sig module M : sig val foo : 'a -> 'a @@ global many end end
        does not match
          module type N = sig module M : sig val foo : 'a -> 'a end end
-       At position "module type N = <here>"
-       Module types do not match:
-         sig module M : sig val foo : 'a -> 'a @@ global many end end
-       is not equal to
-         sig module M : sig val foo : 'a -> 'a end end
-       At position "module type N = sig module M : <here> end"
-       Modules do not match:
-         sig val foo : 'a -> 'a @@ global many end
-       is not included in
-         sig val foo : 'a -> 'a end
        At position "module type N = sig module M : <here> end"
        Modalities on foo do not match:
        The second is empty and the first is aliased.
@@ -1477,10 +1360,6 @@ Lines 8-10, characters 20-3:
  9 |   let (f @ nonportable) = M0.f
 10 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end @ nonportable
-       is not included in
-         sig val f : 'a -> 'a @@ portable end @ nonportable
        Values do not match:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -1505,10 +1384,6 @@ Lines 3-5, characters 17-3:
 4 |   let (f @ nonportable) = M1.f
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'a end @ nonportable
-       is not included in
-         sig val f : 'a -> 'a end @ portable
        Values do not match:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -1550,10 +1425,6 @@ Line 2, characters 12-13:
 2 | module N = (M : sig class foo : object end end @ portable)
                 ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig class foo : object  end end @ nonportable
-       is not included in
-         sig class foo : object  end end @ portable
        Class declarations foo do not match:
        First is "nonportable"
          because it contains the class "foo" defined as the class at line 1, characters 32-54

@@ -207,22 +207,6 @@ Lines 8-15, characters 6-3:
 14 |   let n = Fun.id
 15 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type 'a pos = 'a M.t
-           type 'a neg = 'a M.t
-           val p : 'a -> 'a
-           val pn : 'a -> 'a
-           val n : 'a -> 'a
-         end
-       is not included in
-         sig
-           type +'a pos = private string
-           type -'a neg = private string
-           val p : 'a M.t -> 'a pos
-           val pn : 'a pos -> 'a neg
-           val n : 'a neg -> 'a M.t
-         end
        Type declarations do not match:
          type 'a pos = 'a M.t
        is not included in
@@ -251,14 +235,6 @@ Lines 7-11, characters 6-3:
 10 |   let prj = Fun.id
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a priv val inj : 'a -> 'a val prj : 'a -> 'a end
-       is not included in
-         sig
-           type +-'a t = private int
-           val inj : 'a priv -> 'a t
-           val prj : 'a t -> 'a priv
-         end
        Type declarations do not match:
          type 'a t = 'a priv
        is not included in

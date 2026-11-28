@@ -36,10 +36,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = <[string]> expr
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = <[string]> expr end
-       is not included in
-         sig type t = <[int]> expr end
        Type declarations do not match:
          type t = <[string]> expr
        is not included in

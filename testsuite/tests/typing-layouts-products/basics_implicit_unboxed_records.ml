@@ -313,10 +313,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { i : int ; a: (<x:'a * 'a> as 'a) }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { i : int; a : < x : 'a * 'a > as 'a; } end
-       is not included in
-         sig type t = { i : int; a : < x : 'a > as 'a; } end
        Type declarations do not match:
          type t = { i : int; a : < x : 'a * 'a > as 'a; }
        is not included in
@@ -348,10 +344,6 @@ Lines 3-6, characters 6-3:
 5 |   type u = t#
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { s : string; r : string; } type u = t# end
-       is not included in
-         sig type u end
        Type declarations do not match: type u = t# is not included in type u
        The layout of the first is value non_float & value non_float
          because it is an unboxed record.
@@ -544,13 +536,6 @@ Lines 3-6, characters 6-3:
 5 |   type u = t# = private #{ x : int; y : bool }
 6 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t = private { x : int; y : bool; }
-           type u = t# = private #{ x : int; y : bool; }
-         end
-       is not included in
-         sig type u = #{ x : int; } end
        Type declarations do not match:
          type u = t# = private #{ x : int; y : bool; }
        is not included in
@@ -571,13 +556,6 @@ Lines 3-6, characters 6-3:
 5 |   type u = t# = private #{ x : int }
 6 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t = private { x : int; }
-           type u = t# = private #{ x : int; }
-         end
-       is not included in
-         sig type u = #{ x : int; y : bool; } end
        Type declarations do not match:
          type u = t# = private #{ x : int; }
        is not included in

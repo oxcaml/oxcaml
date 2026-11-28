@@ -32,10 +32,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a constraint 'a = int
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a constraint 'a = int end
-       is not included in
-         sig type 'a t : immediate constraint 'a = int end
        Type declarations do not match:
          type 'a t = Foo of 'a constraint 'a = int
        is not included in
@@ -93,16 +89,6 @@ Lines 3-5, characters 6-3:
 4 |   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type ('b : value mod portable contended, 'a) t = 'b
-             constraint 'a = 'b
-         end
-       is not included in
-         sig
-           type ('b : value mod portable contended, 'a) t : value mod many
-             constraint 'a = 'b
-         end
        Type declarations do not match:
          type ('b : value mod portable contended, 'a) t = 'b
            constraint 'a = 'b
@@ -136,10 +122,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a constraint 'a = 'b ref
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a constraint 'a = 'b ref end
-       is not included in
-         sig type 'a t : immutable_data with 'b constraint 'a = 'b ref end
        Type declarations do not match:
          type 'a t = Foo of 'a constraint 'a = 'b ref
        is not included in
@@ -194,10 +176,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = Foo of 'a constraint 'a = ('b : mutable_data) list
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = Foo of 'a constraint 'a = 'b list end
-       is not included in
-         sig type 'a t : immutable_data constraint 'a = 'b list end
        Type declarations do not match:
          type 'a t = Foo of 'a constraint 'a = 'b list
        is not included in

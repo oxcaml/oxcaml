@@ -374,10 +374,6 @@ Lines 3-5, characters 6-3:
 4 |   kind_ k = immediate
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = immediate end
-       is not included in
-         sig kind_ k = value end
        Kind declarations do not match:
          kind_ k = immediate
        is not included in
@@ -396,10 +392,6 @@ Lines 3-5, characters 6-3:
 4 |   kind_ k = value
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = value end
-       is not included in
-         sig kind_ k = immediate end
        Kind declarations do not match:
          kind_ k = value
        is not included in
@@ -418,10 +410,6 @@ Lines 3-5, characters 6-3:
 4 |   kind_ k
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k end
-       is not included in
-         sig kind_ k = value end
        Kind declarations do not match:
          kind_ k
        is not included in
@@ -440,10 +428,6 @@ Lines 3-5, characters 6-3:
 4 |   kind_ k
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k end
-       is not included in
-         sig kind_ k = any end
        Kind declarations do not match:
          kind_ k
        is not included in
@@ -997,10 +981,6 @@ Line 1, characters 38-42:
 1 | module M : sig kind_ k = F_M2.k end = F_M1
                                           ^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = F(M1).k end
-       is not included in
-         sig kind_ k = F_M2.k end
        Kind declarations do not match:
          kind_ k = F(M1).k
        is not included in
@@ -1027,10 +1007,6 @@ Line 8, characters 36-38:
 8 | module M : sig kind_ k = M1.k end = M2
                                         ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig kind_ k = M2.k end
-       is not included in
-         sig kind_ k = M1.k end
        Kind declarations do not match:
          kind_ k = M2.k
        is not included in
@@ -1509,8 +1485,8 @@ module F : functor (X : sig kind_ k end) -> sig end
 Line 3, characters 11-24:
 3 | module M = F(struct end)
                ^^^^^^^^^^^^^
-Error: Modules do not match: sig end is not included in sig kind_ k end
-     The kind "k" is required but not provided
+Error: Signature mismatch:
+       The kind "k" is required but not provided
 |}]
 
 (*************************************************)
@@ -2280,15 +2256,8 @@ Line 11, characters 48-49:
 11 | module Bad_widen (X : Portable_id) : Value_id = X
                                                      ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val id : ('a : value mod portable). 'a -> 'a end
-       is not included in
-         Value_id
-       Values do not match:
-         val id : ('a : value mod portable). 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The value "id" does not match its expected declaration
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of id at line 8, characters 2-33.
        But the kind of 'a must be a subkind of value mod portable

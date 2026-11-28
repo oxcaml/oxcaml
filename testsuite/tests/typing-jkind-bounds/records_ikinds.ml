@@ -898,10 +898,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { mutable x : int; y : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { mutable x : int; y : string; } end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type t = { mutable x : int; y : string; }
        is not included in
@@ -924,10 +920,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { x : int ref; y : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { x : int ref; y : string; } end
-       is not included in
-         sig type t : immutable_data end
        Type declarations do not match:
          type t = { x : int ref; y : string; }
        is not included in
@@ -950,10 +942,6 @@ Lines 3-5, characters 6-3:
 4 |   type 'a t = { x : 'a; y : string }
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = { x : 'a; y : string; } end
-       is not included in
-         sig type 'a t : immutable_data end
        Type declarations do not match:
          type 'a t = { x : 'a; y : string; }
        is not included in

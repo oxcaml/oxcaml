@@ -17,10 +17,6 @@ Lines 3-6, characters 6-3:
 5 |  let f = function A | B -> 0
 6 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = X.t = A | B val f : t -> int end
-       is not included in
-         sig type t = int * bool end
        Type declarations do not match:
          type t = X.t = A | B
        is not included in
@@ -138,10 +134,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = Foo : int -> t
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Foo : int -> t end
-       is not included in
-         sig type t = Foo of int end
        Type declarations do not match:
          type t = Foo : int -> t
        is not included in

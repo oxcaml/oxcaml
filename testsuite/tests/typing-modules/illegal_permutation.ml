@@ -46,10 +46,6 @@ Line 8, characters 21-51:
 8 | module A: expected = struct module type x = c12 end
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = c12 end
-       is not included in
-         expected
        Module type declarations do not match:
          module type x = c12
        does not match
@@ -67,10 +63,6 @@ Line 1, characters 21-52:
 1 | module B: expected = struct module type x = c123 end
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = c123 end
-       is not included in
-         expected
        Module type declarations do not match:
          module type x = c123
        does not match
@@ -112,28 +104,6 @@ Lines 9-17, characters 6-3:
 16 |   end
 17 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type x =
-             sig
-               val a : int
-               val b : int
-               val e : int
-               val d : int
-               val c : int
-             end
-         end
-       is not included in
-         sig
-           module type x =
-             sig
-               val a : int
-               val b : int
-               val c : int
-               val d : int
-               val e : int
-             end
-         end
        Module type declarations do not match:
          module type x =
            sig
@@ -179,10 +149,6 @@ Lines 6-11, characters 6-3:
 10 |   end
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = sig val x : int class x : ct end end
-       is not included in
-         sig module type x = sig class x : ct val x : int end end
        Module type declarations do not match:
          module type x = sig val x : int class x : ct end
        does not match
@@ -220,27 +186,12 @@ Lines 8-15, characters 6-3:
 14 |   end
 15 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type a =
-             sig module type b = sig val y : int val x : int end end
-         end
-       is not included in
-         sig
-           module type a =
-             sig module type b = sig val x : int val y : int end end
-         end
        Module type declarations do not match:
          module type a =
            sig module type b = sig val y : int val x : int end end
        does not match
          module type a =
            sig module type b = sig val x : int val y : int end end
-       At position "module type a = <here>"
-       Module types do not match:
-         sig module type b = sig val y : int val x : int end end
-       is not equal to
-         sig module type b = sig val x : int val y : int end end
        At position "module type a = <here>"
        Module type declarations do not match:
          module type b = sig val y : int val x : int end
@@ -275,10 +226,6 @@ Lines 7-12, characters 6-3:
 11 |   end
 12 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = sig class b : ct class a : ct end end
-       is not included in
-         sig module type x = sig class a : ct class b : ct end end
        Module type declarations do not match:
          module type x = sig class b : ct class a : ct end
        does not match
@@ -310,10 +257,6 @@ Lines 6-11, characters 6-3:
 10 |   end
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = sig type exn += B type exn += A end end
-       is not included in
-         sig module type x = sig type exn += A type exn += B end end
        Module type declarations do not match:
          module type x = sig type exn += B type exn += A end
        does not match
@@ -350,10 +293,6 @@ Line 16, characters 38-68:
 16 | module C: sig module type x = w end = struct module type x = w21 end
                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = w21 end
-       is not included in
-         sig module type x = w end
        Module type declarations do not match:
          module type x = w21
        does not match
@@ -371,10 +310,6 @@ Line 1, characters 38-71:
 1 | module D: sig module type x = w end = struct module type x = wOne21 end
                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = wOne21 end
-       is not included in
-         sig module type x = w end
        Module type declarations do not match:
          module type x = wOne21
        does not match
@@ -396,10 +331,6 @@ Lines 2-4, characters 0-3:
 3 |   module type x = functor(X:c12) -> s
 4 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = functor (X : c12) -> s end
-       is not included in
-         sig module type x = functor (X : s) -> s end
        Module type declarations do not match:
          module type x = functor (X : c12) -> s
        does not match
@@ -421,10 +352,6 @@ Lines 2-4, characters 0-3:
 3 |   module type x = functor(X:s) -> c12
 4 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module type x = functor (X : s) -> c12 end
-       is not included in
-         sig module type x = functor (X : s) -> s end
        Module type declarations do not match:
          module type x = functor (X : s) -> c12
        does not match
@@ -492,36 +419,6 @@ Lines 22-43, characters 4-3:
 42 |   end
 43 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module type x =
-             sig
-               module A :
-                 sig
-                   module B :
-                     sig
-                       module C :
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig ... end) -> sig end
-                     end
-                 end
-             end
-         end
-       is not included in
-         sig
-           module type x =
-             sig
-               module A :
-                 sig
-                   module B :
-                     sig
-                       module C :
-                         functor (X : sig end) (Y : sig end)
-                           (Z : sig ... end) -> sig end
-                     end
-                 end
-             end
-         end
        Module type declarations do not match:
          module type x =
            sig

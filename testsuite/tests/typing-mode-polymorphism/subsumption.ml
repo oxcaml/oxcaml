@@ -277,16 +277,9 @@ Lines 1-3, characters 59-3:
 2 |   let f (x @ local) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
-       The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
-       is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
+       The value "f" does not match its expected declaration
+       The type "'a @ [< 'm] -> 'a @ [> 'm | local]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -299,14 +292,7 @@ Lines 1-3, characters 60-3:
 2 |   let f (x @ unique) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & unique] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & unique] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "unique" but is "aliased"
@@ -321,14 +307,7 @@ Lines 1-3, characters 60-3:
 2 |   let f (x @ global) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & global] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & global] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "global"
@@ -344,17 +323,25 @@ Lines 1-3, characters 62-3:
 2 |   let f (x @ portable) = x
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm & portable] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
-       Values do not match:
-         val f : 'a @ [< 'm & portable] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The argument mode was expected to be "portable" but is "nonportable"
+|}]
+
+(* Subsumption errors that are about types should not print any modes *)
+module Fail_type_mismatch : module type of Base = struct
+  let f x = (x, x)
+end
+[%%expect{|
+Lines 1-3, characters 50-3:
+1 | ..................................................struct
+2 |   let f x = (x, x)
+3 | end
+Error: Signature mismatch:
+       The value "f" does not match its expected declaration
+       The type "... -> 'a * 'a" is not compatible with the type "... -> 'a @ 'm"
+       Type "'a * 'a" is not compatible with type "'a"
 |}]
 
 module Producer = struct
@@ -389,20 +376,11 @@ Lines 1-3, characters 46-3:
 2 |   let f (x @ local) y = y
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm] end
-       is not included in
-         sig
-           val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-         end
-       Values do not match:
-         val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
-       is not included in
-         val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-       The type
-         "'a @ [> past('m) | local] -> 'b @ [< 'n > past('o)] -> 'b @ [> 'n]"
+       The value "f" does not match its expected declaration
+       The type "'a @ [< past('m)] -> ('b -> 'b) @ [> past('m) | local]"
        is not compatible with the type
-         "'a @ [< past('m) & global] -> 'b @ [< 'p & past('o)] -> 'b @ [> 'p]"
+         "'a @ [< past('n) & global] ->
+         ('b @ [< 'o] -> 'b @ [> 'o]) @ [> past('n)]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -417,16 +395,9 @@ Lines 3-5, characters 6-3:
 4 |   let f x = x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] end
-       is not included in
-         sig val f : 'a @ local -> 'a end
-       Values do not match:
-         val f : 'a @ [< 'm] -> 'a @ [> 'm]
-       is not included in
-         val f : 'a @ local -> 'a
+       The value "f" does not match its expected declaration
        The type
-         "'a @ [< 'm > local aliased nonportable unforkable yielding stateful dynamic] ->
+         "'a @ [< 'm] ->
          'a @ [> 'm | local aliased nonportable unforkable yielding stateful dynamic]"
        is not compatible with the type "'a @ local -> 'a"
        The return mode was expected to be "global"
@@ -444,17 +415,8 @@ Lines 3-5, characters 6-3:
 4 |   let f x = use_portable x
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
-         end
-       is not included in
-         sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
-       is not included in
-         val f : 'a -> 'a
-       The type "'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]"
+       The value "f" does not match its expected declaration
+       The type "'a @ [< 'm & global portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a -> 'a"
        The argument mode was expected to be "portable" but is "nonportable"
 |}]
@@ -478,10 +440,6 @@ Lines 3-9, characters 6-3:
 8 |     !r
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val r : int ref val f : unit @ 'm -> int @ [> dynamic] end @ nonportable
-       is not included in
-         sig val f : unit -> int @@ portable end @ nonportable
        Values do not match:
          val f : unit @ 'm -> int @ [> dynamic] (* in a structure at nonportable *)
        is not included in
@@ -500,14 +458,6 @@ Lines 3-9, characters 6-3:
 8 |     !r
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val r : int ref
-           val f :
-             unit @ 'm -> int @ [> aliased nonportable stateful dynamic]
-         end @ nonportable
-       is not included in
-         sig val f : unit -> int @@ portable end @ nonportable
        Values do not match:
          val f : unit @ 'm -> int @ [> aliased nonportable stateful dynamic] (* in a structure at nonportable *)
        is not included in
