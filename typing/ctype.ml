@@ -2649,7 +2649,9 @@ let try_expand_once = try_expand_once_gen expand_abbrev
 let try_expand_safe env ty =
   let snap = Btype.snapshot () in
   try try_expand_once env ty
-  with Escape _ ->
+  with
+  | Cannot_expand -> raise_notrace Cannot_expand
+  | Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise_notrace Cannot_expand
 
 (* Note [Beta normal form]
