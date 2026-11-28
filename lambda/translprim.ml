@@ -1875,6 +1875,19 @@ let layout_of_ty_for_idx_set env loc ty =
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
 
+(* Reading an element of a flat float array allocates a box for the float, at
+   the mode of the read. That is unsound if the element type crosses locality,
+   since the box can then be used beyond its region. It is also unsound for
+   generic reads, since a caller can instantiate the element type with one that
+   crosses locality. In both cases, box on the heap instead. *)
+let heap_box_float_read_if_unsafe env ~elt_ty
+      (ref_kind : array_ref_kind) : array_ref_kind =
+  match ref_kind with
+  | Pfloatarray_ref _ when Ctype.crosses_locality env elt_ty ->
+    Pfloatarray_ref alloc_heap
+  | Pgenarray_ref _ -> Pgenarray_ref alloc_heap
+  | _ -> ref_kind
+
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
@@ -1932,6 +1945,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       let array_ref_type =
         glb_array_ref_type loc rt
           (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
+        |> heap_box_float_read_if_unsafe env ~elt_ty:res_ty
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1950,6 +1964,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       let array_ref_type =
         glb_array_ref_type loc rt
           (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
+        |> heap_box_float_read_if_unsafe env ~elt_ty:res_ty
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None

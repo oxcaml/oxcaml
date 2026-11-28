@@ -6888,6 +6888,18 @@ let crossing_of_ty env ?modalities ty =
   | None -> crossing
   | Some m -> Crossing.modality m crossing
 
+let crosses_locality env ty =
+  let areality = Crossing.Axis.Comonadic Areality in
+  let crossing =
+    if !Clflags.ikinds
+    then Ikind.crossing_of_type env ty
+    else crossing_of_jkind env (type_jkind_purely env ty)
+  in
+  not
+    (Crossing.Per_axis.le areality
+       (Crossing.proj areality Crossing.max)
+       (Crossing.proj areality crossing))
+
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> With_regionality.disallow_right |> Crossing.apply_left crossing

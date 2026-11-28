@@ -925,6 +925,12 @@ val crossing_of_ty :
   Types.type_expr ->
   Mode.Crossing.t
 
+(** Whether values of the type cross the locality axis at all, so that a local
+    value of the type can be used at a stronger locality. Unlike
+    [crossing_of_ty], this ignores principality, so it is meant for use after
+    type checking. *)
+val crosses_locality : Env.t -> Types.type_expr -> bool
+
 (** Cross a right mode according to a type wrapped in modalities. Non-principal
     types don't cross. *)
 val cross_right :
