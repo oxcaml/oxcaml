@@ -371,30 +371,19 @@ let defined_symbols ~macho ~prefix path =
    variant and no others: a link that takes -lasmrun from a variant's tree,
    as a hand-written link of an -output-obj object may, must not find the
    runtime of another variant there. The names of the archives end in the
-   variant's axes that the runtime depends on, unless those are the default
-   variant's. A name does not say what the file is: each runtime defines
-   the guard symbol of the variant it was built for and no other (see
-   runtime/codegen_variant_guard.c), which nm shows. *)
+   variant's axes that the runtime depends on: in nothing for base, the
+   variant of the library root. A name does not say what the file is: each
+   runtime defines the guard symbol of the variant it was built for and no
+   other (see runtime/codegen_variant_guard.c), which nm shows. *)
 let check_runtime_archives t =
   let stdlib = installed t "lib/ocaml" in
   let config variable =
     capture (installed t "bin/ocamlopt") ["-config-var"; variable]
   in
-  let default_axes =
-    List.filter_map (fun (axis, variable, enabled) ->
-      if config variable = enabled then Some axis else None)
-      [ "asan", "with_address_sanitizer", "true";
-        "fp", "with_frame_pointers", "true";
-        "sc", "no_stack_checks", "false" ]
-  in
   let macho = config "system" = "macosx" in
   let check tree axes =
     checking "runtime archives of %s" tree;
-    let suffix =
-      if axes = default_axes then ""
-      else if axes = [] then "_base"
-      else "_" ^ String.concat "_" axes
-    in
+    let suffix = if axes = [] then "" else "_" ^ String.concat "_" axes in
     let expected =
       sorted
         [ "libasmrun" ^ suffix ^ ".a"; "libasmrund" ^ suffix ^ ".a";
@@ -419,7 +408,7 @@ let check_runtime_archives t =
         fail "%s defines [%s]: the runtime of this tree's variant defines %s"
           path (String.concat " " defined) guard) expected
   in
-  check stdlib default_axes;
+  check stdlib [];
   config "codegen_variants" |> words |> List.iter (fun variant ->
     check (Filename.concat (Filename.concat stdlib "variants") variant)
       (String.split_on_char '-' variant
@@ -490,13 +479,10 @@ let create_dune_target ?(dir = ".") ?(source = "let () = ()\n") name kind =
     dependency (String.concat " " (link_flags name)));
   dir
 
-(* The tokens of a codegen variant's name, with their OCAMLPARAM keys and
-   with what ocamlopt -config prints when the default variant has them. *)
+(* The tokens of a codegen variant's name, with their OCAMLPARAM keys. *)
 let codegen_axes =
-  [ "asan", "asan", ("with_address_sanitizer", "true");
-    "fp", "frame-pointers", ("with_frame_pointers", "true");
-    "poll", "poll-insertion", ("poll_insertion", "true");
-    "sc", "stack-checks", ("no_stack_checks", "false") ]
+  [ "asan", "asan"; "fp", "frame-pointers"; "poll", "poll-insertion";
+    "sc", "stack-checks" ]
 
 (* A consumer prints whether it is fully polled. Poll insertion is not in
    the fingerprint that the linker enforces, so only the linked program
@@ -513,8 +499,8 @@ let consumer_source =
 (* Build systems select a codegen variant with OCAMLPARAM alone and go on
    naming the libraries by their paths in the default tree, the one that
    ocamlc -where reports; the compiler resolves those paths in the variant's
-   tree. So under every variant that the installation serves, its default
-   one (with an empty OCAMLPARAM) and each of the others, every package
+   tree. So under every variant that the installation serves, base (with
+   an empty OCAMLPARAM) and each of the others, every package
    whose native archives that variant's tree provides has to link, through
    findlib and through Dune, into a program of that variant, which has to
    run. *)
@@ -523,18 +509,13 @@ let check_variant_consumers t packages =
   let config variable =
     capture (installed t "bin/ocamlopt") ["-config-var"; variable]
   in
-  let default =
-    List.filter_map (fun (token, _, (variable, value)) ->
-      if config variable = value then Some token else None) codegen_axes
-  in
   let variants =
-    ((if default = [] then "base" else String.concat "-" default),
-     default, stdlib, "") ::
+    ("base", [], stdlib, "") ::
     List.map (fun variant ->
       let tokens = String.split_on_char '-' variant in
       variant, tokens,
       Filename.concat (Filename.concat stdlib "variants") variant,
-      String.concat "," ("_" :: List.map (fun (token, key, _) ->
+      String.concat "," ("_" :: List.map (fun (token, key) ->
         Printf.sprintf "%s=%d" key (Bool.to_int (List.mem token tokens)))
         codegen_axes))
       (config "codegen_variants" |> words)
