@@ -10717,6 +10717,7 @@ and type_label_access
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
+        lbl_inherit = Not_inherited;
         lbl_mut;
         lbl_modalities = Typemode.mutable_modalities lbl_mut;
         lbl_pos = 0;

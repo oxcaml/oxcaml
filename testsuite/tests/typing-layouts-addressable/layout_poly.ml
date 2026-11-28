@@ -88,36 +88,10 @@ Error: The value "x" has type "float#" but an expression was expected of type
          representable at call sites).
 |}]
 
-(* ...including at an unboxed product with an unaddressable component *)
-let bad (x : #(float# * string)) = id_addressable x
+(* An unboxed product is addressable even if a component is not *)
+let ok (x : #(float# * string)) = id_addressable x
 [%%expect{|
-Line 1, characters 50-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                                      ^
-Error: The value "x" has type "#(float# * string)"
-       but an expression was expected of type
-         "('a : '_representable_layout_3 addressable)"
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be addressable
-         because we must know concretely how to return a function result.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
-Line 1, characters 50-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                                      ^
-Error: The value "x" has type "#(float# * string)"
-       but an expression was expected of type
-         "('a : '_representable_layout_3 addressable)"
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+val ok : #(float# * string) -> #(float# * string) = <fun>
 |}]
 
 (* We can constrain an unfilled variable to always be addressable *)
@@ -135,7 +109,7 @@ let bad x =
 Line 3, characters 3-4:
 3 |   (x : float#)
        ^
-Error: The value "x" has type "('a : '_representable_layout_4 addressable)"
+Error: The value "x" has type "('a : '_representable_layout_3 addressable)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -333,9 +307,7 @@ let d (y : r) = id_addressable y
 val d : r -> r = <fun>
 |}]
 
-(* Constraining types with product kinds to be addressable (in a way that
-   exercises [Jkind.decompose_product] because the kind stored on the
-   declaration of [mixed_pair] is approximate). *)
+(* Products whose kind stored on the declaration is approximate *)
 
 type ('a : any) mixed_pair = #{ a : 'a; b : string }
 
@@ -345,33 +317,7 @@ type ('a : any) mixed_pair = #{ a : 'a; b : string; }
 val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
 |}]
 
-let bad (y : b8 mixed_pair) = id_addressable y
+let ok (y : b8 mixed_pair) = id_addressable y
 [%%expect{|
-Line 1, characters 45-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                                 ^
-Error: The value "y" has type "b8 mixed_pair"
-       but an expression was expected of type
-         "('a : ('_representable_layout_5 & value_or_null) addressable)"
-       The layout of b8 mixed_pair is bits8 & value non_float
-         because of the definition of mixed_pair at line 1, characters 0-52.
-       But the layout of b8 mixed_pair must be addressable
-         because we must know concretely how to return a function result.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
-Line 1, characters 45-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                                 ^
-Error: The value "y" has type "b8 mixed_pair"
-       but an expression was expected of type
-         "('a : ('_representable_layout_5 & value_or_null) addressable)"
-       The layout of b8 mixed_pair is bits8 & value non_float
-         because of the definition of mixed_pair at line 1, characters 0-52.
-       But the layout of b8 mixed_pair must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+val ok : b8 mixed_pair -> b8 mixed_pair = <fun>
 |}]

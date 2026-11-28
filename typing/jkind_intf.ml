@@ -79,8 +79,10 @@ module type Sort = sig
        The core properties of [addressable] are reflected in
        [Sort.constrain_addressable]. We also provide the following notes:
        - Some base sorts are inherently addressable.
-       - If all the components of a product are addressable, then so is the
-         product.
+       - An ampersand makes its non-inherit components addressable:
+         [k1 & k2 inherit] is [k1 addressable & k2 inherit]. A component is
+         written [k inherit] to opt out, so [k1 & k2 inherit] has an
+         unaddressable component and is not itself addressable.
        - Addressability is idempotent: [k] is addressable iff
          [k addressable = k].
        - The addressable kinds are all subkinds of [any addressable].
@@ -107,6 +109,8 @@ module type Sort = sig
     val genvar : var -> t
 
     val equal : t -> t -> bool
+
+    val equal_up_to_addressability : t -> t -> bool
 
     val format : Format_doc.formatter -> t -> unit
 
@@ -534,6 +538,9 @@ module History = struct
   type product_creation_reason =
     | Unboxed_tuple
     | Unboxed_record
+    | Unboxed_record_making_field_addressable
+        (** An unboxed record whose sole field is not [inherit] and does not
+            already have an addressable layout *)
 
   type creation_reason =
     | Annotated : ('l * 'r) annotation_context * Location.t -> creation_reason

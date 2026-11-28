@@ -57,6 +57,7 @@ type jkind_annotation_desc = Shim.jkind_annotation_desc =
   | Pjk_with of Shim.jkind_annotation * Ppxlib_ast.Parsetree.core_type * Shim.Modalities.t
   | Pjk_kind_of of Ppxlib_ast.Parsetree.core_type
   | Pjk_product of Shim.jkind_annotation list
+  | Pjk_inherit of Shim.jkind_annotation
 
 type jkind_annotation = Shim.jkind_annotation =
   { pjka_loc : Location.t

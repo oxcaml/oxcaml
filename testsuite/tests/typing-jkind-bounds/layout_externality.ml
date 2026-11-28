@@ -213,7 +213,7 @@ module M : sig
   type 'a f : float64 with 'a
   val mk : unit -> string f
 end = struct
-  type 'a f = #{ x : float# }
+  type 'a f = #{ inherit x : float# }
   let mk () = #{ x = #1. }
 end
 let use_external (type (a : float64 mod external_)) (_ : a) = ()
