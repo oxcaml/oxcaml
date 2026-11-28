@@ -156,6 +156,8 @@ end = struct
                     if Label.equal l label then target_label else l))
               block.predecessors;
             (* Update terminator. *)
+            Fdo_dropped_counters.register ~reason:Cfg_branch_to_jump
+              (C.fdo_counters_of_terminator block.terminator.desc);
             block.terminator
               <- { block.terminator with desc = Cfg_intf.S.Never };
             assert (Option.is_none block.exn);
@@ -257,6 +259,8 @@ end = struct
             then (
               assert (Label.equal b1_label (List.hd b2_predecessors));
               (* modify b1 *)
+              Fdo_dropped_counters.register ~reason:Cfg_branch_to_jump
+                (Cfg.fdo_counters_of_terminator b1_block.terminator.desc);
               DLL.transfer ~to_:b1_block.body ~from:b2_block.body ();
               b1_block.terminator <- b2_block.terminator;
               b1_block.exn <- b2_block.exn;

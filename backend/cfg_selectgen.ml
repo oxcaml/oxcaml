@@ -49,6 +49,12 @@ type error = Builtin_not_recognized of string
 
 exception Error of error * Debuginfo.t
 
+(* The successor starting [sub_cfg], for a branch with annotations [annots]. *)
+let branch_successor sub_cfg annots =
+  Cfg.successor
+    (Sub_cfg.start_label sub_cfg)
+    ~fdo_annotation:(Branch_annotations.fdo_annotation annots)
+
 (* CR-soon gyorsh: This functor must not have state, because it is instantiated
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
    dependency cycles. *)
@@ -383,14 +389,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] | _ :: _ -> wrong_num_args 3
     in
     match[@ocaml.warning "+fragile-match"] op with
-    | Capply { callees; returns; _ } -> (
+    | Capply { callees; returns; callsite_counter; _ } -> (
       let make_call op : Cfg.basic_or_terminator =
         Terminator
           (if returns then Call { op; label_after } else Call_no_return op)
       in
       match[@ocaml.warning "-fragile-match"] args with
-      | Cconst_symbol (func, _dbg) :: rem -> make_call (Direct func), rem
-      | _ -> make_call (Indirect callees), args)
+      | Cconst_symbol (func, _dbg) :: rem ->
+        make_call (Direct { sym = func; callsite_counter }), rem
+      | _ -> make_call (Indirect { callees; callsite_counter }), args)
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -1251,8 +1258,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Sub_cfg.set_entry_debuginfo sub_else ifnot_dbg;
       let term_desc =
         SU.terminator_of_test cond
-          ~label_true:(Sub_cfg.start_label sub_if)
-          ~label_false:(Sub_cfg.start_label sub_else)
+          ~ifso:(branch_successor sub_if ifso_a)
+          ~ifnot:(branch_successor sub_else ifnot_a)
       in
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
@@ -1284,7 +1291,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         sub_cases ecases;
       let subs = Array.map (fun (_, sub_cfg) -> sub_cfg) sub_cases in
       let term_desc : Cfg.terminator =
-        Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
+        Switch
+          (Array.map
+             (fun idx ->
+               let _, _, annots = ecases.(idx) in
+               branch_successor subs.(idx) annots)
+             index)
       in
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
@@ -1524,9 +1536,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
       let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
       match call with
-      | Direct func
+      | Direct { sym = func; callsite_counter }
         when String.equal func.sym_name !SU.current_function_name
              && SU.trap_stack_is_empty env ->
+        Fdo_dropped_counters.register ~reason:Cfg_self_tail_call_to_jump
+          (Fdo_annotation.of_list (Option.to_list callsite_counter));
         let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
         let loc_arg =
           assert (stack_ofs >= 0);
@@ -1575,8 +1589,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Sub_cfg.set_entry_debuginfo sub_else ifnot_dbg;
       let term_desc =
         SU.terminator_of_test cond
-          ~label_true:(Sub_cfg.start_label sub_if)
-          ~label_false:(Sub_cfg.start_label sub_else)
+          ~ifso:(branch_successor sub_if ifso_a)
+          ~ifnot:(branch_successor sub_else ifnot_a)
       in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
         ~phantom_available_before:(SU.phantom_vars_from_env env);
@@ -1602,7 +1616,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       let term_desc : Cfg.terminator =
         Switch
-          (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
+          (Array.map
+             (fun idx ->
+               let _, _, annots = ecases.(idx) in
+               branch_successor sub_cases.(idx) annots)
+             index)
       in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
         ~phantom_available_before:(SU.phantom_vars_from_env env);
@@ -1802,9 +1820,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.create ~fun_name:f.Cmm.fun_name.sym_name ~fun_args:loc_arg
         ~fun_codegen_options:
           (Cfg.of_cmm_codegen_option f.Cmm.fun_codegen_options)
-        ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
-        ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
-        ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
+        ~fun_dbg:f.Cmm.fun_dbg
+        ~fun_fdo_entry_annotation:f.Cmm.fun_fdo_entry_annotation
+        ~fun_contains_calls:true ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
+        ~fun_poll:f.Cmm.fun_poll ~next_instruction_id:Sub_cfg.instr_id
+        ~fun_ret_type:f.Cmm.fun_ret_type
         ~fun_phantom_lets:(SU.phantom_lets_for_fundecl env)
         ~allowed_to_be_irreducible:false
     in

@@ -1,5 +1,8 @@
 ; Tests for the FDO system with pseudo-instrumentation
 
+; CR-someday yusumez: Generate this file (as the gen/gen_dune.ml of other test
+; directories do): most of it repeats the same stanzas for each test.
+
 ; The operations on pseudo-instrumentation counters ([Fdo_counter]).
 
 (executable
@@ -45,6 +48,75 @@
  (deps cmm_switch_counters.output cmm_switch_counters.output.corrected)
  (action
   (diff cmm_switch_counters.output cmm_switch_counters.output.corrected)))
+
+; The counters that instruction selection puts in the Cfg.
+
+(executable
+ (name selection_counters)
+ (modules selection_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   selection_counters.output.corrected
+   (run ./selection_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps selection_counters.output selection_counters.output.corrected)
+ (action
+  (diff selection_counters.output selection_counters.output.corrected)))
+
+; The counters of the terminators that [Simplify_terminator] rewrites.
+
+(executable
+ (name simplify_terminator_counters)
+ (modules simplify_terminator_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   simplify_terminator_counters.output.corrected
+   (run ./simplify_terminator_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps simplify_terminator_counters.output simplify_terminator_counters.output.corrected)
+ (action
+  (diff simplify_terminator_counters.output simplify_terminator_counters.output.corrected)))
+
+; The counters of the blocks that [Cfg_merge_blocks] merges.
+
+(executable
+ (name merge_blocks_counters)
+ (modules merge_blocks_counters)
+ (libraries ocamloptcomp))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (with-stdout-to
+   merge_blocks_counters.output.corrected
+   (run ./merge_blocks_counters.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps merge_blocks_counters.output merge_blocks_counters.output.corrected)
+ (action
+  (diff merge_blocks_counters.output merge_blocks_counters.output.corrected)))
 
 ; Extracting the FDO annotations from fexpr dumps.
 
@@ -491,3 +563,97 @@
  (deps to_cmm_probe.output to_cmm_probe.output.corrected)
  (action
   (diff to_cmm_probe.output to_cmm_probe.output.corrected)))
+
+; The counters in Cfg: none of the Cmm selected is lost, and none is added. A
+; self tail call becomes a jump, whose counter is dropped. The Cfg dumps hold
+; every pass that prints one.
+
+(rule
+ (targets cfg.output.corrected)
+ (deps cfg.ml to_cmm.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p cfg_cmm cfg_cfg)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cmm/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcfg
+     -dfdo-dropped-counters
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cfg/cfg.cmx
+     cfg.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcmm
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cmm/to_cmm.cmx
+     to_cmm.ml))
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -dcfg
+     -dump-into-file
+     -color
+     never
+     -o
+     cfg_cfg/to_cmm.cmx
+     to_cmm.ml))
+   (with-stdout-to
+    cfg.output.corrected
+    (progn
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      cfg_cmm/cfg.cmx.dump
+      cfg_cfg/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list cfg_cmm/cfg.cmx.dump)
+     (run ./fdo_annotations.exe list cfg_cfg/cfg.cmx.dump)
+     (run ./fdo_annotations.exe dropped cfg_cfg/cfg.cmx.dump)
+     (run
+      ./fdo_annotations.exe
+      compare-sets
+      cfg_cmm/to_cmm.cmx.dump
+      cfg_cfg/to_cmm.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps cfg.output cfg.output.corrected)
+ (action
+  (diff cfg.output cfg.output.corrected)))

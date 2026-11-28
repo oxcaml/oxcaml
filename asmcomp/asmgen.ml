@@ -592,23 +592,26 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   in
   if !Oxcaml_flags.ssa_validate
   then
-    begin try
-      let cfg_without_ssa =
-        Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-      in
-      (* First conversion: used only for [Cfg_compare], so we emit a CFG that
-         stays faithful to plain [cfg_selectgen]. Note that both conversions
-         share the global [Sub_cfg.instr_id] counter and reset it, so
-         [cfg_without_ssa]'s [next_instruction_id] is stale by the time the
-         comparison runs; this is fine only because [Cfg_compare] never adds
-         instructions. *)
-      let cfg_from_ssa_for_compare =
-        Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
-      in
-      Cfg_compare.compare ~old_cfg:cfg_without_ssa
-        ~new_cfg:cfg_from_ssa_for_compare ppf_dump
-    with exn -> report_pipeline_error exn ssa
-    end;
+    (* Only the Cfg converted below is compiled: the counters dropped while
+       building those of the comparison must not be registered. *)
+    Fdo_dropped_counters.without_registering (fun () ->
+        begin try
+          let cfg_without_ssa =
+            Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+          in
+          (* First conversion: used only for [Cfg_compare], so we emit a CFG
+             that stays faithful to plain [cfg_selectgen]. Note that both
+             conversions share the global [Sub_cfg.instr_id] counter and reset
+             it, so [cfg_without_ssa]'s [next_instruction_id] is stale by the
+             time the comparison runs; this is fine only because [Cfg_compare]
+             never adds instructions. *)
+          let cfg_from_ssa_for_compare =
+            Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
+          in
+          Cfg_compare.compare ~old_cfg:cfg_without_ssa
+            ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+        with exn -> report_pipeline_error exn ssa
+        end);
   if !Oxcaml_flags.dump_ssa
   then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
   (* Second conversion: produces the CFG that feeds the real pipeline. This is

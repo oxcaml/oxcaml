@@ -1,0 +1,114 @@
+switch to a single target:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(2))
+  after:
+    1: goto 100
+  dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2)
+  removed, not dropped:
+
+switch with two runs:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(3)); case 4: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(4))
+  after:
+    1: if < u 2 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)); if = u 2 goto 101 fdo_annotation("Test.f":0:00000001:0:branch(2)); if > u 2 goto 101 fdo_annotation("Test.f":0:00000001:0:branch(3) "Test.f":0:00000001:0:branch(4))
+  dropped:
+  removed, not dropped:
+
+switch with a run in the middle:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: if < u 2 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)); if = u 2 goto 101 fdo_annotation("Test.f":0:00000001:0:branch(2)); if > u 2 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  dropped:
+  removed, not dropped:
+
+switch with two single arms first:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 102 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: if < u 1 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); if = u 1 goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); if > u 1 goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3))
+  dropped:
+  removed, not dropped:
+
+switch with three runs:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  dropped:
+  removed, not dropped:
+
+switch with four runs:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(2)); case 3: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  dropped:
+  removed, not dropped:
+
+truth test to a single target:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  after:
+    1: goto 100
+  dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+  removed, not dropped:
+
+int test to a single target:
+  before:
+    1: if < s 0 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); if = s 0 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1)); if > s 0 goto 100 fdo_annotation("Test.f":0:00000001:0:branch(2))
+  after:
+    1: goto 100
+  dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2)
+  removed, not dropped:
+
+float test to a single target:
+  before:
+    1: if < goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); if = goto 100 fdo_annotation("Test.f":0:00000001:0:branch(1)); if > goto 100 fdo_annotation("Test.f":0:00000001:0:branch(2)); else goto 100 fdo_annotation("Test.f":0:00000001:0:branch(3))
+  after:
+    1: goto 100
+  dropped: "Test.f":0:00000001:0:branch(0) "Test.f":0:00000001:0:branch(1)
+    "Test.f":0:00000001:0:branch(2) "Test.f":0:00000001:0:branch(3)
+  removed, not dropped:
+
+truth test with a known argument:
+  before:
+    1: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  after:
+    1: goto 100
+  dropped: "Test.f":0:00000001:0:branch(0)
+  removed, not dropped: "Test.f":0:00000001:0:branch(1)
+
+switch with a known argument:
+  before:
+    1: switch; case 0: goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); case 1: goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1)); case 2: goto 102 fdo_annotation("Test.f":0:00000001:0:branch(2))
+  after:
+    1: goto 101
+  dropped: "Test.f":0:00000001:0:branch(1)
+  removed, not dropped: "Test.f":0:00000001:0:branch(0)
+    "Test.f":0:00000001:0:branch(2)
+
+jump to a known test:
+  before:
+    1: goto 102
+    102: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  after:
+    1: goto 101
+    102: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped: "Test.f":0:00000001:0:branch(1)
+  removed, not dropped:
+
+jump to an unknown test:
+  before:
+    1: goto 103
+    102: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    103: goto 102
+  after:
+    1: goto 103
+    102: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+    103: if true goto 100 fdo_annotation("Test.f":0:00000001:0:branch(0)); else goto 101 fdo_annotation("Test.f":0:00000001:0:branch(1))
+  dropped:
+  removed, not dropped:
+

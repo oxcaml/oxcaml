@@ -141,7 +141,10 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
             terminator =
               { id = make_id ();
                 desc =
-                  Call { op = Indirect None; label_after = move_tmp_res_label };
+                  Call
+                    { op = Indirect { callees = None; callsite_counter = None };
+                      label_after = move_tmp_res_label
+                    };
                 arg = arg_locs;
                 res = tmp_result_locs
               }
@@ -724,9 +727,9 @@ let make_loop ~loop_loc_first n =
               { id = make_id ();
                 desc =
                   Int_test
-                    { lt = loop_loc_label;
-                      eq = loop_reg_label;
-                      gt = move_tmp_res_label;
+                    { lt = Cfg.successor loop_loc_label;
+                      eq = Cfg.successor loop_reg_label;
+                      gt = Cfg.successor move_tmp_res_label;
                       is_signed = Signed;
                       imm = Some 0
                     };
@@ -755,9 +758,9 @@ let make_loop ~loop_loc_first n =
               { id = make_id ();
                 desc =
                   Int_test
-                    { lt = loop_loc_label;
-                      eq = loop_reg_label;
-                      gt = move_tmp_res_label;
+                    { lt = Cfg.successor loop_loc_label;
+                      eq = Cfg.successor loop_reg_label;
+                      gt = Cfg.successor move_tmp_res_label;
                       is_signed = Signed;
                       imm = Some 1
                     };
@@ -780,9 +783,9 @@ let make_loop ~loop_loc_first n =
               { id = make_id ();
                 desc =
                   Int_test
-                    { lt = loop_reg_label;
-                      eq = move_tmp_res_label;
-                      gt = move_tmp_res_label;
+                    { lt = Cfg.successor loop_reg_label;
+                      eq = Cfg.successor move_tmp_res_label;
+                      gt = Cfg.successor move_tmp_res_label;
                       is_signed = Signed;
                       imm = Some 2
                     };

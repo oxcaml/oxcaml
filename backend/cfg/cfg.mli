@@ -134,6 +134,9 @@ type t =
     fun_codegen_options : codegen_option list;
         (** Code generation options passed from Cmm. *)
     fun_dbg : Debuginfo.t;  (** Dwarf debug info for function entry. *)
+    fun_fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
+        (** The FDO counters of the function's entry edge, and the body hash its
+            interior counters were numbered with. *)
     entry_label : Label.t;
         (** This label must be the first in all layouts of this cfg. *)
     fun_contains_calls : bool;
@@ -166,6 +169,7 @@ val create :
   fun_args:Reg.t array ->
   fun_codegen_options:codegen_option list ->
   fun_dbg:Debuginfo.t ->
+  fun_fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   fun_contains_calls:bool ->
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
@@ -189,6 +193,19 @@ val predecessor_labels : basic_block -> Label.t list
 (** [exn] does not account for exceptional flow from the block that goes outside
     of the function. *)
 val successor_labels : normal:bool -> exn:bool -> basic_block -> Label.Set.t
+
+(** The successors of a branching terminator, in the order of its fields
+    ([ifso]/[ifnot], [lt]/[eq]/[gt](/[uo]), the arms of a switch); empty for
+    other terminators. *)
+val branch_successors : terminator -> successor list
+
+(** A successor with the given FDO counters (none by default). *)
+val successor : ?fdo_annotation:Fdo_annotation.t -> Label.t -> successor
+
+(** The FDO counters of the edges and of the call of a terminator. *)
+val fdo_counters_of_terminator : terminator -> Fdo_annotation.t
+
+val callsite_counter : func_call_operation -> Fdo_counter.t option
 
 val replace_successor_labels :
   t -> normal:bool -> exn:bool -> basic_block -> f:(Label.t -> Label.t) -> unit
