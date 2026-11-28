@@ -802,11 +802,19 @@ let rec expr env acc (e : Fexpr.expr) : _ * RE.t =
             fresh_var env depth_var Flambda_kind.rec_info
           in
           (* CR sspies: In the future, consider propagating these debug UIDs. *)
+          let return_arity = Flambda_arity.cardinal_unarized result_arity in
           let return_continuation, env =
-            fresh_cont env ret_cont ~sort:Return
-              ~arity:(Flambda_arity.cardinal_unarized result_arity)
+            fresh_cont env ret_cont ~sort:Return ~arity:return_arity
           in
           let exn_continuation, env = fresh_exn_cont env exn_cont ~arity:1 in
+          let env =
+            { env with
+              done_continuation = return_continuation, return_arity;
+              error_continuation =
+                Exn_continuation.create ~exn_handler:exn_continuation
+                  ~extra_args:[]
+            }
+          in
           let acc = Acc.push_closure_info acc ~code_id in
           let acc, body = expr env acc body in
           let _closure_info, acc = Acc.pop_closure_info acc in
@@ -1129,7 +1137,7 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
     |> Symbol.create_wrapped
   in
   let env = init_env () in
-  let { done_continuation = return_continuation;
+  let { done_continuation = return_continuation, _;
         error_continuation;
         toplevel_alloc_region;
         _
