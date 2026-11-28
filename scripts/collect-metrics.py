@@ -91,7 +91,7 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
 
         # Collect metrics for each artifact. The codegen-variant library
         # trees are left out, and so is every symbolic link: what is
-        # measured is the default library tree, of which a variant tree
+        # measured is the library root, of which a variant tree
         # holds another build of the native files and links to the rest.
         kind = "size_in_bytes"
         variants_path = install_path / "lib" / "ocaml" / "variants"

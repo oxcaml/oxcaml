@@ -29,10 +29,10 @@
 
    A name is looked for as it is written, as [Load_path.find] does it, and
    the file that is found is then taken from the tree of the selected
-   variant when it is inside the default root.  So a bare name and a name
+   variant when it is inside the library root.  So a bare name and a name
    with a directory are found in the variant's tree whether the search
    meets them there or, when the root is the current directory, in the
-   default tree first; no name is searched for under a tree that the
+   root first; no name is searched for under a tree that the
    search goes through already.  A file that the invocation wrote is that
    file, not searched for and not mapped, however it is named: that file
    only, not another one named after the same source, and not the file
@@ -42,9 +42,9 @@
 
 let root = Config.standard_library
 
-let default = Codegen_variant.default
+let base = Codegen_variant.base
 
-let selected = { default with stack_checks = not default.stack_checks }
+let selected = { base with stack_checks = true }
 
 let in_root file = Filename.concat root file
 
@@ -96,7 +96,7 @@ let describe ~file found =
   if same_file found (in_tree file)
   then "the file in the variant's tree"
   else if same_file found (in_root file)
-  then "the file in the default tree"
+  then "the file in the root"
   else "another file"
 
 let lookups ~no_cwd =

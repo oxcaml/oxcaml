@@ -46,8 +46,8 @@ val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit
 (** The archive of cached generic functions that a link with
     [-use-cached-generic-functions] uses, whether or not the file exists: the
     one that [-cached-generic-functions-path] names, redirected like any other
-    path inside the default library root ([Codegen_variant.in_selected_root]),
-    or else the archive of the library tree that serves the selected codegen
-    variant. The linker resolves the archive with this function, so this is the
-    file for a build to depend on. *)
+    path inside the library root ([Codegen_variant.in_selected_root]), or else
+    the archive of the library tree that serves the selected codegen variant.
+    The linker resolves the archive with this function, so this is the file for
+    a build to depend on. *)
 val cached_generic_functions_archive : unit -> string

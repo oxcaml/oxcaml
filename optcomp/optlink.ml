@@ -65,13 +65,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   (* The C objects and archives of the link, those of the command line and those
      that the linked archives record, likewise taken from the selected variant's
-     tree when they are named by a path inside the default library root: they
-     carry no fingerprint, so nothing would refuse the default tree's copy.
-     Everything else stays as written: linker options, files elsewhere, and a
-     file without a counterpart in the variant's tree, such as the default
-     tree's runtime archive when the variant has a runtime of its own, under
-     another name. These names are paths, relative to the current directory if
-     they are relative, and are not searched for on the load path. *)
+     tree when they are named by a path inside the library root: they carry no
+     fingerprint, so nothing would refuse the root's copy. Everything else stays
+     as written: linker options, files elsewhere, and a file without a
+     counterpart in the variant's tree, such as the root's runtime archive when
+     the variant has a runtime of its own, under another name. These names are
+     paths, relative to the current directory if they are relative, and are not
+     searched for on the load path. *)
   let c_objects_to_link linkenv =
     List.map
       (fun name ->

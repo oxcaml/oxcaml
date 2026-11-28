@@ -50,7 +50,7 @@
 
 (* The object that ocamlopt writes for a source is the one that the same
    invocation then links or archives, also when the source is inside the
-   default library root (here a root that compiled_in_root.sh makes and
+   library root (here a root that compiled_in_root.sh makes and
    OCAMLLIB names) and the tree of the selected variant has a file of the
    same name: a path inside the root is looked up in that tree when it
    names a file of the installation, not when the compiler has just

@@ -33,7 +33,7 @@ TEST
   fi
 }
 
-# No selection: the default variant of the compiler under test.
+# No selection: the base variant of the compiler under test.
 nested unselected "" "=> passed"
 
 # Frame pointers off and stack checks on, where the compiler under test

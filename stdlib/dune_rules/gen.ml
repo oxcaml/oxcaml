@@ -73,7 +73,7 @@ let pp_flags ~awk_dir ~target =
   then sprintf " -pp \"awk -f %%{dep:%s/expand_module_aliases.awk}\"" awk_dir
   else ""
 
-(* [variant] is [None] for the rules of the default tree, stdlib/build, and
+(* [variant] is [None] for the rules of the tree of base, stdlib/build, and
    [Some (dir, flags)] for those of the tree of a codegen variant, of which
    only the .cmx rules are generated: [dir] is the name of the tree's
    directory and [flags] the variant's ocamlopt flags. *)
@@ -128,16 +128,16 @@ let gen_rule ~ppf ~tgt_file ~base ~deps ~variant =
          in
          rule ~ppf ~target ~exts:["o";"cmx"] ~src ~deps ~action
       | Some (dir, variant_flags) ->
-         (* A variant tree compiles the default tree's copy of the source,
-            in the default tree's directory.  The path of the source is part
+         (* A variant tree compiles the copy of the source of stdlib/build,
+            in that directory.  The path of the source is part
             of the symbols of anonymous functions (-absname) and of the
             debug information, and it must be the same in every tree: the
             trees of two variants that differ only in poll insertion have
             to define the same symbols and to have the same implementation
             CRCs (see Codegen_variant.selected_tree in
             utils/codegen_variant.mli).  A debugger then finds one source
-            for every variant, too.  -nocwd keeps the default tree's own
-            .cmx files out of the search path. *)
+            for every variant, too.  -nocwd keeps the .cmx files of
+            stdlib/build out of the search path. *)
          let action =
            sprintf "(chdir ../build \
                      (run %%{exe:../../boot_ocamlopt.exe} %s %s -nocwd \
@@ -258,9 +258,9 @@ let iter_module_deps table f =
 (* Generate rules to build the stdlib (only used in bootstrap build).
 
    [variant] selects which stdlib tree the rules build:
-   - [`Base]: stdlib/build, the configure-default codegen mode.
+   - [`Base]: stdlib/build, the tree of the base variant.
    - [`Variant name]: the sibling stdlib/build_<name> tree serving the named
-     NON-default codegen variant (absolute naming: build_fp is always the
+     codegen variant (absolute naming: build_fp is always the
      frame-pointer tree). Only the native artifacts are rebuilt, by
      boot_ocamlopt with the variant's per-axis ocamlopt flags (from the
      codegen_variant build-settings record) prepended to the stdlib flags,
@@ -270,8 +270,8 @@ let iter_module_deps table f =
      @runtime_variants; suffixed by the variant name's projection onto the
      runtime axes) are copied from runtime/, so that one variant tree is a
      complete stdlib root for compiling and linking in that mode. When the
-     named variant is not in the configure-computed build list (it is the
-     default, configure did not select it, or codegen variants are disabled),
+     named variant is not in the configure-computed build list (it is base,
+     configure did not select it, or codegen variants are disabled),
      only an empty alias is emitted, keeping every @stdlib_<name>
      well-defined. *)
 (* [@inline never] [@local never]: this must stay the body of a function.
@@ -386,8 +386,8 @@ let[@inline never] [@local never] write_stdlib_dune ~variant ppf =
   |}
   else begin
     (* Byte artifacts and sources are codegen-variant-agnostic: copy them
-       from the default tree. (.cmx/.o/.a/.cmxa are rebuilt with the variant
-       flags above, from the default tree's .ml files.) *)
+       from stdlib/build. (.cmx/.o/.a/.cmxa are rebuilt with the variant
+       flags above, from the .ml files there.) *)
     copy_files ~ppf "../build/*.{cmi,cmti,cmsi,cmo,cms,cmt}";
     copy_files ~ppf "../build/*.{ml,mli}";
     copy_files ~ppf "../build/stdlib.cma";
@@ -506,7 +506,7 @@ type codegen_archive_set = {
   cg_aspp_flags : string list;
 }
 
-let default_codegen =
+let base_codegen =
   { cg_suffix = ""; cg_cc_flags = []; cg_aspp_flags = [] }
 
 (* Generate runtime.dune for the bootstrap build (which builds the runtime) *)
@@ -648,15 +648,15 @@ let write_runtime_dune ppf =
     target
   in
 
-  let default_archives =
+  let base_archives =
     [`Byte; `Native] |> List.concat_map (fun mode ->
       [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
         sources ~variant ~mode
-        |> List.iter (compile_object ~variant ~mode ~codegen:default_codegen));
+        |> List.iter (compile_object ~variant ~mode ~codegen:base_codegen));
       [`Normal; `Debug; `PIC; `Shared] |> List.map (fun variant ->
-        archive ~variant ~mode ~codegen:default_codegen))
+        archive ~variant ~mode ~codegen:base_codegen))
   in
-  (* Native archives for the non-default codegen variants. These are
+  (* Native archives for the codegen variants other than base. These are
      deliberately kept out of @runtime_all (and hence out of
      `make boot-compiler`); they are built by the @runtime_variants alias
      (hooked into `make compiler`, see Makefile.common-ox). *)
@@ -683,7 +683,7 @@ let write_runtime_dune ppf =
     (String.concat " " prim_files);
 
   (* ocamlrun and ocamlrund *)
-  compile_object ~variant:`Normal ~mode:`Byte ~codegen:default_codegen
+  compile_object ~variant:`Normal ~mode:`Byte ~codegen:base_codegen
     "runtime/prims.c";
   [`Normal; `Debug] |> List.iter (fun variant ->
     let target = "ocamlrun" ^ variant_suff ~variant in
@@ -712,12 +712,12 @@ let write_runtime_dune ppf =
   ))
 |};
 
-  (* aliases. runtime_all must list the default-codegen archives explicitly
+  (* aliases. runtime_all must list the archives of base explicitly
      (not a glob) so that the codegen-variant archives never leak into
      boot-compiler builds. *)
   fprintf ppf
     "(alias\n    (name runtime_all)\n    (deps ocamlrun ocamlrund %s))\n"
-    (String.concat " " default_archives);
+    (String.concat " " base_archives);
   (match variant_archives with
    | [] -> fprintf ppf "(alias (name runtime_variants))\n"
    | archives ->

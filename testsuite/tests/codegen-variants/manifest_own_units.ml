@@ -36,7 +36,7 @@
 *)
 
 (* Two units compiled and linked by one invocation, the first of them where
-   its source is, inside the default library root (a root that
+   its source is, inside the library root (a root that
    manifest_own_units.sh makes and OCAMLLIB names).  A manifest names the
    interface and the .cmx file of the first unit there, as it would name
    those of a library of the installation, and the tree of the selected

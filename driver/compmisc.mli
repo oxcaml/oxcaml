@@ -21,7 +21,7 @@ val init_parameters : unit -> unit
     from, and for the files that the compiler adds to a link.  The name is
     looked for exactly as [Load_path.find] does it; the file found, like
     one named by its path, is then taken from the library tree of the
-    selected codegen variant if it is inside the default library root
+    selected codegen variant if it is inside the library root
     ([Codegen_variant.in_selected_root]).  Only a file that this invocation
     wrote in a directory of that root that the variant's tree stands for is
     not searched for: it is that file

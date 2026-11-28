@@ -23,7 +23,7 @@ let auto_include find_in_dir fn =
 (* [Codegen_variant.expand_directory] (used by [init_path] below and the
    other resolution points for caller-requested '+'-directories) rejects
    directories that the selected variant's library tree does not provide
-   while the default root does; [Codegen_variant] sits in utils and cannot
+   while the library root does; [Codegen_variant] sits in utils and cannot
    register the printer itself. *)
 let report_variant_directory_error ppf
       ({ directory; variant; variant_root }
@@ -43,12 +43,12 @@ let () =
 (* A name is looked for as [Load_path.find] does it, with the name as
    written, and the file that is found is then mapped: so no name is
    searched for under a tree that the search goes through already, and a
-   name with a directory part that the search finds inside the default
+   name with a directory part that the search finds inside the library
    root, from a directory above it, is the selected variant's, as when it
    is named by its path.  The one exception is a file that the invocation
-   wrote in a directory of the default root that the selected variant's
+   wrote in a directory of the library root that the selected variant's
    tree stands for: the search would look for it in that tree, so it is
-   used as the file that it is.  Under the default variant, and for every
+   used as the file that it is.  Under the base variant, and for every
    file in a directory that is not replaced, this is [Load_path.find]. *)
 let find_input name =
   if Codegen_variant.is_product_in_replaced_directory name
@@ -106,7 +106,7 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
     (if !Clflags.no_cwd then []
      else
        (* The current directory is a directory of the load path like the
-          others: inside the default library root, it stands for its
+          others: inside the library root, it stands for its
           counterpart in the selected variant's tree, as [-I .] does.  So
           every file that is looked up by name comes from one tree, whoever
           looks it up: an interface, a .cmx file, an input of the link. *)
@@ -152,7 +152,7 @@ let initial_env () =
     else
       Some "Stdlib"
   in
-  (* An interface inside the default library root is the selected variant's,
+  (* An interface inside the library root is the selected variant's,
      like the directory of -H that it is in; this is done for each
      compilation, since the selection can differ between files. *)
   let open_implicit_args =

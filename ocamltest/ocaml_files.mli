@@ -81,7 +81,7 @@ type native_host =
 val native_host_name : native_host -> string
 
 (* The build of a native host for a codegen variant: the one for the
-   install's default variant ([~variant:None]), or the copy for the named
+   base variant ([~variant:None]), or the copy for the named
    variant, which install_for_test puts under
    testsuite/tools/variants/<variant>. *)
 val native_host : variant:string option -> native_host -> string

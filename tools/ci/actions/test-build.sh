@@ -77,7 +77,7 @@ cleanup() {
 }
 trap cleanup EXIT
 # The trees repeat a lot of code far apart: each codegen variant's native
-# libraries and test programs are near copies of the default's, and many
+# libraries and test programs are near copies of those of base, and many
 # executables link the same libraries. Only a window this long lets zstd
 # find the repeats: without it the archive is nearly twice the size.
 # Decompression must allow the same window.

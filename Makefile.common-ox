@@ -87,9 +87,9 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer
     ; enabled. -fno-asan leaves the code uninstrumented and does not change
-    ; its codegen variant: where AddressSanitizer is the default, the
-    ; compiler is still built against the default library tree and linked
-    ; with the AddressSanitizer runtime.
+    ; its codegen variant. It matters in the context of a variant with
+    ; AddressSanitizer, which has the same flag (below): this context is
+    ; that of base, which has none.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     ; STDLIB_JSIR_OCAMLOPT_FLAGS: for the JSIR builds of the compiler's
     ; libraries (see external/ast-dependent-libs/stdlib-jsir/dune).
@@ -99,8 +99,9 @@ define dune_main_context
 endef
 
 # Codegen-variant library builds. The variant trees we build and install
-# are the NON-default variants named in $(CODEGEN_VARIANTS) (computed by
-# configure); names are absolute (e.g. "fp" or "base"), agreeing with
+# are those of the variants named in $(CODEGEN_VARIANTS) (computed by
+# configure; base, which the main context builds, is not among them); names
+# are absolute (e.g. "fp"), agreeing with
 # utils/codegen_variant_name.ml, stdlib/dune_rules/gen.ml and the runtime
 # archive suffixes. Otherlibs for each variant are built in a dedicated
 # dune context main-<name>, kept out of duneconf/main.ws so that ordinary
@@ -329,7 +330,7 @@ duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants
 	echo "$$contents" > $@
 
 # Only the compiler's own workspaces embed configure output (such as the
-# default variant and the variant list). The pattern rule above also makes
+# variant list). The pattern rule above also makes
 # duneconf/ast-dependent-libs.ws, which is built in trees that were never
 # configured.
 compiler_workspaces = duneconf/main.ws duneconf/compiler.ws \
@@ -480,7 +481,7 @@ _install: compiler
 ifneq ($(codegen_variant_names),)
 # Assemble the codegen-variant library trees: one COMPLETE library root at
 # lib/ocaml/variants/<name> per built variant, mirroring the base root's
-# shape, so a compile/link for a non-default codegen variant can use it
+# shape, so a compile/link for that codegen variant can use it
 # wholesale via -I / as a remapped stdlib root. Rebuilt per variant:
 # every native artifact of the base root (.cmx/.cmxa/.a/.cmxs/std_exit) --
 # the stdlib, the otherlibs and the compiler's own libraries
@@ -499,14 +500,13 @@ ifneq ($(codegen_variant_names),)
 # headers. The exception is each variant's caml/m.h, which gets a prefix
 # naming that variant, so that C code compiled against the tree's headers
 # without -DCAML_CODEGEN_VARIANT_EXPLICIT sees the tree's axis macros
-# instead of the configure default's.
+# instead of none.
 # Bytecode -custom and -output-obj links use the lib<name>_stubs.a
 # archives too, and a variant tree's are that variant's builds. A bytecode
 # link takes them from the base root unless it names a variant tree itself,
 # with -I or OCAMLLIB, which it should not: the stub archives of an
-# AddressSanitizer tree are instrumented, and where AddressSanitizer is not
-# the configure default a bytecode link does not pass -fsanitize=address,
-# so it fails on them.
+# AddressSanitizer tree are instrumented, and a bytecode link does not
+# pass -fsanitize=address, so it fails on them.
 # Deliberately absent: findlib META files (findlib and Dune find the
 # packages in the base root) and the JSIR artifacts (a JSIR compilation
 # always uses the base root). A final check asserts that the assembled
@@ -628,10 +628,10 @@ endif
 #   utils/config.common.ml.in), so it would compile and link against a tree
 #   that an earlier installation left behind. The second rsync only
 #   deletes: it creates no file and updates none.
-# - The cached generic functions of the default library root
+# - The cached generic functions of the library root
 #   (-use-cached-generic-functions), which are generated in the installed
-#   tree by the compiler that was installed there: this installation's
-#   default variant need not be that one's, and a link would take the
+#   tree by the compiler that was installed there: an earlier installation
+#   may have had another variant in its root, and a link would take the
 #   archive as it is.
 define copy_install_to_prefix
 	mkdir -p $(install_destination)
@@ -850,7 +850,7 @@ endif
 	fi
 
 # $(call variant_test_tree,<name>): what ocamltest runs and links for
-# variant <name>, built in the variant's context as the default ones are in
+# variant <name>, built in the variant's context as those of base are in
 # the main context: the tools of the native tests that compile inside a
 # tool (expect.opt, the native toplevel and the asmgen tests), in
 # _runtest/testsuite/tools/variants/<name>, and the native halves of the
@@ -877,7 +877,7 @@ endef
 
 # The ocamltest suite can target any codegen variant this tree builds:
 #   make test CODEGEN_VARIANT=fp
-# runs the whole suite as if that variant were the compiler's default: the
+# runs the whole suite for that variant instead of base: the
 # native test programs are built for it, and native expect, toplevel and
 # asmgen tests run in the builds of their host programs for it (see
 # testsuite/Makefile). The variable is honored by test, test-no-rebuild,

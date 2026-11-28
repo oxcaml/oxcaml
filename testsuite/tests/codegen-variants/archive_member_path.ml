@@ -110,11 +110,11 @@
  }
 *)
 
-(* A unit given to ocamlopt -a by a path inside the default library root
+(* A unit given to ocamlopt -a by a path inside the library root
    (here the root OCAMLLIB names) is taken from the tree of the variant
-   being compiled, like an input of a link: the default tree's std_exit.cmx
+   being compiled, like an input of a link: the root's std_exit.cmx
    would be refused under every variant with a fingerprint of its own. It
-   would be accepted under a variant that differs from the default one in
+   would be accepted under a variant that differs from base in
    poll insertion alone, so the script looks at what the archive got: the
    unit of the variant's tree, with its fingerprint and with polls or
    without. *)

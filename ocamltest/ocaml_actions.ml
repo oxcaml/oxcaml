@@ -1557,10 +1557,9 @@ let no_stack_allocation = Actions.make
 
 (* The per-axis predicates below read the EFFECTIVE codegen variant
    ([Ocaml_flags.effective_codegen_variant]: the block's [codegen_variant]
-   when set, else the run's -codegen-variant, else the configure default),
-   not the raw configure constants: each predicate's meaning is the axis's
-   value in the variant that the block's native compilations actually
-   use. *)
+   when set, else the run's -codegen-variant, else base): each predicate's
+   meaning is the axis's value in the variant that the block's native
+   compilations actually use. *)
 let poll_insertion = Actions.make
   ~name:"poll-insertion"
   ~description:"Passes if the effective codegen variant inserts polls"
@@ -1613,8 +1612,8 @@ let only_default_codegen =
     ~name:"only-default-codegen"
     ~description:"Passes if the effective codegen variant (the \
                   codegen_variant variable, else -codegen-variant, else \
-                  the install's default) is the all-off \"base\" variant \
-                  that the [%%expect_asm] recordings assume"
+                  \"base\") is the all-off \"base\" variant that the \
+                  [%%expect_asm] recordings assume"
     ~does_something:false
     (Ocaml_flags.codegen_variant_predicate (String.equal base)
        "base codegen"
@@ -1632,8 +1631,8 @@ let only_stack_checks_codegen =
     ~name:"only-stack-checks-codegen"
     ~description:"Passes if the effective codegen variant (the \
                   codegen_variant variable, else -codegen-variant, else \
-                  the install's default) is the stack-checks-only \"sc\" \
-                  variant that the [%%expect_asm] recordings assume"
+                  \"base\") is the stack-checks-only \"sc\" variant that \
+                  the [%%expect_asm] recordings assume"
     ~does_something:false
     (Ocaml_flags.codegen_variant_predicate (String.equal stack_checks_only)
        "stack-checks codegen"
@@ -1647,14 +1646,14 @@ let only_stack_checks_codegen =
      codegen_variant = "+fp";
      variant_available;
    (see [Ocaml_flags.test_codegen_variant]).  With the variable unset,
-   the variant is the run's (the one of -codegen-variant, else the
-   install's default), which is always available. *)
+   the variant is the run's (the one of -codegen-variant, else base),
+   which is always available. *)
 let variant_available = Actions.make
   ~name:"variant_available"
   ~description:"Passes if the tested install can compile and link native \
                 code for the codegen variant that the codegen_variant \
                 variable selects (when unset: the one of -codegen-variant, \
-                else the install's default)"
+                else \"base\")"
   ~does_something:false
   (fun log env ->
     match Ocaml_flags.effective_codegen_variant env with

@@ -2,10 +2,10 @@
 
 # usage: sh root_lookups.sh <library root> <variant>
 #
-# Makes a library root (see library_root.sh) in which the default tree and
+# Makes a library root (see library_root.sh) in which the root and
 # the tree of <variant> hold different files under the same names, and
 # prints, for each way to name such a file, which of the two the compiler
-# takes when it compiles for <variant>.  When <variant> is the default one,
+# takes when it compiles for <variant>.  When <variant> is base,
 # there is only one tree, and its files are the variant's.  What the
 # compilers say is shown only if one of them fails where it should not.
 
@@ -20,7 +20,7 @@ log=$here/compilers.log
 failed=false
 trap '$failed && cat "$log" >&2' EXIT
 
-# Every axis is stated, so that nothing depends on the default variant or
+# Every axis is stated, so that nothing depends on the base variant or
 # on the one that the testsuite runs under.
 axis () { # <token> <flag when on> <flag when off>
   case -$variant- in *-$1-*) echo "$2";; *) echo "$3";; esac
@@ -34,11 +34,11 @@ ocamlopt () {
   "$ocamlsrcdir/ocamlopt.opt" $flags "$@" >> "$log" 2>&1
 }
 
-# trees <command> <argument>...: runs the command for the default tree and
+# trees <command> <argument>...: runs the command for the root and
 # then for the tree of the variant, with the tree and what a file of it
 # says of itself as the first two arguments.
 trees () {
-  if [ "$selected" != "$default" ]; then "$@" "$default" "the default tree"; fi
+  if [ "$selected" != "$default" ]; then "$@" "$default" "the root"; fi
   "$@" "$selected" "the variant's tree"
 }
 
@@ -79,7 +79,7 @@ echo 'let () = print_endline "linked"' > out/plain.ml
 cat > out/probe_user.ml <<'EOT'
 external probe : unit -> bool = "probe"
 let () =
-  print_endline (if probe () then "the variant's tree" else "the default tree")
+  print_endline (if probe () then "the variant's tree" else "the root")
 EOT
 (cd out && ocamlopt -c plain.ml probe_user.ml)
 
@@ -144,7 +144,7 @@ let () =
   print_endline
     (if Variant_tree < Default_tree
      then "the variant's tree"
-     else "the default tree")
+     else "the root")
 EOT
 from_here "An interface given to -open-cmi-x" -H "$default/order" \
   -open-cmi-x "$default/order/order.cmi" out/first.ml
@@ -205,7 +205,7 @@ fi
 # a .mli file next to it or -cmi-file names its interface.  So a manifest
 # that names the file inside the root leads to the one just written in the
 # first case, and to the installation's in the two others: there the
-# variant's tree has an interface that the default tree's does not match.
+# variant's tree has an interface that the root's does not match.
 # Whether the unit has an interface file is settled before it is typed:
 # with -intf-suffix .cmi, the file that typing writes has the very name
 # of an interface file of the unit, and is still a file that the command
@@ -260,7 +260,7 @@ noted "The interface that it wrote under the name of an interface file" \
 # which holds an installed unit of that name: the second source is
 # compiled against that one, and the link, which takes the unit that the
 # invocation compiled, refuses the two.  Sources that depend on each other
-# are to be compiled outside the library root, or for its default tree.
+# are to be compiled outside the library root, or for its root.
 installed () { # <tree> <text>
   if [ "$1" != "$default" ]; then
     mkdir build/prior "$1/lib"
@@ -287,8 +287,8 @@ fi
 if [ "$selected" = "$default" ]; then wanted="compiled together"
 else wanted=refused; fi
 if [ "$together" = "$wanted" ]; then
-  echo "Two dependent sources in a directory of the root: only for its" \
-    "default tree"
+  echo "Two dependent sources in a directory of the root: only for the" \
+    "variant of the root"
 else
   failed=true
   echo "Two dependent sources in a directory of the root: $together"
@@ -316,7 +316,7 @@ inside () { # <argument>...: runs ocamlopt in the root and says how it ended
 only_default () { # <description> <outcome>
   if [ "$selected" = "$default" ]; then wanted=done; else wanted="not found"; fi
   if [ "$2" = "$wanted" ]; then
-    echo "$1: only for its default tree"
+    echo "$1: only for the variant of the root"
   else
     failed=true; echo "$1: $2"
   fi

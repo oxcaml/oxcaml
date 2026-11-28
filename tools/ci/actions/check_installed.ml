@@ -159,7 +159,7 @@ let check_archive_ownership t archives =
   (* The compiler links stdlib.cmxa implicitly. *)
   let implicit_stdlib = installed t "lib/ocaml/stdlib.cmxa" in
   (* Codegen-variant library trees deliberately carry no META files
-     (findlib and dune find the packages in the default root, and the
+     (findlib and dune find the packages in the library root, and the
      compiler looks the paths they pass up in the selected variant's
      tree), so their archives are not META-referenced by design. *)
   let variants = installed t "lib/ocaml/variants" in
@@ -200,18 +200,18 @@ let check_native_smoke_programs t =
     fail "eval: missing ocaml-jit dependency";
   smoke "eval" "let () = ()\n"
 
-(* The installation serves each codegen variant besides its default one from
+(* The installation serves each codegen variant besides base from
    a library tree of its own, lib/ocaml/variants/<name>, which mirrors the
-   default tree: it has its own build of every native file, and every other
-   file is a relative link to the default tree's file, so that it is stored
-   once. JSIR artifacts and META files are in the default tree only, and each
+   library root: it has its own build of every native file, and every other
+   file is a relative link to the root's file, so that it is stored
+   once. JSIR artifacts and META files are in the root only, and each
    tree has its own runtime archives and caml/m.h. A program built for a
    variant that compiles code into itself gets that variant's build of the
    native toplevel, the JIT and eval. *)
 let check_variant_trees t =
   let stdlib = installed t "lib/ocaml" in
   let variants = Filename.concat stdlib "variants" in
-  let default_only file =
+  let root_only file =
     file = "META" || String.ends_with ~suffix:"-js" file ||
     String.ends_with ~suffix:"-wasm" file
   in
@@ -233,9 +233,9 @@ let check_variant_trees t =
       if Sys.is_directory default then
         (if default <> variants then check_dir root path)
       else if String.starts_with ~prefix:"libasmrun" file then ()
-      else if default_only file then
+      else if root_only file then
         (if Sys.file_exists copy then
-           fail "%s: only the default library tree has this file" copy)
+           fail "%s: only the library root has this file" copy)
       else match (Unix.lstat copy).st_kind with
         | exception Unix.Unix_error (ENOENT, _, _) -> fail "Missing %s" copy
         | S_REG when own path -> ()
@@ -265,7 +265,7 @@ let check_variant_trees t =
     checking "library tree of codegen variant %s" variant;
     check_dir (Filename.concat variants variant) "";
     let tokens = String.split_on_char '-' variant in
-    (* The headers of the tree are links to the default tree's, and the
+    (* The headers of the tree are links to the root's, and the
        caml/m.h that they include has to be the tree's own. *)
     checking "C headers of codegen variant %s" variant;
     write "macros.c"
@@ -497,7 +497,7 @@ let consumer_source =
   \  | exception Failure message -> print_string message\n"
 
 (* Build systems select a codegen variant with OCAMLPARAM alone and go on
-   naming the libraries by their paths in the default tree, the one that
+   naming the libraries by their paths in the library root, the one that
    ocamlc -where reports; the compiler resolves those paths in the variant's
    tree. So under every variant that the installation serves, base (with
    an empty OCAMLPARAM) and each of the others, every package

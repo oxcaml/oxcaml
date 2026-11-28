@@ -1,4 +1,4 @@
-The default variant:
+The base variant:
   by default: <root>/cached-generic-functions.a
   the root's, by name: <root>/cached-generic-functions.a
   another, by name: elsewhere/cached-generic-functions.a

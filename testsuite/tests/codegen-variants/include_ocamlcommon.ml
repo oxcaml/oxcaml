@@ -53,11 +53,11 @@
  }
 *)
 
-(* [include ocamlcommon] names directories of the default codegen variant.
+(* [include ocamlcommon] names directories of the base codegen variant.
    For a block that selects a variant, ocamltest resolves them in that
    variant's library tree, whose compiler-libs directory has the variant's
    own build of the compiler's libraries: a program that uses them can be
-   built for every variant.  With the default variant's build, the
+   built for every variant.  With the base variant's build, the
    compilation or the link would be refused. *)
 
 let () =

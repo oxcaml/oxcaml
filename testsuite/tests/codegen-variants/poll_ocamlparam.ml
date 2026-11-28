@@ -23,5 +23,5 @@
    ocamlobjinfo prints as "Polled: true".  Gated to configurations where
    the rest of the pinned output is known (all axes off).  The
    installation need not have a library tree with poll insertion: the
-   unit is then compiled against the default one. *)
+   unit is then compiled against the root. *)
 let answer () = 42

@@ -69,7 +69,7 @@ let cached_generic_functions_archive_and_place () =
   match !Oxcaml_flags.cached_generic_functions_path with
   | Some path ->
     (* An explicit -cached-generic-functions-path that names the archive of the
-       default root selects the one of the selected variant's tree, like any
+       library root selects the one of the selected variant's tree, like any
        path inside that root. Any other path is used as it is: it is for the
        linker to refuse an archive generated for another variant. *)
     Codegen_variant.in_selected_root path, Named
@@ -83,16 +83,16 @@ let cached_generic_functions_archive_and_place () =
     match Codegen_variant.selected_tree () with
     | Some (tree_variant, root) ->
       (* A tree under variants/ is taken at its word for its own variant. The
-         root, which serves the default variant with either poll-insertion
-         setting, is checked, since OCAMLLIB can make it anything. For the
-         default variant itself it is refused when its standard library says
-         that it is built for another variant, and not when it has none to say
-         so, as in an installation that only links with -output-obj. For the
-         other poll-insertion setting std_exit.cmx has to be readable and have
-         the variant's other settings: its poll bit is not compared. *)
+         root, which serves the base variant with either poll-insertion setting,
+         is checked, since OCAMLLIB can make it anything. For the base variant
+         itself it is refused when its standard library says that it is built
+         for another variant, and not when it has none to say so, as in an
+         installation that only links with -output-obj. For the other
+         poll-insertion setting std_exit.cmx has to be readable and have the
+         variant's other settings: its poll bit is not compared. *)
       ( Filename.concat root archive,
         if
-          (not (Codegen_variant.is_default tree_variant))
+          (not (Codegen_variant.is_base tree_variant))
           ||
           if Codegen_variant.equal tree_variant variant
           then not (Linkenv.standard_library_is_built_for_another variant)
@@ -129,8 +129,8 @@ let cached_generic_functions_path () =
     if Sys.file_exists path
     then path
     else
-      (* A path inside the default library root was looked up in the selected
-         variant's tree first: say where. *)
+      (* A path inside the library root was looked up in the selected variant's
+         tree first: say where. *)
       let directory = Filename.dirname path in
       let in_tree = Codegen_variant.in_selected_root directory in
       let also_looked_up =
@@ -166,9 +166,9 @@ let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
-  (* Archives for the install's default codegen variant have unsuffixed names;
-     other variants are suffixed with the projection of the variant name onto
-     the runtime axes. The naming rule is described in stdlib/dune_rules/gen.ml
+  (* The archives of the base variant have unsuffixed names; those of the other
+     variants are suffixed with the projection of the variant name onto the
+     runtime axes. The naming rule is described in stdlib/dune_rules/gen.ml
      (write_runtime_dune). *)
   let codegen_variant = Codegen_variant.current () in
   let codegen_suffix = Codegen_variant.runtime_archive_suffix codegen_variant in
@@ -186,9 +186,9 @@ let runtime_lib () =
       | exception Not_found -> false
     in
     (* Blame the codegen variant only when the runtime variant itself exists for
-       the install's default codegen mode and the installation has no library
-       tree for the selected variant (and is not one itself). With such a tree,
-       what is missing is this file. *)
+       the base variant and the installation has no library tree for the
+       selected variant (and is not one itself). With such a tree, what is
+       missing is this file. *)
     if
       unsuffixed_exists
       && Option.is_none (Codegen_variant.selected_tree ())

@@ -29,7 +29,7 @@
 (** The codegen-variant naming scheme: one token per code-generation axis,
     a variant name being the '-'-joined, canonically sorted names of the
     enabled tokens, with the all-off variant spelled "base" (names are
-    absolute, independent of the configure default).  Examples: "base",
+    absolute: the same on every installation).  Examples: "base",
     "fp", "poll", "fp-sc", "asan-fp".
 
     This module is dependency-free (no [Clflags]/[Config]/[Misc]): it is the

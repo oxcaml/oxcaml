@@ -217,7 +217,7 @@ val check_backend_for_jit_load : unit -> unit
     AddressSanitizer) are those that this executable's native-toplevel
     machinery was built for (the per-context constants baked in by the
     toplevel_host_variant rule in toplevel/native/dune): not always those
-    of [Codegen_variant.default], since a copy of this library built in a
+    of [Codegen_variant.base], since a copy of this library built in a
     codegen-variant context is built for that context's variant.  Poll
     insertion is a property of each unit: it is on when every unit of
     the program was compiled with it, so that phrases keep the program

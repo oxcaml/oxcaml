@@ -18,7 +18,7 @@
  }
 *)
 
-(* A file inside the default library root is looked up in the tree of the
+(* A file inside the library root is looked up in the tree of the
    selected variant whichever way the compiler comes to it, and the outcome
    does not depend on how the root or the file is named.  root_lookups.sh
    makes a root whose two trees hold different files under the same names,
@@ -49,5 +49,5 @@
    two as inconsistent, or it sees none.  And a file that an earlier
    command left there is not found by its bare name; it is by its path.
 
-   One block compiles for the default variant, whatever the configure
-   default: its tree is the root itself, and nothing changes there. *)
+   One block compiles for the base variant: its tree is the root itself,
+   and nothing changes there. *)

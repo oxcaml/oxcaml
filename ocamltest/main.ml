@@ -455,8 +455,8 @@ let () =
   Strace.init ();
   init_tests_to_skip()
 
-(* The native hosts that the test tree has for the install's default
-   variant and lacks for the suite variant. *)
+(* The native hosts that the test tree has for the base variant and
+   lacks for the suite variant. *)
 let missing_native_hosts () =
   match Ocaml_flags.suite_codegen_variant with
   | None -> []

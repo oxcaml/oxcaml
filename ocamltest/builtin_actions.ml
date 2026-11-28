@@ -123,8 +123,8 @@ let hasstr = make
    axis gone, permission is per-program: a native program's runtime allows
    more than one domain only when every linked unit was compiled with poll
    insertion, which in the testsuite means the effective codegen variant
-   (the codegen_variant variable, else -codegen-variant, else the
-   install's default) enables poll insertion.  One predicate guards both
+   (the codegen_variant variable, else -codegen-variant, else base)
+   enables poll insertion.  One predicate guards both
    the byte and native legs of a test block, so it conservatively requires
    the native condition even though bytecode is always fully polled; set
      codegen_variant = "+poll";  (or the name of a variant that polls)
@@ -342,10 +342,9 @@ let function_sections = make
 
 (* The per-axis predicates below read the EFFECTIVE codegen variant
    ([Ocaml_flags.effective_codegen_variant]: the block's [codegen_variant]
-   when set, else the run's -codegen-variant, else the configure default),
-   not the raw configure default: each predicate's meaning is the axis's
-   value in the variant that the block's native compilations actually
-   use. *)
+   when set, else the run's -codegen-variant, else base): each predicate's
+   meaning is the axis's value in the variant that the block's native
+   compilations actually use. *)
 let frame_pointers = make
   ~name:"frame_pointers"
   ~description:"Pass if the effective codegen variant has frame pointers"

@@ -14,8 +14,8 @@ trap 'status=$?; [ $status = 0 ] || cat compilers.log' EXIT
 # environment of the test sets.
 unset OCAMLRUNPARAM
 
-# The variants base and poll, whatever the default one is: each command
-# below states its poll-insertion setting.
+# The variants base and poll, whatever variant the testsuite is running
+# under: each command below states its poll-insertion setting.
 OCAMLPARAM=asan=0,frame-pointers=0,stack-checks=0,_
 export OCAMLPARAM
 

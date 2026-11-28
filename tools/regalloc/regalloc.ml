@@ -343,7 +343,7 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
 
 (* One directory can hold IR saved under several configurations: a build saves
    that of every codegen variant it builds, and both instrumented and
-   uninstrumented IR where AddressSanitizer is the default. A run processes the
+   uninstrumented IR for a variant with AddressSanitizer. A run processes the
    files saved under its own configuration and counts the others, by what
    differs. *)
 let skipped_files : (string, int) Hashtbl.t = Hashtbl.create 8

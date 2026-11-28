@@ -17,25 +17,25 @@
 
 (* The variant that the compilers compile for when nothing selects one,
    and that the library root of every install holds: base. *)
-let default_codegen_variant =
+let base_codegen_variant =
   Codegen_variant_name.to_string Codegen_variant_name.base
 
 let codegen_variant_directory name =
-  if String.equal name default_codegen_variant
+  if String.equal name base_codegen_variant
   then Ocaml_directories.stdlib
   else
     Ocamltest_stdlib.Filename.make_path
       [Ocaml_directories.stdlib; "variants"; name]
 
 (* Whether the tested install can compile and link native code for the named
-   codegen variant: either the variant is the configure-time default (served
-   by the standard-library root itself), or the install provides a library
-   tree for it under <stdlib>/variants/.  Checked against the actual tree
+   codegen variant: either the variant is base (served by the
+   standard-library root itself), or the install provides a library tree
+   for it under <stdlib>/variants/.  Checked against the actual tree
    being tested rather than configure-time truth, so that predicates stay
    correct if the variant trees are absent (e.g. --disable-codegen-variants
    builds, or incomplete installs). *)
 let codegen_variant_available name =
-  String.equal name default_codegen_variant
+  String.equal name base_codegen_variant
   || (let dir = codegen_variant_directory name in
       Sys.file_exists dir && Sys.is_directory dir)
 
@@ -53,7 +53,7 @@ let available_codegen_variants =
              (List.sort String.compare (Array.to_list (Sys.readdir variants)))
          else []
        in
-       default_codegen_variant :: installed)
+       base_codegen_variant :: installed)
   in
   fun () -> Lazy.force available
 
@@ -64,13 +64,12 @@ let available_codegen_variants =
    selection wins; an empty [codegen_variant] selects nothing, so the suite
    variant applies.
 
-   Asking for the install's default variant is the same as not asking:
-   [make test CODEGEN_VARIANT=base] on a base-default install is
-   [make test]. *)
+   Asking for the base variant is the same as not asking:
+   [make test CODEGEN_VARIANT=base] is [make test]. *)
 let suite_codegen_variant =
   match Options.codegen_variant with
   | "" -> None
-  | name when String.equal name default_codegen_variant -> None
+  | name when String.equal name base_codegen_variant -> None
   | name -> Some name
 
 (* A value of [codegen_variant] that is neither a name nor requirements is
@@ -95,7 +94,7 @@ let invalid_codegen_variant ?reason selection =
         | Some reason -> message ^ ": " ^ reason))
 
 (* The variant that [name] names.  Every name that ocamltest computes with
-   is one: the install's default variant, the suite variant (checked at
+   is one: the base variant, the suite variant (checked at
    startup) or a test's selection (checked by [test_codegen_variant]). *)
 let variant_of_name name =
   match Codegen_variant_name.of_string name with
@@ -202,7 +201,7 @@ let variant_of_selection selection =
 
 (* A test that is about an axis, and not about one variant, states its
    requirements.  It then runs under the variant that the run uses anyway
-   (the suite variant, else the install's default) when that one meets
+   (the suite variant, else base) when that one meets
    them, and otherwise under the available variant that meets them and
    differs from it on the fewest axes (the first such one in
    [available_codegen_variants]).  So it runs wherever some variant will
@@ -213,7 +212,7 @@ let variant_of_selection selection =
 let variant_meeting requirements =
   let run_variant =
     variant_of_name
-      (Option.value suite_codegen_variant ~default:default_codegen_variant)
+      (Option.value suite_codegen_variant ~default:base_codegen_variant)
   in
   let required token =
     List.find_map
@@ -281,18 +280,18 @@ let codegen_variant env =
   | None -> suite_codegen_variant
 
 (* The codegen variant that a test block's native code is built for: the
-   selected variant, or the install's default one, which every axis flag
+   selected variant, or base, which every axis flag
    defaults to (per-test [flags +=] additions are not visible here). *)
 let effective_codegen_variant env =
   match codegen_variant env with
-  | None -> default_codegen_variant
+  | None -> base_codegen_variant
   | Some name -> name
 
-(* The effective variant when it is not the install's default one, the
+(* The effective variant when it is not base, the
    case in which commands need something more than their defaults. *)
-let non_default_codegen_variant env =
+let non_base_codegen_variant env =
   match codegen_variant env with
-  | Some name when not (String.equal name default_codegen_variant) ->
+  | Some name when not (String.equal name base_codegen_variant) ->
     Some name
   | Some _ | None -> None
 
@@ -301,17 +300,17 @@ let non_default_codegen_variant env =
    flag, ignore the axis keys of OCAMLPARAM and always use the default
    tree, so bytecode steps run the same under every selection.  (The
    interfaces and the bytecode objects of a variant tree are those of the
-   default tree, so one test block can still mix backends.)  The same
+   root, so one test block can still mix backends.)  The same
    holds for the JSIR targets. *)
 let library_codegen_variant env (backend : Ocaml_backends.t) =
   match backend with
-  | Native -> non_default_codegen_variant env
+  | Native -> non_base_codegen_variant env
   | Bytecode | Jsir_js | Jsir_wasm -> None
 
-(* Marks [task] as work that depends on a non-default codegen variant: a
+(* Marks [task] as work that depends on a non-base codegen variant: a
    command that is given such a variant ([variant_work_for]), or what a
    guard lets through when it holds for the effective variant but not for
-   the default one ([codegen_variant_predicate]).  Under a suite variant, a
+   base ([codegen_variant_predicate]).  Under a suite variant, a
    test file whose task carries no such mark would only repeat the default
    run, so [Main.test_file] skips it when the run is restricted to what
    depends on the variant (-codegen-variant-only).  The mark is part of the
@@ -335,7 +334,7 @@ let has_variant_work (task : Actions.task) =
 (* Per-axis read of the effective variant, for the axis predicates
    (frame_pointers, stack-checks, poll-insertion, address-sanitizer and
    their duals): each predicate's meaning is the axis's value in the
-   variant the block actually compiles for, not the raw configure default. *)
+   variant the block actually compiles for. *)
 let codegen_variant_name_mem name token =
   Codegen_variant_name.mem token (variant_of_name name)
 
@@ -343,7 +342,7 @@ let effective_codegen_variant_mem env token =
   codegen_variant_name_mem (effective_codegen_variant env) token
 
 (* A predicate on the effective variant: [holds] applied to its name.  When
-   it holds for the effective variant but not for the default one, what it
+   it holds for the effective variant but not for base, what it
    lets through is work that only this variant can do, whatever the backend
    of that work (see [variant_work]). *)
 let codegen_variant_predicate holds pass_reason skip_reason log env =
@@ -352,7 +351,7 @@ let codegen_variant_predicate holds pass_reason skip_reason log env =
     Actions_helpers.predicate satisfied pass_reason skip_reason log env
   in
   let task =
-    if satisfied && not (holds default_codegen_variant)
+    if satisfied && not (holds base_codegen_variant)
     then variant_work task
     else task
   in
@@ -375,7 +374,7 @@ let codegen_variant_flags env backend =
    does not guard: the command would run for another variant, or fail for
    a reason that does not say so. *)
 let variant_work_for env task =
-  match non_default_codegen_variant env with
+  match non_base_codegen_variant env with
   | Some name when codegen_variant_available name -> variant_work task
   | Some name ->
     Actions.Static
@@ -395,14 +394,14 @@ let native_variant_work env (backend : Ocaml_backends.t) task =
   | Native -> variant_work_for env task
   | Bytecode | Jsir_js | Jsir_wasm -> task
 
-(* The directories that tests name are those of the default variant:
+(* The directories that tests name are those of the base variant:
    library modifiers (see ocaml_modifiers.ml, e.g. [include unix]) add
    <srcdir>/otherlibs/<lib>, [include testing] and [include tool-ocaml-lib]
    add <srcdir>/testsuite/lib, the compiler-libs modifiers ([include
    ocamlcommon] and the like, [include config]) add the directories of
    [Ocaml_modifiers.compilerlibs_subdirs], and tests also write such
    directories themselves.  A compilation for another variant must not mix
-   the default variant's artifacts in (its C stub archives would link
+   the base variant's artifacts in (its C stub archives would link
    unnoticed), so each such directory is resolved in that variant's
    library tree instead (the read-time analogue of the [stdlib] remap
    below) whenever the tree provides it: the otherlibs are
@@ -413,7 +412,7 @@ let native_variant_work env (backend : Ocaml_backends.t) task =
    [make install_for_test]).  Any other directory, and every directory
    when the variant is the default, is left unchanged. *)
 let library_directory_for_variant name dir =
-  if String.equal name default_codegen_variant then dir
+  if String.equal name base_codegen_variant then dir
   else begin
     let srcdir_path = Ocaml_directories.srcdir_path in
     let variant_path path =
@@ -448,7 +447,7 @@ let library_directory_for_variant name dir =
 
 (* [dirs], the value of the [directories] variable, resolved in the library
    tree that a compilation for [backend] uses.  Several directories of the
-   default variant can be one directory of another variant, which is then
+   base variant can be one directory of another variant, which is then
    named once. *)
 let variant_library_directories env ~backend dirs =
   match library_codegen_variant env backend with
@@ -536,10 +535,10 @@ let with_variant_stdlib env =
 (* The C code that a test builds itself, with the [cc] action or from a
    script, goes into the programs of its block.  Native programs are built
    for the effective variant, and so is their C code.  Bytecode and JSIR
-   programs have no codegen variant: their C code is built for the
-   install's default one, like the bytecode runtime that it is linked
-   with.  A block builds native programs unless it was set up for another
-   backend ([set_build_env_backend]). *)
+   programs have no codegen variant: their C code is built for base,
+   like the bytecode runtime that it is linked with.  A block builds
+   native programs unless it was set up for another backend
+   ([set_build_env_backend]). *)
 let set_build_env_backend backend env =
   Environments.add Ocaml_variables.build_env_backend
     (Ocaml_backends.string_of_backend backend)
@@ -565,7 +564,7 @@ let c_code_variant_work env task =
    settings for its tests.  Left there, they would come after the keys of
    a test's own variant and override them, and they would stay for a test
    that selects nothing, whose predicates and library tree are the
-   default variant's.  [clear_inherited_axis_defaults] takes them out of
+   base variant's.  [clear_inherited_axis_defaults] takes them out of
    the environment that every command of this run inherits.  Whatever else
    the value has stays.
 
@@ -622,12 +621,12 @@ let inherited_axis_settings () =
 
 (* What a C compiler needs after the configured flags to compile the C
    code of the block against the installed headers, which describe the
-   default variant: for native programs under another variant, the marker
+   base variant: for native programs under another variant, the marker
    that the axis macros are given explicitly, the macros of the enabled
    axes, and the flags that change the generated code (for
    AddressSanitizer, also needed at the link).  Nothing otherwise. *)
 let variant_cc_flags env =
-  match non_default_codegen_variant env with
+  match non_base_codegen_variant env with
   | Some name when builds_native_programs env ->
     String.concat " "
       (Codegen_variant_name.variant_cc_flags (variant_of_name name))
@@ -639,7 +638,7 @@ let cflags env =
   | variant_flags -> Ocamltest_config.cflags ^ " " ^ variant_flags
 
 (* [env] with [cflags] and [mkexe] followed by [variant_cc_flags]: what is
-   built for another variant than the default one gets the two variables
+   built for another variant than base gets the two variables
    in this form, where the last word is the variant's.  The flags that a
    test gives a native compiler are read in such an environment too: the
    compiler states the variant itself for the C files that it compiles,
@@ -671,7 +670,7 @@ let with_variant_c_flags env =
    keep what the test has in them, so the addition follows the selection
    and the block, and a test can change them. *)
 let command_environment env =
-  match non_default_codegen_variant env with
+  match non_base_codegen_variant env with
   | None -> env
   | Some name ->
     let keys = Codegen_variant_name.ocamlparams (variant_of_name name) in

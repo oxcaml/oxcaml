@@ -432,7 +432,7 @@ let pending_hidden_manifests
 let manifests_reader = s_table Dune_manifests_reader.create ()
 
 (* Where a manifest, or the file that a manifest or a -H-file option names,
-   is: one inside the default library root is taken from the tree of the
+   is: one inside the library root is taken from the tree of the
    selected codegen variant, like the files of a directory given to -I or
    -H.  The selection is read when this is applied to [()]; the load path is
    initialized again before a unit is compiled or linked for another one. *)

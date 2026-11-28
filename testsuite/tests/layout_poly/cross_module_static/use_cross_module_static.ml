@@ -24,8 +24,8 @@
   check-program-output;
  }{
   (* The "Codegen fingerprint"/"Polled" lines in the objinfo output depend
-     on the configure defaults; strip them so the references hold on all
-     configurations.  They are checked by
+     on the codegen variant; strip them so the references hold under all
+     of them.  They are checked by
      tool-ocamlobjinfo/codegen_fingerprint.ml. *)
   program = "-no-code -no-approx cross_module_static_lib.cmx";
   output = "cross_module_static_lib.objinfo.output";

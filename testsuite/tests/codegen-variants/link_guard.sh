@@ -7,7 +7,7 @@
 #
 #   sh link_guard.sh runtime <library tree> <copy>
 #     Copies the runtime archive of a library tree: libasmrun.a in the tree
-#     of the default variant, libasmrun_<axes>.a in the others.
+#     of the base variant, libasmrun_<axes>.a in the others.
 #
 #   sh link_guard.sh refusal <file> <log>
 #     Says why the link that wrote <log> failed, in words that depend
@@ -19,12 +19,12 @@
 #     Runs a command that must fail, a link or a program that loads a
 #     plugin, and says why as above.
 #
-#   sh link_guard.sh runtime-suffix <default library tree> <compiler>...
+#   sh link_guard.sh runtime-suffix <library root> <compiler>...
 #     For each variant tree whose runtime archive has a name of its own,
-#     libasmrun<suffix>.a, links a program compiled for the default variant
+#     libasmrun<suffix>.a, links a program compiled for the base variant
 #     with that tree on the search path and -runtime-variant <suffix>, the
 #     way that archive can be given for a debug or instrumented runtime of
-#     the default variant. Every such link must be refused.
+#     the base variant. Every such link must be refused.
 #
 #   sh link_guard.sh generic-functions <plugin>
 #     Says whether a plugin defines generic functions (caml_apply<n>,

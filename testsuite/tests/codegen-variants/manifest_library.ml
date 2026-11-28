@@ -48,12 +48,12 @@
 
 (* A build system that gives the compiler manifests instead of include
    directories names the files of the installation's libraries by their
-   paths inside the default library root, as others do with -I, whatever
+   paths inside the library root, as others do with -I, whatever
    the codegen variant.  The manifest here, which manifest_library.sh
    writes, lists the interface, the .cmx, the .cmxa and the archive of the
    unix library in the root that OCAMLLIB names; the compiler has to use
    the copies in the tree of the variant that it compiles for, and the
-   default tree's copies are refused under every variant with a
+   root's copies are refused under every variant with a
    fingerprint of its own.  The C stubs are named by their path in the
    root too, with -cclib.  The first block is the variant of the test run;
    the others each select one. *)

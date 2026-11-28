@@ -36,7 +36,7 @@
    asked to compile for it: a unit, a C file, which would otherwise be
    compiled with the macros and the flags of that selection, and a C file
    on its way into an archive.  The flags give every axis that the message
-   depends on, so that the configure default does not matter;
+   depends on, whatever variant the testsuite is running under;
    AddressSanitizer without frame pointers is refused before the platform
    is looked at, and the second selection has frame pointers, which only
    amd64 supports. *)

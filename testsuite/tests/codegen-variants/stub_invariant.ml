@@ -19,7 +19,7 @@
    fp-sc, growing the stack while a C frame sits between two OCaml regions
    makes caml_try_realloc_stack walk and rewrite the chain through that
    frame (runtime/fiber.c).  This test compiles the stub WITH
-   -fomit-frame-pointer (overriding the configured default) and triggers a
+   -fomit-frame-pointer (overriding the configured flags) and triggers a
    stack reallocation from a callback under the fp-sc DEBUG runtime
    (-runtime-variant d), checking that the broken invariant is caught by
    the CAMLassert [fp->prev == link->sp] in caml_try_realloc_stack rather

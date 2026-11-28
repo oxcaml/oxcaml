@@ -132,7 +132,7 @@ let check_backend_for_jit_load () =
    default.  Its whole-program axes are those that this library was built
    for: the per-context constants baked in by the toplevel_host_variant
    rule in toplevel/native/dune.  They are not always those of
-   [Codegen_variant.default]: a copy of this library built in a
+   [Codegen_variant.base]: a copy of this library built in a
    codegen-variant context is built for that context's variant.  Poll
    insertion is a property of each unit and has no such constant: phrases
    get it by default when every unit of the program has it, so that

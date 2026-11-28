@@ -43,7 +43,7 @@
  }
 *)
 
-(* A directory of C headers named by a path inside the default library root
+(* A directory of C headers named by a path inside the library root
    (here the root OCAMLLIB names) is looked up in the tree of the variant
    being compiled, like any other -I directory.  The stub includes m.h
    through that directory only, and the flags take back the axis macros

@@ -1,7 +1,7 @@
-The default variant: 0 of 19 paths change
+The base variant: 0 of 19 paths change
 A variant without a tree: 0 of 19 paths change
 The same variant, with the other poll-insertion setting: 0 of 19 paths change
-The default variant, with the other poll-insertion setting: 0 of 19 paths change
+The base variant, with the other poll-insertion setting: 0 of 19 paths change
 A variant with a tree:
   "<root>" -> "<root>/variants/<selected>"
   "<root>/" -> "<root>/variants/<selected>"

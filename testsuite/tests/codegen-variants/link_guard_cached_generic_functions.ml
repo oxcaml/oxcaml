@@ -61,7 +61,7 @@
 
    Each block generates an archive for one codegen variant: the generator
    runs as a script, which gets the variant of the block the way ocamlopt
-   does (from OCAMLPARAM, unless it is the default). A program compiled for
+   does (from OCAMLPARAM, unless it is base). A program compiled for
    that variant links with the archive and runs; the same program compiled
    for another variant does not link.
 

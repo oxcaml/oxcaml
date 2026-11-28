@@ -9,8 +9,8 @@
    Makefile-side name tables (Makefile.codegen-variants) are a second
    encoder of utils/codegen_variant_name.ml; this check keeps the encoders
    honest: every installed variant name must round-trip
-   Codegen_variant.of_string/to_string, must not be the default variant
-   (the default is served in situ, with no variants/ directory), and its
+   Codegen_variant.of_string/to_string, must not be the base variant
+   (which is served in situ, with no variants/ directory), and its
    tokens must respect the reservation rule (no '-'/'_' inside a token, and
    no token equal to a runtime-variant suffix string). *)
 
@@ -42,13 +42,13 @@ let check_tokens name =
     (String.split_on_char '-' name)
 
 let () =
-  let default = Codegen_variant.default in
-  let default_name = Codegen_variant.to_string default in
-  (match Codegen_variant.of_string default_name with
-   | Some t when Codegen_variant.equal t default -> ()
+  let base = Codegen_variant.base in
+  let base_name = Codegen_variant.to_string base in
+  (match Codegen_variant.of_string base_name with
+   | Some t when Codegen_variant.equal t base -> ()
    | Some _ | None ->
-     failwithf "default variant name %S does not round-trip" default_name);
-  check_tokens default_name;
+     failwithf "base variant name %S does not round-trip" base_name);
+  check_tokens base_name;
   List.iter
     (fun name ->
       (match Codegen_variant.of_string name with
@@ -56,10 +56,10 @@ let () =
        | Some t ->
          if not (String.equal (Codegen_variant.to_string t) name) then
            failwithf "installed variant name %S does not round-trip" name;
-         if Codegen_variant.is_default t then
+         if Codegen_variant.is_base t then
            failwithf
-             "default variant %S must be served in situ, not by a variants/ \
-              directory" name);
+             "the base variant %S must be served in situ, not by a \
+              variants/ directory" name);
       check_tokens name)
     (installed_variants ());
   print_endline "OK"

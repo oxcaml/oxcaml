@@ -9,7 +9,7 @@
 
 set -e
 
-# The default variant, whatever the testsuite is running under.
+# The base variant, whatever the testsuite is running under.
 unset OCAMLPARAM
 ocamlopt="$ocamlrun $ocamlopt_byte"
 

@@ -3,11 +3,11 @@
 #
 # make_library_root <library root> <variant>
 #
-# Makes ./root, a library root with the contents of <library root> for the
-# default variant and for <variant>, and sets $selected to the tree in it
-# that a compilation for <variant> uses: root/variants/<variant>, or root
-# itself when <variant> is the default one.  The directories of both trees
-# are new ones, at every depth, and the files in them are symbolic links
+# Makes ./root, a library root with the contents of <library root> for
+# base and for <variant>, and sets $selected to the tree in it that a
+# compilation for <variant> uses: root/variants/<variant>, or root itself
+# when <variant> is base.  The directories of both trees are new ones, at
+# every depth, and the files in them are symbolic links
 # to the files of <library root>.  So a test can add files anywhere in
 # both trees, and what it adds stays out of <library root>.  To replace a
 # file it removes the link first: writing to the link would change the

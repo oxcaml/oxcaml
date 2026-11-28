@@ -1,15 +1,15 @@
 #!/bin/sh
 
 # Helper for variant_only.ml: runs ocamltest on test files, as
-# child-ocamltest.sh does, for a codegen variant other than the default one
-# and with -codegen-variant-only, and checks which of them it runs.
+# child-ocamltest.sh does, for a codegen variant other than base and with
+# -codegen-variant-only, and checks which of them it runs.
 
 ocamltest="$1"
 tree="$2"
 tests="$3"
 
-# A variant that the compiler under test and the test tree both have. The
-# default variant has no directory of its own.
+# A variant that the compiler under test and the test tree both have. base
+# has no directory of its own.
 variant=
 for hosts in "$tree"/testsuite/tools/variants/*; do
   name=$(basename "$hosts")

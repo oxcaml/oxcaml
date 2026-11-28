@@ -57,13 +57,13 @@
 *)
 
 (* Build systems name the libraries of the installation by path inside the
-   default library root, whatever the codegen variant: here the root is the
+   library root, whatever the codegen variant: here the root is the
    one OCAMLLIB names, and the unix library is given as an include directory
    and as an archive, both inside it.  The compiler has to use the copies in
    the tree of the variant it compiles for (the first block is the variant
    of the test run; the others each select one).  The call below needs
    unix.cmx when it is compiled, and the link needs unix.cmxa: with the
-   default tree's copies, one or the other is refused. *)
+   root's copies, one or the other is refused. *)
 
 let () =
   Unix.handle_unix_error

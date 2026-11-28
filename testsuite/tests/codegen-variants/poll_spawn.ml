@@ -30,7 +30,7 @@
      with default runtime parameters: the startup constant
      caml_code_fully_polled is 1, so max_domains defaults to
      Max_domains_def;
-   - the same program compiled for the (non-polled) default variant
+   - the same program compiled for the (non-polled) base variant
      defaults to max_domains = 1 and the spawn fails with a hint naming
      the cause;
    - OCAMLRUNPARAM d=2 overrides the cap of the non-polled binary: the

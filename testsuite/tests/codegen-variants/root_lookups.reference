@@ -43,9 +43,9 @@ The interface that compiling a unit wrote, named by a manifest: as written
 The same for a unit with a .mli file, which writes none: the installation's
 The same for a unit compiled with -cmi-file: the installation's
 The interface that it wrote under the name of an interface file: as written
-Two dependent sources in a directory of the root: only for its default tree
-Two dependent sources compiled inside the root: only for its default tree
-A file left in the root, given to -pack by its bare name: only for its default tree
+Two dependent sources in a directory of the root: only for the variant of the root
+Two dependent sources compiled inside the root: only for the variant of the root
+A file left in the root, given to -pack by its bare name: only for the variant of the root
 The same file, given to -pack by its path: done
 A unit of the invocation that -Hx-file names: the .cmx file that it wrote
 An archive named like a source of the invocation: the one on the load path

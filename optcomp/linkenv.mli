@@ -125,7 +125,7 @@ type error =
         saved : Codegen_variant.fingerprint;
         current : Codegen_variant.fingerprint
       }
-    (* The runtime archive for a non-default codegen variant (e.g.
+    (* The runtime archive for a codegen variant other than base (e.g.
        libasmrun_fp.a) was not found in the load path. *)
   | Codegen_variant_runtime_not_found of
       { filename : filepath;
@@ -153,7 +153,7 @@ type error =
       }
     (* The file that -cached-generic-functions-path names does not exist, and
        neither does [also_looked_up], its counterpart in the selected variant's
-       tree, when the path lies inside the default library root. *)
+       tree, when the path lies inside the library root. *)
   | Cached_generic_functions_file_not_found of
       { filename : filepath;
         also_looked_up : filepath option

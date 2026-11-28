@@ -34,9 +34,8 @@
 *)
 
 (* A C stub compiled by ocamlopt sees exactly the axis macros of the codegen
-   variant being compiled, whatever the configure default is: each block
-   compiles the stub for one variant and prints the macros it found
-   defined. *)
+   variant being compiled: each block compiles the stub for one variant and
+   prints the macros it found defined. *)
 
 external axis_macros : unit -> string = "axis_macros"
 

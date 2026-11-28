@@ -627,9 +627,9 @@ let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
 
-(* The LLVM backend generates code for some variants only, whatever the
-   configure default: its trap-block scheme requires frame pointers, and it
-   emits neither stack checks nor AddressSanitizer instrumentation. *)
+(* The LLVM backend generates code for some variants only, and not for
+   base: its trap-block scheme requires frame pointers, and it emits
+   neither stack checks nor AddressSanitizer instrumentation. *)
 let validate_llvm_backend () =
   if !Clflags.llvm_backend
   then (
@@ -652,7 +652,7 @@ let validate_llvm_backend () =
          or remove -llvm-backend")
 
 (* A JSIR compilation or link ignores the selection ([Codegen_variant.current]
-   is then the default variant), so there is nothing to check for it. *)
+   is then the base variant), so there is nothing to check for it. *)
 let validate_codegen_variant () =
   if not (Clflags.target_is_jsir ())
   then (

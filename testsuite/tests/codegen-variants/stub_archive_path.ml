@@ -47,20 +47,19 @@
  }
 *)
 
-(* A C object or archive that a link is given by a path inside the default
+(* A C object or archive that a link is given by a path inside the
    library root is taken from the tree of the variant being compiled, like
    the .cmxa files that build systems name in the same way: nothing would
-   refuse the default tree's copy, which has no fingerprint.  The root is
+   refuse the root's copy, which has no fingerprint.  The root is
    one that stub_archive_path.sh makes, OCAMLLIB names it, and each function
    below says which tree its definition comes from.  One block compiles for
-   the default variant, whose tree is the root itself, whatever the
-   configure default.
+   the base variant, whose tree is the root itself.
 
    One archive is the argument of -cclib, and the one of
    [Stub_archive_path_lib] is recorded in its .cmxa, by the path given to
-   ocamlopt -a.  The last archive exists in the default tree only and has
+   ocamlopt -a.  The last archive exists in the root only and has
    to be linked from there: a variant with a runtime of its own has no
-   counterpart for the default tree's runtime archive either. *)
+   counterpart for the root's runtime archive either. *)
 
 external probe_archive : unit -> (int[@untagged])
   = "probe_archive_bytecode" "probe_archive"
@@ -87,5 +86,5 @@ let () =
   report "An object" probe_object;
   report "An archive given with -cclib" probe_cclib;
   report "An archive recorded in a .cmxa" Stub_archive_path_lib.probe;
-  Printf.printf "An archive of the default tree only: %s\n"
+  Printf.printf "An archive of the root only: %s\n"
     (if probe_default_tree_only () = 1 then "linked" else "not linked")

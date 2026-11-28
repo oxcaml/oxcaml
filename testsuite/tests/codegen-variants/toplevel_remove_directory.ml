@@ -5,7 +5,7 @@
 *)
 
 (* #remove_directory removes what #directory added, also for a directory
-   that is named inside the default library root and that the toplevel of
+   that is named inside the library root and that the toplevel of
    another variant therefore resolves in the tree of its variant.  The
    directives are called as functions for the sake of the directory, whose
    name depends on the installation. *)

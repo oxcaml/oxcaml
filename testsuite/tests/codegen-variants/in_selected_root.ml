@@ -14,24 +14,21 @@
 *)
 
 (* [Codegen_variant.in_selected_root], the function behind the resolution of
-   -I directories and link inputs named by a path inside the default library
+   -I directories and link inputs named by a path inside the library
    root, on a library root that this program creates: OCAMLLIB names it, so
-   it is [Config.standard_library].  The variants are named relative to the
-   configure default, so that the output is the same on every
-   configuration. *)
+   it is [Config.standard_library]. *)
 
 let root = Config.standard_library
 
-let default = Codegen_variant.default
+let base = Codegen_variant.base
 
 (* The variant with a tree in the root, one that has a tree but is never
    selected, and one that no tree serves. *)
-let with_tree = { default with stack_checks = not default.stack_checks }
+let with_tree = { base with stack_checks = true }
 
-let other = { default with frame_pointers = not default.frame_pointers }
+let other = { base with frame_pointers = true }
 
-let without_tree =
-  { with_tree with frame_pointers = not default.frame_pointers }
+let without_tree = { with_tree with frame_pointers = true }
 
 (* A variant without a tree is served by the tree of the variant with the
    other poll-insertion setting, if there is one. *)
@@ -122,14 +119,14 @@ let () =
       in_root (variant_tree other ^ "/unix/unix.cmxa");
       root ^ "_sibling/unix/unix.cmxa";
       root ^ "_sibling/" ^ variant_tree with_tree ^ "/unix/unix.cmxa" ];
-  Codegen_variant.apply default;
-  none_changes "The default variant";
+  Codegen_variant.apply base;
+  none_changes "The base variant";
   Codegen_variant.apply without_tree;
   none_changes "A variant without a tree";
   Codegen_variant.apply (other_poll_insertion without_tree);
   none_changes "The same variant, with the other poll-insertion setting";
-  Codegen_variant.apply (other_poll_insertion default);
-  none_changes "The default variant, with the other poll-insertion setting";
+  Codegen_variant.apply (other_poll_insertion base);
+  none_changes "The base variant, with the other poll-insertion setting";
   Codegen_variant.apply with_tree;
   print_endline "A variant with a tree:";
   List.iter

@@ -60,7 +60,7 @@
    the linker is given, and the runtimes of the other variants are named
    after their axes: with the library tree of another variant on the search
    path, -runtime-variant _fp or _sc names that variant's runtime for code
-   of the default variant. The last block tries this with the runtime of
+   of the base variant. The last block tries this with the runtime of
    every other variant that has a name of its own: each link is refused,
    since nothing defines the guard of the code. *)
 

@@ -40,8 +40,8 @@ type task_item =
         promote: bool }
 
 (* [Depends_on_codegen_variant] does nothing when run.  It marks the
-   work around it as depending on a codegen variant other than the
-   install's default one (see [Ocaml_flags.variant_work]). *)
+   work around it as depending on a codegen variant other than base (see
+   [Ocaml_flags.variant_work]). *)
 
 type task =
   | Static of Result.t

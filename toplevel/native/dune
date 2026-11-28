@@ -37,7 +37,7 @@
 
 ; The whole-program axes of the codegen variant this context's ocamlnat is
 ; actually built for, baked in so that opttoploop pins phrase compilation to
-; the binary's own rather than the install default's (the two differ in a
+; the binary's own rather than to base (the two differ in a
 ; codegen-variant context).  Reuses the
 ; per-context sources generated for otherlibs/dynlink's dynlink_host_variant
 ; rule by the _build/_bootinstall recipe in Makefile.common-ox.

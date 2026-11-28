@@ -44,7 +44,7 @@
    the object file refers to. Linkers and systems differ in how they print
    an undefined symbol, and the tests that need two codegen variants do not
    run on every system. The first block runs on every system, with an
-   object file of the default variant: it checks the decision itself,
+   object file of the base variant: it checks the decision itself,
    against the diagnostics of the linkers of each supported system,
    including the leading underscore of the symbols of some of them,
    against symbols that only contain the name of the guard, and against

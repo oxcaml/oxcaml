@@ -9,32 +9,29 @@
 
 (* The files that a manifest (-I-manifest, -H-manifest) or an -H-file or
    -Hx-file option names are looked up like the files of a directory given
-   to -I, -H or -Hx: one inside the default library root is found in the
+   to -I, -H or -Hx: one inside the library root is found in the
    tree of the selected variant when that tree has it, and what the entry
    says about the .cmx file of the unit holds for the file found there.  A
    variant that has no tree of its own is served by the tree of the variant
    with the other poll-insertion setting, when the root has that one.  The
-   root is one that this program creates and that OCAMLLIB names; the
-   variants are named relative to the configure default, so that the output
-   is the same on every configuration. *)
+   root is one that this program creates and that OCAMLLIB names. *)
 
 let root = Config.standard_library
 
 let manifest_files_root = Filename.dirname root
 
-let default = Codegen_variant.default
+let base = Codegen_variant.base
 
-let with_tree = { default with stack_checks = not default.stack_checks }
+let with_tree = { base with stack_checks = true }
 
-let without_tree =
-  { default with frame_pointers = not default.frame_pointers }
+let without_tree = { base with frame_pointers = true }
 
 let in_tree variant file =
   Filename.concat
     (Filename.concat (Filename.basename root) "variants")
     (Filename.concat (Codegen_variant.to_string variant) file)
 
-let in_default_tree file = Filename.concat (Filename.basename root) file
+let in_library_root file = Filename.concat (Filename.basename root) file
 
 let write file lines =
   let rec make_directory dir =
@@ -60,7 +57,7 @@ let files =
     "single_x.cmi", "an -Hx-file option";
     "in_h.cmi", "a file of an -H directory";
     "in_hx.cmi", "a file of an -Hx directory";
-    "default_only.cmi", "a file that only the default tree has";
+    "default_only.cmi", "a file that only the root has";
     "outside.cmi", "a file outside the root" ]
 
 let show path =
@@ -98,44 +95,44 @@ let lookups description variant =
 let () =
   List.iter
     (fun file ->
-      write (in_default_tree ("lib/" ^ file)) [];
+      write (in_library_root ("lib/" ^ file)) [];
       write (in_tree with_tree ("lib/" ^ file)) [])
     [ "visible.cmi"; "nested.cmi"; "hidden.cmi"; "hidden_x.cmi"; "single.cmi";
       "single_x.cmi" ];
   List.iter
     (fun file ->
-      write (in_default_tree file) [];
+      write (in_library_root file) [];
       write (in_tree with_tree file) [])
     ["dir_h/in_h.cmi"; "dir_hx/in_hx.cmi"];
-  write (in_default_tree "lib/default_only.cmi") [];
+  write (in_library_root "lib/default_only.cmi") [];
   write "elsewhere/outside.cmi" [];
   write "visible.manifest"
-    [ "file visible.cmi " ^ in_default_tree "lib/visible.cmi";
-      "file default_only.cmi " ^ in_default_tree "lib/default_only.cmi";
+    [ "file visible.cmi " ^ in_library_root "lib/visible.cmi";
+      "file default_only.cmi " ^ in_library_root "lib/default_only.cmi";
       "file outside.cmi elsewhere/outside.cmi";
       "manifest nested nested.manifest" ];
   write "nested.manifest"
-    ["file nested.cmi " ^ in_default_tree "lib/nested.cmi" ^ " x"];
+    ["file nested.cmi " ^ in_library_root "lib/nested.cmi" ^ " x"];
   write "hidden.manifest"
-    [ "file hidden.cmi " ^ in_default_tree "lib/hidden.cmi";
-      "file hidden_x.cmi " ^ in_default_tree "lib/hidden_x.cmi" ^ " x" ];
+    [ "file hidden.cmi " ^ in_library_root "lib/hidden.cmi";
+      "file hidden_x.cmi " ^ in_library_root "lib/hidden_x.cmi" ^ " x" ];
   Load_path.For_testing.set_manifest_files_root (Some manifest_files_root);
   Clflags.include_manifests := ["visible.manifest"];
   Clflags.hidden_include_manifests := ["hidden.manifest"];
   Clflags.hidden_include_files
     := [ { basename = "single.cmi";
-           actual_path = in_default_tree "lib/single.cmi";
+           actual_path = in_library_root "lib/single.cmi";
            cmx_guaranteed = false
          };
          { basename = "single_x.cmi";
-           actual_path = in_default_tree "lib/single_x.cmi";
+           actual_path = in_library_root "lib/single_x.cmi";
            cmx_guaranteed = true
          } ];
   Clflags.no_std_include := true;
   Clflags.hidden_include_dirs
     := [ { path = Filename.concat root "dir_hx"; cmx_guaranteed = true };
          { path = Filename.concat root "dir_h"; cmx_guaranteed = false } ];
-  lookups "The default variant" default;
+  lookups "The base variant" base;
   lookups "A variant without a tree" without_tree;
   lookups "A variant with a tree" with_tree;
   lookups "The same variant, with the other poll-insertion setting"

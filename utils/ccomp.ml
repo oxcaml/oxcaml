@@ -147,7 +147,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
     let variant =
       if Clflags.target_is_native ()
       then Codegen_variant.current ()
-      else Codegen_variant.default
+      else Codegen_variant.base
     in
     let enabled_tokens =
       List.filter (axis_value variant) Codegen_variant_name.all_tokens

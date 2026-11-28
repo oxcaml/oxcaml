@@ -17,7 +17,7 @@
 
 (* The name of the variant that the compilers compile for when nothing
    selects one, and that the library root of every install holds: base. *)
-val default_codegen_variant : string
+val base_codegen_variant : string
 
 (* The test's own selection, from the [codegen_variant] TSL variable
    ([None] when unset or empty).  The value is the name of a variant, or
@@ -26,7 +26,7 @@ val default_codegen_variant : string
    "+fp-sc" or "+fp -sc".  A value whose first character, blanks aside,
    is a sign is requirements; any other value is a name.  The selection is
    then the variant that the run uses anyway (the suite variant, else the
-   install's default) when that one meets the requirements, and otherwise
+   base) when that one meets the requirements, and otherwise
    the available variant that meets them and differs from it on the fewest
    axes; when none is available, the variant that would have been
    closest, which [codegen_variant_available] then refuses.  A value that
@@ -39,7 +39,7 @@ val test_codegen_variant : Environments.t -> string option
 exception Invalid_codegen_variant of string
 
 (* The selection for the whole run: the operand of -codegen-variant, when
-   it names a variant other than the install's default ([None] otherwise:
+   it names a variant other than base ([None] otherwise:
    asking for the default is the same as not asking). *)
 val suite_codegen_variant : string option
 
@@ -54,15 +54,15 @@ val codegen_variant : Environments.t -> string option
    follow it; bytecode and JSIR have no codegen variants. *)
 val effective_codegen_variant : Environments.t -> string
 
-(* [effective_codegen_variant] when it is not the install's default
+(* [effective_codegen_variant] when it is not base
    variant. *)
-val non_default_codegen_variant : Environments.t -> string option
+val non_base_codegen_variant : Environments.t -> string option
 
 (* Whether [effective_codegen_variant] enables the given axis. *)
 val effective_codegen_variant_mem :
   Environments.t -> Codegen_variant_name.token -> bool
 
-(* Marks a task as work that depends on a non-default codegen variant.
+(* Marks a task as work that depends on a non-base codegen variant.
    Under a suite variant with -codegen-variant-only, [Main.test_file] skips
    a test file whose task carries no such mark ([has_variant_work]): it
    would only repeat the default run. *)
@@ -71,7 +71,7 @@ val has_variant_work : Actions.task -> bool
 
 (* [variant_work_for env task] marks [task], which runs a command that is
    given the effective variant (a program built for it, its C flags, its
-   OCAMLPARAM keys), when that variant is not the default one.  When the
+   OCAMLPARAM keys), when that variant is not base.  When the
    install does not have that variant, the result is a failure that says
    so instead: such a block needs the [variant_available] guard. *)
 val variant_work_for : Environments.t -> Actions.task -> Actions.task
@@ -85,7 +85,7 @@ val native_variant_work :
 (* The body of a predicate on the effective variant:
    [codegen_variant_predicate holds pass_reason skip_reason], where [holds]
    is a property of a variant name.  When it holds for the effective
-   variant but not for the default one, the result is marked as
+   variant but not for base, the result is marked as
    [variant_work]. *)
 val codegen_variant_predicate :
   (string -> bool) -> string -> string -> Actions.code
@@ -97,12 +97,12 @@ val codegen_variant_axis_predicate :
   Actions.code
 
 (* The library tree of the named codegen variant: the install's library
-   directory for the default variant, <stdlib>/variants/<name> for any
+   directory for the base variant, <stdlib>/variants/<name> for any
    other. *)
 val codegen_variant_directory : string -> string
 
 (* Whether the tested install can compile and link native code for the
-   named codegen variant: it is the install's default variant, or the
+   named codegen variant: it is the base variant, or the
    install has a library tree for it under <stdlib>/variants/. *)
 val codegen_variant_available : string -> bool
 
@@ -111,10 +111,10 @@ val codegen_variant_available : string -> bool
 val available_codegen_variants : unit -> string list
 
 (* [-nostdlib -I <root>], where <root> is the library tree that a
-   compilation for [backend] uses: the default one, or its
-   variants/<name> subtree for a native compilation when a non-default
+   compilation for [backend] uses: the library root, or its
+   variants/<name> subtree for a native compilation when a non-base
    codegen variant is selected (bytecode and JSIR compilations always use
-   the default tree). *)
+   the root). *)
 val stdlib : Environments.t -> backend:Ocaml_backends.t -> string
 
 (* The native compiler flags selecting the selected codegen variant ("" when
@@ -123,11 +123,11 @@ val codegen_variant_flags : Environments.t -> Ocaml_backends.t -> string
 
 (* Resolves the directories of the [directories] variable in the library
    tree of the codegen variant that a compilation for [backend] uses.  A
-   test names the default variant's directories: <srcdir>/otherlibs/<lib>
+   test names the base variant's directories: <srcdir>/otherlibs/<lib>
    (e.g. via [include unix]), <srcdir>/otherlibs/eval, <srcdir>/testsuite/lib
    ([include testing]) and the directories of the compiler's own libraries
    ([include ocamlcommon], [include config]).  For a native compilation
-   under a non-default variant, each of them becomes the directory of the
+   under a non-base variant, each of them becomes the directory of the
    variant's tree that holds the same library, when the tree has it;
    directories that end up equal are given once.  The list is returned
    unchanged otherwise. *)
@@ -166,7 +166,7 @@ val inherited_axis_settings : unit -> string list
    [cc] action, [cflags] and [mkexe] in a script) is built for the
    effective variant, except in a block set up for bytecode or JSIR: such
    programs have no codegen variant, and their C code is for the bytecode
-   runtime, which is the default variant's. *)
+   runtime, which is the base variant's. *)
 val set_build_env_backend :
   Ocaml_backends.t -> Environments.t -> Environments.t
 
@@ -178,12 +178,12 @@ val c_code_variant_work : Environments.t -> Actions.task -> Actions.task
    that state the effective variant for the C code of the block
    ([Codegen_variant_name.variant_cc_flags]: its axis macros and, for
    example, the sanitizer flags) when that code is built for a variant
-   other than the default one. *)
+   other than base. *)
 val cflags : Environments.t -> string
 
 (* [env] for a command that a test writes itself (a script, a hook, the
    program of [run], a compiler given its whole command line, ocamlmklib):
-   under a non-default effective variant, OCAMLPARAM makes that variant
+   under a non-base effective variant, OCAMLPARAM makes that variant
    the default of the compilers that the command starts, as it would be on
    an install configured with it, and [cflags] and [mkexe] are followed by
    the flags that state the variant for the C code of the block (tests
@@ -201,7 +201,7 @@ val with_variant_c_flags : Environments.t -> Environments.t
 (* [run_for_variant run], where [run] is one of
    [Actions_helpers.run_program], [run_script], [run_config_script] and
    [run_hook name]: the command runs in [command_environment], and under
-   a non-default effective variant it is marked as [variant_work]. *)
+   a non-base effective variant it is marked as [variant_work]. *)
 val run_for_variant :
   (command_env:(Environments.t -> Environments.t) -> Actions.code) ->
   Actions.code

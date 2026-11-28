@@ -42,9 +42,9 @@ type t =
   }
 
 (** The variant selected by the current invocation's flags.  Always
-    [default] when the target is JSIR (js_of_ocaml or wasm_of_ocaml): the
+    [base] when the target is JSIR (js_of_ocaml or wasm_of_ocaml): the
     axes describe native code generation only, and the JSIR libraries exist
-    only in the default library root. *)
+    only in the library root. *)
 val current : unit -> t
 
 (** The variant that the axis flags select, whatever the target: what the
@@ -56,11 +56,11 @@ val flags_variant : unit -> t
 (** The base variant, with every axis off: what is compiled for when no
     flag and no OCAMLPARAM setting selects another, and what the library
     root holds, on every installation. *)
-val default : t
+val base : t
 
 val equal : t -> t -> bool
 
-val is_default : t -> bool
+val is_base : t -> bool
 
 (** Sets every per-invocation axis flag ([Clflags.address_sanitizer],
     [Clflags.frame_pointers], [Clflags.poll_insertion],
@@ -122,7 +122,7 @@ val string_of_fingerprint : fingerprint -> string
     selected by the current invocation's flags, with the variant that the
     tree was built for; [None] when the installation has no such tree.
 
-    The tree of the default variant is [Config.standard_library] (which
+    The tree of the base variant is [Config.standard_library] (which
     already honors OCAMLLIB/CAMLLIB), that of any other variant is
     [Config.standard_library]/variants/<name>, when that directory exists.
     Poll insertion is a property of each unit, not of the program: two trees
@@ -140,14 +140,14 @@ val string_of_fingerprint : fingerprint -> string
 val selected_tree : unit -> (t * string) option
 
 (** The root of [selected_tree ()], and [Config.standard_library] when
-    there is none (the base root may itself be a variant tree, e.g. via
+    there is none (the library root may itself be a variant tree, e.g. via
     OCAMLLIB during the in-tree build; mistakes are caught by the
     artifact-fingerprint and runtime-archive checks).  Like
     [selected_tree], not to be captured at module-initialization time. *)
 val effective_standard_library : unit -> string
 
 (** The directory that would serve [t]'s standard library when [t] is not
-    the default, [Config.standard_library]/variants/<name>, whether or not
+    base, [Config.standard_library]/variants/<name>, whether or not
     it exists; callers wanting the fallback semantics described above use
     [effective_standard_library]. *)
 val variant_root : t -> string
@@ -155,15 +155,15 @@ val variant_root : t -> string
 (** The counterpart of [path] in the library tree of the selected variant.
 
     Build systems name the libraries of the installation by path inside the
-    default root, the one [-where] and [-config] report whatever the variant
+    library root, the one [-where] and [-config] report whatever the variant
     (<root>/unix, <root>/unix/unix.cmxa).  When the tree that serves the
-    selected variant ([selected_tree]) is not the default root and [path]
+    selected variant ([selected_tree]) is not the library root and [path]
     lies inside [Config.standard_library], this is the same path inside
     [effective_standard_library ()], provided it exists there; in every
-    other case it is [path] itself.  So nothing changes when the default
+    other case it is [path] itself.  So nothing changes when the library
     root serves the selected variant or when no tree does, and a path
-    with no counterpart in the selected tree still names the default
-    root's file, for the fingerprint and consistency checks to accept or
+    with no counterpart in the selected tree still names the file of the
+    library root, for the fingerprint and consistency checks to accept or
     reject.
 
     A path is compared with the root as a file is, by its absolute path,
@@ -203,8 +203,7 @@ val is_product : string -> bool
 
 (** Whether [path] is a file that this invocation wrote ([is_product]) in a
     directory that [in_selected_root] replaces by another: a directory of
-    the default library root that the tree of the selected variant also
-    has.  That is the one case in which a search does not find such a file
+    the library root that the tree of the selected variant also has.  That is the one case in which a search does not find such a file
     where it was written: the other directory is searched in its place, and
     can have a file of that name.  A directory of the root without a
     counterpart, and one inside a variant's tree, are searched as they
@@ -219,8 +218,8 @@ val is_product_in_replaced_directory : string -> bool
     taken for different files. *)
 val same_file : string -> string -> bool
 
-(** A '+'-directory that the selected non-default variant's library tree
-    does not provide while the default root does: expanding it against the
+(** A '+'-directory that the library tree of the selected variant does not
+    provide while the library root does: expanding it against the
     variant root would silently resolve to a nonexistent directory even
     though a directory of that name exists one root over.  The error
     printer is registered in [Compmisc]. *)
@@ -237,7 +236,7 @@ exception Directory_not_provided_by_variant of directory_error
     the caller asked to read from (-I, -H, [#directory], ...): raises
     [Directory_not_provided_by_variant] when [s] starts with '+' and the
     selected variant's tree exists but lacks the subdirectory while the
-    default root provides it; directories absent from both roots expand
+    library root provides it; directories absent from both roots expand
     permissively as always (a nonexistent include directory is not an
     error). *)
 val expand_directory : string -> string

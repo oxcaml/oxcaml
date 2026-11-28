@@ -475,8 +475,8 @@ let report_error ppf = function
       Location.Doc.quoted_filename filename (fun ppf ->
         Option.iter
           (fprintf ppf
-             ",@ nor %a,@ where a path inside the default library root is \
-              looked up first for the selected codegen variant"
+             ",@ nor %a,@ where a path inside the library root is looked up \
+              first for the selected codegen variant"
              Location.Doc.quoted_filename)
           also_looked_up)
 

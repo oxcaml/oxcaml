@@ -4,8 +4,8 @@
 #
 # <library tree> is the tree that serves the codegen variant that OCAMLPARAM
 # selects, and OCAMLLIB the library root of the installation. When the tree
-# is a variant's own (root/variants/<name>) and the variant differs from the
-# default one by more than poll insertion, tries three links that must fail
+# is a variant's own (root/variants/<name>) and the variant differs from
+# base by more than poll insertion, tries three links that must fail
 # and writes what their errors say to the file diagnostics.output; see
 # root_diagnostics.ml.
 
@@ -17,7 +17,7 @@ case $tree in
 esac
 root=$OCAMLLIB
 
-# A unit compiled for the default variant, and the same for the selected
+# A unit compiled for the base variant, and the same for the selected
 # one. The errors are about frame pointers, stack checks and
 # AddressSanitizer: a variant with the default settings for these, whose
 # object files refer to the same link-time guard, has none to show.
@@ -66,7 +66,7 @@ refused() {
 }
 
 {
-  # The unit compiled for the default variant, linked for the selected one.
+  # The unit compiled for the base variant, linked for the selected one.
   # (In a subshell: whether an assignment in front of a function call
   # outlives the call depends on the shell.)
   ( OCAMLLIB=$tree
@@ -82,9 +82,9 @@ refused() {
   ( OCAMLLIB=$PWD/bare
     refused "the root has no tree for the variant" bare.log \
       "$@" link_guard_unit.cmx -o bare.exe )
-  # A runtime library that only exists for the default variant.
+  # A runtime library that only exists for the base variant.
   mkdir flavor
   cp "$root"/libasmrun.a flavor/libasmrunlocal.a
-  refused "a runtime library of the default variant alone" flavor.log \
+  refused "a runtime library of the base variant alone" flavor.log \
     "$@" -I flavor -runtime-variant local root_diagnostics.ml -o flavor.exe
 } > diagnostics.output 2>&1

@@ -14,8 +14,8 @@
    instrumentation nor stack checks.  In an AddressSanitizer variant, where
    this test runs, the backend is refused for an instrumented unit and
    accepted for one compiled with -fno-asan, which stays a unit of the
-   variant.  Each refusal names flags that can be passed, whatever the
-   configure default.  (The backend itself needs an LLVM toolchain, so the
+   variant.  Each refusal names flags that can be passed.  (The backend
+   itself needs an LLVM toolchain, so the
    checks are called here as the driver calls them.) *)
 
 let check description =

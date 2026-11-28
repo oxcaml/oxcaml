@@ -27,7 +27,7 @@
    for. Outside the library root that is the current directory itself;
    inside, #directory names the directory changed to.
 
-   The script runs the toplevel of the default variant in a library root
+   The script runs the toplevel of the base variant in a library root
    where each of the two trees has a plugin that says which tree it is. It
-   needs the tree of the variant that differs from the default one in poll
+   needs the tree of the variant that differs from base in poll
    insertion only (poll_pair.sh). *)

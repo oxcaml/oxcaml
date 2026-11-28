@@ -17,16 +17,15 @@
    -cached-generic-functions-path. A path given with that option is
    redirected like any other path inside the root: the archive of the root,
    named explicitly, is the one of the selected variant's tree where there
-   is one. The variants are named relative to the configure default, so
-   that the output is the same on every configuration. *)
+   is one. *)
 
 let root = Config.standard_library
 
-let default = Codegen_variant.default
+let base = Codegen_variant.base
 
-let with_tree = { default with stack_checks = not default.stack_checks }
+let with_tree = { base with stack_checks = true }
 
-let without_tree = { default with frame_pointers = not default.frame_pointers }
+let without_tree = { base with frame_pointers = true }
 
 let archive = "cached-generic-functions" ^ Config.ext_lib
 
@@ -77,6 +76,6 @@ let queries description variant =
 let () =
   touch (root ^ "/" ^ archive);
   touch (tree with_tree ^ "/" ^ archive);
-  queries "The default variant" default;
+  queries "The base variant" base;
   queries "A variant with a tree" with_tree;
   queries "A variant without a tree" without_tree

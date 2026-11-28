@@ -69,7 +69,7 @@ let ocaml = toplevel
   ~backend: Ocaml_backends.Bytecode
   ~compiler: Ocaml_compilers.ocamlc_byte
 
-(* [name] is the build for the install's default codegen variant; the
+(* [name] is the build for the base codegen variant; the
    [ocamlnat] action runs the one for the test's effective variant. *)
 let ocamlnat = toplevel
   ~name: (Ocaml_files.native_host ~variant:None Ocamlnat)

@@ -44,7 +44,7 @@ let flags_variant () =
    and no OCAMLPARAM setting selects another, and what its library root
    holds.  It is not configurable; see the default values of the axis
    flags in [Clflags], which this must agree with. *)
-let default =
+let base =
   { address_sanitizer = false;
     frame_pointers = false;
     poll_insertion = false;
@@ -53,12 +53,12 @@ let default =
 
 (* The axes describe native code generation only.  A JSIR compilation
    (-target js_of_ocaml or wasm_of_ocaml) emits no native code, and the
-   JSIR libraries are installed once, in the default library root, so such
-   a compilation always counts as the default variant whatever the axis
-   flags say: its artifacts carry the default fingerprint and its library
-   root is never remapped. *)
+   JSIR libraries are installed once, in the library root, so such a
+   compilation always counts as the base variant whatever the axis flags
+   say: its artifacts carry the fingerprint of base and its library root is
+   never remapped. *)
 let current () =
-  if Clflags.target_is_jsir () then default else flags_variant ()
+  if Clflags.target_is_jsir () then base else flags_variant ()
 
 let equal t1 t2 =
   Bool.equal t1.address_sanitizer t2.address_sanitizer
@@ -66,7 +66,7 @@ let equal t1 t2 =
   && Bool.equal t1.poll_insertion t2.poll_insertion
   && Bool.equal t1.stack_checks t2.stack_checks
 
-let is_default t = equal t default
+let is_base t = equal t base
 
 let apply t =
   Clflags.address_sanitizer := t.address_sanitizer;
@@ -192,7 +192,7 @@ let directory_exists dir = try Sys.is_directory dir with Sys_error _ -> false
 
 (* The library tree built for exactly [t], when the installation has it. *)
 let tree t =
-  if is_default t
+  if is_base t
   then Some (t, Config.standard_library)
   else
     let root = variant_root t in
@@ -214,7 +214,7 @@ let effective_standard_library () =
   match selected_tree () with
   | Some (_, root) -> root
   | None ->
-    (* The base root may itself serve the requested variant (the in-tree
+    (* The library root may itself serve the requested variant (the in-tree
        build compiles with -frame-pointers against an fp stdlib via
        OCAMLLIB, and users may point OCAMLLIB at a custom-built variant
        tree); genuinely wrong roots are caught by the artifact-fingerprint
@@ -294,12 +294,12 @@ let is_product path =
   && Hashtbl.mem written_files (file_identity path)
 
 let selected_root_mapping () =
-  let default_root = Config.standard_library in
+  let library_root = Config.standard_library in
   let root = effective_standard_library () in
-  if String.equal root default_root
+  if String.equal root library_root
   then Fun.id
   else
-    let prefix = absolute_components default_root in
+    let prefix = absolute_components library_root in
     fun path ->
       match strip_prefix ~prefix (absolute_components path) with
       | None -> path
@@ -350,11 +350,11 @@ let expand_directory s =
     then expanded
     else if
       (* The selected variant's tree exists but lacks this subdirectory.
-         When the DEFAULT root provides it, the include would silently
+         When the library root provides it, the include would silently
          resolve to a nonexistent directory while a directory of that name
          exists one root over, so fail with a targeted error naming what
          is missing from the selected root.  (Nothing is assumed about the
-         default root's copy: whether its artifacts suit this variant is
+         library root's copy: whether its artifacts suit this variant is
          for the fingerprint checks to decide if the caller names it by
          absolute path.)  Directories absent from both roots keep the
          permissive expansion (a nonexistent include directory is not an

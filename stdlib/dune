@@ -3,8 +3,8 @@
 ;; Codegen-variant stdlib trees, statically enumerated for the closed
 ;; curated name set (dune subdir stanzas cannot be generated). Only the
 ;; trees named in the configure-computed variant list contain build rules;
-;; every other one (the configure default, a name that configure did not
-;; select, or all of them with --disable-codegen-variants) contains only an
+;; every other one (base, whose tree is build, a name that configure did
+;; not select, or all of them with --disable-codegen-variants) contains only an
 ;; empty @stdlib_<name> alias. See stdlib/dune_rules/gen.ml.
 (subdir build_base (dynamic_include ../dune_rules/stdlib_base.dune))
 (subdir build_fp (dynamic_include ../dune_rules/stdlib_fp.dune))

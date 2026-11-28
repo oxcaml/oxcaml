@@ -46,8 +46,8 @@
 *)
 
 (* In a block set up for a bytecode compiler or for the bytecode toplevel,
-   the cc action compiles for the bytecode runtime, which is the default
-   variant's, whatever variant is selected: an object instrumented for
+   the cc action compiles for the bytecode runtime, which is that of
+   base, whatever variant is selected: an object instrumented for
    AddressSanitizer would not link with that runtime.  It has no use for
    the selected variant there, so it does not fail either where the
    compiler under test lacks that variant. *)

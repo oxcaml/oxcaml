@@ -56,7 +56,7 @@
 
 (* A program that links the compiler's own libraries can be built for every
    codegen variant of one installation: the library tree of each variant
-   has its own build of them (the linker would refuse the default
+   has its own build of them (the linker would refuse the base
    variant's). *)
 
 let () =

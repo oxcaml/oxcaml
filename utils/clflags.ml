@@ -424,7 +424,7 @@ let pic_code = ref (match Config.architecture with (* -fPIC *)
 
 (* The four axes of the codegen variants are off by default, on every
    installation: with no flag, the compiler targets the base variant
-   ([Codegen_variant.default], which these values must agree with). *)
+   ([Codegen_variant.base], which these values must agree with). *)
 
 (* This ref lives here rather than in [Oxcaml_flags] because it is read by
    [Translprim], which cannot depend on the driver libraries. *)

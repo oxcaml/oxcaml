@@ -19,7 +19,7 @@
 
 (* What the errors of a link say about the installation, for each of two
    variants that has other frame-pointer, stack-check or AddressSanitizer
-   settings than the default one (at least one of the two has):
+   settings than base (at least one of the two has):
 
    - With the tree of the variant itself as the library root (OCAMLLIB), a
      unit compiled for the other variant is refused for what it was
@@ -29,7 +29,7 @@
    - With a root that has no tree for the variant and is not one, the same
      error does say so.
    - With -runtime-variant and a runtime library that only exists for the
-     default variant, what the error reports as missing is the file of
+     base variant, what the error reports as missing is the file of
      that runtime library for the selected variant, and not the variant,
      which the installation provides. *)
 

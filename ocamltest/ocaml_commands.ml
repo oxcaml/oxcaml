@@ -29,7 +29,7 @@ let expect =
 
 let native_host env host =
   Ocaml_files.native_host host
-    ~variant:(Ocaml_flags.non_default_codegen_variant env)
+    ~variant:(Ocaml_flags.non_base_codegen_variant env)
 
 let ocamlrun_ocamllex = ocamlrun Ocaml_files.ocamllex
 

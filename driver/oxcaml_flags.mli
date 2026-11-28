@@ -145,7 +145,7 @@ val use_cached_generic_functions : bool ref
 (** Set by -cached-generic-functions-path.  When unset, the archive is looked
     up in the selected codegen variant's standard-library root.  Either way,
     [Asmlink.cached_generic_functions_archive] is the file that a link uses:
-    a path given here that lies inside the default library root is redirected
+    a path given here that lies inside the library root is redirected
     to the selected variant's tree like any other. *)
 val cached_generic_functions_path : string option ref
 
