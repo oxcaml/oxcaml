@@ -271,10 +271,42 @@ module RE = Flambda2_simplify.Rebuilt_expr
 
 let are_rebuilding = Are_rebuilding_terms.are_rebuilding
 
+let cost_metrics_of_set_of_closures set =
+  let slot_size_of_code_ids =
+    Function_slot.Map.fold
+      (fun function_slot
+           (code_id : Function_declarations.code_id_in_function_declaration)
+           sizes ->
+        match code_id with
+        | Code_id { code_id; only_full_applications = _ } ->
+          Code_id.Map.add code_id (Function_slot.size function_slot) sizes
+        | Deleted _ -> sizes)
+      (Function_declarations.funs (Set_of_closures.function_decls set))
+      Code_id.Map.empty
+  in
+  Cost_metrics.set_of_closures set ~find_code_characteristics:(fun code_id ->
+      (* Strictly speaking wrong, but good enough for now (if we care about the
+         code size for fexpr input, we can always write it explicitly) *)
+      { cost_metrics = Cost_metrics.zero;
+        function_slot_size = Code_id.Map.find code_id slot_size_of_code_ids
+      })
+
+let cost_metrics_of_named (named : Flambda.Named.t) =
+  match named with
+  | Simple simple -> Cost_metrics.from_size (Code_size.simple simple)
+  | Prim (prim, _) ->
+    Cost_metrics.from_size (Code_size.prim ~machine_width prim)
+  | Set_of_closures (set, _) -> cost_metrics_of_set_of_closures set
+  | Static_consts _ ->
+    (* We only care about the code size within closures, and those can't contain
+       static consts. *)
+    Cost_metrics.zero
+  | Rec_info _ -> Cost_metrics.zero
+
 let create_let bound named ~body =
   RE.create_let are_rebuilding bound (Or_null.this named) ~body
     ~free_names_of_defining_expr:(Flambda.Named.free_names named)
-    ~cost_metrics_of_defining_expr:Cost_metrics.zero
+    ~cost_metrics_of_defining_expr:(cost_metrics_of_named named)
 
 let set_of_closures env fun_decls value_slots =
   let fun_decls : Function_declarations.t =
@@ -802,6 +834,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * RE.t =
           | Recursive, _ | _, Recursive -> Recursive
           | Non_recursive, Non_recursive -> Non_recursive
         in
+        let cost_metrics =
+          match code_size with
+          | Some code_size ->
+            Cost_metrics.from_size (Code_size.of_int code_size)
+          | None -> RE.Function_params_and_body.cost_metrics params_and_body
+        in
         let params_and_body =
           RE.Function_params_and_body.to_function_params_and_body
             params_and_body are_rebuilding
@@ -818,9 +856,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * RE.t =
           loopify
           |> Option.value
                ~default:Loopify_attribute.Default_loopify_and_not_tailrec
-        in
-        let cost_metrics =
-          Cost_metrics.from_size (Code_size.of_int code_size)
         in
         (* CR ncourant: allow fexpr to specify modes? *)
         let param_modes =

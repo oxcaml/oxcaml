@@ -894,13 +894,15 @@ and code_binding ppf
      } :
       code) =
   Format.fprintf ppf
-    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
+    "@[<hv 2>%tcode%t@[<h>%t%a%a%a%a%a%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
     Flambda_colours.static_keyword Flambda_colours.pop Flambda_colours.elide
     (recursive ~space:Before) rec_
     (inline_attribute_opt ~space:Before)
     inline
     (loopify_attribute_opt ~space:Before)
-    loopify code_size cs
+    loopify
+    (pp_option ~space:Before (pp_like "size(%a)" code_size))
+    cs
     (pp_option ~space:Before (pp_like "newer_version_of(%a)" code_id))
     newer_version_of
     (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")

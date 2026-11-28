@@ -433,7 +433,7 @@ and code =
     recursive : is_recursive;
     inline : inline_attribute option;
     params_and_body : params_and_body;
-    code_size : code_size;
+    code_size : code_size option;
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;

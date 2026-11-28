@@ -244,7 +244,6 @@ let make_boxed_const_int (i, m) : static_data =
 %type <Fexpr.kind_with_subkind list> kinds_with_subkinds_nonempty
 %type <Fexpr.variable -> Fexpr.static_data> static_data_kind
 %type <Fexpr.symbol_binding> symbol_binding
-%type <Fexpr.is_recursive> recursive
 %type <Fexpr.is_cont_recursive> cont_recursive
 %%
 
@@ -329,12 +328,12 @@ code:
 code_header:
   | KWD_CODE;
     recursive = recursive;
-    inline = option(inline);
+    inline = ioption(inline);
     loopify = loopify_opt;
-    KWD_SIZE LPAREN; code_size = code_size; RPAREN;
-    newer_version_of = option(newer_version_of);
-    is_tupled = boption(KWD_TUPLED);
-    stub = boption(KWD_STUB);
+    code_size = ioption(code_size_annotation);
+    newer_version_of = ioption(newer_version_of);
+    is_tupled = iboption(KWD_TUPLED);
+    stub = iboption(KWD_STUB);
     id = code_id;
     { recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
       stub }
@@ -355,9 +354,9 @@ static_set_of_closures:
     KWD_END
     { { bindings; elements } }
 
-recursive:
-  | { Nonrecursive }
-  | KWD_REC { Recursive }
+%inline recursive:
+  | { (Nonrecursive : is_recursive) }
+  | KWD_REC { (Recursive : is_recursive) }
 ;
 
 mutability:
@@ -711,7 +710,7 @@ inlining_state_depth:
   | KWD_DEPTH LPAREN; i = plain_int; RPAREN { i }
 ;
 
-loopify_opt:
+%inline loopify_opt:
   | { None }
   | KWD_LOOPIFY LPAREN; l = loopify; RPAREN { Some l }
 ;
@@ -994,6 +993,15 @@ code_id:
 
 code_size:
   | i = plain_int { i }
+;
+
+%inline iboption(X):
+  | { false }
+  | X { true }
+;
+
+code_size_annotation:
+  | KWD_SIZE LPAREN; size = code_size; RPAREN { size }
 
 function_slot:
   | v = variable { v }
