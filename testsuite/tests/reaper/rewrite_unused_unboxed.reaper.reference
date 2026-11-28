@@ -12,7 +12,7 @@ in
 let $camlRewrite_unused_unboxed__print_int_1 =
   closure print_int_0_1 @print_int &toplevel
 in
-let code inline(never) loopify(never) size(5) newer_version_of(consume_1)
+let code inline(never) loopify(never) size(5)
       consume_1_1 (Pmakeblock_into_m_field_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -28,7 +28,7 @@ in
 let $camlRewrite_unused_unboxed__consume_2 =
   closure consume_1_1 @consume &toplevel
 in
-let code inline(never) loopify(never) size(6) newer_version_of(Make_2)
+let code inline(never) loopify(never) size(6)
       Make_2_1 (N : val)
         my_closure &my_alloc_region my_depth
         -> k * k1

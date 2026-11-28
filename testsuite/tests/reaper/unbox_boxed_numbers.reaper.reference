@@ -15,7 +15,7 @@ let code indirect_14 deleted in
 let code test_value_slot_not_unboxed_12 deleted in
 let code pair_first_15 deleted in
 let code test_pair_16 deleted in
-let code inline(never) loopify(never) size(2) newer_version_of(add_int64_0)
+let code inline(never) loopify(never) size(2)
       add_int64_0_1
         (int64_of_int_into_x_field_unboxed_int64 : int64,
          int64_of_int_into_y_field_unboxed_int64 : int64)
@@ -31,7 +31,7 @@ in
 let $camlUnbox_boxed_numbers__add_int64_1 =
   closure add_int64_0_1 @add_int64 &toplevel
 in
-let code inline(never) loopify(never) size(2) newer_version_of(add_int32_1)
+let code inline(never) loopify(never) size(2)
       add_int32_1_1
         (int32_of_int_into_x_field_unboxed_int32 : int32,
          int32_of_int_into_y_field_unboxed_int32 : int32)
@@ -47,7 +47,7 @@ in
 let $camlUnbox_boxed_numbers__add_int32_2 =
   closure add_int32_1_1 @add_int32 &toplevel
 in
-let code inline(never) loopify(never) size(2) newer_version_of(add_nativeint_2)
+let code inline(never) loopify(never) size(2)
       add_nativeint_2_1
         (nativeint_of_int_into_x_field_unboxed_nativeint : nativeint,
          nativeint_of_int_into_y_field_unboxed_nativeint : nativeint)
@@ -144,7 +144,7 @@ in
 let $camlUnbox_boxed_numbers__test_nativeint_6 =
   closure test_nativeint_5_1 @test_nativeint &toplevel
 in
-let code inline(never) loopify(never) size(3) newer_version_of(add_float_6)
+let code inline(never) loopify(never) size(3)
       add_float_6_1
         (float_of_int_into_x_field_unboxed_float : float,
          float_of_int_into_y_field_unboxed_float : float)
@@ -160,7 +160,7 @@ in
 let $camlUnbox_boxed_numbers__add_float_7 =
   closure add_float_6_1 @add_float &toplevel
 in
-let code inline(never) loopify(never) size(3) newer_version_of(add_float32_7)
+let code inline(never) loopify(never) size(3)
       add_float32_7_1
         (float32_of_int_into_x_field_unboxed_float32 : float32,
          float32_of_int_into_y_field_unboxed_float32 : float32)
@@ -226,7 +226,7 @@ in
 let $camlUnbox_boxed_numbers__test_float32_10 =
   closure test_float32_9_1 @test_float32 &toplevel
 in
-let code inline(never) loopify(never) size(3) newer_version_of(read_11)
+let code inline(never) loopify(never) size(3)
       read_11_1 (read_into_my_closure_field_b_field_unboxed_int64 : int64)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -261,7 +261,7 @@ in
 let $camlUnbox_boxed_numbers__test_value_slot_11 =
   closure test_value_slot_10_1 @test_value_slot &toplevel
 in
-let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
+let code inline(never) loopify(never) size(6)
       indirect_14_1 (read : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
@@ -311,7 +311,7 @@ let $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_12 =
   closure test_value_slot_not_unboxed_12_1 @test_value_slot_not_unboxed
     &toplevel
 in
-let code inline(never) loopify(never) size(3) newer_version_of(pair_first_15)
+let code inline(never) loopify(never) size(3)
       pair_first_15_1 (Pmakeblock_into_p_field_0_field_unboxed_int64 : int64)
         my_closure &my_alloc_region my_depth
         -> k * k1

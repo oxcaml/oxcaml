@@ -248,9 +248,14 @@ let solve (type f) (problem : f Traverse.Problem.t)
     | ( With_types types_rewrite_context,
         With_types final_typing_env,
         With_types unit_symbol ) ->
+      let final_typing_env =
+        Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
+          final_typing_env
+      in
       With_types
-        (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
-           final_typing_env)
+        (Typing_env.with_code_age_relation final_typing_env
+           (UA.rewrite_code_age_relation code_changes
+              (Typing_env.code_age_relation final_typing_env)))
   in
   { analysis_scope;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;

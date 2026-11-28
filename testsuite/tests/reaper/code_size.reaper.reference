@@ -1,7 +1,7 @@
 let code h_2 deleted in
 let code g_1 deleted in
 let code f_0 deleted in
-let code inline(never) loopify(never) size(1) newer_version_of(h_2)
+let code inline(never) loopify(never) size(1)
       h_2_1 (Pmakeblock_into_u_field_0)
         my_closure &my_alloc_region my_depth
         -> k * k1 =

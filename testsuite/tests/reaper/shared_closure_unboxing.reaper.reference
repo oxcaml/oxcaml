@@ -9,7 +9,7 @@ let $camlShared_closure_unboxing__Pmakeblock_2 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
            $camlShared_closure_unboxing__const_block_1)
 in
-let code inline(never) loopify(never) size(3) newer_version_of(f_0)
+let code inline(never) loopify(never) size(3)
       f_0_1 (z : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

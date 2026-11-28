@@ -28,6 +28,9 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
+let rewrite_newer_version_of t ~f =
+  Code_id.Map.filter_map (fun newer older -> f ~newer ~older) t
+
 let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
   if Code_id.Set.mem id candidates
   then Known true

@@ -12,7 +12,7 @@ let $`camlUnbox_noreturn__fn[unbox_noreturn.ml:15,7--28]_2` =
   closure `fn[unbox_noreturn.ml:15,7--28]_2_1`
     @`fn[unbox_noreturn.ml:15,7--28]` &toplevel
 in
-let code inline(never) loopify(never) size(32) newer_version_of(body_1)
+let code inline(never) loopify(never) size(32)
       body_1_1 (return : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
