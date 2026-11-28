@@ -196,6 +196,8 @@ let mk_Ix f =
  \     (Like -I, but indicates that cmx files for modules in <dir> are\n\
  \     always available)"
 
+(* CR-soon zqian: [-H] and its sibling flags ([-H-manifest], [-H-file],
+   [-Hx-file]) will be removed. *)
 let mk_H f =
   "-H", Arg.String f,
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
@@ -535,6 +537,20 @@ let mk_open_cmi_x f =
   "-open-cmi-x", Arg.String f,
   "<file.cmi>  Same as -open-cmi, but indicates that the cmx file for\n\
   \    the module is always available (like -Ix)"
+
+let mk_open_h f =
+  "-open-h", Arg.String f,
+  "<unit>  Same as -open, for a compilation unit <unit>, which stays hidden\n\
+  \    if it is a hidden dependency"
+
+let mk_bind f =
+  let name = ref "" in
+  "-bind",
+    Arg.Tuple [
+      Arg.String (fun s -> name := s);
+      Arg.String (fun s -> f !name s);
+    ],
+    "<name> <unit>  Refer to the compilation unit <unit> as <name>"
 
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
@@ -1258,6 +1274,8 @@ module type Common_options = sig
   val _open : string -> unit
   val _open_cmi : string -> unit
   val _open_cmi_x : string -> unit
+  val _open_h : string -> unit
+  val _bind : string -> string -> unit
   val _ppx : string -> unit
   val _keywords: string -> unit
   val _principal : unit -> unit
@@ -1628,6 +1646,8 @@ struct
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_open_cmi_x F._open_cmi_x;
+    mk_open_h F._open_h;
+    mk_bind F._bind;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1762,6 +1782,8 @@ struct
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_open_cmi_x F._open_cmi_x;
+    mk_open_h F._open_h;
+    mk_bind F._bind;
     mk_ppx F._ppx;
     mk_keywords F._keywords;
     mk_principal F._principal;
@@ -1936,6 +1958,8 @@ struct
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_open_cmi_x F._open_cmi_x;
+    mk_open_h F._open_h;
+    mk_bind F._bind;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -2125,6 +2149,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_open_cmi_x F._open_cmi_x;
+    mk_open_h F._open_h;
+    mk_bind F._bind;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -2240,6 +2266,8 @@ struct
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_open_cmi_x F._open_cmi_x;
+    mk_open_h F._open_h;
+    mk_bind F._bind;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2361,11 +2389,18 @@ module Default = struct
     let _nostdlib = set no_std_include
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
-    let _open s = open_args := Open s :: !open_args
+    let _open s = scope_args := Open s :: !scope_args
     let _open_cmi path =
-      open_args := Open_cmi { path; cmx_guaranteed = false } :: !open_args
+      scope_args := Open_cmi { path; cmx_guaranteed = false } :: !scope_args
     let _open_cmi_x path =
-      open_args := Open_cmi { path; cmx_guaranteed = true } :: !open_args
+      scope_args := Open_cmi { path; cmx_guaranteed = true } :: !scope_args
+    let unit_arg flag s =
+      if Unit_info.is_unit_name s then s
+      else raise (Arg.Bad (flag ^ " expects a compilation unit, got " ^ s))
+    let _open_h s =
+      scope_args := Open_h (unit_arg "-open-h" s) :: !scope_args
+    let _bind name intf =
+      scope_args := Bind (name, unit_arg "-bind" intf) :: !scope_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching

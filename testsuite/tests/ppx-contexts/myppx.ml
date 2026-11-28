@@ -28,15 +28,17 @@ let () =
       Printf.eprintf "load_path.visible: [%s]\n" (quote_dirs visible);
       Printf.eprintf "load_path.hidden: [%s]\n" (quote_dirs hidden);
       *)
-      let quote_open_arg : Clflags.open_arg -> string = function
+      let quote_scope_arg : Clflags.scope_arg -> string = function
         | Open s -> Printf.sprintf "Open(%S)" s
         | Open_cmi { path; cmx_guaranteed = false } ->
           Printf.sprintf "Open_cmi(%S)" path
         | Open_cmi { path; cmx_guaranteed = true } ->
           Printf.sprintf "Open_cmi_x(%S)" path
+        | Open_h s -> Printf.sprintf "Open_h(%S)" s
+        | Bind (name, intf) -> Printf.sprintf "Bind(%S, %S)" name intf
       in
-      Printf.eprintf "open_args: [%s]\n"
-        (List.map quote_open_arg !Clflags.open_args |> String.concat " ");
+      Printf.eprintf "scope_args: [%s]\n"
+        (List.map quote_scope_arg !Clflags.scope_args |> String.concat " ");
       Printf.eprintf "for_package: %S\n"
         (quote_option !Clflags.for_package);
       Printf.eprintf "use_debug: %B\n"

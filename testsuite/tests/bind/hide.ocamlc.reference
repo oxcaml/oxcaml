@@ -1,0 +1,4 @@
+File "hide.ml", line 4, characters 8-16:
+4 | let z = Lib__bar.x
+            ^^^^^^^^
+Error: Unbound module Lib__bar

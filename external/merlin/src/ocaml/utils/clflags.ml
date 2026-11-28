@@ -25,11 +25,13 @@ let nopervasives        = ref false
 let strict_formats      = ref true
 let syntax_quotations   = ref Config.syntax_quotations
 
-type open_arg =
+type scope_arg =
   | Open of string
   | Open_cmi of { path : string; cmx_guaranteed : bool }
+  | Open_h of string
+  | Bind of string * string
 
-let open_args           = ref ([] : open_arg list)
+let scope_args           = ref ([] : scope_arg list)
 let parameters          = ref ([] : string list)
 let as_parameter        = ref false
 let as_argument_for     = ref None

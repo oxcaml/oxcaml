@@ -1,0 +1,1 @@
+let from_bind = ()

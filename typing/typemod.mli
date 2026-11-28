@@ -109,11 +109,15 @@ val functorize_implementation:
   module_sigs:(Ident.t * Types.signature) list ->
   Unit_info.t -> Compilation_unit.t -> Typedtree.module_coercion
 
+(* Process one of [Clflags.scope_args], as [initial_env] does. *)
+val process_scope_arg:
+  loc:Location.t -> Env.t -> Clflags.scope_arg -> Env.t
+
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_args:Clflags.open_arg list -> Env.t
+  scope_args:Clflags.scope_arg list -> Env.t
 
 module Sig_component_kind : sig
   type t =

@@ -19,7 +19,7 @@ type ocaml =
     nopervasives : bool;
     strict_formats : bool;
     syntax_quotations : bool;
-    open_args : Clflags.open_arg list;
+    scope_args : Clflags.scope_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;
@@ -57,16 +57,19 @@ let dump_ocaml x =
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
       ("syntax_quotations", `Bool x.syntax_quotations);
-      ( "open_args",
+      ( "scope_args",
         Json.list
-          (fun (arg : Clflags.open_arg) ->
+          (fun (arg : Clflags.scope_arg) ->
             match arg with
             | Open md -> `Assoc [ ("open", `String md) ]
             | Open_cmi { path; cmx_guaranteed = false } ->
               `Assoc [ ("open-cmi", `String path) ]
             | Open_cmi { path; cmx_guaranteed = true } ->
-              `Assoc [ ("open-cmi-x", `String path) ])
-          x.open_args );
+              `Assoc [ ("open-cmi-x", `String path) ]
+            | Open_h intf -> `Assoc [ ("open-h", `String intf) ]
+            | Bind (name, intf) ->
+              `Assoc [ ("bind", `List [ `String name; `String intf ]) ])
+          x.scope_args );
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
       ("warnings", dump_warnings x.warnings);
@@ -1080,26 +1083,40 @@ let ocaml_flags =
        directive" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
-          { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
+          { ocaml with scope_args = Clflags.Open md :: ocaml.scope_args }),
       "<module>  Opens the module <module> before typing" );
     ( "-open-cmi",
       Marg.param "file" (fun file ocaml ->
           { ocaml with
-            open_args =
+            scope_args =
               Clflags.Open_cmi { path = file; cmx_guaranteed = false }
-              :: ocaml.open_args
+              :: ocaml.scope_args
           }),
       "<file>  Opens the module whose compiled interface is <file> before \
        typing" );
     ( "-open-cmi-x",
       Marg.param "file" (fun file ocaml ->
           { ocaml with
-            open_args =
+            scope_args =
               Clflags.Open_cmi { path = file; cmx_guaranteed = true }
-              :: ocaml.open_args
+              :: ocaml.scope_args
           }),
       "<file>  Same as -open-cmi, but indicates that the cmx file for the \
        module is always available (like -Ix)" );
+    ( "-open-h",
+      Marg.param "unit" (fun intf ocaml ->
+          { ocaml with scope_args = Clflags.Open_h intf :: ocaml.scope_args }),
+      "<unit>  Opens the compilation unit <unit> before typing" );
+    ( "-bind",
+      (fun args ocaml ->
+        match args with
+        | name :: intf :: args ->
+          ( args,
+            { ocaml with
+              scope_args = Clflags.Bind (name, intf) :: ocaml.scope_args
+            } )
+        | _ -> failwith "expects a module name and a compilation unit"),
+      "<name> <unit>  Refer to the compilation unit <unit> as <name>" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1203,7 +1220,7 @@ let initial =
         nopervasives = false;
         strict_formats = false;
         syntax_quotations = Config.syntax_quotations;
-        open_args = [];
+        scope_args = [];
         ppx = [];
         pp = None;
         warnings = Warnings.backup ();
