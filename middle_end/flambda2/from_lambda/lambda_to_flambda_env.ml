@@ -126,6 +126,12 @@ let current_unit t = t.current_unit
 
 let fdo t = t.fdo
 
+let fdo_call_counter t loc =
+  Option.map (fun fdo -> Fdo_from_lambda_env.call_counter fdo loc) t.fdo
+
+let fdo_switch_counters t switch =
+  Option.map (fun fdo -> Fdo_from_lambda_env.switch_counters fdo switch) t.fdo
+
 let machine_width t = t.machine_width
 
 let ident_stamp_upon_starting t = t.ident_stamp_upon_starting
