@@ -40,6 +40,12 @@ so it has to be the one users' ppx_deriving builds on.
 sexp_type's type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to
 be the same as the one users' sexplib0 builds on.
 
+## Location check documentation
+
+`src/location_check_doc.ml` holds the optional URL that location check errors
+end with. It is `None` here; a distribution can replace that file to point at
+its own documentation.
+
 ## Syntax errors explained by lrgrep
 
 When the compiler's parser rejects a source file, ppxlib parses it again with
