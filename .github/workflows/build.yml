@@ -1312,9 +1312,14 @@ jobs:
       - name: Show the tools of the system
         run: |
           sw_vers
-          for tool in bash make diff find rsync tar xargs awk sed cc; do
+          for tool in bash make diff rsync tar awk cc; do
             echo "== $tool: $(command -v "$tool")"
             "$tool" --version 2>&1 | head -n 2 || true
+          done
+          # The find, xargs and sed of BSD have no option that prints a
+          # version: asking for one only prints an error.
+          for tool in find xargs sed; do
+            echo "== $tool: $(command -v "$tool")"
           done
 
       - name: Configure OxCaml
