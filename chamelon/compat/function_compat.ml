@@ -99,7 +99,13 @@ let function_to_cases_view { params; body } =
     in
     { arg_label;
       param;
-      cases = [{ c_lhs = pattern; c_cont = None; c_guard = None; c_rhs }];
+      cases =
+        [ { c_lhs = pattern;
+            c_cont = None;
+            c_guard = None;
+            c_rhs;
+            c_generalized = []
+          } ];
       partial;
       optional_default;
       cases_view_identifier = Param param_identifier
