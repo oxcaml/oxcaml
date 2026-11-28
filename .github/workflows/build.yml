@@ -500,6 +500,45 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
+      # What is left in _build of the IR that the compilations saved. Dune
+      # removes from a build directory the files that none of its rules
+      # produces, saved IR among them, when it next reads the rules of that
+      # directory: this step finds what the step above compiled last, the
+      # test programs. It comes before the steps that run `make compiler`
+      # again, which reads every directory of a variant's build context
+      # and so removes the IR that the link of each test program saved.
+      - name: Run register allocation on artifacts
+        if: matrix.run_regalloc_tool == true
+        env:
+          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
+          REGALLOC_OPTIONS: ${{ matrix.regalloc_options }}
+        run: |
+          set -euo pipefail
+          # A run of the tool processes the IR of one configuration, which
+          # its options select (the base variant's without any), reports
+          # what it skips of the others, and fails when it finds none of
+          # its own. For a job with a codegen variant, that is the IR in
+          # the build context of the variant.
+          ir=_build${CODEGEN_VARIANT:+/main-$CODEGEN_VARIANT}
+          # The tool only reads that IR, so its runs are independent: GNU
+          # parallel runs each line below as one command and stops at the
+          # first failure. A run with irc needs several times the memory
+          # of the others (about 3 GB), hence the limit on the runs at
+          # once and the order that spreads them out.
+          regalloc="./_build/main/tools/regalloc/regalloc.exe $ir -validate $REGALLOC_OPTIONS"
+          {
+            for options in "-summary" "-insert-prologue" \
+                "-param SPLIT_AROUND_LOOPS:on" "-param AFFINITY:on"; do
+              for allocator in irc ls gi; do
+                echo "$regalloc $options -regalloc $allocator"
+              done
+            done
+            echo "$regalloc -summary -regalloc irc -param BIT_MATRIX_THRESHOLD:8192"
+            for allocator in ls gi; do
+              echo "$regalloc -copy-propagation -regalloc $allocator"
+            done
+          } | parallel --gnu --no-notice --jobs 8 --keep-order --tag --halt now,fail=1
+
       - name: Run upstream testsuite
         id: test
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
@@ -626,40 +665,6 @@ jobs:
           install_path="${INSTALL_PATH:-_install}"
           make debug || exit 1
           $install_path/bin/ocamldebug $install_path/bin/ocamlc <<< ""
-
-      - name: Run register allocation on artifacts
-        if: matrix.run_regalloc_tool == true
-        env:
-          CODEGEN_VARIANT: ${{ matrix.codegen_variant }}
-          REGALLOC_OPTIONS: ${{ matrix.regalloc_options }}
-        run: |
-          set -euo pipefail
-          # The build saved IR for every codegen variant that it builds,
-          # each in the build context of its variant, and the tests saved
-          # more next to it. A run of the tool processes the IR of one
-          # configuration, which its options select (the base variant's
-          # without any), reports what it skips of the others, and fails
-          # when it finds none of its own. For a job with a codegen
-          # variant, that is the IR in the build context of the variant.
-          ir=_build${CODEGEN_VARIANT:+/main-$CODEGEN_VARIANT}
-          # The tool only reads that IR, so its runs are independent: GNU
-          # parallel runs each line below as one command and stops at the
-          # first failure. A run with irc needs several times the memory
-          # of the others (about 3 GB), hence the limit on the runs at
-          # once and the order that spreads them out.
-          regalloc="./_build/main/tools/regalloc/regalloc.exe $ir -validate $REGALLOC_OPTIONS"
-          {
-            for options in "-summary" "-insert-prologue" \
-                "-param SPLIT_AROUND_LOOPS:on" "-param AFFINITY:on"; do
-              for allocator in irc ls gi; do
-                echo "$regalloc $options -regalloc $allocator"
-              done
-            done
-            echo "$regalloc -summary -regalloc irc -param BIT_MATRIX_THRESHOLD:8192"
-            for allocator in ls gi; do
-              echo "$regalloc -copy-propagation -regalloc $allocator"
-            done
-          } | parallel --gnu --no-notice --jobs 8 --keep-order --tag --halt now,fail=1
 
       - name: Collect and push metrics
         if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
