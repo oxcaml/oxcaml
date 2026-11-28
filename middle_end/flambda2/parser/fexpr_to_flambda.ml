@@ -267,6 +267,15 @@ module Acc = struct
       } )
 end
 
+module RE = Flambda2_simplify.Rebuilt_expr
+
+let are_rebuilding = Are_rebuilding_terms.are_rebuilding
+
+let create_let bound named ~body =
+  RE.create_let are_rebuilding bound (Or_null.this named) ~body
+    ~free_names_of_defining_expr:(Flambda.Named.free_names named)
+    ~cost_metrics_of_defining_expr:Cost_metrics.zero
+
 let set_of_closures env fun_decls value_slots =
   let fun_decls : Function_declarations.t =
     let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
@@ -342,7 +351,7 @@ let continuation_sort (sort : Fexpr.continuation_sort) : Continuation.Sort.t =
   | Exn -> Normal_or_exn
   | Define_root_symbol -> Define_root_symbol
 
-let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
+let rec expr env acc (e : Fexpr.expr) : _ * RE.t =
   match e with
   | Let { bindings = []; _ } -> assert false (* should not be possible *)
   | Let
@@ -384,11 +393,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let alloc_mode = alloc_mode_for_allocations env alloc in
     let named = Flambda.Named.create_set_of_closures ~alloc_mode soc in
     let acc, body = expr env acc body in
-    let let_expr =
-      Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
-      |> Flambda.Expr.create_let
-    in
-    acc, let_expr
+    acc, create_let bound named ~body
   | Let
       { bindings =
           { defining_expr = Simple _ | Prim _ | Rec_info _; _ } :: _ :: _;
@@ -412,11 +417,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     in
     let var = Bound_var.create id id_duid name_mode in
     let bound = Bound_pattern.singleton var in
-    let let_expr =
-      Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
-      |> Flambda.Expr.create_let
-    in
-    acc, let_expr
+    acc, create_let bound named ~body
   | Let_cont { recursive; body; bindings = [{ name; params; sort; handler }] }
     ->
     let sort =
@@ -461,24 +462,22 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let handler_env, params = create_params env params in
     let acc, handler = expr handler_env acc handler in
     let handler =
-      Flambda.Continuation_handler.create params ~handler
-        ~free_names_of_handler:Unknown ~is_exn_handler ~is_cold:false
+      RE.Continuation_handler.create params ~handler ~is_exn_handler
     in
     let let_cont =
       match recursive with
       | Nonrecursive ->
-        Flambda.Let_cont.create_non_recursive name handler ~body
-          ~free_names_of_body:Unknown
+        RE.create_non_recursive_let_cont are_rebuilding name handler ~body
       | Recursive _ ->
         let handlers = Continuation.Lmap.singleton name handler in
-        Flambda.Let_cont.create_recursive ~invariant_params handlers ~body
-          ~free_names_of_handlers:Unknown
+        RE.create_recursive_let_cont are_rebuilding ~invariant_params handlers
+          ~body
     in
     acc, let_cont
   | Let_cont _ -> failwith "TODO andwhere"
   | Apply_cont ac ->
     let acc, ac = apply_cont env acc ac in
-    acc, Flambda.Expr.create_apply_cont ac
+    acc, RE.create_apply_cont ~is_cold:false ac
   | Switch { scrutinee; cases } ->
     let (acc, build_let_ks), arms =
       List.fold_left_map
@@ -507,7 +506,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     in
     let arms = Target_ocaml_int.Map.of_list arms in
     build_let_ks acc
-    @@ Flambda.Expr.create_switch
+    @@ RE.create_switch are_rebuilding ~is_cold:false
          (Flambda.Switch.create ~condition_dbg:Debuginfo.none
             ~scrutinee:(simple env scrutinee) ~arms)
   | Let_symbol { bindings; value_slots; body } ->
@@ -719,11 +718,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
           | Some ar -> arity ar
         in
-        let ( _params,
-              params_and_body,
-              free_names_of_params_and_body,
-              is_my_closure_used,
-              acc ) =
+        let params_and_body, acc =
           let { Fexpr.params;
                 closure_var;
                 region_vars;
@@ -784,28 +779,38 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let acc, body = expr env acc body in
           let _closure_info, acc = Acc.pop_closure_info acc in
           let params_and_body =
-            Flambda.Function_params_and_body.create ~return_continuation
+            RE.Function_params_and_body.create ~return_continuation
               ~exn_continuation
               (Bound_parameters.create params)
               ~body ~my_closure ~my_alloc_mode ~my_depth
-              ~free_names_of_body:Unknown
           in
-          let free_names =
-            (* CR mshinwell: This needs fixing XXX *)
-            Name_occurrences.empty
-          in
-          ( params,
-            params_and_body,
-            free_names,
-            Flambda.Function_params_and_body.is_my_closure_used params_and_body,
-            acc )
+          params_and_body, acc
+        in
+        let free_names_of_params_and_body =
+          RE.Function_params_and_body.free_names params_and_body
+        in
+        let is_my_closure_used =
+          RE.Function_params_and_body.is_my_closure_used params_and_body
+        in
+        (* The code is recursive if marked as such, or if its body uses its
+           depth variable, as in [Simplify_set_of_closures] *)
+        let recursive : Recursive.t =
+          match
+            ( convert_recursive_flag recursive,
+              RE.Function_params_and_body.recursive params_and_body )
+          with
+          | Recursive, _ | _, Recursive -> Recursive
+          | Non_recursive, Non_recursive -> Non_recursive
+        in
+        let params_and_body =
+          RE.Function_params_and_body.to_function_params_and_body
+            params_and_body are_rebuilding
         in
         let result_mode =
           match result_mode with
           | Not_alloc_stack -> Lambda.not_alloc_stack
           | Maybe_alloc_stack -> Lambda.maybe_alloc_stack
         in
-        let recursive = convert_recursive_flag recursive in
         let inline =
           inline |> Option.value ~default:Inline_attribute.Default_inline
         in
@@ -858,11 +863,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let static_consts = Flambda.Static_const_group.create static_const_group in
     let acc, body = expr env acc body in
     ( acc,
-      Flambda.Let.create
+      create_let
         (Bound_pattern.static bound_static)
         (Flambda.Named.create_static_consts static_consts)
-        ~body ~free_names_of_body:Unknown
-      |> Flambda.Expr.create_let )
+        ~body )
   | Apply
       { func;
         call_kind;
@@ -979,23 +983,20 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callsite_counter ~inlined ~inlining_state ~probe:None ~position:Normal
         ~yielding:May_yield ~relative_history:Inlining_history.Relative.empty
     in
-    acc, Flambda.Expr.create_apply apply
-  | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")
+    acc, RE.create_apply are_rebuilding ~is_cold:false apply
+  | Invalid -> acc, RE.create_invalid (Message "Invalid from fexpr")
 
 and inlined_goto env acc (handler_body : Fexpr.expr) =
   let acc, handler = expr env acc handler_body in
   let handler =
-    Flambda.Continuation_handler.create Bound_parameters.empty
-      ~free_names_of_handler:Unknown ~is_exn_handler:false ~is_cold:false
-      ~handler
+    RE.Continuation_handler.create Bound_parameters.empty ~handler
+      ~is_exn_handler:false
   in
   (* no need to propagate env, nothing here can nor should be used elsewhere *)
   let cont = Continuation.create ~name:"branch_k" ~sort:Normal_or_exn () in
   let apply = Flambda.Apply_cont.create cont ~args:[] ~dbg:Debuginfo.none in
   let build_let acc body =
-    ( acc,
-      Flambda.Let_cont.create_non_recursive cont handler ~body
-        ~free_names_of_body:Unknown )
+    acc, RE.create_non_recursive_let_cont are_rebuilding cont handler ~body
   in
   acc, build_let, apply
 
@@ -1103,6 +1104,7 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let exn_continuation = Exn_continuation.exn_handler error_continuation in
   let env = bind_all_code_ids_and_function_slots env fexpr in
   let acc, body = expr env Acc.empty fexpr.body in
+  let body = RE.to_expr body are_rebuilding in
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
