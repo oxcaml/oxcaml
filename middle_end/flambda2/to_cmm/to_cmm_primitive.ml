@@ -1301,15 +1301,16 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
        and the fact that they will be forbidden entirely in OCaml 5. *)
     ( None,
       res,
-      C.ite
-        (C.or_int
-           (C.and_int arg (C.int 1 ~dbg) dbg)
-           (C.eq arg (C.int 0 ~dbg) ~dbg)
-           dbg)
-        ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
-        ~then_annots:Branch_annotations.default
-        ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
-        ~else_dbg:dbg ~else_annots:Branch_annotations.default )
+      C.bind "arg" arg (fun arg ->
+          C.ite
+            (C.or_int
+               (C.and_int arg (C.int 1 ~dbg) dbg)
+               (C.eq arg (C.int 0 ~dbg) ~dbg)
+               dbg)
+            ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
+            ~then_annots:Branch_annotations.default
+            ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
+            ~else_dbg:dbg ~else_annots:Branch_annotations.default) )
   | Is_flat_float_array ->
     None, res, C.eq ~dbg (C.get_tag arg dbg) (C.floatarray_tag dbg)
   | End_region { ghost = false } | End_try_region { ghost = false } ->

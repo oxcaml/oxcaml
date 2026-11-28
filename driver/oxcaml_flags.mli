@@ -254,6 +254,7 @@ module Flambda2 : sig
       val fallback_inlining_heuristic : bool
       val inline_effects_in_cmm : bool
       val cmm_safe_subst : bool
+      val cmm_pin_reads : bool
       val phantom_lets : bool
       val max_block_size_for_projections : int option
       val max_unboxing_depth : int
@@ -268,6 +269,7 @@ module Flambda2 : sig
       fallback_inlining_heuristic : bool;
       inline_effects_in_cmm : bool;
       cmm_safe_subst : bool;
+      cmm_pin_reads : bool;
       phantom_lets : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
@@ -283,6 +285,7 @@ module Flambda2 : sig
     val fallback_inlining_heuristic : bool or_default ref
     val inline_effects_in_cmm : bool or_default ref
     val cmm_safe_subst : bool or_default ref
+    val cmm_pin_reads : bool or_default ref
     val phantom_lets : bool or_default ref
     val max_block_size_for_projections : int option or_default ref
     val max_unboxing_depth : int or_default ref

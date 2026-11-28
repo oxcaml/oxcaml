@@ -1,0 +1,6 @@
+exclave_block_load: 10
+exclave_unbox: 11
+exclave_array_length: 2
+exclave_iarray_load: 10
+try_region_block_load: 10
+mutable_load_before_raising_call: 5

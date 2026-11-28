@@ -184,6 +184,8 @@ module Expert : sig
 
   val cmm_safe_subst : unit -> bool
 
+  val cmm_pin_reads : unit -> bool
+
   val max_block_size_for_projections : unit -> int option
 
   val phantom_lets : unit -> bool

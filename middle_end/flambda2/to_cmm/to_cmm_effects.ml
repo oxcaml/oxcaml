@@ -35,6 +35,48 @@ let classify_by_effects_and_coeffects effs =
   | No_effects, Has_coeffects, _, _ -> Coeffect_only
   | No_effects, No_coeffects, _, _ -> Pure
 
+let reads_memory (p : Flambda_primitive.t) ~is_my_closure =
+  match p with
+  | Nullary prim -> (
+    match prim with
+    | Dls_get | Tls_get | Domain_index | Thread_self_id -> true
+    | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+    | Poll | Cpu_relax ->
+      false)
+  | Unary (prim, arg) -> (
+    match prim with
+    | Project_value_slot _ -> not (is_my_closure arg)
+    | Block_load _ | Duplicate_block _ | Duplicate_array _ | Get_tag
+    | Array_length _ | Bigarray_length _ | String_length _ | Unbox_number _
+    | Is_boxed_float | Is_flat_float_array | Obj_dup _ | Get_header | Peek _ ->
+      true
+    | Is_int _ | Is_null | Int_as_pointer _ | Opaque_identity _ | Int_arith _
+    | Float_arith _ | Num_conv _ | Boolean_not _ | Reinterpret_64_bit_word _
+    | Reinterpret_boxed_vector | Box_number _ | Untag_immediate | Tag_immediate
+    | Project_function_slot _ | End_region _ | End_try_region _ | Make_lazy _ ->
+      false)
+  | Binary (prim, _, _) -> (
+    match prim with
+    | Array_load _ | String_or_bigstring_load _ | Bigarray_load _
+    | Bigarray_get_alignment _ | Atomic_load _ | Read_offset _ ->
+      true
+    | Block_set _ | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _
+    | Float_arith _ | Float_comp _ | Poke _ ->
+      false)
+  | Ternary
+      ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
+        | Atomic_int_arith _ | Atomic_set _ | Atomic_exchange _ | Write_offset _
+          ),
+        _,
+        _,
+        _ )
+  | Quaternary
+      ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
+  | Variadic
+      ((Begin_region _ | Begin_try_region _ | Make_block _ | Make_array _), _)
+    ->
+    false
+
 type let_binding_classification =
   | Drop_defining_expr
   | Regular

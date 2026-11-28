@@ -619,10 +619,22 @@ and let_prim env res ~num_occurrences_of_bound_vars v p dbg body =
     in
     expr env res body
   in
+  (* With [-flambda2-expert-cmm-pin-reads], a read of memory is never
+     substituted: it is bound here and so stays before every later effect, end
+     of region and control flow point. This relies on
+     [-flambda2-expert-cmm-safe-subst] to prevent earlier control flow points
+     (e.g. function calls) from being moved after the read. *)
+  let pin_read =
+    Flambda_features.Expert.cmm_pin_reads ()
+    && To_cmm_effects.reads_memory p ~is_my_closure:(Env.is_my_closure env)
+  in
   match inline with
   (* It can be useful to translate a dropped expression because it allows to
      inline (and thus remove from the env) the arguments in it. *)
   | Drop_defining_expr | Regular -> simple_case Do_not_inline
+  | (May_inline_once | Must_inline_once | Must_inline_and_duplicate)
+    when pin_read ->
+    simple_case Do_not_inline
   | May_inline_once -> simple_case May_inline_once
   | Must_inline_once -> complex_case Must_inline_once
   | Must_inline_and_duplicate -> complex_case Must_inline_and_duplicate
