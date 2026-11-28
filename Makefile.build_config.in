@@ -25,11 +25,50 @@
 override BUILD_CONFIG_INCLUDED =
 
 include $(ROOTDIR)/Makefile.config
+
+## Arguments passed to the configure script
+
+# Upstream this is also in Makefile.config, but it breaks relocatable builds.
+# The correct 4.08+ way is to preserve config.status and use that to recover the
+# configuration when required.
+
+CONFIGURE_ARGS=@CONFIGURE_ARGS@
+
+## Installation directories
+
+# Upstream has these in Makefile.config (and so installed) but this breaks
+# relocatable builds. Their presence in Makefile.config is unnecessary, as you
+# must either know LIBDIR (to find Makefile.config) or BINDIR (to find ocamlopt)
+
+prefix=@prefix@
+
+exec_prefix=@exec_prefix@
+
+### Where to install the binaries
+BINDIR=@bindir@
+
+datarootdir=@datarootdir@
+
+### Where to install the standard library on host
+LIBDIR=@libdir@
+
+### Where to install the stub code for the standard library
+STUBLIBDIR=@libdir@/stublibs
+
+### Where to install the man pages
+# Man pages for commands go in $(MANDIR)/man1
+# Man pages for the library go in $(MANDIR)/man3
+MANDIR=@mandir@
+PROGRAMS_MAN_DIR=$(MANDIR)/man1
+LIBRARIES_MAN_DIR=$(MANDIR)/man3
+
 INSTALL ?= @INSTALL@ -p
 INSTALL_DATA ?= @INSTALL_DATA@
 INSTALL_PROG ?= @INSTALL_PROGRAM@
 
 SRCDIR_ABS = @ocamlsrcdir@
+
+install_prefix = @prefix@
 
 # Whether to build certain libraries and tools
 
