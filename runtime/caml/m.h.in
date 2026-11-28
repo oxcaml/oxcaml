@@ -77,29 +77,27 @@
    each defined (to 1) when the corresponding axis is on and left undefined
    when it is off: test them with #ifdef or defined().
 
-   The three templates below record this installation's default variant,
-   which is what C code compiled against these headers with no further
-   flags sees.  A compilation for a specific variant defines
-   CAML_CODEGEN_VARIANT_EXPLICIT on the command line together with
-   -D<macro> for exactly the axes that are on; the defaults below are then
-   skipped.  ocamlopt does so for every .c file it compiles, and the build
-   does so for the variant runtime archives and for the C stubs of the
-   variant library trees (utils/codegen_variant_name.ml,
-   Makefile.codegen-variants).  Without CAML_CODEGEN_VARIANT_EXPLICIT, a
-   -D<macro> on the command line turns that axis on in addition to the
-   defaults.
+   This header defines none of them where there are codegen variants: C
+   code compiled against it with no further flags is compiled for the base
+   variant, the one of the library root.  A compilation for a specific
+   variant defines CAML_CODEGEN_VARIANT_EXPLICIT on the command line
+   together with -D<macro> for exactly the axes that are on.  ocamlopt
+   does so for every .c file it compiles, and the build does so for the
+   variant runtime archives and for the C stubs of the variant library
+   trees (utils/codegen_variant_name.ml, Makefile.codegen-variants).  The
+   copy of this header in the library tree of a variant starts with the
+   macros of that variant, for a compilation that does not define
+   CAML_CODEGEN_VARIANT_EXPLICIT.
 
    Nothing more is implied: the native stack/frame layout macros derived
    from these in config.h, stack.h and fiber.h additionally require
    -DNATIVE_CODE and the TARGET_<arch> define, as they always have. */
 
-#ifndef CAML_CODEGEN_VARIANT_EXPLICIT
-#undef WITH_FRAME_POINTERS
-
+/* Not an axis, where configure defines it: on the architectures whose C
+   runtime cannot do without explicit stack checks, which are those
+   without a native backend and without codegen variants, the runtime is
+   always built with them. */
 #undef STACK_CHECKS_ENABLED
-
-#undef WITH_ADDRESS_SANITIZER
-#endif
 
 /* The link-time guard of the codegen variant: the symbol that a native
    runtime built for these settings defines, and that native code compiled
