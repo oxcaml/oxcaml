@@ -135,6 +135,9 @@ The following are not yet supported in JSIR translation, and will raise an excep
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
 
+### Classic mode
+The translation does not support the Flambda 2 classic mode, so `-Oclassic` (and the `[@@@flambda_oclassic]` attribute) is ignored: the unit is compiled as if no optimisation flag was given.
+
 ### Partial applications of functions of void parameters
 Void parameters are erased in JSIR, so a function all of whose parameters are void is a closure of arity 0.
 When the callee is unknown, the generic application of `js_of_ocaml` and `wasm_of_ocaml` (`caml_call_gen`, `caml_apply0`) cannot tell a partial application supplying only some of its void arguments from a full one, and evaluates the function immediately (native and bytecode defer it).
