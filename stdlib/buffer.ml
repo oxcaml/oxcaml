@@ -33,7 +33,7 @@ type inner_buffer = {
 type t =
  {mutable inner : inner_buffer;
   mutable position : int;
-  initial_buffer : bytes}
+  initial_buffer : bytes @@ global}
 (* Invariants: all parts of the code preserve the invariants that:
    - [inner.length = Bytes.length inner.buffer]
    In absence of data races, we also have
@@ -298,7 +298,7 @@ let add_substitute b f s =
          subst current (i + 1)
     end else
     if previous = '\\' then add_char b previous in
-  subst ' ' 0
+  subst ' ' 0 [@nontail]
 
 let truncate b len =
     if len < 0 || len > length b then
@@ -328,7 +328,7 @@ let to_seqi b =
   in
   aux 0
 
-let add_seq b seq = Seq.iter (add_char b) seq
+let add_seq b seq = Seq.iter (fun c -> add_char b c) seq [@nontail]
 
 let of_seq i =
   let b = create 32 in
@@ -337,18 +337,29 @@ let of_seq i =
 
 (** {6 Binary encoding of integers} *)
 
-external unsafe_set_int8 : bytes -> int -> int -> unit @@ portable = "%bytes_unsafe_set"
-external unsafe_set_int16 : bytes -> int -> int -> unit @@ portable = "%caml_bytes_set16u"
-external unsafe_set_int32 : bytes -> int -> int32 -> unit @@ portable = "%caml_bytes_set32u"
-external unsafe_set_int64 : bytes -> int -> int64 -> unit @@ portable = "%caml_bytes_set64u"
-external set_int8 : bytes -> int -> int -> unit @@ portable = "%bytes_safe_set"
-external set_int16 : bytes -> int -> int -> unit @@ portable = "%caml_bytes_set16"
-external set_int32 : bytes -> int -> int32 -> unit @@ portable = "%caml_bytes_set32"
-external set_int64 : bytes -> int -> int64 -> unit @@ portable = "%caml_bytes_set64"
+external unsafe_set_int8 :
+  bytes @ local -> int -> int -> unit @@ portable = "%bytes_unsafe_set"
+external unsafe_set_int16 :
+  bytes @ local -> int -> int -> unit @@ portable = "%caml_bytes_set16u"
+external unsafe_set_int32 :
+  bytes @ local -> int -> int32 -> unit @@ portable = "%caml_bytes_set32u"
+external unsafe_set_int64 :
+  bytes @ local -> int -> int64 @ local -> unit @@ portable
+  = "%caml_bytes_set64u"
+external set_int8 :
+  bytes @ local -> int -> int -> unit @@ portable = "%bytes_safe_set"
+external set_int16 :
+  bytes @ local -> int -> int -> unit @@ portable = "%caml_bytes_set16"
+external set_int32 :
+  bytes @ local -> int -> int32 -> unit @@ portable = "%caml_bytes_set32"
+external set_int64 :
+  bytes @ local -> int -> int64 @ local -> unit @@ portable
+  = "%caml_bytes_set64"
 
 external swap16 : int -> int @@ portable = "%bswap16"
 external swap32 : int32 -> int32 @@ portable = "%bswap_int32"
-external swap64 : int64 -> int64 @@ portable = "%bswap_int64"
+external swap64 :
+  int64 @ local -> (int64[@local_opt]) @@ portable = "%bswap_int64"
 
 
 let add_int8 b x =

@@ -1288,11 +1288,11 @@ let f ~opt_source_map_file ch fields =
 
     let position = pos_out
 
-    let seek = seek_out
+    let seek t p = seek_out t p
 
-    let byte = output_byte
+    let byte t b = output_byte t b
 
-    let string = output_string
+    let string t s = output_string t s
 
     let push_mapping m = mappings := m :: !mappings
 

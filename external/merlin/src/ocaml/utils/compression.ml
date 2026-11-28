@@ -14,5 +14,5 @@
 (**************************************************************************)
 
 let compression_supported = false
-let output_value = Stdlib.output_value
+let output_value c v = Stdlib.output_value c v
 let input_value = Stdlib.input_value
