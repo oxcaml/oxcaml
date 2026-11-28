@@ -999,6 +999,34 @@ module LamTbl = Hashtbl.Make(struct
     let hash = Hashtbl.hash
   end)
 
+(* The layout of the result of a term, when the term is annotated with it. *)
+let annotated_result_layout ~recurse = function
+  | Lapply { ap_result_layout = layout; _ }
+  | Lswitch (_, _, _, layout)
+  | Lstringswitch (_, _, _, _, layout)
+  | Lstaticcatch (_, _, _, _, layout)
+  | Ltrywith (_, _, _, _, layout)
+  | Lifthenelse (_, _, _, layout)
+  | Lsend (_, _, _, _, _, _, _, layout, _)
+  | Lregion (_, layout) ->
+      Some layout
+  | Llet (_, _, _, _, _, body)
+  | Lmutlet (_, _, _, _, body)
+  | Lletrec (_, body)
+  | Lsequence (_, body)
+  | Levent (body, _)
+  | Lifused (_, body)
+  | Lexclave body ->
+      recurse body
+  | Lprim ((Psequand | Psequor), _, _) ->
+      (* The second argument of [&&] and [||] is in tail position (see
+         [Lambda.shallow_iter]), but the result is always a boolean. *)
+      Some layout_int
+  | Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lprim _ | Lstaticraise _
+  | Lwhile _ | Lfor _ | Lassign _ | Lkindtemplate _ | Lkindinstantiate _
+  | Ltemplate _ | Linstantiate _ ->
+      None
+
 let simplify_local_functions lam =
   let slots = Hashtbl.create 16 in
   let static_id = Hashtbl.create 16 in (* function id -> static id *)
@@ -1144,6 +1172,15 @@ let simplify_local_functions lam =
     current_region_scope := old_tail_scope
   in
   tail lam;
+  let layouts = LamTbl.create 16 in
+  let rec result_layout lam =
+    match LamTbl.find_opt layouts lam with
+    | Some result -> result
+    | None ->
+        let result = annotated_result_layout ~recurse:result_layout lam in
+        LamTbl.add layouts lam result;
+        result
+  in
   let rec rewrite lam0 =
     let lam =
       match lam0 with
@@ -1164,6 +1201,15 @@ let simplify_local_functions lam =
       List.map
         (fun (p: lparam) -> (p.name, p.debug_uid, p.layout)) lf.params
     in
+    (* The catch returns whatever [lam0] returns (either [lf]'s body or another
+       tail branch of [lam0]), so its layout must come from [lam0], not
+       [lf.return]. These can differ because constructs that erase in Lambda,
+       such as [This (h x)] or [(h x :> t)], leave [h x] in tail position of
+       [lam0] while other tail branches of [lam0] return values that
+       [lf.return] does not allow (e.g. [Null] or a block). *)
+    let layout lf =
+      Option.value (result_layout lam0) ~default:lf.return
+    in
     List.fold_right
       (fun (st, lf, exclave) lam ->
          let body = rewrite lf.body in
@@ -1173,7 +1219,7 @@ let simplify_local_functions lam =
            | Exclave -> Lexclave body, Same_region
            | Within_exclave -> body, Popped_region
          in
-         Lstaticcatch (lam, (st, new_params lf), body, r, lf.return)
+         Lstaticcatch (lam, (st, new_params lf), body, r, layout lf)
       )
       (LamTbl.find_all static lam0)
       lam
