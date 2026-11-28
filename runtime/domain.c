@@ -1633,7 +1633,7 @@ static void stw_wait_for_running(caml_domain_state* domain)
      in any case */
 
   if (stw_request.spin_work) {
-    struct caml_opportunistic_events evs = { false, 0 };
+    struct caml_opportunistic_events evs = { false, 0, 0 };
     /* Spin while there is useful work to do */
     SPIN_WAIT_BOUNDED {
       if (caml_plat_barrier_is_released(&stw_request.domains_still_running)) {
