@@ -97,16 +97,40 @@ for variant in $(sed -n 's/^CODEGEN_VARIANTS=//p' Makefile.config); do
     fail "the staging directory has no library tree for $variant"
 done
 
+# Put standard input where an earlier installation would have left a file,
+# in place of what is there. The file is replaced and not written to, which
+# takes permissions on its directory only: the files of an installation
+# need not be writable. `make install` asks rsync to make them so
+# (--chmod=u+rw,go+r), and the rsync of macOS does not do that for the files
+# of a directory that it copies: they keep the modes that they have in
+# _install, where they are read-only like the outputs of the build.
+plant() {
+  rm -f "$1"
+  cat > "$1"
+}
+
+# For the log of a run: the staged file $lookalike as `ls -l` shows it,
+# after the step that $1 names.
+show() {
+  echo "$1: $(ls -l "$staged/$lookalike" 2>&1)"
+}
+
 # The same removals must happen inside a staging directory that holds an
 # earlier installation. Its cached generic functions give way to those of
 # this installation, if it has any, and so does a file that differs from
 # this installation's in its contents only: same size, same time.
 mkdir -p "$staged/$stale_tree"
-echo earlier > "$staged/$cache"
+echo earlier | plant "$staged/$cache"
 lookalike=lib/ocaml/stdlib.cmxa
-head -c "$(wc -c < "_install/$lookalike")" /dev/zero > "$staged/$lookalike"
+echo "in _install: $(ls -l "_install/$lookalike" 2>&1)"
+show "after make install"
+# wc pads its count with spaces on some systems.
+size=$(($(wc -c < "_install/$lookalike")))
+head -c "$size" /dev/zero | plant "$staged/$lookalike"
 touch -r "_install/$lookalike" "$staged/$lookalike"
+show "replaced by a file of the same size and time"
 staged_make install_for_opam
+show "after make install_for_opam"
 cmp -s "_install/$lookalike" "$staged/$lookalike" ||
   fail "a staged install over an earlier one kept a $lookalike of the \
 same size and time as this installation's, with other contents"
