@@ -3,10 +3,9 @@
 ;; Codegen-variant stdlib trees, statically enumerated for the closed
 ;; curated name set (dune subdir stanzas cannot be generated). Only the
 ;; trees named in the configure-computed variant list contain build rules;
-;; every other one (base, whose tree is build, a name that configure did
-;; not select, or all of them with --disable-codegen-variants) contains only an
-;; empty @stdlib_<name> alias. See stdlib/dune_rules/gen.ml.
-(subdir build_base (dynamic_include ../dune_rules/stdlib_base.dune))
+;; every other one (a name that configure did not select, or all of them
+;; with --disable-codegen-variants) contains only an empty @stdlib_<name>
+;; alias. The tree of base is build, above. See stdlib/dune_rules/gen.ml.
 (subdir build_fp (dynamic_include ../dune_rules/stdlib_fp.dune))
 (subdir build_sc (dynamic_include ../dune_rules/stdlib_sc.dune))
 (subdir build_poll (dynamic_include ../dune_rules/stdlib_poll.dune))
@@ -33,9 +32,6 @@
 (subdir build/caml (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build/stdlib (dynamic_include ../../copy_workaround/meta.dune))
 (subdir build/dynlink (dynamic_include ../../copy_workaround/fake_dynlink.dune))
-(subdir build_base/caml (dynamic_include ../../copy_workaround/headers.dune))
-(subdir build_base/dynlink
-  (dynamic_include ../../copy_workaround/fake_dynlink.dune))
 (subdir build_fp/caml (dynamic_include ../../copy_workaround/headers.dune))
 (subdir build_fp/dynlink
   (dynamic_include ../../copy_workaround/fake_dynlink.dune))

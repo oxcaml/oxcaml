@@ -270,8 +270,8 @@ let iter_module_deps table f =
      @runtime_variants; suffixed by the variant name's projection onto the
      runtime axes) are copied from runtime/, so that one variant tree is a
      complete stdlib root for compiling and linking in that mode. When the
-     named variant is not in the configure-computed build list (it is base,
-     configure did not select it, or codegen variants are disabled),
+     named variant is not in the configure-computed build list (configure
+     did not select it, or codegen variants are disabled),
      only an empty alias is emitted, keeping every @stdlib_<name>
      well-defined. *)
 (* [@inline never] [@local never]: this must stay the body of a function.
