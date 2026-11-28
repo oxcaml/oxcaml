@@ -1409,7 +1409,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
       if KS.must_be_gc_scannable kind
       then
         (* x = base, y = byte offset, z = new value *)
-        let write_into_block =
+        let write_into_block x =
           match mode with
           | Heap ->
             let addr = C.add_int_ptr ~ptr_out_of_heap:false x y dbg in
@@ -1424,14 +1424,18 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
            NULL, in which case byte_offset is a pointer we store to directly.
            See comment under [Write_offset] in [flambda_primitive.mli]. *)
         match write_offset_kind with
-        | Into_block -> write_into_block
+        | Into_block -> write_into_block x
         | Into_block_or_off_heap ->
-          let base_is_null = C.eq ~dbg x (C.nativeint ~dbg 0n) in
-          C.ite ~dbg base_is_null
-            ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
-            ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
-            ~then_annots:Branch_annotations.default
-            ~else_annots:Branch_annotations.default
+          (* The base is used both in the test and in one of the arms, so it is
+             bound. *)
+          C.bind "base" x (fun x ->
+              let base_is_null = C.eq ~dbg x (C.nativeint ~dbg 0n) in
+              C.ite ~dbg base_is_null
+                ~then_:
+                  (C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
+                ~else_:(write_into_block x) ~then_dbg:dbg ~else_dbg:dbg
+                ~then_annots:Branch_annotations.default
+                ~else_annots:Branch_annotations.default)
       else
         let addr = C.add_int_ptr ~ptr_out_of_heap:false x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z

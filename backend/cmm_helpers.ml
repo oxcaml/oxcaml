@@ -3086,25 +3086,28 @@ let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
         [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
         dbg )
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
-          dbg )
-    in
-    let v2 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          (* CR mshinwell/gbury: Refactor this to compute [idx + 1] using
-             [add_int], then use [add_int_ptr] on that. *)
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
-          dbg )
-    in
-    let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
-    Cop (Cor, [lsl_int b1 (cconst_int 8) dbg; b2], dbg)
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "idx" idx (fun idx ->
+        bind "ptr" ptr (fun ptr ->
+            let cconst_int i = Cconst_int (i, dbg) in
+            let v1 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
+                  dbg )
+            in
+            let v2 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  (* CR mshinwell/gbury: Refactor this to compute [idx + 1]
+                     using [add_int], then use [add_int_ptr] on that. *)
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 1) dbg ],
+                  dbg )
+            in
+            let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
+            Cop (Cor, [lsl_int b1 (cconst_int 8) dbg; b2], dbg)))
 
 let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
@@ -3113,22 +3116,29 @@ let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
       ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
       ~new_value:newval
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
-    in
-    let v2 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
-    let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
-    Csequence
-      ( store ~dbg Byte_unsigned Assignment
-          ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-          ~new_value:b1,
-        store ~dbg Byte_unsigned Assignment
-          ~addr:
-            (add_int_ptr ~ptr_out_of_heap
-               (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-               (cconst_int 1) dbg)
-          ~new_value:b2 )
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "newval" newval (fun newval ->
+        bind "idx" idx (fun idx ->
+            bind "ptr" ptr (fun ptr ->
+                let cconst_int i = Cconst_int (i, dbg) in
+                let v1 =
+                  Cop
+                    ( Cand,
+                      [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF],
+                      dbg )
+                in
+                let v2 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
+                let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
+                Csequence
+                  ( store ~dbg Byte_unsigned Assignment
+                      ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      ~new_value:b1,
+                    store ~dbg Byte_unsigned Assignment
+                      ~addr:
+                        (add_int_ptr ~ptr_out_of_heap
+                           (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                           (cconst_int 1) dbg)
+                      ~new_value:b2 ))))
 
 let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
@@ -3138,48 +3148,52 @@ let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
         [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
         dbg )
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
-          dbg )
-    in
-    let v2 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
-          dbg )
-    in
-    let v3 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 2) dbg ],
-          dbg )
-    in
-    let v4 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 3) dbg ],
-          dbg )
-    in
-    let b1, b2, b3, b4 =
-      if Arch.big_endian then v1, v2, v3, v4 else v4, v3, v2, v1
-    in
-    Cop
-      ( Cor,
-        [ Cop
-            ( Cor,
-              [lsl_int b1 (cconst_int 24) dbg; lsl_int b2 (cconst_int 16) dbg],
-              dbg );
-          Cop (Cor, [lsl_int b3 (cconst_int 8) dbg; b4], dbg) ],
-        dbg )
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "idx" idx (fun idx ->
+        bind "ptr" ptr (fun ptr ->
+            let cconst_int i = Cconst_int (i, dbg) in
+            let v1 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
+                  dbg )
+            in
+            let v2 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 1) dbg ],
+                  dbg )
+            in
+            let v3 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 2) dbg ],
+                  dbg )
+            in
+            let v4 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 3) dbg ],
+                  dbg )
+            in
+            let b1, b2, b3, b4 =
+              if Arch.big_endian then v1, v2, v3, v4 else v4, v3, v2, v1
+            in
+            Cop
+              ( Cor,
+                [ Cop
+                    ( Cor,
+                      [ lsl_int b1 (cconst_int 24) dbg;
+                        lsl_int b2 (cconst_int 16) dbg ],
+                      dbg );
+                  Cop (Cor, [lsl_int b3 (cconst_int 8) dbg; b4], dbg) ],
+                dbg )))
 
 let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
@@ -3188,149 +3202,163 @@ let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
       ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
       ~new_value:newval
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 24], dbg); cconst_int 0xFF], dbg)
-    in
-    let v2 =
-      Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 16], dbg); cconst_int 0xFF], dbg)
-    in
-    let v3 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
-    in
-    let v4 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
-    let b1, b2, b3, b4 =
-      if Arch.big_endian then v1, v2, v3, v4 else v4, v3, v2, v1
-    in
-    Csequence
-      ( Csequence
-          ( Cop
-              ( Cstore (Byte_unsigned, Assignment),
-                [add_int_ptr ~ptr_out_of_heap ptr idx dbg; b1],
-                dbg ),
-            Cop
-              ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 1) dbg;
-                  b2 ],
-                dbg ) ),
-        Csequence
-          ( Cop
-              ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 2) dbg;
-                  b3 ],
-                dbg ),
-            Cop
-              ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 3) dbg;
-                  b4 ],
-                dbg ) ) )
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "newval" newval (fun newval ->
+        bind "idx" idx (fun idx ->
+            bind "ptr" ptr (fun ptr ->
+                let cconst_int i = Cconst_int (i, dbg) in
+                let v1 =
+                  Cop
+                    ( Cand,
+                      [Cop (Clsr, [newval; cconst_int 24], dbg); cconst_int 0xFF],
+                      dbg )
+                in
+                let v2 =
+                  Cop
+                    ( Cand,
+                      [Cop (Clsr, [newval; cconst_int 16], dbg); cconst_int 0xFF],
+                      dbg )
+                in
+                let v3 =
+                  Cop
+                    ( Cand,
+                      [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF],
+                      dbg )
+                in
+                let v4 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
+                let b1, b2, b3, b4 =
+                  if Arch.big_endian then v1, v2, v3, v4 else v4, v3, v2, v1
+                in
+                Csequence
+                  ( Csequence
+                      ( Cop
+                          ( Cstore (Byte_unsigned, Assignment),
+                            [add_int_ptr ~ptr_out_of_heap ptr idx dbg; b1],
+                            dbg ),
+                        Cop
+                          ( Cstore (Byte_unsigned, Assignment),
+                            [ add_int_ptr ~ptr_out_of_heap
+                                (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                (cconst_int 1) dbg;
+                              b2 ],
+                            dbg ) ),
+                    Csequence
+                      ( Cop
+                          ( Cstore (Byte_unsigned, Assignment),
+                            [ add_int_ptr ~ptr_out_of_heap
+                                (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                (cconst_int 2) dbg;
+                              b3 ],
+                            dbg ),
+                        Cop
+                          ( Cstore (Byte_unsigned, Assignment),
+                            [ add_int_ptr ~ptr_out_of_heap
+                                (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                (cconst_int 3) dbg;
+                              b4 ],
+                            dbg ) ) ))))
 
 let unaligned_load_64 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
   then
     Cop (mk_load_mut Word_int, [add_int_ptr ~ptr_out_of_heap ptr idx dbg], dbg)
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
-          dbg )
-    in
-    let v2 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
-          dbg )
-    in
-    let v3 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 2) dbg ],
-          dbg )
-    in
-    let v4 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 3) dbg ],
-          dbg )
-    in
-    let v5 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 4) dbg ],
-          dbg )
-    in
-    let v6 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 5) dbg ],
-          dbg )
-    in
-    let v7 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 6) dbg ],
-          dbg )
-    in
-    let v8 =
-      Cop
-        ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 7) dbg ],
-          dbg )
-    in
-    let b1, b2, b3, b4, b5, b6, b7, b8 =
-      if Arch.big_endian
-      then v1, v2, v3, v4, v5, v6, v7, v8
-      else v8, v7, v6, v5, v4, v3, v2, v1
-    in
-    Cop
-      ( Cor,
-        [ Cop
-            ( Cor,
-              [ Cop
-                  ( Cor,
-                    [ lsl_int b1 (cconst_int (8 * 7)) dbg;
-                      lsl_int b2 (cconst_int (8 * 6)) dbg ],
-                    dbg );
-                Cop
-                  ( Cor,
-                    [ lsl_int b3 (cconst_int (8 * 5)) dbg;
-                      lsl_int b4 (cconst_int (8 * 4)) dbg ],
-                    dbg ) ],
-              dbg );
-          Cop
-            ( Cor,
-              [ Cop
-                  ( Cor,
-                    [ lsl_int b5 (cconst_int (8 * 3)) dbg;
-                      lsl_int b6 (cconst_int (8 * 2)) dbg ],
-                    dbg );
-                Cop (Cor, [lsl_int b7 (cconst_int 8) dbg; b8], dbg) ],
-              dbg ) ],
-        dbg )
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "idx" idx (fun idx ->
+        bind "ptr" ptr (fun ptr ->
+            let cconst_int i = Cconst_int (i, dbg) in
+            let v1 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [add_int_ptr ~ptr_out_of_heap ptr idx dbg],
+                  dbg )
+            in
+            let v2 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 1) dbg ],
+                  dbg )
+            in
+            let v3 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 2) dbg ],
+                  dbg )
+            in
+            let v4 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 3) dbg ],
+                  dbg )
+            in
+            let v5 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 4) dbg ],
+                  dbg )
+            in
+            let v6 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 5) dbg ],
+                  dbg )
+            in
+            let v7 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 6) dbg ],
+                  dbg )
+            in
+            let v8 =
+              Cop
+                ( mk_load_mut Byte_unsigned,
+                  [ add_int_ptr ~ptr_out_of_heap
+                      (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                      (cconst_int 7) dbg ],
+                  dbg )
+            in
+            let b1, b2, b3, b4, b5, b6, b7, b8 =
+              if Arch.big_endian
+              then v1, v2, v3, v4, v5, v6, v7, v8
+              else v8, v7, v6, v5, v4, v3, v2, v1
+            in
+            Cop
+              ( Cor,
+                [ Cop
+                    ( Cor,
+                      [ Cop
+                          ( Cor,
+                            [ lsl_int b1 (cconst_int (8 * 7)) dbg;
+                              lsl_int b2 (cconst_int (8 * 6)) dbg ],
+                            dbg );
+                        Cop
+                          ( Cor,
+                            [ lsl_int b3 (cconst_int (8 * 5)) dbg;
+                              lsl_int b4 (cconst_int (8 * 4)) dbg ],
+                            dbg ) ],
+                      dbg );
+                  Cop
+                    ( Cor,
+                      [ Cop
+                          ( Cor,
+                            [ lsl_int b5 (cconst_int (8 * 3)) dbg;
+                              lsl_int b6 (cconst_int (8 * 2)) dbg ],
+                            dbg );
+                        Cop (Cor, [lsl_int b7 (cconst_int 8) dbg; b8], dbg) ],
+                      dbg ) ],
+                dbg )))
 
 let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
@@ -3340,112 +3368,125 @@ let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
         [add_int_ptr ~ptr_out_of_heap ptr idx dbg; newval],
         dbg )
   else
-    let cconst_int i = Cconst_int (i, dbg) in
-    let v1 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 7)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v2 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 6)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v3 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 5)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v4 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 4)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v5 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 3)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v6 =
-      Cop
-        ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 2)], dbg); cconst_int 0xFF],
-          dbg )
-    in
-    let v7 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
-    in
-    let v8 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
-    let b1, b2, b3, b4, b5, b6, b7, b8 =
-      if Arch.big_endian
-      then v1, v2, v3, v4, v5, v6, v7, v8
-      else v8, v7, v6, v5, v4, v3, v2, v1
-    in
-    Csequence
-      ( Csequence
-          ( Csequence
-              ( Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [add_int_ptr ~ptr_out_of_heap ptr idx dbg; b1],
-                    dbg ),
-                Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 1) dbg;
-                      b2 ],
-                    dbg ) ),
-            Csequence
-              ( Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 2) dbg;
-                      b3 ],
-                    dbg ),
-                Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 3) dbg;
-                      b4 ],
-                    dbg ) ) ),
-        Csequence
-          ( Csequence
-              ( Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 4) dbg;
-                      b5 ],
-                    dbg ),
-                Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 5) dbg;
-                      b6 ],
-                    dbg ) ),
-            Csequence
-              ( Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 6) dbg;
-                      b7 ],
-                    dbg ),
-                Cop
-                  ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 7) dbg;
-                      b8 ],
-                    dbg ) ) ) )
+    (* The arguments are used once per byte, so they are bound. *)
+    bind "newval" newval (fun newval ->
+        bind "idx" idx (fun idx ->
+            bind "ptr" ptr (fun ptr ->
+                let cconst_int i = Cconst_int (i, dbg) in
+                let v1 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 7)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v2 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 6)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v3 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 5)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v4 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 4)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v5 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 3)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v6 =
+                  Cop
+                    ( Cand,
+                      [ Cop (Clsr, [newval; cconst_int (8 * 2)], dbg);
+                        cconst_int 0xFF ],
+                      dbg )
+                in
+                let v7 =
+                  Cop
+                    ( Cand,
+                      [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF],
+                      dbg )
+                in
+                let v8 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
+                let b1, b2, b3, b4, b5, b6, b7, b8 =
+                  if Arch.big_endian
+                  then v1, v2, v3, v4, v5, v6, v7, v8
+                  else v8, v7, v6, v5, v4, v3, v2, v1
+                in
+                Csequence
+                  ( Csequence
+                      ( Csequence
+                          ( Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [add_int_ptr ~ptr_out_of_heap ptr idx dbg; b1],
+                                dbg ),
+                            Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 1) dbg;
+                                  b2 ],
+                                dbg ) ),
+                        Csequence
+                          ( Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 2) dbg;
+                                  b3 ],
+                                dbg ),
+                            Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 3) dbg;
+                                  b4 ],
+                                dbg ) ) ),
+                    Csequence
+                      ( Csequence
+                          ( Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 4) dbg;
+                                  b5 ],
+                                dbg ),
+                            Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 5) dbg;
+                                  b6 ],
+                                dbg ) ),
+                        Csequence
+                          ( Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 6) dbg;
+                                  b7 ],
+                                dbg ),
+                            Cop
+                              ( Cstore (Byte_unsigned, Assignment),
+                                [ add_int_ptr ~ptr_out_of_heap
+                                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+                                    (cconst_int 7) dbg;
+                                  b8 ],
+                                dbg ) ) ) ))))
 
 let load_chunk ~ptr_out_of_heap chunk ptr idx dbg =
   Cop (mk_load_mut chunk, [add_int_ptr ~ptr_out_of_heap ptr idx dbg], dbg)
