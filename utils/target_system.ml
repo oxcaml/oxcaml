@@ -25,18 +25,6 @@ let is_arm () =
   | ARM | AArch64 -> true
   | _ -> false
 
-let is_64_bit () =
-  match architecture () with
-  | X86_64
-  | AArch64
-  | POWER
-  | Z
-  | Riscv -> true
-  | IA32
-  | ARM -> false
-
-let is_32_bit () = not (is_64_bit ())
-
 type derived_system =
   | Linux
   | MinGW_32
