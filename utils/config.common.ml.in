@@ -75,16 +75,27 @@ type name_mangling_scheme =
 
 exception Invalid_name_mangling_scheme of string
 
+(* The four settings of the codegen variants are chosen by each invocation
+   of the native compiler (see [Codegen_variant]).  These are their values
+   in the base variant, the one that is compiled for when nothing selects
+   another and that the standard-library root holds: constants, whatever
+   the compiler was configured with.  They say nothing of the C runtime of
+   an architecture without a native backend, which is built with stack
+   checks. *)
+let with_frame_pointers = false
+let with_address_sanitizer = false
+let poll_insertion = false
+let no_stack_checks = true
+
 type configuration_value =
   | String of string
   | Int of int
   | Bool of bool
 
-(* The names of the non-default codegen variants this installation provides,
-   sorted alphabetically.  A property of the install tree, not of configure:
-   the <standard_library>/variants directory is scanned when this is called
-   (with_frame_pointers etc. describe the default variant, served by the
-   standard-library root itself). *)
+(* The names of the codegen variants this installation provides besides
+   base, sorted alphabetically.  A property of the install tree, not of
+   configure: the <standard_library>/variants directory is scanned when
+   this is called (base is served by the standard-library root itself). *)
 let installed_codegen_variants () =
   let dir = Filename.concat standard_library "variants" in
   match Sys.readdir dir with

@@ -55,7 +55,6 @@ let flambda2 = false
 let stack_allocation = false
 let with_cpp_mangling = false
 let probes = false
-let poll_insertion = false
 let with_flambda_invariants = false
 let with_cmm_invariants = false
 let with_codegen_invariants = false
@@ -75,8 +74,6 @@ let target_os_type =
 let asm = boot_cannot_call "the assembler"
 let asm_cfi_supported = false
 let asm_size_type_directives = false
-let with_frame_pointers = false
-let with_address_sanitizer = false
 let reserved_header_bits = 0
 let custom_ops_struct_size = 64
 let ext_exe = ".ex_The boot compiler should not be using Config.ext_exe"
@@ -90,7 +87,6 @@ let systhread_supported = false
 let flexdll_dirs = []
 let ar_supports_response_files = true
 
-let no_stack_checks = false
 (* This setting is only for bootstrap, does not affect dune-built compilers: *)
 let naked_pointers = false
 let parameterised_modules = true

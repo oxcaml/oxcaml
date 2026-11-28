@@ -73,7 +73,6 @@ let function_sections = @function_sections@
 let probes = @probes@
 let afl_instrument = @afl@
 let stack_allocation = @stack_allocation@
-let poll_insertion = @poll_insertion@
 
 let native_compiler = @native_compiler@
 
@@ -86,8 +85,6 @@ let asm = {@QS@|@AS@|@QS@}
 let asm_cfi_supported = @asm_cfi_supported@
 let asm_file0_supported = @asm_file0_supported@
 let asm_size_type_directives = @asm_size_type_directives@
-let with_frame_pointers = @frame_pointers@
-let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
 let name_mangling_scheme_string = {@QS@|@name_mangling_scheme@|@QS@}
 let custom_ops_struct_size = @custom_ops_struct_size@
@@ -110,8 +107,6 @@ let ar_supports_response_files = @ar_supports_response_files@
 let syntax_quotations = "@enable_syntax_quotations@" = "yes"
 
 let reserved_header_bits = @reserved_header_bits@
-
-let no_stack_checks = not @stack_checks@
 
 let tsan = @tsan@
 
