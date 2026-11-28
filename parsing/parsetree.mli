@@ -940,14 +940,17 @@ and law_declaration =
   {
     plaw_flag : law_flag;
     plaw_name : string loc;
+    plaw_newtypes : (string loc * jkind_annotation option) list;
     plaw_params : (string loc * core_type option) list;
     plaw_assumptions : expression list;
     plaw_conclusion : expression;
     plaw_attributes : attributes;
     plaw_loc : Location.t
   }
-  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] or
-      [law_ name ...], where each parameter [pi] is [x] or [(x : T)] *)
+  (** [law_? name (type a1 ... am) p1 ... pn
+            : A1 implies_ ... implies_ Ak implies_ C]
+      or [law_ name ...], where each parameter [pi] is [x] or [(x : T)] and
+      the types [ai] are [a] or [(a : k)] *)
 
 
 (** {1 Class language} *)

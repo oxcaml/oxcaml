@@ -1598,15 +1598,19 @@ and law_def ctxt f ld =
     | None -> pp f "@;%a" ident_of_name name.txt
     | Some ty -> pp f "@;(%a :@ %a)" ident_of_name name.txt (core_type ctxt) ty
   in
+  let law_newtype f (name, jkind) =
+    pp f "@;(type %a)" name_jkind (name.txt, jkind)
+  in
   let clause = law_clause ctxt in
   let assumption f e = pp f "%a implies_@ " clause e in
   let flag f = function
     | Testable -> pp f "law_?"
     | Provable -> pp f "law_"
   in
-  pp f "@[<2>%a@ %a%a :@ %a%a@]%a"
+  pp f "@[<2>%a@ %a%a%a :@ %a%a@]%a"
     flag ld.plaw_flag
     ident_of_name ld.plaw_name.txt
+    (list law_newtype ~sep:"") ld.plaw_newtypes
     (list law_param ~sep:"") ld.plaw_params
     (list assumption ~sep:"") ld.plaw_assumptions
     clause ld.plaw_conclusion
