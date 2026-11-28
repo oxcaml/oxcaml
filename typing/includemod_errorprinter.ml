@@ -870,6 +870,14 @@ let subcase_list l ppf = match l with
         (Fmt.pp_print_list ~pp_sep:space pp_msg)
         (List.rev l)
 
+let core_prints_modes = function
+  | Err.Value_descriptions {symptom = Type {trace}} ->
+      begin match Misc.last trace with
+      | Some (Errortrace.Mode_mismatch _) -> true
+      | _ -> false
+      end
+  | _ -> true
+
 (* Printers for leaves *)
 let core env id x =
   match x with
@@ -882,10 +890,12 @@ let core env id x =
       let mode1, mode2 =
         maybe_print_modes ~in_structure:true ~is_modal diff.modes
       in
+      let print_modes = core_prints_modes x in
       Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a@]"
         "Values do not match"
         !Oprint.out_sig_item
-        (Out_type.tree_of_value_description id diff.got)
+        (Out_type.with_modes print_modes (fun () ->
+           Out_type.tree_of_value_description id diff.got))
         mode1
         "is not included in"
         !Oprint.out_sig_item

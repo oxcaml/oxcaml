@@ -940,6 +940,9 @@ let mode_polymorphism_printing_enabled () =
     is_at_least Mode_polymorphism Alpha
     && is_enabled Mode_polymorphism_printing)
 
+let print_modes = ref true
+let with_modes b f = Misc.protect_refs [R (print_modes,b)] f
+
 module Internal_names : sig
 
   val reset : unit -> unit
@@ -1012,6 +1015,7 @@ let curry_acc :
     With_locality.lr ->
     Curry_mode.t =
   fun ?instance acc marg ->
+    if not !print_modes then acc else
     match With_locality.zap_to_legacy ~arg:true marg with
     | Some arg -> Curry_mode.add_const_arg acc arg
     | None ->
@@ -1032,6 +1036,7 @@ let curry_mode_of_occurrence :
     With_locality.lr ->
     Curry_mode.t =
   fun ?instance ~arg m ->
+    if not !print_modes then Const With_locality.Const.legacy else
     match With_locality.zap_to_legacy ~arg m with
     | Some c -> Const c
     | None ->
@@ -2452,7 +2457,7 @@ end = struct
   let reserve_with_base ~base ty =
     normalize_type ty;
     add_named_vars ty;
-    if mode_polymorphism_printing_enabled () then begin
+    if !print_modes && mode_polymorphism_printing_enabled () then begin
       type_aliases := !aliases_of_type ty;
       register_visible_modes ty;
       add_visible_paths ();
@@ -3030,7 +3035,9 @@ and tree_of_ret_typ_mutating (acc_mode : Curry_mode.t) m ty=
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      if Variable_names.is_implied_curry_mode m acc_mode then begin
+      if not !print_modes
+         || Variable_names.is_implied_curry_mode m acc_mode
+      then begin
         (Orm_no_parens, acc_mode)
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined
