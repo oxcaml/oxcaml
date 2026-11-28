@@ -310,7 +310,13 @@ module User = struct
        memory: the number of buffers for a domain is equal to the
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
-    let create_buffer () = Bytes.create 1024 in
+    let create_buffer () =
+      (* RUNTIME_EVENTS_MAX_CUSTOM_VALUE_BYTES plus one 64-bit element for
+         the trailing byte recording how much padding was added to reach
+         a whole number of elements. *)
+      let write_buffer_size = 1024 + 8 in
+      Bytes.create write_buffer_size
+    in
     let open struct
       type buffer_cache = bytes Modes.Contended.t list Atomic.t
     end in
