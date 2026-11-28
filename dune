@@ -268,6 +268,7 @@
   shape
   shape_reduce
   zero_alloc
+  spec
   types
   btype
   oprint
@@ -284,6 +285,7 @@
   jkind_intf
   signature_with_global_bindings
   typedtree
+  translspec
   printtyped
   ctype
   printtyp
