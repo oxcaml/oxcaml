@@ -53,9 +53,9 @@ static int st_thread_create(st_thread_id * res,
    threads. */
 
 typedef struct {
+  pthread_mutex_t lock;           /* to protect contents */
   bool init;                      /* have the mutex and the cond been
                                      initialized already? */
-  pthread_mutex_t lock;           /* to protect contents */
   bool busy;                      /* false = free, true = taken */
   pthread_t last_locked_by;       /* for debugging */
   atomic_uintnat waiters;         /* number of threads waiting on master lock */
