@@ -18,7 +18,7 @@ let equal_backtraces b1 b2 =
        b1 b2
 
 let rec foo x stack =
-  let r = local_ ref x in
+  let r = stack_ (ref x) in
   r := !r - 1;
   let stack' = get_backtrace () in
   begin match stack with
@@ -41,7 +41,7 @@ let foo () =
 
 (* Test the local functions optimisation *)
 
-let[@inline never] ignore_local (local_ x) = ()
+let[@inline never] ignore_local (x @ local) = ()
 
 let rec foo n p a b stack =
   if n <= 0 then () else
@@ -115,7 +115,7 @@ external local_stack_offset : unit -> int = "caml_local_stack_offset"
 let[@inline never][@specialise never][@local never] allocate () =
   exclave_ ref 0
 
-let[@inline never][@specialise never][@local never] use (local_ r) =
+let[@inline never][@specialise never][@local never] use (r @ local) =
   r := 10
 
 let[@inline never][@specialise never][@local never] bar original =
@@ -221,6 +221,6 @@ let[@inline never][@specialise never][@local never] rec foo previous =
 
 let () = foo None
 
-let[@inline always] inl a b = let local_ z = (a, b) in let r = fst z + snd z in r
-let[@inline never] lret a b = exclave_ let local_ _z = [|a;b|] in inl a b
+let[@inline always] inl a b = let z @ local = (a, b) in let r = fst z + snd z in r
+let[@inline never] lret a b = exclave_ let _z @ local = [|a;b|] in inl a b
 let () = assert ((lret 1 2)+1 = 4)

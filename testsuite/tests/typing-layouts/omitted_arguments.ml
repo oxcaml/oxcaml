@@ -61,8 +61,8 @@ let float_test : float# -> bool =
 let e : int -> size:int -> float# =
   fun s ~size -> unbox_float (Float.of_int s +. Float.of_int size)
 
-let evaluate_1 () : 'a Array.t -> eval:local_ ('a -> float#) -> float# =
-  fun ts ~(local_ eval) ->
+let evaluate_1 () : 'a Array.t -> eval: ('a -> float#) @ local -> float# =
+  fun ts ~(eval @ local) ->
     let eval i = eval (Array.get ts i) in
     if float_test (eval 0) then #3.14 else #10.0
 

@@ -42,19 +42,19 @@ module _ : sig end = struct
 
   let () =
     check_if_zero_alloc ~name:"take unrestricted of local (not exposed)" 0 ~f:(fun x ->
-      take_unrestricted (local_ { a = x; b = x }) [@nontail])
+      take_unrestricted (stack_ { a = x; b = x }) [@nontail])
 end
 
 module _ : sig end = struct
-  let[@opaque] take_local (local_ { a; b }) = a + b
+  let[@opaque] take_local ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of local (not exposed)" 0 ~f:(fun x ->
-      take_local (local_ { a = x; b = x }) [@nontail])
+      take_local (stack_ { a = x; b = x }) [@nontail])
 end
 
 module _ : sig end = struct
-  let[@opaque] take_local (local_ { a; b }) = a + b
+  let[@opaque] take_local ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of global (not exposed)" 0 ~f:(fun x ->
@@ -92,19 +92,19 @@ module M2 = struct
 
   let () =
     check_if_zero_alloc ~name:"take unrestricted of local (exposed)" 0 ~f:(fun x ->
-      take_unrestricted (local_ { a = x; b = x }) [@nontail])
+      take_unrestricted (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M3 = struct
-  let[@opaque] take_local (local_ { a; b }) = a + b
+  let[@opaque] take_local ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of local (exposed)" 0 ~f:(fun x ->
-      take_local (local_ { a = x; b = x }) [@nontail])
+      take_local (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M4 = struct
-  let[@opaque] take_local (local_ { a; b }) = a + b
+  let[@opaque] take_local ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of global (exposed)" 0 ~f:(fun x ->
@@ -122,15 +122,15 @@ module M5 = struct
 end
 
 module M6 = struct
-  let[@opaque] take_local__global_in_mli (local_ { a; b }) = a + b
+  let[@opaque] take_local__global_in_mli ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of local (exposed)" 0 ~f:(fun x ->
-      take_local__global_in_mli (local_ { a = x; b = x }) [@nontail])
+      take_local__global_in_mli (stack_ { a = x; b = x }) [@nontail])
 end
 
 module M7 = struct
-  let[@opaque] take_local__global_in_mli (local_ { a; b }) = a + b
+  let[@opaque] take_local__global_in_mli ({ a; b } @ local) = a + b
 
   let () =
     check_if_zero_alloc ~name:"take local of global (exposed)" 0 ~f:(fun x ->

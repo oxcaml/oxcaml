@@ -92,7 +92,7 @@ heap_alloc_loop:
    [caml_local_realloc]), and is therefore not a safe point. *)
 let[@inline never] local_alloc_loop n =
   for i = 0 to n do
-    let local_ r = ref (opaque i) in
+    let r @ local = ref (opaque i) in
     let (_ : int ref) = opaque r in
     ()
   done

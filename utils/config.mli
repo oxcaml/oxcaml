@@ -362,6 +362,10 @@ val parameterised_modules : bool
 val syntax_quotations : bool
 (** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
+val legacy_mode_syntax : bool
+(** Whether the legacy [local_] and [global_] mode syntax is accepted by
+    default. *)
+
 (** Access to configuration values *)
 val print_config : out_channel -> unit
 

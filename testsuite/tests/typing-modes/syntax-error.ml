@@ -1,12 +1,13 @@
 (* TEST
+ flags = "-no-legacy-mode-syntax";
  toplevel;
 *)
 
-let local_ foo : string @ = "hello";;
+let foo : string @ = "hello";;
 
-let local_ foo @ = "hello";;
+let foo @ = "hello";;
 
-let local_ foo : ('a. 'a -> 'a) @  = fun x -> x;;
+let foo : ('a. 'a -> 'a) @  = fun x -> x;;
 
 let foo : type a. (a -> a) @  = fun x -> x;;
 
@@ -55,32 +56,32 @@ let foo () =
   ~(bar @ ), ~(biz @ )
 ;;
 
-type r = local_ string @  -> string @ ;;
+type r = string @  -> string @ ;;
 
-type r = local_ string * y:string @  -> local_ string * w:string @;;
+type r = string * y:string @  -> string * w:string @;;
 
-type r = x:local_ string * y:string @  -> local_ string * w:string @;;
+type r = x:string * y:string @  -> string * w:string @;;
 
-type r = local_ string @ -> string;;
+type r = string @ -> string;;
 
-type t = Foo of string @@ * global_ string;;
+type t = Foo of string @@ * string;;
 
 type r = {
   x : string @@
 }
 ;;
 
-let foo ?(local_ x @ = 42) () = () ;;
+let foo ?(x @ = 42) () = () ;;
 
-let foo ?(local_ x : _ @ = 42) () = ();;
+let foo ?(x : _ @ = 42) () = ();;
 
-let foo ?(local_ x : ('a. 'a -> 'a) @ ) = ();;
+let foo ?(x : ('a. 'a -> 'a) @ ) = ();;
 
-let foo ?x:(local_ (x,y) @ = (42, 42)) () = ();;
+let foo ?x:((x,y) @ = (42, 42)) () = ();;
 
-let foo ?x:(local_ (x,y) : _ @ = (42, 42)) () = ();;
+let foo ?x:((x,y) : _ @ = (42, 42)) () = ();;
 
-let foo ?x:(local_ (x,y) : ('a.'a->'a) @ ) () = ();;
+let foo ?x:((x,y) : ('a.'a->'a) @ ) () = ();;
 
 let foo ((x @ ), (y@)) = x + y ;;
 
@@ -105,3 +106,27 @@ module type S = sig
 end;;
 
 let foo = ("bar" :> int @ local);;
+
+(* Removed legacy local_ and global_ syntax *)
+let local_ x = "hello";;
+
+let f (local_ x) = x;;
+
+let f x = local_ x;;
+
+type t = local_ int -> int;;
+
+type r = { global_ x : int };;
+
+type v = Foo of global_ int;;
+
+(* Lexer edge cases: [local_] stays a keyword, so it can still be used as a raw
+   identifier but not as a label, and it is rejected even right before [#] or
+   as an attribute name. *)
+let \#local_ = 1;;
+
+let f ~local_:x = x;;
+
+let h o = local_#foo;;
+
+let _ = (1 [@local_]);;

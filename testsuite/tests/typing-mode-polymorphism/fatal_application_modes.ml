@@ -87,15 +87,15 @@ let omitted_labelled_argument_alloc_application () =
   exclave_ (omitted_labelled_argument_alloc ~b:())
 
 let call_local_argument_application_alloc () =
-  let local_ pair = local_argument_application_alloc () in
+  let pair @ local = local_argument_application_alloc () in
   match pair with _x, _y -> ()
 
 let call_direct_tail_call_alloc () =
-  let local_ pair = direct_tail_call_alloc false in
+  let pair @ local = direct_tail_call_alloc false in
   match pair with _x, _y -> ()
 
 let call_omitted_labelled_argument_alloc_application () =
-  let local_ pair = omitted_labelled_argument_alloc_application () in
+  let pair @ local = omitted_labelled_argument_alloc_application () in
   match pair with _x, _y -> ()
 
 let () =

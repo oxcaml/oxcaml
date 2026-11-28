@@ -7,7 +7,7 @@
 
 module IArray = struct
   type 'a t = 'a iarray
-  external length : local_ 'a iarray -> int @@ portable = "%array_length"
+  external length : 'a iarray @ local -> int @@ portable = "%array_length"
   external unsafe_get :
     ('a iarray[@local_opt]) -> int -> ('a[@local_opt]) @@ portable
     = "%array_unsafe_get"

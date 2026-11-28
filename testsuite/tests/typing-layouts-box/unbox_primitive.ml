@@ -124,16 +124,16 @@ val check_value : hide -> 'a -> unit = <fun>
 (* Local allocation. Unboxing a local box yields a local value. *)
 
 let () =
-  let local_ value = box s in
+  let value @ local = box s in
   assert (unbox value == s);
-  let local_ o = Some s in
-  let local_ outer = box o in
+  let o @ local = Some s in
+  let outer @ local = box o in
   assert (unbox outer == o);
-  let local_ f = box #3.25 in
+  let f @ local = box #3.25 in
   assert (eq_f64 (unbox f) #3.25);
-  let local_ i = box #42L in
+  let i @ local = box #42L in
   assert (eq_i64 (unbox i) #42L);
-  let local_ n = box #42s in
+  let n @ local = box #42s in
   assert (eq_i8 (unbox n) #42s)
 [%%expect{|
 |}]
@@ -353,16 +353,16 @@ type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit#; }
 (* Local allocation. Unboxing a local box yields local components. *)
 
 let () =
-  let local_ b = box #(42, s) in
+  let b @ local = box #(42, s) in
   let #(a, c) = unbox b in
   assert (a = 42 && c == s);
-  let local_ r = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
+  let r @ local = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   let #{ g; h; k; l; m } = unbox r in
   assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L);
-  let local_ b = box #(#1L, s) in
+  let b @ local = box #(#1L, s) in
   let #(a, c) = unbox b in
   assert (eq_i64 a #1L && c == s);
-  let local_ n = box #(s, #(#2L, #(3, #4.5s))) in
+  let n @ local = box #(s, #(#2L, #(3, #4.5s))) in
   let #(a, #(c, #(d, e))) = unbox n in
   assert (a == s && eq_i64 c #2L && d = 3 && eq_f32 e #4.5s)
 [%%expect{|

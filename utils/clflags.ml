@@ -225,6 +225,9 @@ let keyword_edition: string option ref = ref None
 let syntax_quotations = ref Config.syntax_quotations
                                         (* -[no-]syntax-quotations *)
 
+let legacy_mode_syntax = ref Config.legacy_mode_syntax
+                                        (* -[no-]legacy-mode-syntax *)
+
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
 and opaque = ref false                  (* -opaque *)

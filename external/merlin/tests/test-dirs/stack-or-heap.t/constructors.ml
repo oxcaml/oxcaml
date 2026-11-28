@@ -30,13 +30,13 @@ let f g x y =
           (* ^ *)
 ;;
 
-let f (local_ _) = ()
+let f (_ @ local) = ()
 
 let g x =
   f (Some x);
        (* ^ *)
-  f (local_ Some x);
-              (* ^ *)
+  f (stack_ (Some x));
+               (* ^ *)
   f (Some x)
        (* ^ *)
 

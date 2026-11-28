@@ -11,7 +11,7 @@
 [@@@warning "-23"]
 type unit_u : void mod everything
 external unbox_unit : unit -> unit_u = "%unbox_unit"
-external globalize : local_ 'a -> 'a = "%obj_dup";;
+external globalize : 'a @ local -> 'a = "%obj_dup";;
 external box_int64x2 : int64x2# -> int64x2 = "%box_vec128"
 external unbox_int64x2 : int64x2 -> int64x2# = "%unbox_vec128"
 external interleave_low_64 : int64x2# -> int64x2# -> int64x2# = "caml_vec128_unreachable" "caml_simd_vec128_interleave_low_64" [@@unboxed] [@@builtin]

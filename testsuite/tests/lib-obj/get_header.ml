@@ -19,7 +19,7 @@ external repr : ('a[@local_opt]) -> (Obj.t[@local_opt]) = "%identity"
 external get_header_unsafe : (Obj.t[@local_opt]) -> nativeint = "%get_header"
 external is_int : (Obj.t[@local_opt]) -> bool = "%obj_is_int"
 
-let get_header (local_ repr) =
+let get_header (repr @ local) =
   if is_int repr then
     None
   else

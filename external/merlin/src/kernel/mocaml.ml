@@ -65,6 +65,7 @@ let setup_reader_config config =
   nopervasives := ocaml.nopervasives;
   strict_formats := ocaml.strict_formats;
   syntax_quotations := ocaml.syntax_quotations;
+  legacy_mode_syntax := ocaml.legacy_mode_syntax;
   open_args := ocaml.open_args;
   cmi_file := ocaml.cmi_file;
   as_parameter := ocaml.as_parameter;

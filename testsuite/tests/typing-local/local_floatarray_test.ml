@@ -8,13 +8,13 @@
 
 type t = Float.Array.t
 
-external create_local : int -> local_ t = "caml_floatarray_create_local"
+external create_local : int -> t @ local = "caml_floatarray_create_local"
 
-external get : local_ t -> int -> float = "%floatarray_safe_get"
-external set : local_ t -> int -> float -> unit = "%floatarray_safe_set"
+external get : t @ local -> int -> float = "%floatarray_safe_get"
+external set : t @ local -> int -> float -> unit = "%floatarray_safe_set"
 
-external unsafe_get : local_ t -> int -> float = "%floatarray_unsafe_get"
-external unsafe_set : local_ t -> int -> float -> unit = "%floatarray_unsafe_set"
+external unsafe_get : t @ local -> int -> float = "%floatarray_unsafe_get"
+external unsafe_set : t @ local -> int -> float -> unit = "%floatarray_unsafe_set"
 
 let create_local ~len x = exclave_
   match create_local len with

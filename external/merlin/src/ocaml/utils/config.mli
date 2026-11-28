@@ -46,6 +46,10 @@ val reserved_header_bits : int
 val syntax_quotations : bool
 (** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
+val legacy_mode_syntax : bool
+(** Whether the legacy [local_] and [global_] mode syntax is accepted by
+    default. *)
+
 val default_keyword_edition : (int * int) option * string list
 
 type name_mangling_scheme =

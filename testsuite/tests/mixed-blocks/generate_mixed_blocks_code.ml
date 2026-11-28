@@ -1066,7 +1066,7 @@ let check_reachable_words expected actual message =
     let line ?(indent = indent) = line ~indent in
     per_value (fun t ->
       line
-        "let local_ %s : %s = %s in"
+        "let %s : %s @ local = %s in"
         (Value.value t)
         (Value.type_ t)
         (Value.construction t));

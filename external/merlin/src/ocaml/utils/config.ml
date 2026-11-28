@@ -48,6 +48,7 @@ let flat_float_array = false
 
 let reserved_header_bits = 8
 let syntax_quotations = true
+let legacy_mode_syntax = true
 
 let merlin = true
 

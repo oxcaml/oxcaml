@@ -36,7 +36,7 @@ type (+'a : any mod separable) t = 'a iarray
 
 (* Array operations *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int @@ portable
+external length : ('a : any mod separable). 'a iarray @ local -> int @@ portable
   = "%array_length"
 [@@layout_poly]
 external get :
@@ -54,7 +54,7 @@ external unsafe_get :
 external concat : ('a : any mod separable). 'a iarray list -> 'a iarray
   @@ portable = "caml_array_concat"
 external concat_local :
-  ('a : any mod separable). local_ 'a iarray list -> local_ 'a iarray
+  ('a : any mod separable). 'a iarray list @ local -> 'a iarray @ local
   @@ portable = "caml_array_concat_local"
 
 external append_prim :
@@ -62,13 +62,13 @@ external append_prim :
   = "caml_array_append"
 external append_prim_local :
   ('a : any mod separable).
-  local_ 'a iarray -> local_ 'a iarray -> local_ 'a iarray @@ portable
+  'a iarray @ local -> 'a iarray @ local -> 'a iarray @ local @@ portable
   = "caml_array_append_local"
 external unsafe_sub :
   ('a : any mod separable). 'a iarray -> int -> int -> 'a iarray @@ portable
   = "caml_array_sub"
 external unsafe_sub_local :
-  ('a : any mod separable). local_ 'a iarray -> int -> int -> local_ 'a iarray
+  ('a : any mod separable). 'a iarray @ local -> int -> int -> 'a iarray @ local
   @@ portable = "caml_array_sub_local"
 external unsafe_of_array : ('a : any mod separable). 'a array -> 'a iarray
   @@ portable = "%array_to_iarray"
@@ -86,7 +86,7 @@ external unsafe_set_mutable :
    these can either make a local mutable array or mutate its contents, and if
    not careful, this can lead to an array's contents pointing forwards. *)
 external make_mutable_local :
-  ('a : value_or_null mod separable). int -> local_ 'a -> local_ 'a array
+  ('a : value_or_null mod separable). int -> 'a @ local -> 'a array @ local
   @@ portable = "caml_array_make_local"
 
 (* Make sure this function is marked zero-alloc because we can't annotate
@@ -95,10 +95,10 @@ let[@inline][@zero_alloc assume] make_mutable_local i x =
   exclave_ make_mutable_local i x
 
 external unsafe_of_local_array :
-  ('a : any mod separable). local_ 'a array -> local_ 'a iarray @@ portable
+  ('a : any mod separable). 'a array @ local -> 'a iarray @ local @@ portable
   = "%array_to_iarray"
 external unsafe_set_local :
-  ('a : any mod separable). local_ 'a array -> int -> local_ 'a -> unit
+  ('a : any mod separable). 'a array @ local -> int -> 'a @ local -> unit
   @@ portable = "%array_unsafe_set"
 [@@layout_poly]
 
@@ -110,7 +110,8 @@ external unsafe_set_local :
 (* Really trusting the inliner here; to get maximum performance, it has to
    inline both [unsafe_init_local] *and* [f]. *)
 (** Precondition: [l >= 0]. *)
-let[@inline always] unsafe_init_local l (local_ f : int -> local_ 'a) = exclave_
+let[@inline always] unsafe_init_local l (f : (int -> 'a @ local) @ local) =
+  exclave_
   if l = 0 then
     unsafe_of_local_array [||]
   else
@@ -138,7 +139,7 @@ let[@inline always] unsafe_init_local l (local_ f : int -> local_ 'a) = exclave_
     unsafe_of_local_array (go 0)
 
 (* The implementation is copied from [Array] so that [f] can be [local_] *)
-let init l (local_ f) =
+let init l (f @ local) =
   if l = 0 then unsafe_of_array [||] else
   if l < 0 then invalid_arg "Iarray.init"
   (* See #6575. We could also check for maximum array size, but this depends
@@ -514,7 +515,7 @@ let fold_right_local_output f a x = exclave_
 
 (* CR aspectorzabusky: Why do I need this?  Shouldn't mode-crossing handle doing
    this? *)
-let[@inline always] globalize_bool : local_ bool -> bool = fun b -> b
+let[@inline always] globalize_bool : bool @ local -> bool = fun b -> b
 
 let exists p a =
   let n = length a in

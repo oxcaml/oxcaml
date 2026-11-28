@@ -20,12 +20,12 @@ let f g x =
   y
 ;;
 
-let f (local_ _) = ()
+let f (_ @ local) = ()
 
 let g z =
   f { z };
    (* ^ *)
-  f (local_ { z });
+  f (stack_ { z });
            (* ^ *)
   f { z }
    (* ^ *)

@@ -24,13 +24,13 @@
 
 module Iarray = Stdlib_stable.IarrayLabels
 
-external opaque_local : local_ 'a -> local_ 'a = "%opaque"
+external opaque_local : 'a @ local -> 'a @ local = "%opaque"
 
-let ignore_local : local_ 'a -> unit = fun x ->
-  let _ = local_ opaque_local x in
+let ignore_local : 'a @ local -> unit = fun x ->
+  let _ @ local = opaque_local x in
   ()
 
-let local_some : 'a -> local_ 'a option = fun x -> exclave_ Some x
+let local_some : 'a -> 'a option @ local = fun x -> exclave_ Some x
 
 let run name f x = exclave_
   let prebefore = Gc.allocated_bytes () in
@@ -87,57 +87,57 @@ let test_combine (a1, a2) = exclave_ Iarray.combine_local a1 a2
 
 (* Run the test, keeping the values alive *)
 let () =
-  let local_ r0 = run "init_local"
+  let r0 @ local = run "init_local"
     test_init
     42
   in
-  let local_ r1 = run "append_local"
+  let r1 @ local = run "append_local"
     test_append
     (Iarray.init_local 42 ~f:local_some, [:None; Some (-1); Some (-2):])
   in
-  let local_ r2 = run "concat_local"
+  let r2 @ local = run "concat_local"
     test_concat
     [Iarray.init_local 42 ~f:local_some; [:None; Some (-1); Some (-2):]]
   in
-  let local_ r3 = run "sub_local"
+  let r3 @ local = run "sub_local"
     test_sub
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ r4 = run "to_list_local"
+  let r4 @ local = run "to_list_local"
     test_to_list (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ r5 = run "of_list_local"
+  let r5 @ local = run "of_list_local"
     test_of_list [Some 0; Some 1; Some 2; Some 3; Some 4; Some 5]
   in
-  let local_ r6 = run "map_local"
+  let r6 @ local = run "map_local"
     test_map
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ r7 = run "mapi_local"
+  let r7 @ local = run "mapi_local"
     test_mapi
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ r8 = run "fold_left_local"
+  let r8 @ local = run "fold_left_local"
     test_fold_left
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ r9 = run "fold_left_map_local"
+  let r9 @ local = run "fold_left_map_local"
     test_fold_left_map
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ rA = run "fold_right_local"
+  let rA @ local = run "fold_right_local"
     test_fold_right
     (Iarray.init_local 42 ~f:local_some)
   in
-  let local_ rB = run "map2_local"
+  let rB @ local = run "map2_local"
     test_map2
     (Iarray.init_local 3 ~f:local_some, [:None; Some (-1); Some (-2):])
   in
-  let local_ rC = run "split_local"
+  let rC @ local = run "split_local"
     test_split
     (Iarray.init_local 42 ~f:(fun i -> exclave_ Some i, Some (-i)))
   in
-  let local_ rD = run "combine_local"
+  let rD @ local = run "combine_local"
     test_combine
     (Iarray.init_local 3 ~f:local_some, [:None; Some (-1); Some (-2):])
   in

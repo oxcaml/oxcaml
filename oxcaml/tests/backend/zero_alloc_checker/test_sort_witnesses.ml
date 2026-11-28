@@ -23,7 +23,7 @@ module UFO = struct
 end
 
 module Int = struct
-  let[@inline always] to_float t = (Stdlib.float_of_int :> local_ int -> _) t
+  let[@inline always] to_float t = (Stdlib.float_of_int :> int @ local -> _) t
 end
 
 module S : sig

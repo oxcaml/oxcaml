@@ -1527,7 +1527,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}];;
 
-<[ let local_ f x = x in f "abc" ]>
+<[ let (f @ local) x = x in f "abc" ]>
 [%%expect {|
 - : <[string]> expr =
 <[let f : _ @ local = (fun x -> (x : _ @ local) : _ @ local) in f "abc"]>

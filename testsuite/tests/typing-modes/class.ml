@@ -17,7 +17,7 @@ val portable_use : 'a @ portable -> unit = <fun>
 
 (* class cannot refer to external local things *)
 let foo () =
-    let local_ s = "hello" in
+    let s @ local = "hello" in
     let module M = struct
     class cla = object
         val k = s

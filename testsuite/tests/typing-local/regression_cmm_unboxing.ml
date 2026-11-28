@@ -13,10 +13,10 @@
 (* Regression test for a bad interaction between Cmm unboxing
    and regions present after inlining *)
 
-external opaque_local : local_ 'a -> local_ 'a = "%opaque"
+external opaque_local : 'a @ local -> 'a @ local = "%opaque"
 
 let[@inline always] reg k c f =
-  let _ = opaque_local (local_ ref 42) in
+  let _ = opaque_local (stack_ (ref 42)) in
   if c then
     f ()
   else
@@ -34,7 +34,7 @@ let () =
 
 
 let[@inline always] f a b =
-  let _ = opaque_local (local_ ref 42) in
+  let _ = opaque_local (stack_ (ref 42)) in
   if a < b then
     a +. (a *. b)
   else
@@ -54,7 +54,7 @@ let () =
 
 
 let[@inline always] f a b =
-  let _ = opaque_local (local_ ref 42) in
+  let _ = opaque_local (stack_ (ref 42)) in
   if a < b then
     Int64.add a (Int64.mul a b)
   else

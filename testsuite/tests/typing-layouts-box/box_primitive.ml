@@ -273,22 +273,22 @@ type all_void = { x : unit#; kept : unit#; }
 
 (* Local allocation. We have to globalize before passing to [Obj] helpers *)
 
-external globalize : local_ 'a -> 'a = "%obj_dup"
+external globalize : 'a @ local -> 'a = "%obj_dup"
 [%%expect{|
 external globalize : 'a @ local -> 'a = "%obj_dup"
 |}]
 
 let () =
-  let local_ value = box s in
+  let value @ local = box s in
   check_shape (globalize value) { v = s };
-  let local_ f = box #3.25 in
+  let f @ local = box #3.25 in
   check_shape (globalize f) { f64 = #3.25 };
   assert (eq_f64 (Obj.magic (globalize f) : f64rec).f64 #3.25);
-  let local_ record : p_many = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
+  let record : p_many @ local = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   check_shape (globalize record) { g = #1L; h = #2.5; k = s; l = 3; m = #4L };
   assert (eq_i64 record.g #1L && record.k == s && record.l = 3);
-  let local_ inner = Some s in
-  let local_ outer = box inner in
+  let inner @ local = Some s in
+  let outer @ local = box inner in
   assert ((Obj.magic (globalize outer) : string option vrec).v == inner)
 [%%expect{|
 |}]

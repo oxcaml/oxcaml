@@ -7,7 +7,7 @@
 (* TMC calls under exception and effect handlers, in functions with a
    local-allocation region. *)
 
-let[@inline never] use_local (local_ _x : int * int) = ()
+let[@inline never] use_local (_x : int * int @ local) = ()
 
 let[@inline never] fail () : unit = raise_notrace Exit
 
@@ -19,7 +19,7 @@ let print_list name l =
    region nor be annotated as a tailcall. The handler at [n = 2] reads [p]
    after the deeper calls have allocated in their own regions. *)
 let[@tail_mod_cons] rec try_body_local n =
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   try
     if n = 0 then fail ();
@@ -46,7 +46,7 @@ let[@tail_mod_cons] rec try_body_no_region n =
 (* Call in the [try] body: not a TMC call, so the function is never applied in
    TMC position. *)
 let[@tail_mod_cons] rec map_try_body t ~f =
-  let local_ p = (Sys.opaque_identity 0, 0) in
+  let p @ local = (Sys.opaque_identity 0, 0) in
   use_local p;
   match t with
   | [] -> []
@@ -55,7 +55,7 @@ let[@tail_mod_cons] rec map_try_body t ~f =
 (* TMC call in the handler: the handler is in tail position, so the region
    can be closed. Constant stack. *)
 let[@tail_mod_cons] rec map_handler t ~f =
-  let local_ p = (Sys.opaque_identity 0, 0) in
+  let p @ local = (Sys.opaque_identity 0, 0) in
   use_local p;
   match t with
   | [] -> []
@@ -66,7 +66,7 @@ let[@tail_mod_cons] rec map_handler t ~f =
    function is never applied in TMC position. *)
 let[@tail_mod_cons] rec try_helper_region n =
   let go n =
-    let local_ q = (Sys.opaque_identity n, n) in
+    let q @ local = (Sys.opaque_identity n, n) in
     use_local q;
     if n = 0 then fail ();
     n :: try_helper_region (n - 1)
@@ -78,7 +78,7 @@ type _ Effect.t += Ask : int Effect.t
 (* The cases of an effect match are compiled to separate closures, so the
    recursive call in the value case is not in TMC position. *)
 let[@tail_mod_cons] rec effect_value_case n =
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   if n = 0 then []
   else
@@ -88,14 +88,14 @@ let[@tail_mod_cons] rec effect_value_case n =
 
 (* [perform] is evaluated before the region is closed at the TMC call. *)
 let[@tail_mod_cons] rec perform_in_tmc n =
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   if n = 0 then [] else (Effect.perform Ask + fst p) :: perform_in_tmc (n - 1)
 
 (* [discontinue] raises at the [perform] inside the [try] body; the handler
    then reads [p]. *)
 let[@tail_mod_cons] rec perform_in_try n =
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   try if n = 0 then [] else Effect.perform Ask :: perform_in_try (n - 1)
   with Exit -> [ - fst p ]

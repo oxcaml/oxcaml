@@ -383,6 +383,10 @@ val parse_keyword_edition: string -> (int*int) option * string list
     [#syntax quotations] directive. Defaults to the configure-time setting. *)
 val syntax_quotations : bool ref
 
+(** Whether the legacy [local_] and [global_] mode syntax is accepted.
+    Defaults to the configure-time setting. *)
+val legacy_mode_syntax : bool ref
+
 (* Support for flags that can also be set from an environment variable *)
 type 'a env_reader = {
   parse : string -> 'a option;

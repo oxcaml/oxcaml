@@ -155,7 +155,7 @@ Error: This value is "aliased"
 |}]
 
 
-let foo (local_ x : string ref) =
+let foo (x : string ref @ local) =
   let module M = struct
     class c =
       let y = !x in

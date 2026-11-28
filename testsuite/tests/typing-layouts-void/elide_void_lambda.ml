@@ -54,7 +54,7 @@ val f : int ref -> (int -> int) Atomic.t -> int = <fun>
    elided arguments. We expect to see [setfield_ptr(maybe-stack)] (because we
    specialize on the [local_ 'a ref]) and not  [setfield_ptr] (which we would
    see if we incorrectly specialized based on the mode of [w]). *)
-external set : (w [@elide_void]) -> local_ 'a ref -> 'a -> unit
+external set : (w [@elide_void]) -> 'a ref @ local -> 'a -> unit
   = "%setfield0"
 
 (* As above; [%arrayblit] specializes based on the destination return mode.
@@ -62,12 +62,12 @@ external set : (w [@elide_void]) -> local_ 'a ref -> 'a -> unit
    third argument (a global elided [w]). *)
 external blit :
   ('a : value non_float).
-  'a array -> int -> (w [@elide_void]) -> local_ 'a array -> int -> int
+  'a array -> int -> (w [@elide_void]) -> 'a array @ local -> int -> int
   -> unit
   = "%arrayblit"
 
-let set_local (local_ r) x = set (w ()) r x
-let blit_local a (local_ b) = blit a 0 (w ()) b 0 1
+let set_local (r @ local) x = set (w ()) r x
+let blit_local a (b @ local) = blit a 0 (w ()) b 0 1
 
 [%%expect{|
 (makeblock 0)

@@ -47,8 +47,8 @@ let test mapper s =
   Format.printf "------------------------------\n"
 
 let () =
-  test mapper "let f (local_ x) = x";
-  test mapper "let (f @ unique) (local_ x) = x";
-  test mapper "let local_ f x: int -> int = x";
+  test mapper "let f (x @ local) = x";
+  test mapper "let (f @ unique) (x @ local) = x";
+  test mapper "let (f @ local) x: int -> int = x";
   test mapper "module M : sig val x : string -> string @ foo @@ bar hello end = struct end";
   ()

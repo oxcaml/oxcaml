@@ -1183,6 +1183,18 @@ let mk_no_syntax_quotations f =
     \     #syntax quotations directive%s"
     (if Config.syntax_quotations then "" else " (default)")
 
+let mk_legacy_mode_syntax f =
+  "-legacy-mode-syntax", Arg.Unit f,
+  Printf.sprintf
+    " Accept the legacy local_ and global_ mode syntax%s"
+    (if Config.legacy_mode_syntax then " (default)" else "")
+
+let mk_no_legacy_mode_syntax f =
+  "-no-legacy-mode-syntax", Arg.Unit f,
+  Printf.sprintf
+    " Reject the legacy local_ and global_ mode syntax%s"
+    (if Config.legacy_mode_syntax then "" else " (default)")
+
 let mk_args f =
   "-args", Arg.Expand f,
   "<file> Read additional newline-terminated command line arguments\n\
@@ -1272,6 +1284,8 @@ module type Common_options = sig
   val _no_strict_formats : unit -> unit
   val _syntax_quotations : unit -> unit
   val _no_syntax_quotations : unit -> unit
+  val _legacy_mode_syntax : unit -> unit
+  val _no_legacy_mode_syntax : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
   val _dump_debug_uids : unit -> unit
@@ -1653,6 +1667,8 @@ struct
     mk_no_strict_formats F._no_strict_formats;
     mk_syntax_quotations F._syntax_quotations;
     mk_no_syntax_quotations F._no_syntax_quotations;
+    mk_legacy_mode_syntax F._legacy_mode_syntax;
+    mk_no_legacy_mode_syntax F._no_legacy_mode_syntax;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -1778,6 +1794,8 @@ struct
     mk_no_strict_formats F._no_strict_formats;
     mk_syntax_quotations F._syntax_quotations;
     mk_no_syntax_quotations F._no_syntax_quotations;
+    mk_legacy_mode_syntax F._legacy_mode_syntax;
+    mk_no_legacy_mode_syntax F._no_legacy_mode_syntax;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
     mk_dump_debug_uids F._dump_debug_uids;
@@ -1966,6 +1984,8 @@ struct
     mk_no_strict_formats F._no_strict_formats;
     mk_syntax_quotations F._syntax_quotations;
     mk_no_syntax_quotations F._no_syntax_quotations;
+    mk_legacy_mode_syntax F._legacy_mode_syntax;
+    mk_no_legacy_mode_syntax F._no_legacy_mode_syntax;
     mk_thread F._thread;
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
@@ -2142,6 +2162,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_strict_formats F._no_strict_formats;
     mk_syntax_quotations F._syntax_quotations;
     mk_no_syntax_quotations F._no_syntax_quotations;
+    mk_legacy_mode_syntax F._legacy_mode_syntax;
+    mk_no_legacy_mode_syntax F._no_legacy_mode_syntax;
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
     mk_unboxed_types F._unboxed_types;
@@ -2254,6 +2276,8 @@ struct
     mk_no_strict_formats F._no_strict_formats;
     mk_syntax_quotations F._syntax_quotations;
     mk_no_syntax_quotations F._no_syntax_quotations;
+    mk_legacy_mode_syntax F._legacy_mode_syntax;
+    mk_no_legacy_mode_syntax F._no_legacy_mode_syntax;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -2344,6 +2368,7 @@ module Default = struct
     let _no_strict_formats = clear strict_formats
     let _no_strict_sequence = clear strict_sequence
     let _no_syntax_quotations = clear syntax_quotations
+    let _no_legacy_mode_syntax = clear legacy_mode_syntax
     let _no_unboxed_types = clear unboxed_types
     let _no_verbose_types = clear verbose_types
     let _disable_all_extensions =
@@ -2373,6 +2398,7 @@ module Default = struct
     let _strict_formats = set strict_formats
     let _strict_sequence = set strict_sequence
     let _syntax_quotations = set syntax_quotations
+    let _legacy_mode_syntax = set legacy_mode_syntax
     let _unboxed_types = set unboxed_types
     let _dump_debug_uids = set dump_debug_uids
     let _dump_debug_uid_tables = set dump_debug_uid_tables

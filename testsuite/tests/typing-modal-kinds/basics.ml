@@ -106,58 +106,58 @@ type float_u_record = { x : float#; y : float# }
 type float_u_record = { x : float#; y : float#; }
 |}]
 
-let string_escape = let local_ x : string = "hello" in x
+let string_escape = let x : string @ local = "hello" in x
 
 [%%expect{|
-Line 1, characters 55-56:
-1 | let string_escape = let local_ x : string = "hello" in x
-                                                           ^
+Line 1, characters 56-57:
+1 | let string_escape = let x : string @ local = "hello" in x
+                                                            ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let int_escape = let local_ x : int = 5 in x
+let int_escape = let x : int @ local = 5 in x
 
 [%%expect{|
 val int_escape : int = 5
 |}]
 
-let string_list_escape = let local_ x : string list = ["hi";"bye"] in x
+let string_list_escape = let x : string list @ local = ["hi";"bye"] in x
 
 [%%expect{|
-Line 1, characters 70-71:
-1 | let string_list_escape = let local_ x : string list = ["hi";"bye"] in x
-                                                                          ^
+Line 1, characters 71-72:
+1 | let string_list_escape = let x : string list @ local = ["hi";"bye"] in x
+                                                                           ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let int_list_escape = let local_ x : int list = [4;5] in x
+let int_list_escape = let x : int list @ local = [4;5] in x
 
 [%%expect{|
-Line 1, characters 57-58:
-1 | let int_list_escape = let local_ x : int list = [4;5] in x
-                                                             ^
+Line 1, characters 58-59:
+1 | let int_list_escape = let x : int list @ local = [4;5] in x
+                                                              ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_string_escape =
-  let local_ x : Hidden_string.t = Hidden_string.hide "hello" in x
+  let x : Hidden_string.t @ local = Hidden_string.hide "hello" in x
 
 [%%expect{|
-Line 2, characters 65-66:
-2 |   let local_ x : Hidden_string.t = Hidden_string.hide "hello" in x
-                                                                     ^
+Line 2, characters 66-67:
+2 |   let x : Hidden_string.t @ local = Hidden_string.hide "hello" in x
+                                                                      ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_int_escape =
-  let local_ x : Hidden_int.t = Hidden_int.hide 42 in x
+  let x : Hidden_int.t @ local = Hidden_int.hide 42 in x
 
 [%%expect{|
 val hidden_int_escape : Hidden_int.t = <abstr>
 |}]
 
 let hidden_string_list_escape =
-  let local_ x : Hidden_string.t list =
+  let x : Hidden_string.t list @ local =
     [Hidden_string.hide "hi"; Hidden_string.hide "bye"]
   in x
 
@@ -169,7 +169,7 @@ Error: This value is "local" but is expected to be "global".
 |}]
 
 let hidden_int_list_escape =
-  let local_ x : Hidden_int.t list =
+  let x : Hidden_int.t list @ local =
     [Hidden_int.hide 2; Hidden_int.hide 3]
   in x
 
@@ -180,65 +180,65 @@ Line 4, characters 5-6:
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let float_escape = let local_ x : float = 3.14 in x
+let float_escape = let x : float @ local = 3.14 in x
 
 [%%expect{|
-Line 1, characters 50-51:
-1 | let float_escape = let local_ x : float = 3.14 in x
-                                                      ^
+Line 1, characters 51-52:
+1 | let float_escape = let x : float @ local = 3.14 in x
+                                                       ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-let float_u_escape () = let local_ x : float# = #3.14 in x
+let float_u_escape () = let x : float# @ local = #3.14 in x
 
 [%%expect{|
 val float_u_escape : unit -> float# = <fun>
 |}]
 
-let int64_u_escape () = let local_ x : int64_u = #314L in x
+let int64_u_escape () = let x : int64_u @ local = #314L in x
 
 [%%expect{|
 val int64_u_escape : unit -> int64_u = <fun>
 |}]
 
 let hidden_float_u_escape () =
-  let local_ x : Hidden_float_u.t = Hidden_float_u.hide #3.14 in x
+  let x : Hidden_float_u.t @ local = Hidden_float_u.hide #3.14 in x
 
 [%%expect{|
 val hidden_float_u_escape : unit -> Hidden_float_u.t = <fun>
 |}]
 
 let hidden_int64_u_escape () =
-  let local_ x : Hidden_int64_u.t = Hidden_int64_u.hide #314L in x
+  let x : Hidden_int64_u.t @ local = Hidden_int64_u.hide #314L in x
 
 [%%expect{|
 val hidden_int64_u_escape : unit -> Hidden_int64_u.t = <fun>
 |}]
 
 let float_u_record_escape =
-  let local_ x : float_u_record = { x = #3.14; y = #2.718 } in x
+  let x : float_u_record @ local = { x = #3.14; y = #2.718 } in x
 
 [%%expect{|
-Line 2, characters 63-64:
-2 |   let local_ x : float_u_record = { x = #3.14; y = #2.718 } in x
-                                                                   ^
+Line 2, characters 64-65:
+2 |   let x : float_u_record @ local = { x = #3.14; y = #2.718 } in x
+                                                                    ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let float_u_record_list_escape =
-  let local_ x : float_u_record list = [] in x
+  let x : float_u_record list @ local = [] in x
 
 [%%expect{|
-Line 2, characters 45-46:
-2 |   let local_ x : float_u_record list = [] in x
-                                                 ^
+Line 2, characters 46-47:
+2 |   let x : float_u_record list @ local = [] in x
+                                                  ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 type r = {x : float; y : float}
 
 let foo () =
-  let local_ r = {x = 3.0; y = 4.0} in
+  let r @ local = {x = 3.0; y = 4.0} in
   (* [r.x] is allocated global and can escape. *)
   r.x
 
@@ -247,22 +247,22 @@ type r = { x : float; y : float; }
 val foo : unit -> float = <fun>
 |}]
 
-let function_escape = let local_ x : int -> int = fun y -> y in x
+let function_escape = let (x @ local) : int -> int = fun y -> y in x
 
 [%%expect{|
-Line 1, characters 64-65:
-1 | let function_escape = let local_ x : int -> int = fun y -> y in x
-                                                                    ^
+Line 1, characters 67-68:
+1 | let function_escape = let (x @ local) : int -> int = fun y -> y in x
+                                                                       ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 let function_list_escape =
-  let local_ x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in x
+  let (x @ local) : (int -> int) list = [(fun y -> y); fun z -> z + 1] in x
 
 [%%expect{|
-Line 2, characters 71-72:
-2 |   let local_ x : (int -> int) list = [(fun y -> y); fun z -> z + 1] in x
-                                                                           ^
+Line 2, characters 74-75:
+2 |   let (x @ local) : (int -> int) list = [(fun y -> y); fun z -> z + 1] in x
+                                                                              ^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -553,14 +553,14 @@ Line 1, characters 67-68:
 
 |}]
 
-let imm_escape () = Immediate.id (local_ 42) [@nontail]
+let imm_escape () = Immediate.id (42 : @ local) [@nontail]
 
 [%%expect{|
 val imm_escape : unit -> int = <fun>
 |}, Principal{|
-Line 1, characters 33-44:
-1 | let imm_escape () = Immediate.id (local_ 42) [@nontail]
-                                     ^^^^^^^^^^^
+Line 1, characters 33-47:
+1 | let imm_escape () = Immediate.id (42 : @ local) [@nontail]
+                                     ^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 

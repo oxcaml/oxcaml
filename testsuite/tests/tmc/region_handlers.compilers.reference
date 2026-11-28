@@ -1,6 +1,6 @@
 File "region_handlers.ml", lines 21-27, characters 39-41:
 21 | .......................................n =
-22 |   let local_ p = (Sys.opaque_identity n, n) in
+22 |   let p @ local = (Sys.opaque_identity n, n) in
 23 |   use_local p;
 24 |   try
 25 |     if n = 0 then fail ();
@@ -30,7 +30,7 @@ Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 
 File "region_handlers.ml", lines 48-53, characters 37-71:
 48 | .....................................t ~f =
-49 |   let local_ p = (Sys.opaque_identity 0, 0) in
+49 |   let p @ local = (Sys.opaque_identity 0, 0) in
 50 |   use_local p;
 51 |   match t with
 52 |   | [] -> []
@@ -41,7 +41,7 @@ Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 File "region_handlers.ml", lines 67-74, characters 42-48:
 67 | ..........................................n =
 68 |   let go n =
-69 |     let local_ q = (Sys.opaque_identity n, n) in
+69 |     let q @ local = (Sys.opaque_identity n, n) in
 70 |     use_local q;
 71 |     if n = 0 then fail ();
 72 |     n :: try_helper_region (n - 1)
@@ -52,7 +52,7 @@ Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 
 File "region_handlers.ml", lines 80-87, characters 42-54:
 80 | ..........................................n =
-81 |   let local_ p = (Sys.opaque_identity n, n) in
+81 |   let p @ local = (Sys.opaque_identity n, n) in
 82 |   use_local p;
 83 |   if n = 0 then []
 84 |   else
@@ -64,7 +64,7 @@ Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 
 File "region_handlers.ml", lines 97-101, characters 39-26:
  97 | .......................................n =
- 98 |   let local_ p = (Sys.opaque_identity n, n) in
+ 98 |   let p @ local = (Sys.opaque_identity n, n) in
  99 |   use_local p;
 100 |   try if n = 0 then [] else Effect.perform Ask :: perform_in_try (n - 1)
 101 |   with Exit -> [ - fst p ]

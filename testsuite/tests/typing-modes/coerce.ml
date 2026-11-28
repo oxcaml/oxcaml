@@ -10,7 +10,7 @@ module M = struct
 
   let _ = (f :> 'a -> unit)
 
-  let _ = f (local_ 42.0)
+  let _ = f (42.0 : @ local)
 end
 
 [%%expect{|

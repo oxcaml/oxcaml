@@ -7,10 +7,10 @@ let[@inline never] f x y z =
 
 type t = int box -> int box -> int
 let[@inline always] h x = x
-let g = (h f :> int box -> local_ t)
+let g = (h f :> int box -> t @ local)
 
 let[@inline never] go a b c =
-  let local_ g1 = (g a) in
+  let g1 @ local = (g a) in
   let g2 = (g1 b) in
   g2 c
 

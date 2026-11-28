@@ -17,7 +17,7 @@ when performing a locate query.
 
   $ $MERLIN single locate -position 4:15 -filename test.ml << EOF | jq .value
   > module List = struct
-  >   let map : f:local_ ('a -> 'b) -> 'a list -> 'b list = failwith ""
+  >   let map : f:('a -> 'b) @ local -> 'a list -> 'b list = failwith ""
   > end
   > let () = List.map ~invalid_arg:2
   > EOF

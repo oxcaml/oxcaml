@@ -24,6 +24,7 @@ let typing_recovery     = ref true
 let nopervasives        = ref false
 let strict_formats      = ref true
 let syntax_quotations   = ref Config.syntax_quotations
+let legacy_mode_syntax  = ref Config.legacy_mode_syntax
 
 type open_arg =
   | Open of string

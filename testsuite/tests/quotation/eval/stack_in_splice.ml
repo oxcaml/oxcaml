@@ -18,7 +18,7 @@ let () =
   Printf.printf "\nTest stack_ tuple in splice\n";
   let f = Eval.eval
     <[ fun () -> $(
-      let local_ _p : int * int =
+      let _p : int * int @ local =
         Sys.opaque_identity
           (stack_ (Sys.opaque_identity 1, 2))
       in
@@ -31,7 +31,7 @@ let () =
   Printf.printf "\nTest stack_ ref in splice\n";
   let f = Eval.eval
     <[ fun () -> $(
-      let local_ r =
+      let r @ local =
         Sys.opaque_identity
           (stack_ (ref (Sys.opaque_identity true)))
       in
@@ -44,7 +44,7 @@ let () =
   Printf.printf "\nTest stack_ option in splice\n";
   let f = Eval.eval
     <[ fun () -> $(
-      let local_ opt =
+      let opt @ local =
         Sys.opaque_identity
           (stack_ (Some (Sys.opaque_identity 42)))
       in

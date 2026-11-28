@@ -1550,7 +1550,7 @@ module M : sig val unbox : #(int * string) -> int * string end
 module M : sig
   val f : (string -> unit) box
 end = struct
-  let f : (local_ string -> unit) box = Obj.magic ()
+  let f : (string @ local -> unit) box = Obj.magic ()
 end
 [%%expect{|
 module M : sig val f : (string -> unit) box end

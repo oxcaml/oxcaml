@@ -7,7 +7,7 @@ inlined from
 test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][camlTest_sort_witnesses__size_6_6]
 test_sort_witnesses.ml:49,10--16[Test_sort_witnesses.compute]
 
-File "test_sort_witnesses.ml", line 26, characters 35-77:
+File "test_sort_witnesses.ml", line 26, characters 35-78:
 Error: allocation of 16 bytes for float
 inlined from
 test_sort_witnesses.ml:38,24--43[Test_sort_witnesses.S.to_float_option][camlTest_sort_witnesses__to_float_option_4_4]
@@ -20,7 +20,7 @@ inlined from
 test_sort_witnesses.ml:44,4--30[Test_sort_witnesses.compute.size][camlTest_sort_witnesses__size_6_6]
 test_sort_witnesses.ml:50,10--16[Test_sort_witnesses.compute]
 
-File "test_sort_witnesses.ml", line 26, characters 35-77:
+File "test_sort_witnesses.ml", line 26, characters 35-78:
 Error: allocation of 16 bytes for float
 inlined from
 test_sort_witnesses.ml:38,24--43[Test_sort_witnesses.S.to_float_option][camlTest_sort_witnesses__to_float_option_4_4]

@@ -7,14 +7,14 @@ expect;
    This should not block TMC, but do to current conservatism in the check, it does 
 *)
 
-let[@inline never] use_local (local_ _ : int ref) = ()
+let[@inline never] use_local (_ : int ref @ local) = ()
 
 let[@inline never] make_void () : unit# = exclave_ #()
 
-let[@tail_mod_cons] rec map_void (local_ u : unit#) f = function
+let[@tail_mod_cons] rec map_void (u : unit# @ local) f = function
   | [] -> []
   | x :: xs ->
-    let local_ r = ref x in
+    let r @ local = ref x in
     use_local r;
     let v = make_void () in
     f x :: map_void v f xs

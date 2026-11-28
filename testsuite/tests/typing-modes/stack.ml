@@ -275,7 +275,7 @@ Error: This value is "local" because it is "stack_"-allocated.
          because it is an argument in a tail call.
 |}]
 
-let f4 (local_ x) =
+let f4 (x @ local) =
     List.length x
 [%%expect{|
 Line 2, characters 16-17:

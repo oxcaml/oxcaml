@@ -108,6 +108,8 @@ let ar_supports_response_files = @ar_supports_response_files@
 
 let syntax_quotations = "@enable_syntax_quotations@" = "yes"
 
+let legacy_mode_syntax = "@enable_legacy_mode_syntax@" = "yes"
+
 let reserved_header_bits = @reserved_header_bits@
 
 let no_stack_checks = "@enable_stack_checks@" <> "yes"

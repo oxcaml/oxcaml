@@ -1,14 +1,14 @@
-Line 5, characters 26-27:
-5 | let local_ foo : string @ = "hello";;
-                              ^
+Line 6, characters 19-20:
+6 | let foo : string @ = "hello";;
+                       ^
 Error: Syntax error: mode expression expected.
-Line 2, characters 17-18:
-2 | let local_ foo @ = "hello";;
-                     ^
+Line 2, characters 10-11:
+2 | let foo @ = "hello";;
+              ^
 Error: Syntax error: mode expression expected.
-Line 2, characters 35-36:
-2 | let local_ foo : ('a. 'a -> 'a) @  = fun x -> x;;
-                                       ^
+Line 2, characters 28-29:
+2 | let foo : ('a. 'a -> 'a) @  = fun x -> x;;
+                                ^
 Error: Syntax error: mode expression expected.
 Line 2, characters 30-31:
 2 | let foo : type a. (a -> a) @  = fun x -> x;;
@@ -64,53 +64,53 @@ Line 5, characters 8-9:
 5 |   ~(bar @ ), ~(biz @ )
             ^
 Error: Syntax error
-Line 2, characters 26-28:
-2 | type r = local_ string @  -> string @ ;;
-                              ^^
+Line 2, characters 19-21:
+2 | type r = string @  -> string @ ;;
+                       ^^
 Error: Syntax error: mode expression expected.
-Line 2, characters 37-39:
-2 | type r = local_ string * y:string @  -> local_ string * w:string @;;
-                                         ^^
+Line 2, characters 30-32:
+2 | type r = string * y:string @  -> string * w:string @;;
+                                  ^^
 Error: Syntax error: mode expression expected.
-Line 2, characters 39-41:
-2 | type r = x:local_ string * y:string @  -> local_ string * w:string @;;
-                                           ^^
+Line 2, characters 32-34:
+2 | type r = x:string * y:string @  -> string * w:string @;;
+                                    ^^
 Error: Syntax error: mode expression expected.
-Line 2, characters 25-27:
-2 | type r = local_ string @ -> string;;
-                             ^^
+Line 2, characters 18-20:
+2 | type r = string @ -> string;;
+                      ^^
 Error: Syntax error: mode expression expected.
 Line 2, characters 26-27:
-2 | type t = Foo of string @@ * global_ string;;
+2 | type t = Foo of string @@ * string;;
                               ^
 Error: Syntax error: modality expression expected.
 Line 4, characters 0-1:
 4 | }
     ^
 Error: Syntax error: modality expression expected.
-Line 2, characters 21-22:
-2 | let foo ?(local_ x @ = 42) () = () ;;
-                         ^
+Line 2, characters 14-15:
+2 | let foo ?(x @ = 42) () = () ;;
+                  ^
 Error: Syntax error: mode expression expected.
-Line 2, characters 25-26:
-2 | let foo ?(local_ x : _ @ = 42) () = ();;
-                             ^
-Error: Syntax error: mode expression expected.
-Line 2, characters 38-39:
-2 | let foo ?(local_ x : ('a. 'a -> 'a) @ ) = ();;
-                                          ^
-Error: Syntax error: mode expression expected.
-Line 2, characters 27-28:
-2 | let foo ?x:(local_ (x,y) @ = (42, 42)) () = ();;
-                               ^
+Line 2, characters 18-19:
+2 | let foo ?(x : _ @ = 42) () = ();;
+                      ^
 Error: Syntax error: mode expression expected.
 Line 2, characters 31-32:
-2 | let foo ?x:(local_ (x,y) : _ @ = (42, 42)) () = ();;
+2 | let foo ?(x : ('a. 'a -> 'a) @ ) = ();;
                                    ^
 Error: Syntax error: mode expression expected.
-Line 2, characters 41-42:
-2 | let foo ?x:(local_ (x,y) : ('a.'a->'a) @ ) () = ();;
-                                             ^
+Line 2, characters 20-21:
+2 | let foo ?x:((x,y) @ = (42, 42)) () = ();;
+                        ^
+Error: Syntax error: mode expression expected.
+Line 2, characters 24-25:
+2 | let foo ?x:((x,y) : _ @ = (42, 42)) () = ();;
+                            ^
+Error: Syntax error: mode expression expected.
+Line 2, characters 34-35:
+2 | let foo ?x:((x,y) : ('a.'a->'a) @ ) () = ();;
+                                      ^
 Error: Syntax error: mode expression expected.
 Line 2, characters 12-13:
 2 | let foo ((x @ ), (y@)) = x + y ;;
@@ -156,4 +156,49 @@ Line 2, characters 10-32:
 2 | let foo = ("bar" :> int @ local);;
               ^^^^^^^^^^^^^^^^^^^^^^
 Error: Syntax error: mode annotations not expected.
+Line 3, characters 4-10:
+3 | let local_ x = "hello";;
+        ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 7-13:
+2 | let f (local_ x) = x;;
+           ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 10-16:
+2 | let f x = local_ x;;
+              ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 9-15:
+2 | type t = local_ int -> int;;
+             ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 11-18:
+2 | type r = { global_ x : int };;
+               ^^^^^^^
+Error: Syntax error: the global_ syntax has been removed.
+Hint: Use @@ global instead.
+Line 2, characters 16-23:
+2 | type v = Foo of global_ int;;
+                    ^^^^^^^
+Error: Syntax error: the global_ syntax has been removed.
+Hint: Use @@ global instead.
+val \#local_ : int = 1
+Line 2, characters 6-14:
+2 | let f ~local_:x = x;;
+          ^^^^^^^^
+Error: local_ is a keyword, it cannot be used as label name
+Line 2, characters 10-16:
+2 | let h o = local_#foo;;
+              ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
+Line 2, characters 13-19:
+2 | let _ = (1 [@local_]);;
+                 ^^^^^^
+Error: Syntax error: the local_ syntax has been removed.
+Hint: Use @ local instead.
 

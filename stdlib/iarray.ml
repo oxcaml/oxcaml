@@ -53,7 +53,7 @@ type (+'a : any mod separable) t = 'a iarray
 
 (* Array operations *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int @@ portable
+external length : ('a : any mod separable). 'a iarray @ local -> int @@ portable
   = "%array_length"
 [@@layout_poly]
 external get :
@@ -86,7 +86,7 @@ external unsafe_set_mutable :
 
 
 (* The implementation is copied from [Array] so that [f] can be [local_] *)
-let init l (local_ f) =
+let init l (f @ local) =
   if l = 0 then unsafe_of_array [||] else
   if l < 0 then invalid_arg "Iarray.init"
   (* See #6575. We could also check for maximum array size, but this depends

@@ -1,4 +1,4 @@
-let[@inline never] [@local never] rec my_fold ~f ~init (local_ xs) = 
+let[@inline never] [@local never] rec my_fold ~f ~init (xs @ local) = 
   match xs with
   | [] -> init
   | x :: xs -> f x (my_fold ~f ~init xs) [@nontail]
@@ -8,7 +8,7 @@ let[@inline never] [@local never] rec local_iota ~start n = exclave_
   else start :: local_iota ~start:(start+1) (n-1)
 
 let[@inline never] [@local never] big_local_alloc () =
-  let xs = local_  local_iota ~start:0 10000 in
+  let xs = ( local_iota ~start:0 10000 : @ local) in
   my_fold ~f:(+) ~init:0 xs [@nontail]
 
 let[@inline never] [@local never] rec heap_iota ~start n =

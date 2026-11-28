@@ -12,28 +12,28 @@ let global_aliased_use : 'a -> unit = fun _ -> ()
 val global_aliased_use : 'a -> unit = <fun>
 |}]
 
-let local_aliased_use (local_ a) = ()
+let local_aliased_use (a @ local) = ()
 [%%expect{|
 val local_aliased_use : 'a @ local -> unit = <fun>
 |}]
 
-let unique_aliased_use (x @ local unique) (local_ y) = ()
+let unique_aliased_use (x @ local unique) (y @ local) = ()
 [%%expect{|
 val unique_aliased_use : 'a @ local unique -> ('b @ local -> unit) @ local =
   <fun>
 |}]
 
-let aliased_unique_use (local_ x) (y @ local unique) = ()
+let aliased_unique_use (x @ local) (y @ local unique) = ()
 [%%expect{|
 val aliased_unique_use : 'a @ local -> 'b @ local unique -> unit = <fun>
 |}]
 
-let aliased_aliased_use (local_ x) (local_ y) = ()
+let aliased_aliased_use (x @ local) (y @ local) = ()
 [%%expect{|
 val aliased_aliased_use : 'a @ local -> 'b @ local -> unit = <fun>
 |}]
 
-let local_returning (local_ x) = [%exclave] x
+let local_returning (x @ local) = [%exclave] x
 [%%expect{|
 val local_returning : 'a @ local -> 'a @ local = <fun>
 |}]

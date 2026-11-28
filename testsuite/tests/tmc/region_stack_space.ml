@@ -6,7 +6,7 @@
 
 let[@inline never] local_pair () = exclave_ (1, 2)
 
-let[@inline never] use_local (local_ _x : int * int) = ()
+let[@inline never] use_local (_x : int * int @ local) = ()
 
 (* tail recursive, no region. Stack space constant *)
 let rec rev_map acc xs ~f =
@@ -39,7 +39,7 @@ let[@tail_mod_cons] rec map_exclave t ~f =
 
 (* TMC, with region, no local parameters, does a local allocation that actually escapes into a call. *)
 let[@tail_mod_cons] rec map_local t ~f =
-  let local_ p = (Sys.opaque_identity 1, Sys.opaque_identity 2) in
+  let p @ local = (Sys.opaque_identity 1, Sys.opaque_identity 2) in
   use_local p;
   match t with
   | [] -> []
@@ -117,7 +117,7 @@ and[@tail_mod_cons] helper ~repeat t ~f =
    Stack space constant. *)
 let last_seen = ref []
 
-let[@tail_mod_cons] rec map_local_args (local_ ctx) ~count ~seen (local_ t)
+let[@tail_mod_cons] rec map_local_args (ctx @ local) ~count ~seen (t @ local)
     ~f =
   let p = local_pair () in
   ignore (Sys.opaque_identity (fst p));
@@ -133,7 +133,7 @@ let[@tail_mod_cons] rec map_local_args (local_ ctx) ~count ~seen (local_ t)
    dps version keeps it. Stack space constant. *)
 let[@inline never] fresh n = (n, n)
 
-let[@tail_mod_cons] rec map_tail_call (local_ prev : int * int) t ~f =
+let[@tail_mod_cons] rec map_tail_call (prev : int * int @ local) t ~f =
   let p = local_pair () in
   ignore (Sys.opaque_identity (fst p));
   use_local prev;
@@ -145,10 +145,10 @@ let[@tail_mod_cons] rec map_tail_call (local_ prev : int * int) t ~f =
 (* TMC, region + a parameter at local. The recursive call is passed values
    that cannot point into the region: the result of a call returning at the
    global mode, a module global and an immediate. Stack space constant. *)
-let[@inline never] next (local_ n : int ref) = !n + 1
+let[@inline never] next (n : int ref @ local) = !n + 1
 
-let[@tail_mod_cons] rec map_global_args (local_ prev : int * int)
-    (local_ cmp : int -> int -> int) (local_ k : int) t ~f =
+let[@tail_mod_cons] rec map_global_args (prev : int * int @ local)
+    (cmp : (int -> int -> int) @ local) (k : int @ local) t ~f =
   let p = local_pair () in
   ignore (Sys.opaque_identity (fst p));
   use_local prev;
@@ -184,7 +184,7 @@ let map_global_closure t ~f =
 
 (* TMC, region + a parameter at local, and the recursive call is passed a
    value allocated in the region. The region must not be closed. *)
-let[@tail_mod_cons] rec map_pass_local (local_ prev : int * int) t ~f =
+let[@tail_mod_cons] rec map_pass_local (prev : int * int @ local) t ~f =
   use_local prev;
   match t with
   | [] -> []
@@ -195,7 +195,7 @@ let[@tail_mod_cons] rec map_pass_local (local_ prev : int * int) t ~f =
    region must not be closed. *)
 type float_record = { v : float }
 
-let[@tail_mod_cons] rec map_float_field (local_ r) (local_ x : float) t ~f =
+let[@tail_mod_cons] rec map_float_field (r @ local) (x : float @ local) t ~f =
   use_local (int_of_float x, 0);
   match t with
   | [] -> []
@@ -205,7 +205,7 @@ let[@tail_mod_cons] rec map_float_field (local_ r) (local_ x : float) t ~f =
    other. The closures are allocated outside the region of the function being
    called, so the region can be closed. Stack space constant. *)
 let map_local_closure t ~f =
-  let local_ offset = (Sys.opaque_identity 0, 0) in
+  let offset @ local = (Sys.opaque_identity 0, 0) in
   let[@tail_mod_cons] rec go t =
     let p = local_pair () in
     ignore (Sys.opaque_identity (fst p));
@@ -216,7 +216,7 @@ let map_local_closure t ~f =
   go t [@nontail]
 
 let map_local_closure_mutual t ~f =
-  let local_ offset = (Sys.opaque_identity 0, 0) in
+  let offset @ local = (Sys.opaque_identity 0, 0) in
   let[@tail_mod_cons] rec go t =
     let p = local_pair () in
     ignore (Sys.opaque_identity (fst p));
@@ -236,8 +236,8 @@ let map_local_closure_mutual t ~f =
    parameter. The captured value is allocated before the closure, so outside
    its region, and the region can be closed. Stack space constant. *)
 let map_free_local t ~f =
-  let local_ k = (Sys.opaque_identity 0, 0) in
-  let[@tail_mod_cons] rec go (local_ ctx : int * int) t =
+  let k @ local = (Sys.opaque_identity 0, 0) in
+  let[@tail_mod_cons] rec go (ctx : int * int @ local) t =
     let p = local_pair () in
     ignore (Sys.opaque_identity (fst p));
     use_local ctx;
@@ -251,9 +251,9 @@ let map_free_local t ~f =
    The region must not be closed when calling [g], or [g] (and the [p] it
    captures) would be freed and overwritten by [_overwrite]. *)
 let[@tail_mod_cons] rec call_local_closure (n : int) =
-  let local_ p = (n, n) in
+  let p @ local = (n, n) in
   let[@tail_mod_cons] rec g n =
-    let local_ _overwrite = Sys.opaque_identity (100, n) in
+    let _overwrite @ local = Sys.opaque_identity (100, n) in
     if n = 0 then [] else fst p :: g (n - 1)
   in
   if n = 0 then 0 :: g 1 else 0 :: call_local_closure (n - 1)
@@ -261,14 +261,14 @@ let[@tail_mod_cons] rec call_local_closure (n : int) =
 (* The TMC call in the body of a [try] must not close the region: this used to
    crash the compiler. *)
 let[@tail_mod_cons] rec try_body n =
-  let local_ p = (n, n) in
+  let p @ local = (n, n) in
   try n :: try_body (n - 1) with _ -> [ fst p ]
 
 (* TMC call under [Sys.opaque_identity]: the argument of [opaque] is in TMC
    position but not in tail position, so the call must not close the region.
    It is not a tailcall, so there is no warning. *)
 let[@tail_mod_cons] rec map_opaque t ~f =
-  let local_ p = (Sys.opaque_identity 0, 0) in
+  let p @ local = (Sys.opaque_identity 0, 0) in
   use_local p;
   match t with
   | [] -> []
@@ -278,7 +278,7 @@ let[@tail_mod_cons] rec map_opaque t ~f =
    the dps version writes its result to the destination, so the call must not
    close the region. *)
 let[@tail_mod_cons] rec send_in_tail (o : < m : int list >) n =
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   if n = 0 then o#m else n :: send_in_tail o (n - 1)
 
@@ -288,7 +288,7 @@ type _ ty = Bool_and : bool ty | Bool_or : bool ty | List : int list ty
 let[@inline never] big n = n > 3
 
 let[@tail_mod_cons] rec seq_in_tail : type a. a ty -> int -> a = fun ty n ->
-  let local_ p = (Sys.opaque_identity n, n) in
+  let p @ local = (Sys.opaque_identity n, n) in
   use_local p;
   match ty with
   | Bool_and -> n > 0 && big n

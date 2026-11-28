@@ -77,7 +77,7 @@ Line 2, characters 21-22:
    - the resulting value can be local/global
    - the value written in the record can be local/global *)
 
-let gc_soundness_bug (r @ local unique) (local_ x) =
+let gc_soundness_bug (r @ local unique) (x @ local) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -89,7 +89,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (r @ local unique) (local_ x) =
+let disallowed_by_locality (r @ local unique) (x @ local) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:
@@ -101,7 +101,7 @@ Error: This value is "local" to the parent region
          which is expected to be "global".
 |}]
 
-let gc_soundness_bug (r @ unique) (local_ x) =
+let gc_soundness_bug (r @ unique) (x @ local) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -113,7 +113,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (r @ unique) (local_ x) =
+let disallowed_by_locality (r @ unique) (x @ local) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:

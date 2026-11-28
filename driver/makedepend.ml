@@ -705,6 +705,10 @@ let run_main argv =
       "-no-syntax-quotations", Arg.Clear Clflags.syntax_quotations,
         " Do not lex quotation syntax in files that do not use the #syntax \
          quotations directive (see ocamlc)";
+      "-legacy-mode-syntax", Arg.Set Clflags.legacy_mode_syntax,
+        " Accept the legacy local_ and global_ mode syntax (see ocamlc)";
+      "-no-legacy-mode-syntax", Arg.Clear Clflags.legacy_mode_syntax,
+        " Reject the legacy local_ and global_ mode syntax (see ocamlc)";
       "-version", Arg.Unit print_version,
         " Print version and exit";
       "-vnum", Arg.Unit print_version_num,

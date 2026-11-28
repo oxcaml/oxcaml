@@ -7,10 +7,10 @@
    allocations. This is a regression test concerning stack alignment.
    See #7088. *)
 
-external opaque_local : local_ 'a -> local_ 'a = "%opaque"
+external opaque_local : 'a @ local -> 'a @ local = "%opaque"
 
 let rec go n =
-  let local_ box = opaque_local (n, n) in
+  let box @ local = opaque_local (n, n) in
   let r = 1 + go (n + 1) in
   ignore (Sys.opaque_identity (fst box));
   r

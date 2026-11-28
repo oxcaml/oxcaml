@@ -11,19 +11,19 @@ type 'a g_or_null =
 type 'a g_or_null = Null | This of 'a @@ global [@@or_null]
 |}]
 
-let f (local_ s : string) = This s
+let f (s : string @ local) = This s
 
 [%%expect{|
-Line 1, characters 33-34:
-1 | let f (local_ s : string) = This s
-                                     ^
+Line 1, characters 34-35:
+1 | let f (s : string @ local) = This s
+                                      ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "This") (with some modality) in the value at line 1, characters 28-34.
+         because it is contained (via constructor "This") (with some modality) in the value at line 1, characters 29-35.
 |}]
 
 let f (s : string) =
-  let local_ x = This s in
+  let x @ local = This s in
   match x with
   | Null -> assert false
   | This s' -> ref s'
@@ -42,7 +42,7 @@ type 'a plain_or_null = Null' | This' of 'a [@@or_null]
 |}]
 
 let f (s : string) =
-  let local_ x = This' s in
+  let x @ local = This' s in
   match x with
   | Null' -> assert false
   | This' s' -> ref s'

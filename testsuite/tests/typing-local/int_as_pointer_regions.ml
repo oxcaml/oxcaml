@@ -1,7 +1,7 @@
 [@@@ocaml.flambda_o3]
 
 external opaque_identity : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
-let[@inline never] ignore_local (local_ x) = let _ = opaque_identity x in ()
+let[@inline never] ignore_local (x @ local) = let _ = opaque_identity x in ()
 
 let allocate_in_current_region x = exclave_
   ignore_local (Some x);

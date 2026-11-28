@@ -37,6 +37,8 @@ type error =
   | Non_lowercase_delimiter of string
   | Capitalized_raw_identifier of string
   | Unknown_keyword of string
+  | Removed_legacy_local
+  | Removed_legacy_global
 
 exception Error of error * Location.t
 
@@ -494,6 +496,10 @@ let () = Lexer.is_keyword_ref := is_keyword
 
 let find_keyword lexbuf name default =
   match Hashtbl.find keyword_table name with
+  | Some LOCAL when not !Clflags.legacy_mode_syntax ->
+      fail lexbuf Removed_legacy_local
+  | Some GLOBAL when not !Clflags.legacy_mode_syntax ->
+      fail lexbuf Removed_legacy_global
   | Some x -> return x
   | None -> fail lexbuf (Unknown_keyword name)
   | exception Not_found -> return default
@@ -626,6 +632,18 @@ let prepare_error loc = function
       "%a has been defined as an additional keyword.@ \
        This version of OCaml does not support this keyword."
       Style.inline_code name
+  | Removed_legacy_local ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "local_"
+        Style.inline_code "@ local"
+  | Removed_legacy_global ->
+      Location.errorf ~loc
+        "Syntax error: the %a syntax has been removed.\n\
+         @{<hint>Hint@}: Use %a instead."
+        Style.inline_code "global_"
+        Style.inline_code "@@ global"
 
 let () =
   Location.register_error_of_exn

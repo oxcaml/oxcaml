@@ -32,7 +32,9 @@ let rec skip_phrase lexbuf =
               | Lexer.Error (Lexer.Unterminated_string, _)
               | Lexer.Error (Lexer.Reserved_sequence _, _)
               | Lexer.Error (Lexer.Unterminated_string_in_comment _, _)
-              | Lexer.Error (Lexer.Illegal_character _, _)) ->
+              | Lexer.Error (Lexer.Illegal_character _, _)
+              | Lexer.Error (Lexer.Removed_legacy_local, _)
+              | Lexer.Error (Lexer.Removed_legacy_global, _)) ->
       skip_phrase lexbuf
 
 let maybe_skip_phrase lexbuf =
@@ -56,7 +58,9 @@ let wrap (parser : 'a parser) lexbuf : 'a =
     last_token := Parser.EOF;
     ast
   with
-  | Lexer.Error(Lexer.Illegal_character _, _) as err
+  | Lexer.Error((Lexer.Illegal_character _
+                | Lexer.Removed_legacy_local
+                | Lexer.Removed_legacy_global), _) as err
     when !Location.input_name = "//toplevel//"->
       skip_phrase lexbuf;
       raise err

@@ -17,7 +17,7 @@ val use_local_product : ('a : value & value). 'a @ local -> unit = <fun>
 
 let f x =
     let (_, x) : _ =
-      42, local_ (Some x)
+      42, stack_ (Some x)
     in
     x
   ;;
@@ -29,7 +29,7 @@ Error: This value is "local"
          because it is an element of the tuple at line 3, characters 6-25
          which is "local"
          because it is a tuple that contains the expression at line 3, characters 10-25
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -37,7 +37,7 @@ Error: This value is "local"
 
 let f x =
     let #(_, x) : _ =
-      #(42, local_ (Some x))
+      #(42, stack_ (Some x))
     in
     x
   ;;
@@ -49,7 +49,7 @@ Error: This value is "local"
          because it is an element of the tuple at line 3, characters 6-28
          which is "local"
          because it is a tuple that contains the expression at line 3, characters 12-27
-         which is "local".
+         which is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
@@ -230,7 +230,7 @@ Error: This value is "local" to the parent region but is expected to be "global"
 |}]
 
 (* An unboxed tuple is not an allocation, but a regular tuple is *)
-let f_unboxed_tuple (local_ a) (local_ b) =
+let f_unboxed_tuple (a @ local) (b @ local) =
   let t = #(a, b) in
   let #(a', _) = t in
   a'
@@ -238,7 +238,7 @@ let f_unboxed_tuple (local_ a) (local_ b) =
 val f_unboxed_tuple : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
-let f_boxed_tuple (local_ a) (local_ b) =
+let f_boxed_tuple (a @ local) (b @ local) =
   let t = (a, b) in
   let (a', _) = t in
   a'
