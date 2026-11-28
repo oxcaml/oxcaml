@@ -291,9 +291,7 @@ let flambda_to_flambda0 : type m.
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
               ~final_typing_env ~free_names flambda
           in
-          (* CR gbury: this checks current fails. @Ekdohibs should probably take
-             a look at that *)
-          if false && Symbol_check.cli_flag ()
+          if Symbol_check.cli_flag ()
           then Symbol_check.check (Flambda_unit.body flambda);
           ( flambda,
             ~all_code,
