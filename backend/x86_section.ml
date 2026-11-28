@@ -52,6 +52,8 @@ module Section_name = struct
 
     let is_data_like t = String.starts_with ~prefix:".data" t.name_str
 
+    let is_rodata_like t = String.starts_with ~prefix:".rodata" t.name_str
+
     let is_note_like t = String.starts_with ~prefix:".note" t.name_str
   end
 
