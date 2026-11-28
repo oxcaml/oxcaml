@@ -12,14 +12,14 @@
    ocamlopt_flags = "-link-jsir -g";
    jsir;
  }{
-   ocamlopt_flags = "-link-jsir -linkall -jsoo-opt -q";
+   ocamlopt_flags = "-link-jsir -linkall";
    jsir;
  }
 *)
 
-(* With -linkall, the whole standard library is linked. wasm_of_ocaml then
-   warns about the primitives it refers to that the WebAssembly runtime lacks,
-   as it does for bytecode executables, unless it is given -q. *)
+(* With -linkall, the whole standard library is linked, but js_of_ocaml still
+   removes what the program does not use: there are no warnings about
+   primitives that the runtime lacks. *)
 
 (* With -link-jsir, the JSIR of the units of an executable is linked
    into one program before js_of_ocaml compiles it, and references to the
