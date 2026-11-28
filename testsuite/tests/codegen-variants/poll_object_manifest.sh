@@ -2,8 +2,9 @@
 
 # usage: sh poll_object_manifest.sh
 #
-# Makes a library root out of the default library tree and the tree of the
-# variant with the other poll-insertion setting. Compiles a unit with and
+# Makes a library root out of the library root of the installation and the
+# tree of the variant with the other poll-insertion setting. Compiles a unit
+# with and
 # without polls, and puts the .cmx file and the object file with polls in
 # the tree with polls, and the object file without polls in the tree
 # without, all under names without extension. Links a program whose other
@@ -28,13 +29,8 @@ done
 for entry in "$stdlib/variants/$other"/*; do
   ln -s "$entry" "$root/variants/$other/"
 done
-if [ "$with_polls" = "$stdlib" ]; then
-  with_tree=$root
-  without_tree=$root/variants/$other
-else
-  with_tree=$root/variants/$other
-  without_tree=$root
-fi
+with_tree=$root/variants/$other
+without_tree=$root
 OCAMLLIB=$root
 MANIFEST_FILES_ROOT=/
 export OCAMLLIB MANIFEST_FILES_ROOT
@@ -88,12 +84,10 @@ link "unit info of the tree with polls, object file of the tree without" \
 link "unit info and object file of the tree with polls" \
   "$with_tree/pkg/object-with-polls"
 
-# An object file that both trees have under one name, named in the default
-# tree: each file of a manifest is mapped on its own, whatever the manifest
-# says of the unit info, so the link takes the one of the tree with polls,
-# which is the selected tree. (Where the default tree is the one with
-# polls, it is the selected tree and nothing is mapped: the case then
-# repeats the one before it.)
+# An object file that both trees have under one name, named in the root:
+# each file of a manifest is mapped on its own, whatever the manifest says
+# of the unit info, so the link takes the one of the tree with polls, which
+# is the selected tree.
 cp with/$unit.o "$with_tree/pkg/body"
 cp without/$unit.o "$without_tree/pkg/body"
 link "unit info of the tree with polls, object file that both trees have" \

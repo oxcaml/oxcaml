@@ -15,8 +15,8 @@
 #
 # "direct" does the first of them with a copy of <library tree> itself as
 # OCAMLLIB, when that tree is a variant's own, and writes what happens to
-# the file direct.output. When that variant differs from the default one by
-# more than poll insertion, it also tries links whose library root has no
+# the file direct.output. When that variant differs from base by more than
+# poll insertion, it also tries links whose library root has no
 # place for the archive, and one whose root cannot be judged, and writes
 # what happens to the file roots.output.
 
@@ -56,11 +56,10 @@ recover() {
   # file elsewhere, with another extension than that of archives. The error
   # names every file that was looked up, and gives no command: a command
   # for the first would write the archive of this variant in the place of
-  # the default variant's, and the generator would name the second
-  # otherwise.
+  # the one of base, and the generator would name the second otherwise.
   path=$(echo "$command" | sed -n -e "s/.* '\\(.*\\)' *\$/\\1/p")
-  # (The root may have its archive by now, from the same links for the
-  # default variant: it is set aside for this.)
+  # (The root may have its archive by now, from the same links for base:
+  # it is set aside for this.)
   if [ -e "$OCAMLLIB/$archive" ]; then
     mv "$OCAMLLIB/$archive" root-archive.aside
   fi
@@ -178,7 +177,7 @@ case $mode in
       recover "$@" && "$@" $cached $source -o direct.exe && ./direct.exe
     } > direct.output 2>&1
     # The rest is about frame pointers, stack checks and AddressSanitizer:
-    # a variant with the default settings for these, whose object files
+    # a variant with the settings of base for these, whose object files
     # refer to the same link-time guard, has nothing to show.
     ( unset OCAMLPARAM; OCAMLLIB=$default_root "$@" -c -o default_unit.cmx \
         $source ) || exit 2
@@ -186,15 +185,12 @@ case $mode in
     if [ "$(guard_of default_unit.o)" = "$(guard_of selected_unit.o)" ]; then
       exit 0
     fi
-    case $("$@" -config-var poll_insertion) in
-      true) other_poll=-disable-poll-insertion ;;
-      *) other_poll=-enable-poll-insertion ;;
-    esac
+    other_poll=-enable-poll-insertion
     {
-      # The root is the tree of this variant. For a link for the default
-      # variant, with either poll-insertion setting, it stands for the tree
-      # of that variant, and its archive, which now exists, is not for it;
-      # the libraries are taken from where they are right.
+      # The root is the tree of this variant. For a link for base, with
+      # either poll-insertion setting, it stands for the tree of that
+      # variant, and its archive, which now exists, is not for it; the
+      # libraries are taken from where they are right.
       ( unset OCAMLPARAM
         no_place "a root built for another variant" \
           "is not built for codegen variant" default.log \
@@ -208,12 +204,12 @@ case $mode in
         no_place "a variant without a library tree" \
           "has no library tree for codegen variant" bare.log \
           "$@" -nostdlib -I "$tree" $cached $source -o bare.exe )
-      # A root of the default variant without the unit info of the standard
-      # library, by which a root is judged, as an installation that only
-      # links with -output-obj may be. For the default variant nothing says
-      # that it is built for another one, and its archive is used. For the
-      # default variant with the other poll-insertion setting, which the
-      # root also stands for, nothing says that it is built for it.
+      # A root of base without the unit info of the standard library, by
+      # which a root is judged, as an installation that only links with
+      # -output-obj may be. For base nothing says that it is built for
+      # another variant, and its archive is used. For base with poll
+      # insertion, which the root also stands for, nothing says that it is
+      # built for it.
       ( unset OCAMLPARAM
         rm embedded-root/std_exit.cmx
         OCAMLLIB=$PWD/embedded-root
@@ -227,10 +223,6 @@ case $mode in
           echo "$description: refused:"
           cat embedded.log
         fi
-        case $("$@" -config-var poll_insertion) in
-          true) other_poll=-disable-poll-insertion ;;
-          *) other_poll=-enable-poll-insertion ;;
-        esac
         no_place "the same root, the other poll setting" \
           "is not built for codegen variant" embedded-poll.log \
           "$@" $other_poll -output-obj $cached $source -o embedded-poll.o )

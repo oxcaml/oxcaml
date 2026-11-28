@@ -3,9 +3,9 @@
 # usage: sh poll_no_trees.sh
 #
 # Compiles the units of poll_no_trees.ml with and without poll insertion
-# against a copy of the default library tree ($ocamlsrcdir/stdlib) that has
-# no tree of another codegen variant, and links and runs them with each
-# setting. Checks that a link with poll insertion is told when these
+# against a copy of the library root ($ocamlsrcdir/stdlib) that has no tree
+# of another codegen variant than base, and links and runs them with each
+# setting. Checks that a link with poll insertion is told that these
 # libraries have none.
 
 set -e
@@ -20,7 +20,7 @@ done
 OCAMLLIB=$(pwd)/root
 export OCAMLLIB
 # Not the defaults for the codegen variant that the testsuite may be
-# running under: this root has the default tree only.
+# running under: this root has the tree of base only.
 unset OCAMLPARAM
 
 ocamlopt="$ocamlrun $ocamlopt_byte"
@@ -56,29 +56,22 @@ link () {
   fi
 }
 
-# The one library tree is that of the default variant.
-if [ "$($ocamlopt -config-var poll_insertion)" = true ]; then
-  without_polled_libraries=0
-else
-  without_polled_libraries=1
-fi
-link $without_polled_libraries -enable-poll-insertion
+# The one library tree is that of base, without polls.
+link 1 -enable-poll-insertion
 link 0 -disable-poll-insertion
 link 0 -enable-poll-insertion -alert -no_polled_libraries
 
 # A program whose units all have polls, linked with poll insertion, is
-# fully polled when these libraries are, and then spawns a domain. When
-# they are not, it cannot, and the failure has to name the libraries: the
-# units of the program are not the cause, and the flag that the message
-# advises was given.
+# not fully polled with these libraries and cannot spawn a domain. The
+# failure has to name the libraries: the units of the program are not the
+# cause, and the flag that the message advises was given.
 $ocamlopt -enable-poll-insertion \
   -alert -no_polled_libraries-unsafe_multidomain-do_not_spawn_domains \
   -o spawn.exe poll_spawn.ml 2> spawn.log
 cat spawn.log
 spawn=$(./spawn.exe)
-case $without_polled_libraries:$spawn in
-  0:"spawned: 42") spawn="what these libraries allow";;
-  1:"spawn failed: "*"or of the libraries it is linked with"*)
+case $spawn in
+  "spawn failed: "*"or of the libraries it is linked with"*)
     spawn="what these libraries allow";;
 esac
 echo "units with polls, linked with: $spawn"

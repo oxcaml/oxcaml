@@ -39,31 +39,12 @@ case "$1" in
     ;;
   order)
     # The two programs of the block agree on what their stub saw, which
-    # the block has checked.  Under a variant that is not the default one,
-    # which has a library tree of its own, it must be the macro: the
-    # variant's part of cflags comes after the -U of the test.
-    if [ "$stdlib" != "$ocamlsrcdir/stdlib" ]; then
-      expected="cflags: FROM_TEST STACK_CHECKS_ENABLED"
-      if [ "$(cat flags.output)" != "$expected" ]; then
-        echo "the stub of a variant with stack checks saw:"
-        cat flags.output
-        exit 1
-      fi
-    fi
-    ;;
-  driver)
-    # The compiler by itself, without the variables of ocamltest, whose
-    # part for the variant would do its work for it: given the configured
-    # C flags again in -ccopt, as a build that names its C compiler does,
-    # ocamlopt neither instruments the stub of a variant without
-    # AddressSanitizer nor links the sanitizer's runtime, also where the
-    # configured flags ask for both.
-    configured=$($ocamlrun $ocamlopt_byte -config-var ocamlopt_cflags)
-    $ocamlrun $ocamlopt_byte -nostdlib -I "$stdlib" -ccopt "$configured" \
-      variant_variables_.c variant_variables.ml -o driver.exe
-    result=$(./driver.exe instrumentation)
-    if [ "$result" != "AddressSanitizer: as the variant has it" ]; then
-      echo "with the configured flags in -ccopt: $result"
+    # the block has checked.  It must be the macro: the variant's part of
+    # cflags comes after the -U of the test.
+    expected="cflags: FROM_TEST STACK_CHECKS_ENABLED"
+    if [ "$(cat flags.output)" != "$expected" ]; then
+      echo "the stub of a variant with stack checks saw:"
+      cat flags.output
       exit 1
     fi
     ;;

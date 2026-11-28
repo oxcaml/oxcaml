@@ -2,21 +2,16 @@
 
 # usage: sh toplevel_poll_preload.sh
 #
-# Makes a library root out of the default library tree and the tree of the
-# variant with the other poll-insertion setting, each with a plugin
-# which.cmxs that says which of the two it is in. Runs the native toplevel
-# of the default variant there with the flag of the other setting, and
-# gives it the plugin by name and by path.
+# Makes a library root out of the library root of the installation and the
+# tree of the variant with the other poll-insertion setting, each with a
+# plugin which.cmxs that says which of the two it is in. Runs the native
+# toplevel of base there with the flag of the other setting, and gives it
+# the plugin by name and by path.
 
 set -e
 
 . "$(dirname "$0")/poll_pair.sh"
 flag=$other_flag
-if [ "$flag" = -disable-poll-insertion ]; then
-  # A fully polled toplevel loads code without polls with one domain only.
-  OCAMLRUNPARAM=d=1
-  export OCAMLRUNPARAM
-fi
 
 root=$(pwd)/root
 mkdir -p "$root/variants/$other"
@@ -45,7 +40,7 @@ echo "by name, default setting: $($toplevel which.cmxs < /dev/null 2>&1)"
 echo "by name: $($toplevel $flag which.cmxs < /dev/null 2>&1)"
 echo "by path: $($toplevel $flag "$root/which.cmxs" < /dev/null 2>&1)"
 # A file that only the selected tree has is not found by a search of the
-# default tree whose result is then looked up in the selected one.
+# root whose result is then looked up in the selected one.
 echo "by name, in one tree: $($toplevel $flag only.cmxs < /dev/null 2>&1)"
 # Without the directory of the standard library in the load path, a name is
 # not found there, and a path still names its file.

@@ -3,7 +3,7 @@
 # usage: sh poll_other_setting.sh
 #
 # For every library tree of the installation under test (those under
-# $ocamlsrcdir/stdlib, the default library root), compiles, links and runs
+# $ocamlsrcdir/stdlib, the library root), compiles, links and runs
 # poll_other_setting.ml for the codegen variant that differs from the
 # tree's in poll insertion alone. Prints the failures, with what the
 # compiler said, and "ok" if there is none.
@@ -27,23 +27,15 @@ key () {
 }
 
 status=ok
-for tree in default $($ocamlopt -config-var codegen_variants); do
-  # The variant of the default tree is the one that the compiler selects
-  # by itself, and the only one of an installation without variants. The
-  # other axes of the variant of another tree are given with OCAMLPARAM,
-  # in place of the defaults for the variant that the testsuite may be
-  # running under.
-  case $tree in
-    default)
-      OCAMLPARAM=_
-      polled=$($ocamlopt -config-var poll_insertion);;
-    *)
-      OCAMLPARAM=$(key "$tree" asan asan),$(key "$tree" fp frame-pointers)
-      OCAMLPARAM=$OCAMLPARAM,$(key "$tree" sc stack-checks),_
-      if has "$tree" poll; then polled=true; else polled=false; fi;;
-  esac
+for tree in base $($ocamlopt -config-var codegen_variants); do
+  # The tree of base is the root, the only one of an installation without
+  # variants. The other axes of the tree's variant are given with
+  # OCAMLPARAM, in place of the defaults for the variant that the testsuite
+  # may be running under.
+  OCAMLPARAM=$(key "$tree" asan asan),$(key "$tree" fp frame-pointers)
+  OCAMLPARAM=$OCAMLPARAM,$(key "$tree" sc stack-checks),_
   export OCAMLPARAM
-  if $polled; then
+  if has "$tree" poll; then
     flag=-disable-poll-insertion
   else
     flag=-enable-poll-insertion

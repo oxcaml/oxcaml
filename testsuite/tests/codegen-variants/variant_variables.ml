@@ -43,11 +43,9 @@
  }{
  (* The test takes the macro of the variant's axis back.  The variant's
     part of cflags comes after what the test adds, so the stub sees the
-    macro all the same, unless the variant is the default one, which has
-    no part of its own.  Either way the flags of a compilation are read
-    as a command line is: the two programs print the same.  The script
-    then checks what they print under a variant that is not the default
-    one. *)
+    macro all the same.  The flags of a compilation are read as a command
+    line is: the two programs print the same, and the script then checks
+    what they print. *)
    compiler_directory_suffix = ".order";
    setup-ocamlopt.byte-build-env;
    codegen_variant = "sc";
@@ -70,20 +68,6 @@
    script = "sh variant_variables.sh order";
    script;
  }{
-   compiler_directory_suffix = ".no-asan";
-   setup-ocamlopt.byte-build-env;
-   codegen_variant = "-asan";
-   variant_available;
-   all_modules = "variant_variables_.c variant_variables.ml";
-   ocamlopt_flags = "-ccopt '${cflags}'";
-   ocamlopt.byte;
-   arguments = "instrumentation";
-   run;
-   reference = "${test_source_directory}/variant_variables.no-asan.reference";
-   check-program-output;
-   script = "sh variant_variables.sh driver";
-   script;
- }{
    compiler_directory_suffix = ".bytecode";
    codegen_variant = "sc";
    variant_available;
@@ -98,14 +82,7 @@
    here after the build environment was set up, under whatever variant the
    run uses.  stdlib is the variant's library tree, and cflags and mkexe
    end with its C flags, after what the test itself added to them.  The
-   flags of a native compilation get them in the same form.  The
-   configured flags in cflags are those of the default variant: where
-   that one has AddressSanitizer, they would instrument the C code of a
-   program built for a variant without it, and the block that asks for
-   such a variant checks the compilation and the link: once with cflags
-   in the flags of a compilation, whose variant's part turns the
-   sanitizer off again, and once with the compiler by itself (the script),
-   which has to do that without it.
+   flags of a native compilation get them in the same form.
    In a block set up for a bytecode compiler, cflags and mkexe are for the
    bytecode runtime and carry nothing of the variant, while stdlib still
    is the variant's tree, for the native compilers that such a block may
@@ -113,10 +90,4 @@
 
 external variant_macros : unit -> string = "variant_macros"
 
-external instrumentation : unit -> string = "variant_instrumentation"
-
-let () =
-  match Sys.argv with
-  | [| _; "instrumentation" |] ->
-    Printf.printf "AddressSanitizer:%s\n" (instrumentation ())
-  | _ -> Printf.printf "cflags:%s\n" (variant_macros ())
+let () = Printf.printf "cflags:%s\n" (variant_macros ())

@@ -35,7 +35,7 @@
    cached-generic-functions.a of the variant's library tree, and an
    installation does not necessarily have it. This test works in a library
    root of its own, made of links to the installation's, and does the same
-   under two variants, of which at most one is the default:
+   under two variants, of which at most one is base:
 
    - Without the archive, a link with -use-cached-generic-functions fails
      with an error that gives the command that generates it. That command,
@@ -44,8 +44,8 @@
    - The archive may also be named, with -cached-generic-functions-path. A
      build system that names the one in the library root, as it names the
      libraries there, gets the one of the selected variant's tree: the
-     archive of the root itself is the default variant's, which the linker
-     refuses for any other.
+     archive of the root itself is that of base, which the linker refuses
+     for any other variant.
 
    The command of the error names the variant, and is run in an environment
    whose OCAMLPARAM selects the other frame-pointer setting, and the LLVM
@@ -55,21 +55,20 @@
 
    The library root may also be the tree of a variant itself, where the
    archive is the root's own. The first point is tried again with a copy of
-   the tree of whichever of the two variants is not the default as the
-   root: the command of the error names the archive where the linker then
-   finds it.
+   the tree of whichever of the two variants is not base as the root: the
+   command of the error names the archive where the linker then finds it.
 
    The error gives no command where there is no place for the archive of
    the selected variant: when the installation has no library tree for the
    variant, and when the library root that stands for that tree is built
    for another variant, whose archive the command would write over. Nor
    does it for a missing archive that is named: the error says which files
-   were looked up. For the default variant itself, a root is built for
-   another variant when the unit info of its standard library says so: one
-   without that file, as an installation that only links with -output-obj
-   may be, is used. For the default variant with the other poll-insertion
-   setting, which the root also stands for, that file has to be read and
-   have the variant's other settings: its poll bit is not compared. *)
+   were looked up. For base itself, a root is built for another variant
+   when the unit info of its standard library says so: one without that
+   file, as an installation that only links with -output-obj may be, is
+   used. For base with poll insertion, which the root also stands for,
+   that file has to be read and have the variant's other settings: its
+   poll bit is not compared. *)
 
 let apply3 f x y z = (Sys.opaque_identity f) x y z
 

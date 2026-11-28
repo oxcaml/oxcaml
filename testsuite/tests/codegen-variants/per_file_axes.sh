@@ -2,15 +2,15 @@
 
 # usage: sh per_file_axes.sh
 #
-# Makes ./root, the default library root of the installation under test
-# (as symbolic links) with an ocaml_compiler_internal_params file of its
-# own: the one of the installation, if it has one, is not linked, so that
+# Makes ./root, the library root of the installation under test (as
+# symbolic links) with an ocaml_compiler_internal_params file of its own:
+# the one of the installation, if it has one, is not linked, so that
 # nothing is written to it.  For the codegen variant of every library tree
-# of the installation, and for the default variant with the other
-# poll-insertion setting, the file sets the axes of that variant for
-# first.ml alone, and an invocation with the default axes compiles first.ml
-# and then second.ml, and links first.ml.  Prints the failures, with what
-# the compiler said, and "ok" if there is none.
+# of the installation, and for base with poll insertion, which an
+# installation need not have a tree for, the file sets the axes of that
+# variant for first.ml alone, and an invocation with the axes of base
+# compiles first.ml and then second.ml, and links first.ml.  Prints the
+# failures, with what the compiler said, and "ok" if there is none.
 
 ocamlopt="$ocamlrun $ocamlopt_byte"
 objinfo="$ocamlrun $ocamlsrcdir/tools/ocamlobjinfo"
@@ -61,12 +61,7 @@ failure () {
 
 for variant in $($ocamlopt -config-var codegen_variants) other-poll; do
   case $variant in
-    other-poll)
-      if [ "$($ocamlopt -config-var poll_insertion)" = true ]; then
-        settings=poll-insertion=0
-      else
-        settings=poll-insertion=1
-      fi;;
+    other-poll) settings=poll-insertion=1;;
     *)
       settings="$(key "$variant" asan asan) \
         $(key "$variant" fp frame-pointers) \
@@ -76,13 +71,13 @@ for variant in $($ocamlopt -config-var codegen_variants) other-poll; do
   : > compiler.log
 
   # What a unit records when the whole invocation has the settings, and
-  # when it has the default axes.
+  # when it has the axes of base.
   : > $params
   OCAMLPARAM=_,$(echo $settings | tr ' ' ,) $ocamlopt -c alone.ml \
     2> compiler.log
   with_settings=$(axes alone.cmx)
   $ocamlopt -c alone.ml 2>> compiler.log
-  with_default_axes=$(axes alone.cmx)
+  with_base_axes=$(axes alone.cmx)
 
   for setting in $settings; do
     echo "first.ml : ${setting%=*} = ${setting#*=}"
@@ -92,7 +87,7 @@ for variant in $($ocamlopt -config-var codegen_variants) other-poll; do
   if [ "$(axes first.cmx)" != "$with_settings" ]; then
     failure "first.ml was not compiled with them"
   fi
-  if [ "$(axes second.cmx)" != "$with_default_axes" ]; then
+  if [ "$(axes second.cmx)" != "$with_base_axes" ]; then
     failure "second.ml was not compiled with the axes of the invocation"
   fi
 
@@ -101,7 +96,7 @@ for variant in $($ocamlopt -config-var codegen_variants) other-poll; do
   # unit, and refuses any other.
   $ocamlopt first.ml -o program.exe 2> compiler.log
   linked=$?
-  if [ "${with_settings%Polled:*}" = "${with_default_axes%Polled:*}" ]; then
+  if [ "${with_settings%Polled:*}" = "${with_base_axes%Polled:*}" ]; then
     if [ $linked != 0 ] || ! ./program.exe > /dev/null; then
       failure "the program was not linked"
     fi

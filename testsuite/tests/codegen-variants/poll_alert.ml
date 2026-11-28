@@ -18,8 +18,8 @@
    program without polls is not what the alert is about, wherever its file
    is, unless it is named Std_exit or its file holds the unit Stdlib.
 
-   The script links this file. It needs the tree of the variant that
-   differs from the default one in poll insertion only (poll_pair.sh). *)
+   The script links this file. It needs the tree of poll, the variant that
+   differs from base in poll insertion only (poll_pair.sh). *)
 
 external fully_polled : unit -> bool
   = "caml_sys_exit" "caml_code_is_fully_polled"

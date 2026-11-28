@@ -22,10 +22,8 @@
    the tree with polls and its object file in the tree without, then in
    the tree with polls: the first link must be refused, and the second
    makes a fully polled program. A third manifest names an object file
-   that both trees have, in the default tree: the driver takes the one of
-   the selected tree, with polls, whatever tree the unit info is named
-   in (which shows nothing where the default tree is the one with polls:
-   it is then the selected tree, and the file named is the file taken).
-   The program is poll_object_loop.ml. The test needs the tree of the
-   variant that differs from the default one in poll insertion only
+   that both trees have, in the root: the driver takes the one of the
+   selected tree, with polls, whatever tree the unit info is named in.
+   The program is poll_object_loop.ml. The test needs the tree of poll,
+   the variant that differs from base in poll insertion only
    (poll_pair.sh). *)

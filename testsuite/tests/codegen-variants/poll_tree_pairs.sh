@@ -3,7 +3,7 @@
 # usage: sh poll_tree_pairs.sh
 #
 # For every two library trees of the installation under test (those under
-# $ocamlsrcdir/stdlib, the default library root) whose codegen variants
+# $ocamlsrcdir/stdlib, the library root) whose codegen variants
 # differ only in poll insertion, checks that the two are the same libraries
 # but for the polls in their code:
 # - they have the same .cmx and .cmxa files, archives and object files (a
@@ -26,23 +26,15 @@ OCAMLLIB=$root
 LC_ALL=C
 export OCAMLLIB LC_ALL
 
-# The name of the default variant, whose tree is the root itself: the
-# tokens of its enabled axes, sorted.
 config () {
   $ocamlopt -config-var "$1"
 }
-default=
-[ "$(config with_address_sanitizer)" = true ] && default=$default-asan
-[ "$(config with_frame_pointers)" = true ] && default=$default-fp
-[ "$(config poll_insertion)" = true ] && default=$default-poll
-[ "$(config no_stack_checks)" = false ] && default=$default-sc
-default=${default#-}
-default=${default:-base}
 
 # usage: tree <variant>
-# The library tree of the variant, if the installation has one.
+# The library tree of the variant, if the installation has one: the root
+# itself for base.
 tree () {
-  if [ "$1" = "$default" ]; then
+  if [ "$1" = base ]; then
     echo "$root"
   elif [ -d "$root/variants/$1" ]; then
     echo "$root/variants/$1"
@@ -121,7 +113,7 @@ differ () {
 }
 
 status=ok
-for with in $default $(config codegen_variants); do
+for with in $(config codegen_variants); do
   case -$with- in
     *-poll-*) ;;
     *) continue;;

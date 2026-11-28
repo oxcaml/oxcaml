@@ -3,9 +3,9 @@
 # usage: sh poll_alert.sh
 #
 # Links programs with poll insertion against the two library trees of the
-# installation that differ only in poll insertion, the default one and
-# the one of the variant with the other setting, and says for each link
-# whether the alert no_polled_libraries was printed and what it names.
+# installation that differ only in poll insertion, the root and the tree
+# of poll, and says for each link whether the alert no_polled_libraries
+# was printed and what it names.
 
 set -e
 
