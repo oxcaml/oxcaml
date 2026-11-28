@@ -411,7 +411,12 @@ let exact_application {kind; params; _} args =
   let arity = List.length params in
   Lambda.find_exact_application kind ~arity args
 
-let beta_reduce params body args =
+let beta_reduce rc params body args =
+  let body =
+    match rc with
+    | Rc_normal | Rc_nontail -> body
+    | Rc_close_at_apply -> Lexclave body
+  in
   List.fold_left2
     (fun l (param: lparam) arg ->
       Llet(Strict, param.layout, param.name, param.debug_uid, arg, l))
@@ -483,14 +488,14 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   | Lvar v ->
      use_var bv v 1
   | Lmutvar _ -> ()
-  | Lapply{ap_func = ll; ap_args = args} ->
+  | Lapply{ap_func = ll; ap_args = args; ap_region_close = rc} ->
       let no_opt () = count bv ll; List.iter (count bv) args in
       begin match ll with
       | Lfunction lf when optimize ->
           begin match exact_application lf args with
           | None -> no_opt ()
           | Some exact_args ->
-              count bv (beta_reduce lf.params lf.body exact_args)
+              count bv (beta_reduce rc lf.params lf.body exact_args)
           end
       | _ -> no_opt ()
       end
@@ -607,7 +612,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
         l
       end
   | Lmutvar _ | Lconst _ as l -> l
-  | Lapply ({ap_func = ll; ap_args = args} as ap) ->
+  | Lapply ({ap_func = ll; ap_args = args; ap_region_close = rc} as ap) ->
       let no_opt () =
         Lapply {ap with ap_func = simplif ap.ap_func;
                         ap_args = List.map simplif ap.ap_args} in
@@ -616,7 +621,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
           begin match exact_application lf args with
           | None -> no_opt ()
           | Some exact_args ->
-              simplif (beta_reduce lf.params lf.body exact_args)
+              simplif (beta_reduce rc lf.params lf.body exact_args)
           end
       | _ -> no_opt ()
       end
