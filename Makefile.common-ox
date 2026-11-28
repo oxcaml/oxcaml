@@ -510,6 +510,61 @@ promote-one-no-rebuild:
 	 fi; \
 	 cd _runtest/testsuite && make promote $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
+.PHONY: install_for_test_boot test-one-boot promote-one-boot
+boot_test_universes = upstream_compatible stable beta alpha
+
+# This sets up _runtest for running (some) tests with the boot compiler. Many
+# things are not available in this mode (e.g. dynlink, expectnat, ...), but
+# this is useful for faster iterative development with the tests that don't
+# need these (in particular, most of the flambda tests don't).
+install_for_test_boot: boot-compiler
+	$(dune) build $(ws_main) \
+	  $(foreach u,$(boot_test_universes),otherlibs/stdlib_$(u)/stdlib_$(u).cm{,x}a)
+	$(dune) build middle_end/flambda2/tests/tools/fexprc.exe
+	rm -rf _runtest
+	mkdir -p _runtest/{runtime,tools,ocamltest,stdlib}
+	cp $(boot_build)/$(boot_ocamlc) _runtest/ocamlc.opt
+	cp $(boot_build)/$(boot_ocamlopt) _runtest/ocamlopt.opt
+	cp $(boot_build)/$(boot_ocamlobjinfo) _runtest/tools/ocamlobjinfo
+	cp $(boot_build)/runtime/ocamlrun _runtest/runtime/
+	cp -R $(boot_build)/stdlib/build/* _runtest/stdlib/
+	chmod -R u+w _runtest
+	for u in $(boot_test_universes); do \
+	  dir=$(main_build)/otherlibs/stdlib_$$u; \
+	  mkdir -p _runtest/otherlibs/$$u; \
+	  $(cpl) $$dir/stdlib_$$u.{cma,cmxa,a} \
+	    $$dir/.stdlib_$$u.objs/byte/*.cmi \
+	    $$dir/.stdlib_$$u.objs/native/*.cmx \
+	    _runtest/otherlibs/$$u/ || exit 1; \
+	  ln -s $$u _runtest/otherlibs/stdlib_$$u; \
+	done
+	(cd _runtest && \
+	 ln -s ocamlc.opt ocamlc && \
+	 ln -s ocamlopt.opt ocamlopt && \
+	 ln -s runtime/ocamlrun ocamlrun && \
+	 ln -s ../stdlib/caml runtime/caml)
+	rsync --link-dest=../../$(ocamldir)/testsuite/ -a $(ocamldir)/testsuite/ \
+	  _runtest/testsuite/
+	rm -f _runtest/testsuite/tools/*
+	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
+	cp $(boot_build)/middle_end/flambda2/tests/tools/fexprc.exe \
+	  _runtest/testsuite/tools/fexprc
+	chmod 755 _runtest/testsuite/tools/fexprc
+	cp $(ocamldir)/Makefile.* _runtest/
+	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/
+	# ocamltest runs ".byte" tools using "$ocamlrun_sys tool", but in our
+	# case those are actually native binaries: setting ocamlrun_sys to the
+	# empty string makes ocamltest run these native binaries.
+	printf '#!/bin/sh\nexec "$${0%%/*}/ocamltest.native" -override ocamlrun_sys= "$$@"\n' \
+	  > _runtest/ocamltest/ocamltest
+	chmod 755 _runtest/ocamltest/ocamltest
+
+test-one-boot: install_for_test_boot
+	$(MAKE) test-one-no-rebuild
+
+promote-one-boot: install_for_test_boot
+	$(MAKE) promote-one-no-rebuild
+
 # Also build the indexes for Merlin's find-all-references (merlin-index) when
 # an ocaml-index is on PATH; it must come from the same Merlin as the editor's
 # ocaml-lsp, as the one in the dev shell does. Restrict dune to our packages so
