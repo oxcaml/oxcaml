@@ -100,12 +100,10 @@ Error: Signature mismatch:
            [> `B of [> `BA | `BB of int list ] | `C of unit ]
        is not included in
          val a : t -> t
-       The type
-         "[ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ] ->
-         [> `B of [> `BA | `BB of int list ] | `C of unit ]"
-       is not compatible with the type "t -> t"
-       Type "[> `B of [> `BA | `BB of int list ] | `C of unit ]"
+       The type "... -> [> `B of [> `BA | `BB of int list ] | `C of ... ]"
+       is not compatible with the type "... -> t"
+       Type "[> `B of [> `BA | `BB of int list ] | `C of ... ]"
        is not compatible with type
-         "t" = "[ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ]"
+         "t" = "[ `A of ... | `B of [ `BA | `BB of unit list ] | `C of ... ]"
        Types for tag "`BB" are incompatible
 |}]

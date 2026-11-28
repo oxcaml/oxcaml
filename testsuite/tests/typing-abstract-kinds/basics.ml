@@ -2359,7 +2359,7 @@ Error: Signature mismatch:
          val id : ('a : value mod portable). 'a -> 'a
        is not included in
          val id : 'a -> 'a
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'a -> ..." is not compatible with the type "'b -> ..."
        The kind of 'a is value
          because of the definition of id at line 8, characters 2-33.
        But the kind of 'a must be a subkind of value mod portable

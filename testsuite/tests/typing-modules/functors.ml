@@ -2028,8 +2028,7 @@ Error: This application of the functor "H" is ill-typed.
             val f : 'a -> 'a
           is not included in
             val f : 'a X.s -> 'a
-          The type "'a X.s -> 'a X.s" is not compatible with the type
-            "'a X.s -> 'a"
+          The type "... -> 'a X.s" is not compatible with the type "... -> 'a"
           Type "'a X.s" is not compatible with type "'a"
 Line 5, characters 0-32:
   Definition of module "X/1"

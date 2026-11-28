@@ -930,6 +930,103 @@ let printer_iter_type_expr f fm ty =
   | _ ->
       Btype.iter_type_expr f fm ty
 
+type spine = TypeSet.t TransientTypeMap.t
+
+type spine_pos = Full | Root of spine | Child of spine * TypeSet.t
+
+let find_spine spine ty =
+  TransientTypeMap.find_opt (Transient_expr.repr ty) spine
+
+let enter_spine pos ty ty' =
+  let step spine =
+    let allowed =
+      match find_spine spine ty with
+      | Some _ as a -> a
+      | None -> find_spine spine ty'
+    in
+    match allowed with
+    | None -> Full
+    | Some allowed -> Child (spine, allowed)
+  in
+  match pos with
+  | Full -> Some Full
+  | Root spine -> Some (step spine)
+  | Child (spine, allowed) ->
+      if TypeSet.mem ty allowed || TypeSet.mem ty' allowed then
+        Some (step spine)
+      else None
+
+let step_skipped pos ty =
+  match pos with
+  | Child (spine, _) when Option.is_some (find_spine spine ty) -> Root spine
+  | _ -> Full
+
+let is_child_shown pos ty =
+  match pos with
+  | Full | Root _ -> true
+  | Child (_, allowed) -> TypeSet.mem ty allowed
+
+let printer_iter_shown_type_expr spine f fm ty =
+  match spine with
+  | Some table ->
+      begin match find_spine table ty with
+      | None -> printer_iter_type_expr (f None) fm ty
+      | Some allowed ->
+          let shown ty = TypeSet.mem ty allowed in
+          let f ty = if shown ty then f spine ty in
+          begin match get_desc ty with
+          | Tarrow ((_, marg, mret), ty1, ty2, _) ->
+              if shown ty1 then fm marg;
+              if shown ty2 then fm mret;
+              f ty1;
+              f ty2
+          | _ -> printer_iter_type_expr f fm ty
+          end
+      end
+  | None -> printer_iter_type_expr (f None) fm ty
+
+let has_matching_child parent is_target =
+  let exception Found in
+  try
+    printer_iter_type_expr
+      (fun c -> if is_target c then raise_notrace Found)
+      (Fun.const ()) parent;
+    begin match get_desc parent with
+    | Tobject (fi, { contents = None }) ->
+        is_target (snd (flatten_fields fi))
+    | _ -> false
+    end
+  with Found -> true
+
+let type_spine diffs =
+  let open Errortrace in
+  let allow allowed parent targets =
+    if not (has_matching_child parent (fun c -> TypeSet.mem c targets))
+    then allowed
+    else
+      TransientTypeMap.update (Transient_expr.repr parent)
+        (fun cur ->
+          let cur = Option.value cur ~default:TypeSet.empty in
+          Some (TypeSet.union targets cur))
+        allowed
+  in
+  let rec loop allowed = function
+    | [] -> allowed
+    | [{ got; expected }] ->
+        List.fold_left (fun allowed ty ->
+          TransientTypeMap.remove (Transient_expr.repr ty) allowed)
+          allowed [got.ty; got.expanded; expected.ty; expected.expanded]
+    | { got = g; expected = e } ::
+      ({ got = g'; expected = e' } :: _ as rest) ->
+        let step allowed d n =
+          let targets = TypeSet.add n.ty (TypeSet.singleton n.expanded) in
+          allow (allow allowed d.ty targets) d.expanded targets
+        in
+        loop (step (step allowed g g') e e') rest
+  in
+  let allowed = loop TransientTypeMap.empty diffs in
+  if TransientTypeMap.is_empty allowed then None else Some allowed
+
 let quoted_ident ppf x =
   Style.as_inline_code !Oprint.out_ident ppf x
 
@@ -1058,8 +1155,8 @@ let is_generic_curry_mode m =
 (** Forward reference to [Aliases.aliases_of], defined after [Variable_names].
     [Variable_names.reserve] needs the type aliases before the printer marks
     them. *)
-let aliases_of_type : (type_expr -> transient_expr list) ref =
-  ref (fun _ -> assert false)
+let aliases_of_type : (?spine:spine -> type_expr -> transient_expr list) ref =
+  ref (fun ?spine:_ _ -> assert false)
 
 module Variable_names : sig
   val reset_names : unit -> unit
@@ -1080,8 +1177,9 @@ module Variable_names : sig
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
-  val reserve: type_expr -> unit
-  val reserve_with_base: base:With_locality.Const.t -> type_expr -> unit
+  val reserve: ?spine:spine -> type_expr -> unit
+  val reserve_with_base:
+    ?spine:spine -> base:With_locality.Const.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -1106,7 +1204,8 @@ end = struct
   let name_subst = ref ([] : (transient_expr * transient_expr) list)
   let name_counter = ref 0
   let named_vars = ref ([] : string list)
-  let visited_for_named_vars = ref ([] : transient_expr list)
+  let visited_key (px, full) (px', full') = px == px' && full = full'
+  let visited_for_named_vars = ref ([] : (transient_expr * bool) list)
 
   module Desc = With_locality.Desc
   module C = With_locality.C
@@ -1322,16 +1421,20 @@ end = struct
         named_vars := name :: !named_vars
     | _ -> ()
 
-  let rec add_named_vars ty =
+  let rec add_named_vars spine ty =
     let tty = Transient_expr.repr ty in
     let px = proxy ty in
-    if not (List.memq px !visited_for_named_vars) then begin
-      visited_for_named_vars := px :: !visited_for_named_vars;
+    let full =
+      Option.is_none (Option.bind spine (fun s -> find_spine s ty))
+    in
+    let key = px, full in
+    if not (List.exists (visited_key key) !visited_for_named_vars) then begin
+      visited_for_named_vars := key :: !visited_for_named_vars;
       match tty.desc with
       | Tvar _ | Tunivar _ ->
           add_named_var tty
       | _ ->
-          printer_iter_type_expr add_named_vars (Fun.const ()) ty
+          printer_iter_shown_type_expr spine add_named_vars (Fun.const ()) ty
     end
 
   let eq_pair :
@@ -1394,7 +1497,7 @@ end = struct
 
   (** [register_visible_modes] iterates over the type and registers every
       visible mode variable. *)
-  let register_visible_modes ty =
+  let register_visible_modes spine ty =
     let seen = ref [] in
     let walked_type_aliases = ref [] in
     let register_visible_mode (mode : With_locality.lr) =
@@ -1408,11 +1511,11 @@ end = struct
           visible_pairs := pair :: !visible_pairs
       end
     in
-    let rec visit ty =
+    let rec visit spine ty =
       if should_walk ~walked_type_aliases ty then
-        printer_iter_type_expr visit register_visible_mode ty
+        printer_iter_shown_type_expr spine visit register_visible_mode ty
     in
-    visit ty
+    visit spine ty
 
   (* The next preprocessing step registers all direct
     paths from one visible mode variable to another.
@@ -2449,18 +2552,19 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve_with_base ~base ty =
+  let reserve_with_base ?spine ~base ty =
     normalize_type ty;
-    add_named_vars ty;
+    add_named_vars spine ty;
     if mode_polymorphism_printing_enabled () then begin
-      type_aliases := !aliases_of_type ty;
-      register_visible_modes ty;
+      type_aliases := !aliases_of_type ?spine ty;
+      register_visible_modes spine ty;
       add_visible_paths ();
       add_visible_edges ();
       suppress_curry_modes ~base ty
     end
 
-  let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty
+  let reserve ?spine ty =
+    reserve_with_base ?spine ~base:With_locality.Const.legacy ty
 end
 
 module Aliases = struct
@@ -2513,7 +2617,7 @@ module Aliases = struct
     | Tobject _ -> opened_object ty
     | _ -> false
 
-  let rec mark_loops_rec visited ty =
+  let rec mark_loops_rec visited spine ty =
     let px = proxy ty in
     if List.memq px visited && aliasable ty then add_proxy px else
       let tty = Transient_expr.repr ty in
@@ -2523,22 +2627,25 @@ module Aliases = struct
           if List.memq px !visited_objects then add_proxy px else begin
             if should_visit_object ty then
               visited_objects := px :: !visited_objects;
-            printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
+            printer_iter_shown_type_expr spine (mark_loops_rec visited)
+              (Fun.const ()) ty
           end
-      | Tpoly(ty, tyl) ->
+      | Tpoly(_, tyl) ->
           List.iter add tyl;
-          mark_loops_rec visited ty
+          printer_iter_shown_type_expr spine (mark_loops_rec visited)
+            (Fun.const ()) ty
       | _ ->
-          printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
+          printer_iter_shown_type_expr spine (mark_loops_rec visited)
+            (Fun.const ()) ty
 
-  let mark_loops ty =
-    mark_loops_rec [] ty
+  let mark_loops ?spine ty =
+    mark_loops_rec [] spine ty
 
   (** [aliases_of ty] returns the types that [mark_loops ty] marks as aliased,
       without modifying the current state *)
-  let aliases_of ty =
+  let aliases_of ?spine ty =
     protect_refs [R (visited_objects, []); R (aliased, [])]
-      (fun () -> mark_loops ty; !aliased)
+      (fun () -> mark_loops ?spine ty; !aliased)
 
   let reset () =
     visited_objects := []; aliased := []; delayed := []; printed_aliases := []
@@ -2726,17 +2833,36 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp mode modal ty =
+let rec tree_of_modal_typexp pos mode modal ty =
+  let ty' =
+    Ctype.reduce_head ~expand_reducible_abbrevs:!print_reduced_abbrevs
+      !printing_env ty
+  in
+  match enter_spine pos ty ty' with
+  | None ->
+      let elided = Otyp_stuff "..." in
+      begin match modal with
+      | Arrow_return _ -> Otyp_ret (Orm_any [], elided)
+      | Other _ -> elided
+      end
+  | Some pos ->
+      tree_of_shown_modal_typexp pos mode modal ty'
+
+and tree_of_shown_modal_typexp pos mode modal ty =
+  let tree_of_acc_typexp_at = tree_of_acc_typexp in
+  let tree_of_modal_typexp = tree_of_modal_typexp pos in
+  let tree_of_acc_typexp = tree_of_acc_typexp pos in
+  let tree_of_typexp = tree_of_typexp pos in
+  let tree_of_typlist = tree_of_typlist ~pos in
+  let tree_of_labeled_typlist = tree_of_labeled_typlist pos in
+  let tree_of_typobject = tree_of_typobject pos in
+  let tree_of_package = tree_of_package pos in
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
         let acc = curry_mode_of_occurrence ~arg:false mode in
         Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
     | Other _ -> tree
-  in
-  let ty =
-    Ctype.reduce_head ~expand_reducible_abbrevs:!print_reduced_abbrevs
-      !printing_env ty
   in
   let px = proxy ty in
   if Aliases.is_printed_proxy px && not (Aliases.is_delayed px) then
@@ -2761,19 +2887,21 @@ let rec tree_of_modal_typexp mode modal ty =
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
         let arg_acc = curry_mode_of_occurrence ~arg:true marg in
+        let shown1 = is_child_shown pos ty1 in
         let t1 =
-          if is_optional l then
+          if not shown1 then Otyp_stuff "..."
+          else if is_optional l then
             match
               get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
             with
             | Tconstr(path, [ty], _)
               when Path.same path Predef.path_option ->
-                tree_of_acc_typexp mode arg_acc ty
+                tree_of_acc_typexp_at (step_skipped pos ty1) mode arg_acc ty
             | _ -> Otyp_stuff "<hidden>"
           else
             tree_of_acc_typexp mode arg_acc ty1
         in
-        let marg_tree = tree_of_modes marg arg_acc in
+        let marg_tree = if shown1 then tree_of_modes marg arg_acc else [] in
         let acc_mode = curry_acc acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
@@ -2896,7 +3024,9 @@ let rec tree_of_modal_typexp mode modal ty =
                let sort_names = tree_of_qsvs tyl in
                let tr =
                  Otyp_repr
-                   (sort_names, tree_of_acc_typexp mode acc_mode inner_ty)
+                   (sort_names,
+                    tree_of_acc_typexp_at (step_skipped pos ty)
+                      mode acc_mode inner_ty)
                in
                Variable_names.remove_names tyl;
                Aliases.delayed := old_delayed;
@@ -2945,11 +3075,11 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (rm, ty)
     | Other acc_mode -> pr_typ acc_mode
 
-and tree_of_acc_typexp mode acc_mode ty =
-  tree_of_modal_typexp mode (Other acc_mode) ty
+and tree_of_acc_typexp pos mode acc_mode ty =
+  tree_of_modal_typexp pos mode (Other acc_mode) ty
 
-and tree_of_typexp mode mode_with_locality ty =
-  tree_of_acc_typexp mode (Curry_mode.Const mode_with_locality) ty
+and tree_of_typexp pos mode mode_with_locality ty =
+  tree_of_acc_typexp pos mode (Curry_mode.Const mode_with_locality) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -3010,17 +3140,17 @@ and tree_of_typvariant_repr row =
     if all_present then None else Some (List.map fst present) in
   { fields; name; closed; present; all_present; tags }
 
-and tree_of_typlist mode tyl =
-  List.map (tree_of_typexp mode With_locality.Const.legacy) tyl
+and tree_of_typlist ?(pos = Full) mode tyl =
+  List.map (tree_of_typexp pos mode With_locality.Const.legacy) tyl
 
-and tree_of_labeled_typlist mode tyl =
+and tree_of_labeled_typlist pos mode tyl =
   List.map
     (fun (label, ty) ->
-      label, tree_of_typexp mode With_locality.Const.legacy ty)
+      label, tree_of_typexp pos mode With_locality.Const.legacy ty)
     tyl
 
 and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
-  (tree_of_typexp Type With_locality.Const.legacy ty,
+  (tree_of_typexp Full Type With_locality.Const.legacy ty,
    tree_of_modalities Immutable gf)
 
 (** NB: This function might mutate states; the caller is responsible for
@@ -3058,18 +3188,19 @@ and tree_of_typobject_repr fi =
   let fields, open_row = tree_of_typfields rest sorted_fields in
   { fields; open_row }
 
-and tree_of_typobject mode fi nm =
+and tree_of_typobject pos mode fi nm =
   match nm with
   | None ->
       let { fields; open_row } = tree_of_typobject_repr fi in
       let fields =
         List.map
-          (fun (s, t) -> (s, tree_of_typexp mode With_locality.Const.legacy t))
+          (fun (s, t) ->
+            (s, tree_of_typexp pos mode With_locality.Const.legacy t))
           fields
       in
       Otyp_object {fields; open_row}
   | Some (p, _ty :: tyl) ->
-      let args = tree_of_typlist mode tyl in
+      let args = tree_of_typlist ~pos mode tyl in
       let (p', s) = best_type_path p in
       assert (s = Id);
       Otyp_class (tree_of_path (Some Type) p', args)
@@ -3088,20 +3219,21 @@ and tree_of_typfields rest = function
       let (fields, rest) = tree_of_typfields rest l in
       (field :: fields, rest)
 
-and tree_of_package mode {pack_path; pack_cstrs} =
+and tree_of_package pos mode {pack_path; pack_cstrs} =
   { opack_path = tree_of_path (Some Module_type) pack_path;
     opack_cstrs =
       List.map
         (fun (li, ty) ->
            (String.concat "." li,
-            tree_of_typexp mode With_locality.Const.legacy ty))
+            tree_of_typexp pos mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_typexp ~base mode ty =
+let tree_of_typexp ?spine ~base mode ty =
+  let pos = match spine with None -> Full | Some s -> Root s in
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode base ty)
+  wrap_mutation (fun () -> tree_of_typexp pos mode base ty)
 
-let tree_of_typexp ~base mode ty =
+let tree_of_typexp ?spine ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
@@ -3109,9 +3241,9 @@ let tree_of_typexp ~base mode ty =
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_typexp ~base mode ty)
+      (fun () -> tree_of_typexp ?spine ~base mode ty)
   else
-    tree_of_typexp ~base mode ty
+    tree_of_typexp ?spine ~base mode ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp ~base:With_locality.Const.legacy mode ty)
@@ -4253,9 +4385,9 @@ let same_path t t' =
 type 'a diff = Same of 'a | Diff of 'a * 'a
 
 let trees_of_type_expansion'
-      ~var_jkinds mode Errortrace.{ty = t; expanded = t'} =
-  let tree_of_typexp' ty =
-    let out = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
+      ?spine ~var_jkinds mode Errortrace.{ty = t; expanded = t'} =
+  let tree_of_typexp' ?spine ty =
+    let out = tree_of_typexp ?spine ~base:With_locality.Const.legacy mode ty in
     if var_jkinds then
       match get_desc ty with
       | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
@@ -4267,25 +4399,38 @@ let trees_of_type_expansion'
       out
   in
   Aliases.reset ();
-  Aliases.mark_loops t;
+  Aliases.mark_loops ?spine t;
   if same_path t t'
-  then begin Aliases.add_delayed (proxy t); Same (tree_of_typexp' t) end
+  then begin Aliases.add_delayed (proxy t); Same (tree_of_typexp' ?spine t) end
   else begin
-    Aliases.mark_loops t';
-    let t' = if proxy t == proxy t' then unalias t' else t' in
+    Aliases.mark_loops ?spine t';
+    let spine', t' =
+      if proxy t == proxy t' then
+        let t'' = unalias t' in
+        let spine' =
+          Option.map (fun s ->
+            match find_spine s t' with
+            | None -> s
+            | Some allowed ->
+                TransientTypeMap.add (Transient_expr.repr t'') allowed s)
+            spine
+        in
+        spine', t''
+      else spine, t'
+    in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
     let first =
       (* preserve unreduced abbrevs in types *)
-      with_reduced_abbrevs false (fun () -> tree_of_typexp' t)
+      with_reduced_abbrevs false (fun () -> tree_of_typexp' ?spine t)
     in
-    let second = tree_of_typexp' t' in
+    let second = tree_of_typexp' ?spine:spine' t' in
     if first = second then Same first
     else Diff(first,second)
   end
 
-let trees_of_type_expansion =
-  trees_of_type_expansion' ~var_jkinds:false
+let trees_of_type_expansion ?spine mode ty_exp =
+  trees_of_type_expansion' ?spine ~var_jkinds:false mode ty_exp
 
 let pp_type ppf t =
   Style.as_inline_code !Oprint.out_type ppf t
@@ -4311,11 +4456,11 @@ let hide_variant_name t =
                       (Jkind.Builtin.value ~why:Row_variable))))
   | _ -> t
 
-let prepare_expansion Errortrace.{ty; expanded} =
+let prepare_expansion ?spine Errortrace.{ty; expanded} =
   let expanded = hide_variant_name expanded in
-  Variable_names.reserve ty;
+  Variable_names.reserve ?spine ty;
   if not (same_path ty expanded) then
-    Variable_names.reserve expanded;
+    Variable_names.reserve ?spine expanded;
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)
@@ -4323,6 +4468,7 @@ let abbreviate ~abbrev f =
   f ?abbrev:(if abbrev then Some (Abbrev.abbrev ()) else None)
 
 (* let tree_of_path = tree_of_path None *)
+let tree_of_typexp ~base mode ty = tree_of_typexp ~base mode ty
 let tree_of_module ident ?(ellipsis = false) =
   tree_of_module ident
     ?abbrev:(if ellipsis then Some (Abbrev.ellipsis ()) else None)

@@ -7426,7 +7426,8 @@ let moregeneral_slow ~self_check env inst_nongen
           moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
         end;
         subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
-      with Moregen_trace trace -> subj_inst, Error trace
+      with Moregen_trace trace ->
+        subj_inst, Error (expand_to_moregen_error env trace)
     end
       ~before_generalize:(fun (subj_inst, _) ->
         ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
@@ -7453,7 +7454,7 @@ let moregeneral_slow ~self_check env inst_nongen
             |> Jkind_types.Sort.Const.subst subst_map
             |> Option.some)
         pat_inst_sorts
-    | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
+    | _, Error err -> raise (Moregen err)
   end
 
 

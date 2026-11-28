@@ -123,7 +123,7 @@ Error: Signature mismatch:
          val g : '_weak1 -> unit
        is not included in
          val poly_ g : 'b -> unit
-       The type "'_weak1 -> unit" is not compatible with the type "'a -> unit"
+       The type "'_weak1 -> ..." is not compatible with the type "'a -> ..."
        Type "'_weak1" is not compatible with type "'a"
 |}]
 
