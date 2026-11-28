@@ -355,18 +355,26 @@ CAMLprim value caml_get_public_method (value obj, value tag)
   return (tag == Field(meths,li) ? Field (meths, li-1) : 0);
 }
 
-/* Allocate OO ids in chunks, to avoid contention */
-#define Id_chunk 1024
+/* Allocate unique ids in chunks, to avoid contention. */
+#define Id_chunk_log_2 12
+#define Id_chunk_mask (Val_long(1 << Id_chunk_log_2) - Val_long(1))
+#define Id_chunk_incr (Val_long(1 << Id_chunk_log_2) - Val_long(0))
+#define Id_incr (Val_long(1) - Val_long(0))
 
-static atomic_uintnat oo_next_id;
+static value unique_id_chunk_counter = Val_long(0);
 
 CAMLprim value caml_fresh_oo_id (value v) {
-  if (Caml_state->oo_next_id_local % Id_chunk == 0) {
-    Caml_state->oo_next_id_local =
-      atomic_fetch_add(&oo_next_id, Id_chunk);
-  }
-  v = Val_long(Caml_state->oo_next_id_local++);
-  return v;
+  caml_domain_state *domain_state = Caml_state;
+  value id = domain_state->unique_id_counter_chunk + Id_incr;
+  /* We intentionally increment the counter before checking whether we
+     have exhausted our chunk as this makes it easy to use one less
+     register for this operation.  As an intrinsic or an inlined
+     operation (if we could expose domain state to OxCaml side) this
+     would require roughly 7 to 9 instructions. */
+  if ((id & Id_chunk_mask) == 0)
+    id = atomic_fetch_add(&unique_id_chunk_counter, Id_chunk_incr);
+  domain_state->unique_id_counter_chunk = id;
+  return id;
 }
 
 CAMLprim value caml_set_oo_id (value obj) {

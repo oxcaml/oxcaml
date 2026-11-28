@@ -699,7 +699,15 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
     d->state = domain_state;
     domain_state->id = d->id;
+
+    /* We initialize the [unique_id_counter_chunk] to a value that
+       will be [Val_long(0)] after it is incremented, which will
+       ensure a new chunk will be allocated for the counter. */
+    domain_state->unique_id_counter_chunk = Val_long(-1);
   } else {
+    /* We do not reset [unique_id_counter_chunk] as doing so would
+       waste whatever was left of the chunk of unique ids from the
+       reused domain state. */
     domain_state = d->state;
     CAMLassert(domain_state->id == d->id);
   }
@@ -831,7 +839,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->local_limit = 0;
 
   domain_state->compare_unordered = 0;
-  domain_state->oo_next_id_local = 0;
 
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
