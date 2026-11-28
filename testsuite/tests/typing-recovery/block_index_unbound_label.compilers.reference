@@ -1,0 +1,31 @@
+File "block_index_unbound_label.ml", line 1:
+Error: Multiple errors were encountered
+File "block_index_unbound_label.ml", line 14, characters 11-13:
+14 | let i1 = (.ab)
+                ^^
+  Unbound record field ab
+File "block_index_unbound_label.ml", line 16, characters 28-30:
+16 | let i2 : (r, _) idx_imm = (.ab)
+                                 ^^
+  This block index is expected to have base type r
+  There is no field ab within type r
+File "block_index_unbound_label.ml", line 18, characters 14-16:
+18 | let i3 = (.c.#xy)
+                   ^^
+  This unboxed access is expected to have base type u
+  There is no unboxed record field xy within type u
+File "block_index_unbound_label.ml", line 20, characters 33-35:
+20 | let i4 : (r, string) idx_mut = (.ab)
+                                      ^^
+  This block index is expected to have base type r
+  There is no field ab within type r
+File "block_index_unbound_label.ml", line 22, characters 28-34:
+22 | let i5 : (r, int) idx_mut = (.abd)
+                                 ^^^^^^
+  This expression has type (r, string) idx_mut
+  but an expression was expected of type (r, int) idx_mut
+  Type string is not compatible with type int
+File "block_index_unbound_label.ml", line 24, characters 14-22:
+24 | let x : int = "string"
+                   ^^^^^^^^
+  This constant has type string but an expression was expected of type int
