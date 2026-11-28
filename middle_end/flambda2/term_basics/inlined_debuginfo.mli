@@ -53,10 +53,15 @@ val none : t
 
 val is_none : t -> bool
 
-(** [create ~called_code_id ~apply_dbg] should be used when a function
-    application (i.e. [Apply_expr] term) with debuginfo [apply_dbg] is to be
-    inlined out. [create] must be called for each such instance of inlining. *)
-val create : called_code_id:Code_id.t -> apply_dbg:Debuginfo.t -> t
+(** [create ~called_code_id ~apply_dbg ~apply_callsite_counter] should be used
+    when a function application (i.e. [Apply_expr] term) with debuginfo
+    [apply_dbg] and FDO counter [apply_callsite_counter] is to be inlined out.
+    [create] must be called for each such instance of inlining. *)
+val create :
+  called_code_id:Code_id.t ->
+  apply_dbg:Debuginfo.t ->
+  apply_callsite_counter:Fdo_counter.t option ->
+  t
 
 (** Merge an existing value of type [t] with [from_apply_expr], the latter
     corresponding to an [Apply_expr] term that is being inlined out. *)
@@ -171,3 +176,11 @@ val merge : t -> from_apply_expr:t -> t
     and the uids enable disambiguation between different instances of inlining
     the same functions. *)
 val rewrite : t -> Debuginfo.t -> Debuginfo.t
+
+(** Appends the call sites in [t] to the inlining stack of an FDO counter from
+    an inlined function body (see [Fdo_counter.inline]). *)
+val inline_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t
+
+(** Specializes an FDO counter from a function copied by the inlinings in [t]
+    (see [Fdo_counter.specialize]). *)
+val specialize_fdo_counter : t -> Fdo_counter.t -> Fdo_counter.t

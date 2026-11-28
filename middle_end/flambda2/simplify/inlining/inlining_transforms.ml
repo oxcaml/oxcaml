@@ -146,6 +146,21 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in
+    (* After inlining, no instruction remains to count entries to the callee in
+       this inlining context ([denv]), so record its entry counters as dropped.
+       Without a [callsite_counter], [denv] adds no inlining frame, so these are
+       the callee's own entry counters. *)
+    let dacc =
+      let reason : Fdo_dropped_counters.Reason.t =
+        match Apply.callsite_counter apply with
+        | Some _ -> Inlined_call
+        | None -> Inlined_call_without_counter
+      in
+      DA.add_dropped_fdo_counters dacc ~reason
+        (DE.rewrite_fdo_annotation denv
+           (Fdo_annotation.With_body_hash.annotation
+              (Code.fdo_entry_annotation code)))
+    in
     let params_and_body = Code.params_and_body code in
     Function_params_and_body.pattern_match params_and_body
       ~f:(fun

@@ -256,7 +256,13 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
             |> Code.with_newer_version_of (Some old_code_id)
             |> Code.with_code_id new_code_id
           in
-          DE.define_code denv ~code_id:new_code_id ~code
+          (* A set of closures in an inlined body defines copies of its
+             functions (e.g. from an inlined functor application), whose FDO
+             counters are specialized as Simplify walks them (see
+             [DE.rewrite_fdo_counter]). [code] still has the original counters,
+             so record it in case it is inlined before being simplified. *)
+          let denv = DE.define_code denv ~code_id:new_code_id ~code in
+          DE.add_fdo_unspecialized_copy denv new_code_id
         else denv)
     old_to_new_code_ids_all_sets denv
 

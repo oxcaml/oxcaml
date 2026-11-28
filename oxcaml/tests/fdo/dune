@@ -159,6 +159,7 @@
     -fdo-counters
     -fexpr-print-fdo-counters
     -fexpr-print-branch-annotations
+    -dflambda-heavy-invariants
     -dfexpr-annot-after
     raw
     -color
@@ -175,3 +176,101 @@
  (deps instrumentation.output instrumentation.output.corrected)
  (action
   (diff instrumentation.output instrumentation.output.corrected)))
+
+; The counters after Simplify: inlined bodies get their call site as inlining
+; context, the functions of inlined functor applications are copies with their
+; own counters, and the counters of removed instructions (inlined calls, folded
+; switches, self tail calls) are dropped. Compilation stops after the middle
+; end, so that only its dropped counters are listed. They are read from the
+; dump next to the .cmx file, so OCAMLPARAM is cleared: CI's metrics job sets
+; dump-dir in it, which moves the dump.
+
+(rule
+ (targets simplify.output.corrected)
+ (deps simplify.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
+     -dfexpr-annot-after
+     simplify
+     -dfdo-dropped-counters
+     -dump-into-file
+     -stop-after
+     middle_end
+     -color
+     never
+     simplify.ml))
+   (with-stdout-to
+    simplify.output.corrected
+    (progn
+     (run ./fdo_annotations.exe list simplify.simplify.fl)
+     (run cat simplify.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps simplify.output simplify.output.corrected)
+ (action
+  (diff simplify.output simplify.output.corrected)))
+
+; The same at -O3 with the reaper, after the reaper (in a directory of its own,
+; so that the module keeps its name). Without local value slots, which CI may
+; enable by default and which remove the code of [R.step].
+
+(rule
+ (targets simplify_o3_reaper.output.corrected)
+ (deps simplify.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run mkdir -p o3_reaper)
+   (setenv
+    OCAMLPARAM
+    ""
+    (run
+     %{bin:ocamlopt.opt}
+     -c
+     -O3
+     -flambda2-reaper
+     -no-reaper-local-fields
+     -fdo-counters
+     -fexpr-print-fdo-counters
+     -fexpr-print-branch-annotations
+     -dflambda-heavy-invariants
+     -dfexpr-annot-after
+     reaper
+     -dfdo-dropped-counters
+     -dump-into-file
+     -stop-after
+     middle_end
+     -color
+     never
+     -o
+     o3_reaper/simplify.cmx
+     simplify.ml))
+   (with-stdout-to
+    simplify_o3_reaper.output.corrected
+    (progn
+     (run ./fdo_annotations.exe list o3_reaper/simplify.reaper.fl)
+     (run cat o3_reaper/simplify.cmx.dump))))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps simplify_o3_reaper.output simplify_o3_reaper.output.corrected)
+ (action
+  (diff simplify_o3_reaper.output simplify_o3_reaper.output.corrected)))
