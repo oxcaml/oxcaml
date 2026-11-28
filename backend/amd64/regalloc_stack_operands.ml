@@ -167,13 +167,14 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
           } ->
         instr
     in
-    match Array.length simd.args, simd.res with
+    match Iarray.length simd.args, simd.res with
     | _, Res_none ->
       (* Res_none implies one argument is already an address. *)
       May_still_have_spilled_registers
     | 1, Arg _ -> May_still_have_spilled_registers
-    | 1, Res [| { loc = res_loc; _ } |] ->
-      let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
+    | 1, Res rr when Iarray.length rr = 1 ->
+      let res_loc = (Iarray.get rr 0).loc in
+      let arg_mem = Simd.loc_allows_mem (Iarray.get simd.args 0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
       if arg_mem
@@ -182,15 +183,15 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       then may_use_stack_operand_for_result map instr ~num_args:1
       else May_still_have_spilled_registers
     | num_args, Arg rr ->
-      if Simd.loc_allows_mem simd.args.(1).loc
+      if Simd.loc_allows_mem (Iarray.get simd.args 1).loc
       then
         may_use_stack_operand_for_second_argument map instr ~num_args
-          ~res_is_fst:(rr.(0) = 0)
+          ~res_is_fst:(Iarray.get rr 0 = 0)
       else May_still_have_spilled_registers
     | num_args, Res rr ->
       (* We don't attempt to allow spilling additional result regs. *)
-      let res_loc = rr.(0).loc in
-      let arg_mem = Simd.loc_allows_mem simd.args.(1).loc in
+      let res_loc = (Iarray.get rr 0).loc in
+      let arg_mem = Simd.loc_allows_mem (Iarray.get simd.args 1).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
       if arg_mem

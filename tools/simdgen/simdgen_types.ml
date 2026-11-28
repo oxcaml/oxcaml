@@ -35,8 +35,8 @@ type evex_flags =
   }
 
 type instr_emit =
-  { ext : ext array (* Multiple extensions may be required. *);
-    args : arg array;
+  { ext : ext iarray (* Multiple extensions may be required. *);
+    args : arg iarray;
     res : res;
     imm : imm;
     mnemonic : string;

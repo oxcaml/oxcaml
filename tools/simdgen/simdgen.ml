@@ -92,6 +92,10 @@ let extract_modifiers arg =
     arg;
   String.trim (Buffer.contents res), !mods
 
+let temp temps = Temp (Iarray.of_list temps)
+
+let snoc arr x = Iarray.append arr (Iarray.of_list [x])
+
 let rec parse_args mnemonic acc encs args imm flags res =
   let set_imm i =
     if !imm <> Imm_none then failwith mnemonic;
@@ -100,14 +104,14 @@ let rec parse_args mnemonic acc encs args imm flags res =
   let set_res_arg () =
     match !res with
     | Res _ -> raise Unsupported
-    | Res_none -> res := Arg [| List.length acc |]
-    | Arg rr -> res := Arg (Array.append rr [| List.length acc |])
+    | Res_none -> res := Arg (Iarray.of_list [List.length acc])
+    | Arg rr -> res := Arg (snoc rr (List.length acc))
   in
   let set_res loc enc =
     match !res with
     | Arg _ -> raise Unsupported
-    | Res_none -> res := Res [| { loc; enc } |]
-    | Res rr -> res := Res (Array.append rr [| { loc; enc } |])
+    | Res_none -> res := Res (Iarray.of_list [{ loc; enc }])
+    | Res rr -> res := Res (snoc rr { loc; enc })
   in
   match args, encs with
   | [], _ -> List.rev acc
@@ -132,103 +136,95 @@ let rec parse_args mnemonic acc encs args imm flags res =
       | "imm8" ->
         set_imm Imm_spec;
         None
-      | "r8/m8" | "r/m8" -> Some (Temp [| R8; M8 |])
-      | "r16/m16" | "r/m16" -> Some (Temp [| R16; M16 |])
-      | "r32/m32" | "r/m32" -> Some (Temp [| R32; M32 |])
-      | "r64/m64" | "r/m64" -> Some (Temp [| R64; M64 |])
-      | "r32/m8" -> Some (Temp [| R32; M8 |])
-      | "r32/m16" -> Some (Temp [| R32; M16 |])
-      | "r8" -> Some (Temp [| R8 |])
-      | "r16" -> Some (Temp [| R16 |])
-      | "r32" | "r32a" | "r32b" -> Some (Temp [| R32 |])
-      | "r64" | "r64a" | "r64b" | "reg" -> Some (Temp [| R64 |])
-      | "reg/m8" -> Some (Temp [| R64; M8 |])
-      | "reg/m16" -> Some (Temp [| R64; M16 |])
-      | "reg/m32" -> Some (Temp [| R64; M32 |])
-      | "reg/m64" -> Some (Temp [| R64; M64 |])
-      | "m8" -> Some (Temp [| M8 |])
-      | "m16" -> Some (Temp [| M16 |])
-      | "m32" -> Some (Temp [| M32 |])
-      | "m64" -> Some (Temp [| M64 |])
-      | "m128" -> Some (Temp [| M128 |])
-      | "m256" -> Some (Temp [| M256 |])
-      | "m512" -> Some (Temp [| M512 |])
-      | "mm" | "mm0" | "mm1" | "mm2" | "mm3" -> Some (Temp [| MM |])
-      | "mm0/m8" | "mm1/m8" | "mm2/m8" | "mm3/m8" -> Some (Temp [| MM; M8 |])
-      | "mm0/m16" | "mm1/m16" | "mm2/m16" | "mm3/m16" ->
-        Some (Temp [| MM; M16 |])
-      | "mm0/m32" | "mm1/m32" | "mm2/m32" | "mm3/m32" ->
-        Some (Temp [| MM; M32 |])
-      | "mm0/m64" | "mm1/m64" | "mm2/m64" | "mm3/m64" ->
-        Some (Temp [| MM; M64 |])
-      | "xmm" | "xmm0" | "xmm1" | "xmm2" | "xmm3" | "xmm4" ->
-        Some (Temp [| XMM |])
-      | "xmm0/m8" | "xmm1/m8" | "xmm2/m8" | "xmm3/m8" ->
-        Some (Temp [| XMM; M8 |])
+      | "r8/m8" | "r/m8" -> Some (temp [R8; M8])
+      | "r16/m16" | "r/m16" -> Some (temp [R16; M16])
+      | "r32/m32" | "r/m32" -> Some (temp [R32; M32])
+      | "r64/m64" | "r/m64" -> Some (temp [R64; M64])
+      | "r32/m8" -> Some (temp [R32; M8])
+      | "r32/m16" -> Some (temp [R32; M16])
+      | "r8" -> Some (temp [R8])
+      | "r16" -> Some (temp [R16])
+      | "r32" | "r32a" | "r32b" -> Some (temp [R32])
+      | "r64" | "r64a" | "r64b" | "reg" -> Some (temp [R64])
+      | "reg/m8" -> Some (temp [R64; M8])
+      | "reg/m16" -> Some (temp [R64; M16])
+      | "reg/m32" -> Some (temp [R64; M32])
+      | "reg/m64" -> Some (temp [R64; M64])
+      | "m8" -> Some (temp [M8])
+      | "m16" -> Some (temp [M16])
+      | "m32" -> Some (temp [M32])
+      | "m64" -> Some (temp [M64])
+      | "m128" -> Some (temp [M128])
+      | "m256" -> Some (temp [M256])
+      | "m512" -> Some (temp [M512])
+      | "mm" | "mm0" | "mm1" | "mm2" | "mm3" -> Some (temp [MM])
+      | "mm0/m8" | "mm1/m8" | "mm2/m8" | "mm3/m8" -> Some (temp [MM; M8])
+      | "mm0/m16" | "mm1/m16" | "mm2/m16" | "mm3/m16" -> Some (temp [MM; M16])
+      | "mm0/m32" | "mm1/m32" | "mm2/m32" | "mm3/m32" -> Some (temp [MM; M32])
+      | "mm0/m64" | "mm1/m64" | "mm2/m64" | "mm3/m64" -> Some (temp [MM; M64])
+      | "xmm" | "xmm0" | "xmm1" | "xmm2" | "xmm3" | "xmm4" -> Some (temp [XMM])
+      | "xmm0/m8" | "xmm1/m8" | "xmm2/m8" | "xmm3/m8" -> Some (temp [XMM; M8])
       | "xmm0/m16" | "xmm1/m16" | "xmm2/m16" | "xmm3/m16" ->
-        Some (Temp [| XMM; M16 |])
+        Some (temp [XMM; M16])
       | "xmm0/m32" | "xmm1/m32" | "xmm2/m32" | "xmm3/m32" ->
-        Some (Temp [| XMM; M32 |])
+        Some (temp [XMM; M32])
       | "xmm0/m64" | "xmm1/m64" | "xmm2/m64" | "xmm3/m64" ->
-        Some (Temp [| XMM; M64 |])
+        Some (temp [XMM; M64])
       | "xmm0/m64/m32bcst" | "xmm1/m64/m32bcst" | "xmm2/m64/m32bcst"
       | "xmm3/m64/m32bcst" ->
         flags.b <- Bcst_32;
-        Some (Temp [| XMM; M64 |])
+        Some (temp [XMM; M64])
       | "xmm0/m128" | "xmm1/m128" | "xmm2/m128" | "xmm3/m128" ->
-        Some (Temp [| XMM; M128 |])
+        Some (temp [XMM; M128])
       | "xmm0/m128/m64bcst" | "xmm1/m128/m64bcst" | "xmm2/m128/m64bcst"
       | "xmm3/m128/m64bcst" ->
         flags.b <- Bcst_64;
-        Some (Temp [| XMM; M128 |])
+        Some (temp [XMM; M128])
       | "xmm0/m128/m32bcst" | "xmm1/m128/m32bcst" | "xmm2/m128/m32bcst"
       | "xmm3/m128/m32bcst" ->
         flags.b <- Bcst_32;
-        Some (Temp [| XMM; M128 |])
-      | "vm32x" -> Some (Temp [| VM32X |])
-      | "vm64x" -> Some (Temp [| VM64X |])
-      | "vm32y" -> Some (Temp [| VM32Y |])
-      | "vm64y" -> Some (Temp [| VM64Y |])
-      | "vm32z" -> Some (Temp [| VM32Z |])
-      | "vm64z" -> Some (Temp [| VM64Z |])
-      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" ->
-        Some (Temp [| YMM |])
+        Some (temp [XMM; M128])
+      | "vm32x" -> Some (temp [VM32X])
+      | "vm64x" -> Some (temp [VM64X])
+      | "vm32y" -> Some (temp [VM32Y])
+      | "vm64y" -> Some (temp [VM64Y])
+      | "vm32z" -> Some (temp [VM32Z])
+      | "vm64z" -> Some (temp [VM64Z])
+      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" -> Some (temp [YMM])
       | "ymm0/m256" | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" ->
-        Some (Temp [| YMM; M256 |])
+        Some (temp [YMM; M256])
       | "ymm0/m256/m64bcst" | "ymm1/m256/m64bcst" | "ymm2/m256/m64bcst"
       | "ymm3/m256/m64bcst" ->
         flags.b <- Bcst_64;
-        Some (Temp [| YMM; M256 |])
+        Some (temp [YMM; M256])
       | "ymm0/m256/m32bcst" | "ymm1/m256/m32bcst" | "ymm2/m256/m32bcst"
       | "ymm3/m256/m32bcst" ->
         flags.b <- Bcst_32;
-        Some (Temp [| YMM; M256 |])
-      | "zmm" | "zmm0" | "zmm1" | "zmm2" | "zmm3" | "zmm4" ->
-        Some (Temp [| ZMM |])
+        Some (temp [YMM; M256])
+      | "zmm" | "zmm0" | "zmm1" | "zmm2" | "zmm3" | "zmm4" -> Some (temp [ZMM])
       | "zmm0/m512" | "zmm1/m512" | "zmm2/m512" | "zmm3/m512" ->
-        Some (Temp [| ZMM; M512 |])
+        Some (temp [ZMM; M512])
       | "zmm0/m512/m64bcst" | "zmm1/m512/m64bcst" | "zmm2/m512/m64bcst"
       | "zmm3/m512/m64bcst" ->
         flags.b <- Bcst_64;
-        Some (Temp [| ZMM; M512 |])
+        Some (temp [ZMM; M512])
       | "zmm0/m512/m32bcst" | "zmm1/m512/m32bcst" | "zmm2/m512/m32bcst"
       | "zmm3/m512/m32bcst" ->
         flags.b <- Bcst_32;
-        Some (Temp [| ZMM; M512 |])
-      | "k0" | "k1" | "k2" | "k3" | "k4" | "k5" | "k6" | "k7" ->
-        Some (Temp [| K |])
+        Some (temp [ZMM; M512])
+      | "k0" | "k1" | "k2" | "k3" | "k4" | "k5" | "k6" | "k7" -> Some (temp [K])
       | "k0/m8" | "k1/m8" | "k2/m8" | "k3/m8" | "k4/m8" | "k5/m8" | "k6/m8"
       | "k7/m8" ->
-        Some (Temp [| K; M8 |])
+        Some (temp [K; M8])
       | "k0/m16" | "k1/m16" | "k2/m16" | "k3/m16" | "k4/m16" | "k5/m16"
       | "k6/m16" | "k7/m16" ->
-        Some (Temp [| K; M16 |])
+        Some (temp [K; M16])
       | "k0/m32" | "k1/m32" | "k2/m32" | "k3/m32" | "k4/m32" | "k5/m32"
       | "k6/m32" | "k7/m32" ->
-        Some (Temp [| K; M32 |])
+        Some (temp [K; M32])
       | "k0/m64" | "k1/m64" | "k2/m64" | "k3/m64" | "k4/m64" | "k5/m64"
       | "k6/m64" | "k7/m64" ->
-        Some (Temp [| K; M64 |])
+        Some (temp [K; M64])
       | arg -> fail mnemonic arg
     in
     let enc, rw = first_word enc in
@@ -270,7 +266,7 @@ let parse_args mnemonic enc args =
   let res = ref Res_none in
   let flags = { z = false; b = Bcst_none; r = Rnd_none; k = false } in
   let parsed = parse_args mnemonic [] enc args imm flags res in
-  Array.of_list parsed, !imm, flags, !res
+  Iarray.of_list parsed, !imm, flags, !res
 
 let parse_enc mnemonic enc ~operand_size_override =
   let enc = String.uppercase_ascii enc in
@@ -460,31 +456,35 @@ let mangle_loc (loc : loc) =
   | Pin RDX -> "rdx"
   | Pin XMM0 -> "xmm0"
   | Temp temps ->
-    Array.map
+    Iarray.map
       (fun temp ->
         match width temp with
         | Some width -> short temp ^ Int.to_string width
         | None -> short temp)
       temps
-    |> Array.to_list |> String.concat ""
+    |> Iarray.to_list |> String.concat ""
 
 let binding instr =
   let base = instr.mnemonic in
   let mangled () =
     let args =
-      Array.map (fun (arg : arg) -> mangle_loc arg.loc) instr.args
-      |> Array.to_list |> String.concat "_"
+      Iarray.map (fun (arg : arg) -> mangle_loc arg.loc) instr.args
+      |> Iarray.to_list |> String.concat "_"
     in
     let res =
       match instr.res with
       | Res_none | Arg _ -> ""
       | Res rr ->
-        Array.fold_left (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_") "" rr
+        Iarray.fold_left
+          (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_")
+          "" rr
     in
     base ^ "_" ^ res ^ args
   in
   let variants = Hashtbl.find all_mnemonics base in
   if variants > 1 then mangled () else base
+
+let print_iarray elements = "(Iarray.of_array [|" ^ elements ^ "|])"
 
 let print_one bind instr =
   let print_ext : ext -> string = function
@@ -551,9 +551,9 @@ let print_one bind instr =
     | Pin XMM0 -> "Pin XMM0"
     | Temp temps ->
       let temps =
-        Array.map print_temp temps |> Array.to_list |> String.concat ";"
+        Iarray.map print_temp temps |> Iarray.to_list |> String.concat ";"
       in
-      "Temp [|" ^ temps ^ "|]"
+      "Temp " ^ print_iarray temps
   in
   let print_arg_enc = function
     | RM_r -> "RM_r"
@@ -569,23 +569,23 @@ let print_one bind instr =
     | Imm_spec -> "Imm_spec"
   in
   let print_args args =
-    Array.map
+    Iarray.map
       (fun (arg : arg) ->
         sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
           (print_arg_enc arg.enc))
       args
-    |> Array.to_list |> String.concat ";"
+    |> Iarray.to_list |> String.concat ";"
   in
   let print_register_args args =
-    Array.map
+    Iarray.map
       (fun ({ loc; _ } as arg : arg) ->
         match loc with
         | Pin _ -> arg
         | Temp temps ->
           let temps =
-            Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+            Iarray.of_list (List.filter temp_is_reg (Iarray.to_list temps))
           in
-          if Array.length temps = 0 then failwith instr.mnemonic;
+          if Iarray.length temps = 0 then failwith instr.mnemonic;
           { arg with loc = Temp temps })
       args
     |> print_args
@@ -617,19 +617,19 @@ let print_one bind instr =
       | VM64X | VM64Y | VM64Z ->
         max_int
     in
-    Array.map
+    Iarray.map
       (fun ({ loc; _ } as arg : arg) ->
         match loc with
         | Pin _ -> arg
         | Temp temps ->
-          let reg = Array.fold_left (fun w t -> max w (reg_width t)) 0 temps in
+          let reg = Iarray.fold_left (fun w t -> max w (reg_width t)) 0 temps in
           let mem =
-            Array.fold_left (fun w t -> min w (mem_width t)) max_int temps
+            Iarray.fold_left (fun w t -> min w (mem_width t)) max_int temps
           in
           if mem < reg
           then
             let regs =
-              Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+              Iarray.of_list (List.filter temp_is_reg (Iarray.to_list temps))
             in
             { arg with loc = Temp regs }
           else arg)
@@ -637,12 +637,12 @@ let print_one bind instr =
     |> print_args
   in
   let print_idxs idxs =
-    Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
+    Iarray.map Int.to_string idxs |> Iarray.to_list |> String.concat ";"
   in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
-    | Arg rr -> sprintf "Arg [|%s|]" (print_idxs rr)
-    | Res rr -> sprintf "Res [|%s|]" (print_result_args rr)
+    | Arg rr -> "Arg " ^ print_iarray (print_idxs rr)
+    | Res rr -> "Res " ^ print_iarray (print_result_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -719,7 +719,8 @@ let print_one bind instr =
   in
   let constructor = String.capitalize_ascii bind in
   let ext =
-    Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
+    Iarray.map print_ext instr.ext
+    |> Iarray.to_list |> String.concat ";" |> print_iarray
   in
   let args, res =
     match instr.res with
@@ -731,14 +732,17 @@ let print_one bind instr =
       let args = print_args instr.args in
       let res_args = print_result_args rr in
       let zeroing_res_args = print_register_args rr in
-      let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
-      ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
-        sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
+      let idxs = print_idxs (Iarray.init (Iarray.length rr) (fun i -> i)) in
+      ( sprintf "(if z then %s else %s)" (print_iarray args)
+          (print_iarray (res_args ^ ";" ^ args)),
+        sprintf "(if z then Res %s else Arg %s)"
+          (print_iarray zeroing_res_args)
+          (print_iarray idxs) )
     | Res rr when instr.flags.z ->
-      ( sprintf "[|%s|]" (print_args instr.args),
-        sprintf "Res [|%s|]" (print_register_args rr) )
+      ( print_iarray (print_args instr.args),
+        "Res " ^ print_iarray (print_register_args rr) )
     | (Res_none | Arg _ | Res _) as res ->
-      sprintf "[|%s|]" (print_args instr.args), print_res res
+      print_iarray (print_args instr.args), print_res res
   in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
@@ -757,7 +761,7 @@ let print_one bind instr =
     {|
 let %s = {
     id = %s
-  ; ext = [|%s|]
+  ; ext = %s
   ; args = %s
   ; res = %s
   ; imm = %s
@@ -827,13 +831,13 @@ let parse_ext ext =
   String.split_on_char ' ' ext
   |> List.map parse_ext
   |> List.filter_map (fun tok -> tok)
-  |> Array.of_list
+  |> Iarray.of_list
 
 let arg_has_int16 arg =
   match arg.loc with
   | Pin _ -> false
   | Temp temps ->
-    Array.exists
+    Iarray.exists
       (function
         | R16 -> true
         | R8 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | M512 | MM | XMM
@@ -842,17 +846,17 @@ let arg_has_int16 arg =
       temps
 
 let arg_is_vm ({ loc; _ } : arg) =
-  match loc with Pin _ -> false | Temp temps -> Array.exists temp_is_vm temps
+  match loc with Pin _ -> false | Temp temps -> Iarray.exists temp_is_vm temps
 
 let drop_mem_loc = function
   | Pin _ as loc -> loc
   | Temp temps -> (
-    match Array.to_list temps |> List.filter temp_is_reg with
+    match Iarray.to_list temps |> List.filter temp_is_reg with
     | [] -> Temp temps
-    | regs -> Temp (Array.of_list regs))
+    | regs -> temp regs)
 
 let drop_mem args =
-  Array.map (fun (arg : arg) -> { arg with loc = drop_mem_loc arg.loc }) args
+  Iarray.map (fun (arg : arg) -> { arg with loc = drop_mem_loc arg.loc }) args
 
 let bcst_mem = function
   | Bcst_none -> assert false
@@ -861,11 +865,9 @@ let bcst_mem = function
 
 let expand_modifiers instr =
   let replace_mem mem args =
-    Array.map
+    Iarray.map
       (fun { loc; enc } ->
-        if loc_allows_mem loc
-        then { loc = Temp [| mem |]; enc }
-        else { loc; enc })
+        if loc_allows_mem loc then { loc = temp [mem]; enc } else { loc; enc })
       args
   in
   let replace_bcst enc =
@@ -892,7 +894,7 @@ let expand_modifiers instr =
     | Rnd_none -> [instr]
     | Rnd_er | Rnd_sae ->
       let allows_mem =
-        Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc)
+        Iarray.exists (fun (arg : arg) -> loc_allows_mem arg.loc)
       in
       let res_allows_mem =
         match instr.res with
@@ -914,22 +916,19 @@ let expand_modifiers instr =
     if not instr.flags.k
     then [instr]
     else
-      let k_index = Array.length instr.args in
+      let k_index = Iarray.length instr.args in
       let masked =
-        { instr with
-          args =
-            Array.append instr.args [| { loc = Temp [| K |]; enc = Mask } |]
-        }
+        { instr with args = snoc instr.args { loc = temp [K]; enc = Mask } }
       in
-      if Array.exists arg_is_vm instr.args
+      if Iarray.exists arg_is_vm instr.args
       then
         (* Gathers/scatters use the mask as a completion mask and zero it as
            elements finish; model the clobber as a modified argument so the
            register allocator does not reuse the stale value. *)
         let res =
           match masked.res with
-          | Arg rr -> Arg (Array.append rr [| k_index |])
-          | Res_none -> Arg [| k_index |]
+          | Arg rr -> Arg (snoc rr k_index)
+          | Res_none -> Arg (Iarray.of_list [k_index])
           | Res _ ->
             failwith
               (instr.mnemonic
@@ -951,7 +950,7 @@ let load_amd64 () =
       | mnemonic :: enc :: ext :: encs -> (
         try
           match parse_ext ext with
-          | [||] -> []
+          | ext when Iarray.length ext = 0 -> []
           | ext ->
             let mnemonic, args = first_word mnemonic in
             let mnemonic = String.lowercase_ascii mnemonic in
@@ -960,7 +959,7 @@ let load_amd64 () =
             in
             let enc =
               parse_enc mnemonic enc
-                ~operand_size_override:(Array.exists arg_has_int16 args)
+                ~operand_size_override:(Iarray.exists arg_has_int16 args)
             in
             expand_modifiers { ext; args; res; imm; mnemonic; enc; flags }
         with Unsupported -> [])

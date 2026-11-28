@@ -609,7 +609,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
     match instr.res with
     | Res_none | Arg _ -> [||]
     | Res rr ->
-      Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
+      Iarray.fold_left (fun acc ({loc; _} : Simd.arg) ->
         match Simd.loc_is_pinned loc with
         | Some RAX -> rax :: acc
         | Some RDI -> rdi :: acc

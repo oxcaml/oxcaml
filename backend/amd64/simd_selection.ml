@@ -1344,16 +1344,16 @@ let maybe_pin arr i loc =
   | Some pinned_loc -> arr.(i) <- to_phys_reg pinned_loc
 
 let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
-  Array.iteri
+  Iarray.iteri
     (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
   match simd.res with
   | Res_none -> arg_regs, res_regs
   | Arg rr ->
     let res_regs = ref res_regs in
-    Array.fold_left
+    Iarray.fold_left
       (fun r a ->
-        let len = Simd.loc_reg_count simd.args.(a).loc in
+        let len = Simd.loc_reg_count (Iarray.get simd.args a).loc in
         let a = Simd.unarized_reg_index simd.args a in
         (* CR-someday mslater: we should require binding all overwritten args *)
         (if r = Array.length !res_regs
@@ -1369,7 +1369,7 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
     |> ignore;
     arg_regs, !res_regs
   | Res rr ->
-    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
+    Iarray.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
     arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =

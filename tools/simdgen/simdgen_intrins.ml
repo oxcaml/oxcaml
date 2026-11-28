@@ -156,7 +156,7 @@ let temp_class : temp -> string option = function
 
 let loc_class : loc -> string option = function
   | Pin _ -> Some "R64"
-  | Temp temps -> Array.find_map temp_class temps
+  | Temp temps -> Iarray.find_map temp_class temps
 
 let ctype_class ctype =
   List.find_map
@@ -224,21 +224,21 @@ let build_by_mnem bindings =
 let bindings_of ~by_mnem mnemonic = Hashtbl.find_all by_mnem mnemonic
 
 let has_mask (instr : instr_emit) =
-  Array.exists
+  Iarray.exists
     (fun (a : arg) -> match a.enc with Mask -> true | _ -> false)
     instr.args
 
 (* Destinations, then value sources. *)
 let operands (instr : instr_emit) =
   let args =
-    Array.to_list instr.args
+    Iarray.to_list instr.args
     |> List.filter (fun (a : arg) ->
         match a.enc with
         | RM_r | RM_rm | Vex_v -> true
         | Mask | Implicit | Immediate -> false)
   in
   match instr.res with
-  | Res rr -> Array.to_list rr @ args
+  | Res rr -> Iarray.to_list rr @ args
   | Arg _ | Res_none -> args
 
 let classes instr =
@@ -256,7 +256,7 @@ let all_regs instr =
 
 let res_is_mem (instr : instr_emit) =
   match instr.res with
-  | Res rr -> Array.exists (fun (a : arg) -> loc_allows_mem a.loc) rr
+  | Res rr -> Iarray.exists (fun (a : arg) -> loc_allows_mem a.loc) rr
   | Arg _ | Res_none -> false
 
 (* The destination that the merge (~z:false) form also reads. *)
@@ -264,11 +264,11 @@ let merge_dest ~zeroing (instr : instr_emit) =
   match instr.res with
   | Res rr when instr.flags.z && merge_reads_dst instr.mnemonic && not zeroing
     ->
-    Array.to_list rr
+    Iarray.to_list rr
   | Res _ | Arg _ | Res_none -> []
 
 let binding_arity ~zeroing (instr : instr_emit) =
-  Array.length instr.args + List.length (merge_dest ~zeroing instr)
+  Iarray.length instr.args + List.length (merge_dest ~zeroing instr)
 
 let prefer f l = match List.filter f l with [] -> l | l -> l
 
@@ -562,11 +562,16 @@ let memory_spec ~binding ~zeroing i : Spec.t =
     merge_dest ~zeroing binding.instr
     @ List.filter
         (fun a -> not (arg_is_implicit a))
-        (Array.to_list binding.instr.args)
+        (Iarray.to_list binding.instr.args)
     |> List.map (fun (a : arg) ->
         if loc_allows_mem a.loc
         then ptr
-        else match a.loc with Temp [| K |] -> pop masks | _ -> pop vecs)
+        else
+          match a.loc with
+          | Temp temps
+            when Iarray.length temps = 1 && equal_temp (Iarray.get temps 0) K ->
+            pop masks
+          | _ -> pop vecs)
   in
   if !masks <> [] || !vecs <> [] then raise Unsupported;
   let arity = List.length i.params in
