@@ -73,8 +73,8 @@
         .equ    domain_field_caml_##name, domain_curr_field ; \
         .set    domain_curr_field, domain_curr_field + 1
 #endif
+#define MINOR_TABLES_FIELDS
 #include "../runtime/caml/domain_state.tbl"
-#undef DOMAIN_STATE
 
 #define Caml_state(var) [DOMAIN_STATE_PTR, 8*domain_field_caml_##var]
 

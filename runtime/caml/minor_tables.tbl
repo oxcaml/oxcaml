@@ -1,0 +1,35 @@
+#ifdef MINOR_TABLES_FIELDS
+# define TABLE_TYPE value *
+# define TABLE_FIELD(t, name) DOMAIN_STATE(t, major_ref_##name)
+# include "table_struct.tbl"
+#else
+  struct caml_ref_table major_ref;
+#endif
+
+#ifdef MINOR_TABLES_FIELDS
+# define TABLE_TYPE struct caml_ephe_ref_elt
+# define TABLE_FIELD(t, name) DOMAIN_STATE(t, ephe_ref_##name)
+# include "table_struct.tbl"
+#else
+  struct caml_ephe_ref_table ephe_ref;
+#endif
+
+#ifdef MINOR_TABLES_FIELDS
+# define TABLE_TYPE struct caml_custom_elt
+# define TABLE_FIELD(t, name) DOMAIN_STATE(t, custom_##name)
+# include "table_struct.tbl"
+#else
+  struct caml_custom_table custom;
+#endif
+
+#ifdef MINOR_TABLES_FIELDS
+# define TABLE_TYPE struct caml_dependent_elt
+# define TABLE_FIELD(t, name) DOMAIN_STATE(t, dependent_##name)
+# include "table_struct.tbl"
+#else
+  struct caml_dependent_table dependent;
+#endif
+
+#ifdef MINOR_TABLES_FIELDS
+# undef MINOR_TABLES_FIELDS
+#endif

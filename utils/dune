@@ -28,7 +28,7 @@
   (:conf ../Makefile.config)
   (:c domainstate.ml.c)
   (:tbl
-   ../runtime/caml/domain_state.tbl)
+    (glob_files %{project_root}/runtime/caml/*.tbl))
   ../runtime/caml/config.h
   ../runtime/caml/m.h
   ../runtime/caml/s.h
@@ -46,7 +46,7 @@
   (:conf ../Makefile.config)
   (:c domainstate.mli.c)
   (:tbl
-   ../runtime/caml/domain_state.tbl)
+    (glob_files %{project_root}/runtime/caml/*.tbl))
   ../runtime/caml/config.h
   ../runtime/caml/m.h
   ../runtime/caml/s.h

@@ -16,6 +16,7 @@
 #ifndef CAML_MINOR_GC_H
 #define CAML_MINOR_GC_H
 
+#include "minor_gc_structs.h"
 #include "address_class.h"
 #include "misc.h"
 #include "config.h"
@@ -30,17 +31,6 @@
 #define caml_minor_heap_wsz Caml_state->minor_heap_wsz
 #define caml_in_minor_collection Caml_state->in_minor_collection
 
-
-#define CAML_TABLE_STRUCT(t) { \
-  t *base;                     \
-  t *end;                      \
-  t *threshold;                \
-  t *ptr;                      \
-  t *limit;                    \
-  asize_t size;                \
-  asize_t reserve;             \
-}
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,33 +41,6 @@ CAMLextern atomic_uintnat caml_minor_collections_count;
 /* The epoch number for major slice. Used to trigger major slices.
    Always, [caml_major_slice_epoch <= caml_minor_collections_count] */
 CAMLextern atomic_uintnat caml_major_slice_epoch;
-
-struct caml_ref_table CAML_TABLE_STRUCT(value *);
-
-struct caml_ephe_ref_elt {
-  value ephe;      /* an ephemeron in major heap */
-  mlsize_t offset; /* the offset that points in the minor heap  */
-  value stash;     /* copy of the field if it requires minor-GC cleaning */
-};
-struct caml_ephe_ref_table CAML_TABLE_STRUCT(struct caml_ephe_ref_elt);
-
-struct caml_custom_elt {
-  value block;     /* The finalized block in the minor heap. */
-};
-struct caml_custom_table CAML_TABLE_STRUCT(struct caml_custom_elt);
-
-struct caml_dependent_elt {
-  value block;     /* The finalized block in the minor heap. */
-  mlsize_t mem;    /* The size in bytes of the dependent memory. */
-};
-struct caml_dependent_table CAML_TABLE_STRUCT(struct caml_dependent_elt);
-
-struct caml_minor_tables {
-  struct caml_ref_table major_ref;
-  struct caml_ephe_ref_table ephe_ref;
-  struct caml_custom_table custom;
-  struct caml_dependent_table dependent;
-};
 
 /* Setting this to a different value can be useful for debugging
  * although may cause some slowdown. It must be a header value not
@@ -114,8 +77,8 @@ extern void caml_realloc_ref_table (struct caml_ref_table *);
 extern void caml_realloc_ephe_ref_table (struct caml_ephe_ref_table *);
 extern void caml_realloc_custom_table (struct caml_custom_table *);
 extern void caml_realloc_dependent_table (struct caml_dependent_table *);
-struct caml_minor_tables* caml_alloc_minor_tables(void);
-void caml_free_minor_tables(struct caml_minor_tables*);
+void caml_setup_minor_tables(struct caml_minor_tables* tables);
+void caml_reset_minor_tables(struct caml_minor_tables* tables);
 void caml_empty_minor_heap_setup(caml_domain_state* domain, void*);
 
 /* We are about to write `count` fields on the major heap, with values

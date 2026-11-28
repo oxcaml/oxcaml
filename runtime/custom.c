@@ -52,7 +52,7 @@ static value alloc_custom_gen (const struct custom_operations * ops,
     Custom_ops_val(result) = ops;
     if (ops->finalize != NULL) {
       /* Record the extra resources in case the block gets promoted. */
-      add_to_custom_table (&Caml_state->minor_tables->custom, result);
+      add_to_custom_table (&Caml_state->minor_tables.custom, result);
     }
   } else {
     result = caml_alloc_shr(wosize, Custom_tag);

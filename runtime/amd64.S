@@ -225,8 +225,8 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
 #define DOMAIN_STATE(c_type, name) \
         .equ    domain_field_caml_##name, domain_curr_field ; \
         .set    domain_curr_field, domain_curr_field + 1
+#define MINOR_TABLES_FIELDS
 #include "../runtime/caml/domain_state.tbl"
-#undef DOMAIN_STATE
 
 #define Caml_state(var) (8*domain_field_caml_##var)(%r14)
 

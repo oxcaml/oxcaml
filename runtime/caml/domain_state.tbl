@@ -75,7 +75,11 @@ DOMAIN_STATE(value*, gc_regs)
 /* Pointer to currently-used register bucket, or NULL.
    Documented in fiber.h. */
 
-DOMAIN_STATE(struct caml_minor_tables*, minor_tables)
+#ifdef MINOR_TABLES_FIELDS
+# include "minor_tables.tbl"
+#else
+  struct caml_minor_tables minor_tables;
+#endif
 
 DOMAIN_STATE(struct mark_stack*, mark_stack)
 /* Mark stack */
@@ -249,3 +253,5 @@ DOMAIN_STATE(value *, memprof_young_trigger)
 
 DOMAIN_STATE(extra_params_area, extra_params)
 /* This member must occur last, because it is an array, not a scalar */
+
+#undef DOMAIN_STATE

@@ -1,0 +1,14 @@
+#ifndef TABLE_FIELD
+# define TABLE_FIELD(t, name) CAMLalign(8) t name;
+#endif
+
+TABLE_FIELD(TABLE_TYPE *, base)
+TABLE_FIELD(TABLE_TYPE *, end)
+TABLE_FIELD(TABLE_TYPE *, threshold)
+TABLE_FIELD(TABLE_TYPE *, ptr)
+TABLE_FIELD(TABLE_TYPE *, limit)
+TABLE_FIELD(asize_t,      size)
+TABLE_FIELD(asize_t,      reserve)
+
+#undef TABLE_FIELD
+#undef TABLE_TYPE
