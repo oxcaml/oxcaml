@@ -301,7 +301,12 @@ let on_fatal_callback cfg_with_infos () =
   save_cfg "ls" (Cfg_with_infos.cfg_with_layout cfg_with_infos)
 
 let run_after_prelude
-    { Regalloc_rewrite.cfg_with_infos; cfg_infos = _; stack_slots; affinity } =
+    { Regalloc_rewrite.cfg_with_infos;
+      cfg_infos = _;
+      stack_slots;
+      affinity;
+      rematerializations
+    } =
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:(on_fatal_callback cfg_with_infos);
@@ -324,7 +329,7 @@ let run_after_prelude
               block.terminator liveness);
         dedent ()))
     cfg_with_infos;
-  cfg_with_infos
+  cfg_with_infos, rematerializations
 
 let run cfg_with_infos =
   if debug then reset_indentation ();

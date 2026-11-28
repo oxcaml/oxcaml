@@ -33,3 +33,9 @@ type destruction_kind =
 val equal_destruction_kind : destruction_kind -> destruction_kind -> bool
 
 val destruction_point_at_end : Cfg.basic_block -> destruction_kind option
+
+(** Supported operation shapes for rematerialization: constants, immutable
+    non-atomic loads, and selected immediate integer operations. Callers must
+    separately check that the instruction has exactly one result, that its
+    operand values are available and unchanged, and placement is safe. *)
+val is_rematerializable_shape : Cfg.basic -> bool
