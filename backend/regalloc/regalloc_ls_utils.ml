@@ -159,7 +159,8 @@ module Range = struct
   let rec remove_expired_cursor : t DLL.Cursor.t -> pos:int -> unit =
    fun cursor ~pos ->
     let value = DLL.Cursor.value cursor in
-    if pos < value.end_
+    (* Ranges include their endpoint, even singleton clobbers at [pos]. *)
+    if pos <= value.end_
     then ()
     else
       match DLL.Cursor.delete_and_next cursor with
