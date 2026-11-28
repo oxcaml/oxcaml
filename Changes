@@ -24,6 +24,9 @@ OCaml 5.4.1
   (Tim McGilchrist, reported by mattiasdrp, review by Sadiq Jaffer and
    Zane Hambly)
 
+- #15092: do not lose domain allocation stats on termination
+  (Edwin Török, report by Eduardo Souza, review by Stefan Muenzel)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
