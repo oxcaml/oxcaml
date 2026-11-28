@@ -379,6 +379,10 @@ type symbol =
     sym_type : machtype
   }
 
+type callee =
+  | Symbol of symbol
+  | Argument of { argument_index : int }
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
   | Cphantom_const_symbol of symbol
@@ -620,7 +624,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option;
+        callees : callee list option;
         returns : bool
       }
   | Cextcall of
@@ -1025,6 +1029,13 @@ let equal_symbol left right =
   String.equal left.sym_name right.sym_name
   && equal_is_global left.sym_global right.sym_global
   && equal_machtype left.sym_type right.sym_type
+
+let equal_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> equal_symbol s1 s2
+  | Argument { argument_index = a1 }, Argument { argument_index = a2 } ->
+    a1 = a2
+  | Symbol _, Argument _ | Argument _, Symbol _ -> false
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128

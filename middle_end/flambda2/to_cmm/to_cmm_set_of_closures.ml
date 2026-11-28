@@ -522,7 +522,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
     ~free_names_of_body ~(translate_expr : translate_expr) =
-  let params =
+  let params_with_my_closure_appended =
     let is_my_closure_used =
       match is_my_closure_used with
       | Unknown -> true
@@ -546,7 +546,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
-      ~exn_continuation
+      ~exn_continuation ~params
   in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,
@@ -574,7 +574,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   (* Translate the arg list and body *)
   let env, fun_params =
-    C.function_bound_parameters env params ~free_names_of_body
+    C.function_bound_parameters env params_with_my_closure_appended
+      ~free_names_of_body
   in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
     translate_expr env res body
