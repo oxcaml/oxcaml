@@ -25,7 +25,13 @@
 #include "caml/startup_aux.h"
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdatomic.h>
+
+/* Upstream defines this in caml/config.h (ocaml/ocaml#13656). */
+#ifndef CAML_PRIuNAT
+#define CAML_PRIuNAT ARCH_INTNAT_PRINTF_FORMAT "u"
+#endif
 #include <string.h>
 #include <sys/stat.h>
 
@@ -85,7 +91,7 @@ typedef enum { EV_RUNTIME, EV_USER } ev_category;
 
 /* These store state for the current ring buffers open for writing */
 static struct runtime_events_metadata_header *current_metadata = NULL;
-static int current_ring_total_size;
+static size_t current_ring_total_size;
 static char_os *runtime_events_path;
 static char_os *current_ring_loc = NULL;
 
@@ -235,7 +241,7 @@ void caml_runtime_events_destroy(void) {
 static void runtime_events_create_from_stw_single(void) {
   /* Don't initialise runtime_events twice */
   if (!atomic_load_acquire(&runtime_events_enabled)) {
-    int ring_headers_length, ring_data_length;
+    size_t ring_headers_length, ring_data_length;
 #ifdef _WIN32
     DWORD pid = GetCurrentProcessId();
 #else
@@ -253,12 +259,23 @@ static void runtime_events_create_from_stw_single(void) {
                   T("%ld.events"), pid);
     }
 
-    current_ring_total_size =
-        RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
+    /* Computed in 64 bits: max_domains * ring_size_bytes can exceed the range
+       of a 32-bit size_t at large OCAMLRUNPARAM e or d settings, so the result
+       is checked before it is narrowed. */
+    uint64_t ring_total_size =
+        (uint64_t)RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
           sizeof(struct runtime_events_custom_event) +
-        caml_params->max_domains * (ring_size_words * sizeof(uint64_t) +
+        (uint64_t)caml_params->max_domains *
+          ((uint64_t)ring_size_words * sizeof(uint64_t) +
                         sizeof(struct runtime_events_buffer_header)) +
         sizeof(struct runtime_events_metadata_header);
+
+    if (ring_total_size > SIZE_MAX) {
+      caml_fatal_error("Ring buffer of %" PRIu64 " bytes exceeds the address "
+                       "space, reduce OCAMLRUNPARAM e or d", ring_total_size);
+    }
+
+    current_ring_total_size = (size_t)ring_total_size;
 
 #ifdef _WIN32
     ring_file_handle = CreateFile(
@@ -282,12 +299,13 @@ static void runtime_events_create_from_stw_single(void) {
       }
     }
 
+    /* Shifting a 32-bit size_t by 32 is undefined, so widen first. */
     ring_handle = CreateFileMapping(
       ring_file_handle,
       NULL,
       PAGE_READWRITE,
-      0,
-      current_ring_total_size,
+      (DWORD)((uint64_t)current_ring_total_size >> 32),
+      (DWORD)(current_ring_total_size & 0xFFFFFFFF),
       NULL
     );
 
@@ -516,6 +534,28 @@ static void write_to_ring(ev_category category, ev_message_type type,
 
   /* account for header and timestamp (which are both uint64) */
   uint64_t length_with_header_ts = event_length + 2;
+
+  /* We must fatal error if the event cannot fit in the ring buffer.
+     Otherwise the loop below loops forever. In practice only the
+     alloc event can hit this, which is emitted by the instrumented
+     runtime. But users can also create arbitrarily sized events.
+     Closes #13335.
+
+     An event is only written whole, so one that would straddle the end of
+     the ring is preceded by padding and written at the start instead. The
+     loop below therefore has to fit the event plus that padding, and the
+     padding can be one word short of the event itself. Half the ring is the
+     largest event that always fits. Closes #15043. */
+  if (2 * length_with_header_ts > ring_size_words) {
+    int min_e = 0;
+    while ((1ULL << min_e) < 2 * length_with_header_ts) min_e++;
+    caml_fatal_error(
+        "runtime_events: event of %" PRIu64 " words does not fit in the ring "
+        "buffer (%d words, from OCAMLRUNPARAM=e=%" CAML_PRIuNAT "). "
+        "Use OCAMLRUNPARAM=e=%d or higher.",
+        length_with_header_ts, ring_size_words,
+        caml_params->runtime_events_log_wsize, min_e);
+  }
 
   /* there is a ring buffer (made up of header and data) for each domain */
   struct runtime_events_buffer_header *domain_ring_header =
