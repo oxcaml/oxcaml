@@ -1,0 +1,201 @@
+Entry point: 0
+
+==== 0 () ====
+  v6 = "caml_get_global_predef"("Assert_failure") 
+  v1 = CONST{"generic_array_access.ml"}
+  v3 = CONST{2}
+  v4 = CONST{27}
+  v2 = imm{tag=0; 0 = v1; 1 = v4; 2 = v3}
+  v5 = imm{tag=0; 0 = v6; 1 = v2}
+  v8 = CONST{2}
+  v9 = CONST{28}
+  v7 = imm{tag=0; 0 = v1; 1 = v9; 2 = v8}
+  v10 = imm{tag=0; 0 = v6; 1 = v7}
+  v12 = CONST{2}
+  v13 = CONST{30}
+  v11 = imm{tag=0; 0 = v1; 1 = v13; 2 = v12}
+  v14 = imm{tag=0; 0 = v6; 1 = v11}
+  v16 = CONST{2}
+  v17 = CONST{31}
+  v15 = imm{tag=0; 0 = v1; 1 = v17; 2 = v16}
+  v18 = imm{tag=0; 0 = v6; 1 = v15}
+  v19 = CONST{"b"}
+  v20 = CONST{"a"}
+  v22 = CONST{2}
+  v23 = CONST{39}
+  v21 = imm{tag=0; 0 = v1; 1 = v23; 2 = v22}
+  v24 = imm{tag=0; 0 = v6; 1 = v21}
+  v26 = CONST{2}
+  v27 = CONST{36}
+  v25 = imm{tag=0; 0 = v1; 1 = v27; 2 = v26}
+  v28 = imm{tag=0; 0 = v6; 1 = v25}
+  v29 = CONST{2.5}
+  v30 = CONST{1.5}
+  v33 = fun(v31, v32){1 ()} [hint:(value,int)->value never_inline]
+  v38 = "caml_register_symbol"("Generic_array_access", "camlGeneric_array_access__get_17", v33) 
+  v42 = fun(v39, v40, v41){4 ()} [hint:(value,int,value)->int never_inline]
+  v47 = "caml_register_symbol"("Generic_array_access", "camlGeneric_array_access__set_18", v42) 
+  v51 = fun(v48, v49, v50){8 ()} [hint:(value,value,value)->int never_inline]
+  v77 = "caml_register_symbol"("Generic_array_access", "camlGeneric_array_access__check_19", v51) 
+  v78 = CONST{1.5}
+  v79 = CONST{1.5}
+  v80 = {tag=254; 0 = v79; 1 = v78}
+  v82 = v51!(v80, v30, v29)
+  branch 29 (v82)
+
+==== 1 () ====
+  v34 = "%is_float_array"(v31) 
+  if v34 then 2 () else 3 ()
+
+==== 2 () ====
+  v36 = "caml_floatarray_unsafe_get"(v31, v32)
+  return v36
+
+==== 3 () ====
+  v35 = v31[v32]
+  return v35
+
+==== 4 () ====
+  v43 = "%is_float_array"(v39) 
+  if v43 then 6 () else 7 ()
+
+==== 5 () ====
+  v45 = CONST{0}
+  return v45
+
+==== 6 () ====
+  v44 = "caml_floatarray_unsafe_set"(v39, v40, v41) 
+  branch 5 ()
+
+==== 7 () ====
+  v39[v40] = v41
+  branch 5 ()
+
+==== 8 () ====
+  v53 = CONST{0}
+  v54 = v33!(v48, v53)
+  branch 10 (v54)
+
+==== 9 () ====
+  v58 = CONST{1}
+  v59 = v33!(v48, v58)
+  branch 14 (v59)
+
+==== 10 (v52) ====
+  v56 = "caml_equal"(v52, v49)
+  branch 11 (v56)
+
+==== 11 (v55) ====
+  if v55 then 9 () else 12 ()
+
+==== 12 () ====
+  raise v5
+
+==== 13 () ====
+  v63 = CONST{1}
+  v64 = v42!(v48, v63, v50)
+  branch 18 (v64)
+
+==== 14 (v57) ====
+  v61 = "caml_equal"(v57, v49)
+  branch 15 (v61)
+
+==== 15 (v60) ====
+  if v60 then 13 () else 16 ()
+
+==== 16 () ====
+  raise v10
+
+==== 17 () ====
+  v66 = CONST{0}
+  v67 = v33!(v48, v66)
+  branch 20 (v67)
+
+==== 18 (v62) ====
+  branch 17 ()
+
+==== 19 () ====
+  v71 = CONST{1}
+  v72 = v33!(v48, v71)
+  branch 23 (v72)
+
+==== 20 (v65) ====
+  v69 = "caml_equal"(v65, v49)
+  branch 21 (v69)
+
+==== 21 (v68) ====
+  if v68 then 19 () else 22 ()
+
+==== 22 () ====
+  raise v14
+
+==== 23 (v70) ====
+  v74 = "caml_equal"(v70, v50)
+  branch 24 (v74)
+
+==== 24 (v73) ====
+  v75 = CONST{0}
+  if v73 then 26 () else 25 ()
+
+==== 25 () ====
+  raise v18
+
+==== 26 () ====
+  return v75
+
+==== 27 () ====
+  v101 = imm{tag=0; 0 = v33; 1 = v42; 2 = v51}
+  v102 = "caml_register_global"(v101, "Generic_array_access")
+  stop
+
+==== 28 () ====
+  v83 = "caml_floatarray_unsafe_get"(v80, 1)
+  v84 = "caml_eq_float"(v83, 2.5)
+  if v84 then 30 () else 31 ()
+
+==== 29 (v81) ====
+  branch 28 ()
+
+==== 30 () ====
+  v86 = "caml_make_vect"(2, v30)
+  branch 32 (v86)
+
+==== 31 () ====
+  raise v28
+
+==== 32 (v85) ====
+  v88 = v51!(v85, v30, v29)
+  branch 34 (v88)
+
+==== 33 () ====
+  v89 = "caml_floatarray_unsafe_get"(v85, 1)
+  v90 = "caml_eq_float"(v89, 2.5)
+  if v90 then 35 () else 36 ()
+
+==== 34 (v87) ====
+  branch 33 ()
+
+==== 35 () ====
+  v91 = {tag=0; 0 = v20; 1 = v20}
+  v93 = v51!(v91, v20, v19)
+  branch 38 (v93)
+
+==== 36 () ====
+  raise v24
+
+==== 37 () ====
+  v94 = CONST{1}
+  v95 = CONST{1}
+  v96 = {tag=0; 0 = v95; 1 = v94}
+  v98 = CONST{2}
+  v99 = CONST{1}
+  v100 = v51!(v96, v99, v98)
+  branch 39 (v100)
+
+==== 38 (v92) ====
+  branch 37 ()
+
+==== 39 (v97) ====
+  branch 27 ()
+
+

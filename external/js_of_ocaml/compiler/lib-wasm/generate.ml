@@ -880,6 +880,9 @@ module Generate (Target : Target_sig.S) = struct
         let* f = register_import ~name:"caml_obj_tag" (Fun (Type.primitive_type 1)) in
         let* x = x in
         return (W.Call (f, [ x ])));
+    (* Emitted by the OxCaml JSIR backend for arrays whose kind is not known
+       statically. *)
+    register_un_prim "%is_float_array" `Pure ~ret_typ:int_sn Memory.check_is_float_array;
     if Config.Flag.portable_int ()
     then
       register_un_prim "%int_neg" `Pure ~typ:int_lu ~ret_typ:int_lu Value64.int_neg
