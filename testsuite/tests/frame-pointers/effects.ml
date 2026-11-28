@@ -3,6 +3,7 @@
    readonly_files = "fp_backtrace.c";
    all_modules = "${readonly_files} effects.ml";
    flags = " -no-flambda2-simplify-stubs";
+   reference = "${test_source_directory}/effects.reference";
    native;
 *)
 

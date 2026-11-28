@@ -1008,8 +1008,14 @@ stdenv.mkDerivation {
       ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
     '';
 
-  meta =
-    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+  meta = {
+    broken =
+      let
+        host = pkgs.stdenv.hostPlatform;
+      in
+      (framePointers && !(host.isx86_64 || host.isAarch64))
+      || (addressSanitizer && !host.isx86_64);
+  };
 
   passthru = {
     inherit

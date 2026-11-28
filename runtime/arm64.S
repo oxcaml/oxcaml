@@ -231,9 +231,10 @@ G(name):
 /* Switch from OCaml to C stack.
 
    If a C function is called which might call back into OCaml,
-   then nothing may be pushed to the C stack between SWITCH_OCAML_TO_C
-   and the next call on the C stack. (This is to ensure frame pointers
-   are correctly maintained if the stack is reallocated) */
+   then SWITCH_OCAML_TO_C must be followed by PUSH_C_FRAME_RECORD, and
+   nothing else may be pushed to the C stack before the call. (This is
+   to ensure frame pointers are correctly maintained if the stack is
+   reallocated) */
 .macro SWITCH_OCAML_TO_C
     /* Fill in Caml_state->current_stack->sp */
         ldr     TMP, Caml_state(current_stack)
@@ -264,6 +265,34 @@ G(name):
         mov     sp, TMP
         CFI_RESTORE_STATE
 .endm
+
+/* Push a frame record just below the c_stack_link, linking to the frame
+   record on the OCaml stack. caml_try_realloc_stack expects it there,
+   but a C compiler may save x29 anywhere in its frame. */
+#ifdef WITH_FRAME_POINTERS
+.macro PUSH_C_FRAME_RECORD
+        adr     TMP, .
+        stp     x29, TMP, [sp, -16]!
+#ifdef ASM_CFI_SUPPORTED
+        CFI_REMEMBER_STATE
+        .cfi_escape DW_CFA_def_cfa_expression, 5,                      \
+           DW_OP_breg + DW_REG_sp, 16 + Cstack_sp_offset, DW_OP_deref, \
+           DW_OP_plus_uconst, 16 /* fp + retaddr */
+#endif
+        add     x29, sp, #0
+.endm
+
+.macro POP_C_FRAME_RECORD
+        ldr     x29, [sp], 16
+        CFI_RESTORE_STATE
+.endm
+#else
+.macro PUSH_C_FRAME_RECORD
+.endm
+
+.macro POP_C_FRAME_RECORD
+.endm
+#endif
 
 /* Save all of the registers that may be in use to a free gc_regs bucket
    and store ALLOC_PTR and TRAP_PTR back to Caml_state
@@ -397,9 +426,10 @@ G(name):
 
    REG: Stack_handler(target_fiber)
 
-   The frame pointer will be pushed into the stack immediately after these
-   instructions. The offset of the oldest saved x29 in a fiber from the stack
-   handler is 48 = 4 words (caml_runstack) + 2 words (x30 and x29).
+   The macro records [sp - 16] as the new oldest saved x29 for the target
+   fiber. This anticipates the next x29/x30 pair push on the target stack.
+   The offset of the oldest saved x29 in a fiber from the stack handler is
+   48 = 4 words (caml_runstack) + 2 words (x30 and x29).
    */
 #ifdef WITH_FRAME_POINTERS
 .macro UPDATE_BASE_POINTER reg
@@ -557,7 +587,9 @@ FUNCTION(caml_call_realloc_stack)
         SAVE_ALL_REGS
         ldr     C_ARG_1, [sp, 16] /* argument */
         SWITCH_OCAML_TO_C
+        PUSH_C_FRAME_RECORD
         bl      G(caml_try_realloc_stack)
+        POP_C_FRAME_RECORD
         SWITCH_C_TO_OCAML
         cbz     x0, 1f
         RESTORE_ALL_REGS
@@ -602,8 +634,10 @@ L(caml_call_gc):
         SAVE_ALL_REGS
         TSAN_ENTER_FUNCTION
         SWITCH_OCAML_TO_C
+        PUSH_C_FRAME_RECORD
     /* Call the garbage collector */
         bl      G(caml_garbage_collection)
+        POP_C_FRAME_RECORD
         SWITCH_C_TO_OCAML
         TSAN_EXIT_FUNCTION
     /* Caml_state->preemption > 3 means that we should preempt:
@@ -758,6 +792,7 @@ FUNCTION(caml_c_call)
         TSAN_RESTORE_CALLER_REGS
     /* Switch from OCaml to C */
         SWITCH_OCAML_TO_C
+        PUSH_C_FRAME_RECORD
     /* Make the exception handler alloc ptr available to the C code */
         str     ALLOC_PTR, Caml_state(young_ptr)
         str     TRAP_PTR, Caml_state(exn_handler)
@@ -766,6 +801,7 @@ FUNCTION(caml_c_call)
     /* Reload new allocation pointer & exn handler */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
         ldr     TRAP_PTR, Caml_state(exn_handler)
+        POP_C_FRAME_RECORD
     /* Load ocaml stack */
         SWITCH_C_TO_OCAML
 #if defined(WITH_THREAD_SANITIZER)
@@ -1425,7 +1461,6 @@ END_FUNCTION(caml_reperform)
         CFI_OFFSET(30, -8)
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
-        add     x29, sp, #0
         mov     x24, x0                       /* x24 := the continuation */
     /* Check if this is a preemption continuation (wosize == 3) */
         WOSIZE_BLOCK_VAL TMP, x0
@@ -1479,6 +1514,10 @@ END_FUNCTION(caml_reperform)
     /* Pop our frame before stack switch */
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
+    /* Need to update the oldest saved frame pointer here as the current fiber
+       stack may have been reallocated or we may be resuming a computation
+       that was not originally run here. */
+        UPDATE_BASE_POINTER x8
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
     /* Recompute the cached TLS state. */
