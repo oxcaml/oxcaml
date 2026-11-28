@@ -19,6 +19,12 @@
   (deps ../../src/kernel/mconfig.ml)
   (applies_to ocaml-flags))
 
+; Merlin's dune language predates [runtest_alias], so opt in via the environment.
+(cram
+ (applies_to experimental-flags)
+ (alias runtest-experimental-features)
+ (enabled_if (= %{env:RUN_EXPERIMENTAL_FEATURE_TESTS=false} true)))
+
 ; FIXME: re-enable once ppxlib for 5.1 is released
 (cram
  (applies_to with-ppx)

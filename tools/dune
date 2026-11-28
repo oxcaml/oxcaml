@@ -157,6 +157,11 @@
  (modules gen_compiler_libs_installation))
 
 (executable
+ (name gen_experimental_features)
+ (modes native)
+ (modules gen_experimental_features))
+
+(executable
  (name ocamlfilt)
  (modes byte native)
  (modules ocamlfilt)

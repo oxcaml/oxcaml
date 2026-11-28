@@ -1,5 +1,5 @@
 (* TEST
- flags += " -extension layouts_beta -O3 -experimental-optimizations";
+ flags += " -extension layouts_beta -O3 -test-optimizations";
  only-default-codegen;
  expect.opt;
 *)
