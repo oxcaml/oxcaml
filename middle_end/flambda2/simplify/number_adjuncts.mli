@@ -92,6 +92,11 @@ module type Int_number_kind = sig
   module Num : sig
     include Num_common
 
+    (** Signed bounds for this number kind on the target machine. *)
+    val min_value : Target_system.Machine_width.t -> t
+
+    val max_value : Target_system.Machine_width.t -> t
+
     val and_ : t -> t -> t
 
     val or_ : t -> t -> t
