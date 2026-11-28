@@ -137,5 +137,6 @@ local_alloc_loop:
   jmp   .L2
 .L7:
   call  caml_call_local_realloc@PLT
+  movq  64(%r14), %rdx
   jmp   .L1
 |}]
