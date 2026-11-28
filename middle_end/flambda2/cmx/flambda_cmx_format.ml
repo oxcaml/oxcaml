@@ -58,16 +58,17 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   to_raw ~sections t
 
 let import_typing_env_and_code0 ~sections t =
-  let renaming =
+  let import_map =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
         Ids_for_export.Table_data.create_import_map t.table_data
           ~used_value_slots:t.used_value_slots
           ~original_compilation_unit:t.original_compilation_unit)
   in
+  let renaming = Renaming.from_import_map import_map in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
-        Flambda2_types.Typing_env.Serializable.apply_renaming t.final_typing_env
-          renaming)
+        Flambda2_types.Typing_env.Serializable.import_names t.final_typing_env
+          import_map)
   in
   let all_code =
     Profile.record_call ~accumulate:true "exported_code_from_raw" (fun () ->

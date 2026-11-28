@@ -39,8 +39,9 @@ type t =
 let stamp_state t = t.stamp_state
 
 let renaming { table_data; original_compilation_unit; used_value_slots; _ } =
-  Ids_for_export.Table_data.create_import_map table_data ~used_value_slots
-    ~original_compilation_unit
+  Renaming.from_import_map
+    (Ids_for_export.Table_data.create_import_map table_data ~used_value_slots
+       ~original_compilation_unit)
 
 let create_for_current_unit ~sections ~imported_offsets ~used_value_slots
     ~problem ~skeleton =
