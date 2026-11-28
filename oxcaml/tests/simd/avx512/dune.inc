@@ -4,7 +4,7 @@
  (modules basic512)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -16,7 +16,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512.exe)
@@ -29,7 +29,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -40,7 +40,7 @@
  (modules basic512_u)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -52,7 +52,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512_u.exe)
@@ -65,7 +65,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -76,7 +76,7 @@
  (modules callback512)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -88,7 +88,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe callback512.exe)
@@ -101,7 +101,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -112,7 +112,7 @@
  (modules consts512)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -124,7 +124,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe consts512.exe)
@@ -137,7 +137,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -148,7 +148,7 @@
  (modules arrays512)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -160,7 +160,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512.exe)
@@ -173,7 +173,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -184,7 +184,7 @@
  (modules arrays512_u)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -196,7 +196,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_u.exe)
@@ -209,7 +209,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -220,7 +220,7 @@
  (modules arrays512_mask)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -232,7 +232,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_mask.exe)
@@ -245,7 +245,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -256,7 +256,7 @@
  (modules strings512_mask)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -268,7 +268,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe strings512_mask.exe)
@@ -281,7 +281,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -292,7 +292,7 @@
  (modules extcall512_mask)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -304,7 +304,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe extcall512_mask.exe)
@@ -317,7 +317,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -327,7 +327,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -338,7 +338,7 @@
  (modules basic512_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -350,7 +350,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512_nodynlink.exe)
@@ -363,7 +363,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -373,7 +373,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -384,7 +384,7 @@
  (modules basic512_u_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -396,7 +396,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512_u_nodynlink.exe)
@@ -409,7 +409,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -419,7 +419,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -430,7 +430,7 @@
  (modules callback512_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -442,7 +442,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe callback512_nodynlink.exe)
@@ -455,7 +455,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -465,7 +465,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -476,7 +476,7 @@
  (modules consts512_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -488,7 +488,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe consts512_nodynlink.exe)
@@ -501,7 +501,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -511,7 +511,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -522,7 +522,7 @@
  (modules arrays512_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -534,7 +534,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_nodynlink.exe)
@@ -547,7 +547,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -557,7 +557,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -568,7 +568,7 @@
  (modules arrays512_u_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -580,7 +580,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_u_nodynlink.exe)
@@ -593,7 +593,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -603,7 +603,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -614,7 +614,7 @@
  (modules arrays512_mask_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -626,7 +626,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_mask_nodynlink.exe)
@@ -639,7 +639,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -649,7 +649,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -660,7 +660,7 @@
  (modules strings512_mask_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -672,7 +672,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe strings512_mask_nodynlink.exe)
@@ -685,7 +685,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -695,7 +695,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -706,7 +706,7 @@
  (modules extcall512_mask_nodynlink)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -718,7 +718,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe extcall512_mask_nodynlink.exe)
@@ -731,7 +731,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -741,7 +741,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -752,7 +752,7 @@
  (modules basic512_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -764,7 +764,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512_internal_assembler.exe)
@@ -777,7 +777,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -787,7 +787,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -798,7 +798,7 @@
  (modules basic512_u_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -810,7 +810,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe basic512_u_internal_assembler.exe)
@@ -823,7 +823,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -833,7 +833,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -844,7 +844,7 @@
  (modules callback512_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -856,7 +856,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe callback512_internal_assembler.exe)
@@ -869,7 +869,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -879,7 +879,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -890,7 +890,7 @@
  (modules consts512_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -902,7 +902,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe consts512_internal_assembler.exe)
@@ -915,7 +915,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -925,7 +925,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -936,7 +936,7 @@
  (modules arrays512_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -948,7 +948,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_internal_assembler.exe)
@@ -961,7 +961,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -971,7 +971,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -982,7 +982,7 @@
  (modules arrays512_u_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -994,7 +994,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_u_internal_assembler.exe)
@@ -1007,7 +1007,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1017,7 +1017,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1028,7 +1028,7 @@
  (modules arrays512_mask_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1040,7 +1040,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe arrays512_mask_internal_assembler.exe)
@@ -1053,7 +1053,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1063,7 +1063,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1074,7 +1074,7 @@
  (modules strings512_mask_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1086,7 +1086,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe strings512_mask_internal_assembler.exe)
@@ -1099,7 +1099,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1109,7 +1109,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1120,7 +1120,7 @@
  (modules extcall512_mask_internal_assembler)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1132,7 +1132,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe extcall512_mask_internal_assembler.exe)
@@ -1145,7 +1145,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1155,7 +1155,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
@@ -1166,7 +1166,7 @@
  (modules extcall512_mask_flambda2_reaper__reaper_local_fields)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (ocamlopt_flags
@@ -1178,7 +1178,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (deps avx512_available.exe extcall512_mask_flambda2_reaper__reaper_local_fields.exe)
@@ -1191,7 +1191,7 @@
  (alias runtest)
  (enabled_if
    (and
-    (= %{context_name} "main")
+    (<> %{context_name} "default")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action

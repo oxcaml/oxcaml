@@ -1,0 +1,8 @@
+standard library without polls found before the root with polls: not fully polled, an alert that names its directory and the unit CamlinternalFormatBasics
+standard library without polls given by absolute path: an alert that names its directory and the unit CamlinternalFormatBasics
+standard library without polls given by relative path: an alert that names its directory and the unit CamlinternalFormatBasics
+one module of the standard library without polls: an alert that names its directory and the unit Stdlib__Bool
+Std_exit without polls found before the root with polls: not fully polled, an alert that names its directory and the unit Std_exit
+unit without polls in the directory of the libraries: not fully polled, no alert
+units without polls named like those of the standard library: not fully polled, no alert
+unit without polls named through the directory of the libraries: not fully polled, no alert

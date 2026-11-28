@@ -1,7 +1,8 @@
-let enabled_if_main = {|(enabled_if (= %{context_name} "main"))|}
+let enabled_if_main = {|(enabled_if (<> %{context_name} "default"))|}
 
 let enabled_if_main_amd64 =
-  {|(enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )|}
+  {|(enabled_if (and (<> %{context_name} "default") |}
+  ^ {|(= %{architecture} "amd64")) )|}
 
 let flags =
   "-S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg \
@@ -40,7 +41,10 @@ let compile ~enabled_if ~extra_flags name =
   in
   (* We override the OCAMLPARAM environment variable below, because
    * the vectorizer tests uses the "dump-to-file" feature of the
-   * compiler which is also used by the CI job for metrics collection. *)
+   * compiler which is also used by the CI job for metrics collection.
+   * The build context of a codegen variant sets the variant in OCAMLPARAM
+   * too: OXCAML_VARIANT_OCAMLPARAM has that part alone (see
+   * VARIANT_ENV_VARS in Makefile.common-ox). *)
   rule ~subst
     {|
 (rule
@@ -51,7 +55,7 @@ let compile ~enabled_if ~extra_flags name =
  (action
   (setenv
    OCAMLPARAM
-   ""
+   %{env:OXCAML_VARIANT_OCAMLPARAM=}
    (run %{bin:ocamlopt.opt} %{deps} ${flags} ${extra_flags} -o ${runner}))))
 |}
 

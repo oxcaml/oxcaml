@@ -1,0 +1,19 @@
+With the current directory on the load path:
+  a bare name: the file in the variant's tree
+  a name with a directory: the file in the variant's tree
+  a file: the file in the variant's tree
+  a file, spelled otherwise than the root: the file in the variant's tree
+  a file that the invocation wrote: the file in the root
+  the same, spelled otherwise: the file in the root
+  another file named after the same source: the file in the variant's tree
+  a file that a written path with ".." may lead to: the file in the variant's tree
+Without it:
+  a bare name: the file in the variant's tree
+  a name with a directory: the file in the variant's tree
+  a file: the file in the variant's tree
+  a file, spelled otherwise than the root: the file in the variant's tree
+  a file that the invocation wrote: the file in the root
+  the same, spelled otherwise: the file in the root
+  another file named after the same source: the file in the variant's tree
+  a file that a written path with ".." may lead to: the file in the variant's tree
+A directory, spelled otherwise than the root: the file in the variant's tree

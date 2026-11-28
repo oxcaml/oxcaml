@@ -10,6 +10,9 @@ want to modify OxCaml.  Jump to:
   - [Updating magic numbers](#updating-magic-numbers)
   - [Running tests](#running-tests)
   - [Running only part of the upstream testsuite](#running-only-part-of-the-upstream-testsuite)
+  - [Reproducing a CI configuration locally](#reproducing-a-ci-configuration-locally)
+    - [Checks with a build of their own](#checks-with-a-build-of-their-own)
+    - [Checks that test the codegen variants of one build](#checks-that-test-the-codegen-variants-of-one-build)
   - [Running tests with coverage analysis](#running-tests-with-coverage-analysis)
   - [Running the compiler produced by "make hacking" on an example without the stdlib](#running-the-compiler-produced-by-make-hacking-on-an-example-without-the-stdlib)
   - [Using the OCaml debugger to debug the compiler](#using-the-ocaml-debugger-to-debug-the-compiler)
@@ -135,6 +138,122 @@ OCAMLSRCDIR=<OXCAML>/_runtest make one DIR=tests/runtime-errors
 where `<OXCAML>` is the path to your clone.
 You may also need the `CAML_LD_LIBRARY_PATH` setting depending on what you are testing (see `Makefile.in` at the
 root).
+
+## Reproducing a CI configuration locally
+
+Each check of the `build` workflow (`.github/workflows/build.yml`) is one
+configuration: options of `configure`, sometimes a C compiler, and variables
+that the build and the tests run under. The summary page of a job that runs
+the upstream testsuite lists the tests that failed and prints the commands
+below with that job's values.
+
+### Checks with a build of their own
+
+In a clean tree:
+
+```
+$ autoconf
+$ [CC=<compiler>] ./configure --prefix="$PWD/_install" <options>
+$ [export <variables>]
+$ make compiler
+$ make runtest
+$ make test
+$ make minimizer
+```
+
+The variables are exported for the build as well as for the tests, as in the
+workflow. `BUILD_OCAMLPARAM` is the `OCAMLPARAM` that the compiler itself is
+built with; it takes effect in the first build after `configure`. In the
+table, "both: `P`" stands for `BUILD_OCAMLPARAM=P OCAMLPARAM=P`. Some checks
+first delete tests that their configuration cannot pass: see
+`disable_testcases` in the workflow. A check's `sysdeps` in the workflow are
+the packages that it installs first. For most Linux checks that is `gdb`:
+where it is missing, the tests that use it are skipped, they do not fail.
+The Notes name the other packages, and the tools that a check sets up in its
+steps before `Configure OxCaml`.
+
+`CODEGEN_VARIANT=<variant>` makes `make runtest`, `make test` and
+`make minimizer` run for that codegen variant of the build instead of `base`:
+the dune tests and the minimizer in the build context of the variant, the
+upstream testsuite with the variant as the default of every native
+compilation (see "Testing other codegen variants and runtimes" in
+`HACKING.ox.adoc`). The `configure` options of such a check name the axes of
+its variant, so that `configure` fails if it cannot build it.
+
+| Check | `configure` options | Variables | Notes |
+|---|---|---|---|
+| `default (x86_64-linux)` | | | also `make ast-dependent-libs-build-boot` (before the build), `make check-hacking`, `make install check-installed` and `make debug` |
+| `dissector-assembler (x86_64-linux)` | `--enable-assembler-suitable-for-dissector=<llvm-mc>` | | `llvm-mc` of the OxCaml LLVM release named in the workflow |
+| `stack-checks (x86_64-linux)` | `--enable-stack-checks` | `CODEGEN_VARIANT=sc` | |
+| `poll-insertion (x86_64-linux)` | `--enable-poll-insertion` | `CODEGEN_VARIANT=poll` | |
+| `poll-insertion sc (x86_64-linux)` | `--enable-stack-checks --enable-poll-insertion` | `CODEGEN_VARIANT=poll-sc` | |
+| `no-flat-float-array (x86_64-linux)` | `--disable-flat-float-array` | | |
+| `dev (x86_64-linux)` | `--enable-dev --enable-keyword-edition=5.2` | | with `--prefix="$PWD/_custom_install"` |
+| `debug stack-checks (x86_64-linux)` | `--enable-stack-checks --enable-keyword-edition=5.4` | `CODEGEN_VARIANT=sc USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | |
+| `debug (x86_64-linux)` | `--enable-keyword-edition=5.2+effect` | `USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | |
+| `O3 metrics (x86_64-linux)` | | `BUILD_OCAMLPARAM=_ OCAMLPARAM=_,O3=1`; `COLLECT_METRICS=true GITHUB_WORKSPACE="$PWD"` | with `bash tools/ci/actions/run-make-target.sh <target>` in place of each `make <target>`: under `COLLECT_METRICS` that script, which the workflow runs, makes every compilation of the main build context and of the tests write its profile to `_profile_csv` |
+| `Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)` | `--enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants` | `CODEGEN_VARIANT=fp-poll OCAMLPARAM=_,Oclassic=1` | |
+| `regalloc (aarch64-darwin)`, `regalloc (aarch64-linux)` | `--disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1` | between `make runtest` and `make test`, the `regalloc.exe` runs of the workflow, which need GNU parallel: on all of `_build`, where they process the IR of the base variant |
+| `debug regalloc (aarch64-darwin)` | `--disable-warn-error` | both: `_,w=-46,save-ir-before=register_allocation`; `USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` | `regalloc.exe`, as above |
+| `regalloc poll-insertion (aarch64-linux)` | `--enable-poll-insertion --disable-warn-error` | `CODEGEN_VARIANT=poll`; both: `_,w=-46,save-ir-before=register_allocation` | between `make runtest` and `make test`, `regalloc.exe` on the IR of the variant: on `_build/main-poll` in place of `_build`, with `-enable-poll-insertion` |
+| `frame-pointers irc (x86_64-linux)` | `--enable-frame-pointers` | `CODEGEN_VARIANT=fp`; both: `_,w=-46,regalloc=irc` | also `make check_all_arches` |
+| `cfg-invariants (x86_64-linux)`, `cfg-invariants (aarch64-linux)` | | both: `_,w=-46,regalloc=cfg,cfg-invariants=1` | also `make check_all_arches` |
+| `vectorizer (x86_64-linux)` | | both: `_,w=-46,regalloc=cfg,vectorize=1` | also `make check_all_arches` |
+| `x86-peephole (x86_64-linux)` | | both: `_,w=-46,x86-peephole-optimize=1` | also `make check_all_arches` |
+| `experimental-optimizations (x86_64-linux)` | | both: `_,w=-46,experimental-optimizations-optimize=1` | also `make check_all_arches` |
+| `clang (x86_64-linux)` | | | `CC=clang` |
+| `address-sanitizer (x86_64-linux)` | `--enable-address-sanitizer` | `CODEGEN_VARIANT=asan-fp` | `CC=clang`; the only check in which the AddressSanitizer dune tests check instrumented code |
+| `dwarf-tests (x86_64-linux)` | `--enable-function-sections` | | only `OXCAML_LLDB=<lldb> make runtest-dwarf` and `OXCAML_CLANG=<clang> make runtest-sancov` |
+| `frame-pointers llvmize-tests (x86_64-linux)` | `--enable-frame-pointers` | | only `OXCAML_CLANG=<clang> make runtest-llvmize`, which runs in the build context of the `fp` variant |
+| `musl (x86_64-linux)` | | | `CC=musl-gcc`, from the packages `musl` and `musl-tools`; before `configure`, `export C_INCLUDE_PATH=<headers>/x86/include` for the kernel headers that the workflow's step `Install system dependencies (Linux)` downloads for musl |
+| `reaper` | | both: `reaper=1,_` | |
+| `reaper with local value slots` | | both: `reaper=1,reaper-local-fields=1,_` | |
+| `match-in-match` | | both: `O3=1,flambda2-match-in-match=1,_` | |
+
+### Checks that test the codegen variants of one build
+
+One install serves several codegen variants, selected each time the compiler
+runs. Three builds on Linux check that, each with every variant that its
+platform and C compiler can build: on x86_64, one with the system's C
+compiler and one with clang, which the AddressSanitizer variants need; on
+arm64, which has neither frame pointers nor AddressSanitizer, one with the
+system's C compiler. Each builds its compiler once and ships one install
+tree: its other checks then use that one build, on a machine each. The build
+assembles the install tree twice, first for its check of a staged install.
+The `variant` checks install `gdb`, as above, and GNU parallel, without which
+the suite runs one test at a time.
+
+| Build | Its checks |
+|---|---|
+| x86_64 Linux: `./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc` | `codegen variants build (x86_64-linux)`, `variant <variant> (x86_64-linux)`, `variant <variant> debug (x86_64-linux)`, `installed consumers (x86_64-linux)` |
+| x86_64 Linux: `CC=clang ./configure --prefix="$PWD/_install" --with-codegen-variants=base,fp,fp-poll,fp-poll-sc,fp-sc,poll,poll-sc,sc,asan-fp,asan-fp-poll` | `codegen variants build clang (x86_64-linux)`, `variant <variant> clang (x86_64-linux)`, `variant <variant> clang debug (x86_64-linux)`, `installed consumers clang (x86_64-linux)` |
+| arm64 Linux: `./configure --prefix="$PWD/_install" --with-codegen-variants=base,poll,poll-sc,sc` | `codegen variants build (aarch64-linux)`, `variant <variant> (aarch64-linux)`, `variant <variant> debug (aarch64-linux)`, `installed consumers (aarch64-linux)` |
+| arm64 macOS: the same line as arm64 Linux | `codegen variants (aarch64-darwin)`, one check that does all of the above on one machine |
+
+One tree, configured with the line of a build (after `autoconf`), reproduces
+all the checks of that build:
+
+| Check | Command |
+|---|---|
+| `codegen variants build ...` | `make compiler`, then `bash tools/ci/actions/check-staged-install.sh`, then `make install_for_test`. The script runs `make install DESTDIR=...` for a prefix outside the build tree and checks that the prefix itself is left alone: outside the build tree, a staged install writes and removes files under the staging directory only. Every `make install` first assembles the installation anew in `_install` of the build tree, removing what is there: with the development prefix, `$PWD/_install`, that directory is the prefix, and it is rebuilt whatever `DESTDIR` is. With clang also `bash tools/ci/actions/check-configure-variants.sh clang`, which runs `configure` in situations that no build is in, such as a compiler that cannot link AddressSanitizer executables |
+| `variant <variant> ...` | `make test CODEGEN_VARIANT=<variant>` |
+| `variant <variant> ... debug ...` | `make test CODEGEN_VARIANT=<variant> USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1` |
+| `installed consumers ...` | `make install check-installed` |
+
+A `variant` check runs the whole upstream testsuite for one variant and one
+runtime. Leaving `CODEGEN_VARIANT` out is the same as `CODEGEN_VARIANT=base`.
+`make test-one` and `make test-no-rebuild` take the same variables, and
+`make test-variants` runs the first command for every variant of the build.
+An `installed consumers` check builds and runs findlib and dune projects
+against the installed compiler, for every variant.
+
+`codegen variants (aarch64-darwin)` runs these commands in one tree, in this
+order: `make compiler`, `bash tools/ci/actions/check-staged-install.sh`,
+`make install_for_test`, `make check-installed`, then for each variant
+`make test-no-rebuild CODEGEN_VARIANT=<variant> TEST_ID=<variant>` and
+`make test-no-rebuild CODEGEN_VARIANT=<variant> TEST_ID=<variant>-debug
+USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1`. `TEST_ID` keeps the passes apart in the
+one test tree: each has its own log, `_runtest/testsuite/_log.<TEST_ID>`.
 
 ## Running tests with coverage analysis
 

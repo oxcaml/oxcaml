@@ -65,7 +65,7 @@
 ;; This test cannot be promoted automatically.
 
 (rule
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (targets test_assume_stub.output)
  (deps
         test_assume_stub.heap_allocation.output

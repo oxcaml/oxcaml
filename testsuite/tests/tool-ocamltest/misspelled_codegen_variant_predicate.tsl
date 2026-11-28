@@ -1,0 +1,6 @@
+(* CHILDTEST
+ codegen_variant = "sc-fp";
+ no-frame_pointers;
+ no-stack-checks;
+ bytecode;
+*)

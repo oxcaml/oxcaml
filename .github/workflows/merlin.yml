@@ -34,18 +34,15 @@ concurrency:
 
 jobs:
   build:
-    name: merlin
-    runs-on: ${{ matrix.os }}
+    # Branch protection requires a check with exactly this name, which dates
+    # from a one-entry matrix (os: ubuntu-latest, name: flambda2). The runner
+    # below is an Ubuntu image too, with more cores.
+    name: merlin (ubuntu-latest, flambda2)
+    runs-on: warp-ubuntu-latest-x64-32x
+    timeout-minutes: 60
     permissions:
       contents: read
-      pull-requests: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            name: flambda2
+      pull-requests: read # the merge-queue step reads the PR's labels via `gh pr view`
 
     env:
       MERLIN_TESTS: all
@@ -113,7 +110,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/oxcaml-compiler/_install
-        key: cache-oxcaml-compiler-${{ matrix.name }}-${{ github.sha }}
+        key: cache-oxcaml-compiler-flambda2-${{ github.sha }}
 
     - name: Check out the OxCaml repo for the compiler build
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,9 +133,11 @@ jobs:
       run: |
         eval $(opam env)
         autoconf
+        # No Merlin test uses a codegen-variant library tree.
         ./configure \
           --prefix=$GITHUB_WORKSPACE/oxcaml-compiler/_install \
-          --with-dune=$(which dune)
+          --with-dune=$(which dune) \
+          --disable-codegen-variants
         make install
         opam pin remove oxcaml-dev
 
@@ -147,7 +146,7 @@ jobs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ github.workspace }}/oxcaml-compiler/_install
-        key: cache-oxcaml-compiler-${{ matrix.name }}-${{ github.sha }}
+        key: cache-oxcaml-compiler-flambda2-${{ github.sha }}
 
     - name: Install dependencies
       if: env.MERLIN_EMERGENCY_SKIP != 'y'

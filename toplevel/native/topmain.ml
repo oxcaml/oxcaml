@@ -96,6 +96,15 @@ let main () =
   let ppf = Format.err_formatter in
   Clflags.set_target Clflags.Target.Native;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  (* Phrases are compiled into ocamlnat's own image, so the variant flag
+     defaults must describe the variant this binary was actually built for
+     rather than the installation default from [Config] (the two differ
+     in a copy built in a codegen-variant context).  This must precede
+     argument parsing -- not live in [Opttoploop.prepare] -- both so that
+     explicit variant-selecting flags still override the defaults (and are
+     then checked by [prepare]'s host pin), and because a script-file
+     argument invokes [prepare] during parsing. *)
+  Codegen_variant.apply Opttoploop.host_variant;
   let list = ref Options.list in
   begin
     try
@@ -114,4 +123,10 @@ let main () =
 let main () =
   match main () with
   | exception Exit_with_status n -> n
+  | exception x ->
+    (* E.g. [Codegen_variant.Directory_not_provided_by_variant] from an -I
+       directory, raised while [Opttoploop.prepare] sets up the load path;
+       exceptions without a registered printer are re-raised. *)
+    Location.report_exception Format.err_formatter x;
+    2
   | () -> 0

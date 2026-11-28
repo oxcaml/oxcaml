@@ -17,6 +17,7 @@
 
 type task_item =
   | Predicate_pass of string
+  | Depends_on_codegen_variant
   | Chdir of string
   | Check_file_exists of { filename: string; reason: string }
   | Check_file_absent of { filename: string }

@@ -1,5 +1,5 @@
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (deps t.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -c -disable-poll-insertion)))

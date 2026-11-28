@@ -124,8 +124,6 @@ let function_layout = ref Function_layout.default   (* -function-layout *)
 let float_op_fusion = ref true          (* -[no-]float-op-fusion *)
 
 let disable_builtin_check = ref false   (* -disable-builtin-check *)
-let disable_poll_insertion = ref (not Config.poll_insertion)
-                                        (* -disable-poll-insertion *)
 let allow_long_frames = ref true        (* -no-long-frames *)
 (* Keep the value of [max_long_frames_threshold] in sync with LONG_FRAME_MARKER
    in runtime/roots_nat.c *)
@@ -190,6 +188,8 @@ let keep_llvmir = ref false (* -keep-llvmir *)
 let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
+
+let asan_instrumentation = ref true (* -fno-asan *)
 
 let fdo_counters = ref false (* -fdo-counters *)
 
@@ -611,8 +611,12 @@ let opt_flag_handler : Clflags.Opt_flag_handler.t =
   { set_oclassic; set_o2; set_o3; set_o4 }
 
 let use_cached_generic_functions = ref false
-let cached_generic_functions_path =
-  ref (Filename.concat Config.standard_library ("cached-generic-functions" ^ Config.ext_lib))
+
+(* [None] until -cached-generic-functions-path is passed.  The default cannot
+   be computed at module initialization: it depends on the selected codegen
+   variant's standard-library root, and the flags are not parsed yet (see
+   [Asmlink.cached_generic_functions_archive]). *)
+let cached_generic_functions_path = ref None
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
@@ -622,6 +626,39 @@ let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
 
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
+
+(* The LLVM backend generates code for some variants only, and not for
+   base: its trap-block scheme requires frame pointers, and it emits
+   neither stack checks nor AddressSanitizer instrumentation. *)
+let validate_llvm_backend () =
+  if !Clflags.llvm_backend
+  then (
+    if not !Clflags.frame_pointers
+    then
+      Compenv.fatal
+        "The LLVM backend requires frame pointers; \
+         enable them with -frame-pointers (or frame-pointers=1 in OCAMLPARAM)";
+    if !Clflags.stack_checks
+    then
+      Compenv.fatal
+        "The LLVM backend does not support stack checks; disable them with \
+         -no-stack-checks (or stack-checks=0 in OCAMLPARAM)";
+    if !Clflags.address_sanitizer && !asan_instrumentation
+    then
+      Compenv.fatal
+        "The LLVM backend emits no AddressSanitizer instrumentation; pass \
+         -fno-asan to leave this unit uninstrumented, select a variant \
+         without AddressSanitizer with -no-asan (or asan=0 in OCAMLPARAM), \
+         or remove -llvm-backend")
+
+(* A JSIR compilation or link ignores the selection ([Codegen_variant.current]
+   is then the base variant), so there is nothing to check for it. *)
+let validate_codegen_variant () =
+  if not (Clflags.target_is_jsir ())
+  then (
+    Result.iter_error Compenv.fatal
+      (Codegen_variant.check_supported (Codegen_variant.current ()));
+    validate_llvm_backend ())
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

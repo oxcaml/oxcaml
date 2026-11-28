@@ -15,6 +15,13 @@
    program = "-no-code question.cmx";
    ocamlobjinfo;
 
+   (* The codegen fingerprint depends on the configure flags; strip it so
+      the reference holds on all configurations. *)
+   stdout = "strip-codegen-fingerprint.stdout";
+   stderr = "strip-codegen-fingerprint.stderr";
+   script = "sh ${test_source_directory}/strip-codegen-fingerprint.sh ${output}";
+   script;
+
    check-program-output;
  }{
    program = "question.cmx";

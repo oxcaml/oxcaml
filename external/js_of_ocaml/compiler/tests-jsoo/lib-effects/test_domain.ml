@@ -1,7 +1,7 @@
 [@@@ocaml.alert "-unsafe_parallelism-unsafe_multidomain-do_not_spawn_domains"]
 
-(* The domain tests are not run natively: OxCaml is usually built without
-   multidomain support, and Domain.spawn then fails. *)
+(* The domain tests are not run natively: a native program compiled without
+   poll insertion, the default, is limited to one domain: Domain.spawn fails. *)
 
 let%expect_test ("Domain.spawn" [@when not native]) =
   let d = Domain.spawn (fun () -> 1 + 2) in

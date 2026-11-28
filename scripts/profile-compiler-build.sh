@@ -29,8 +29,12 @@ if [ -d "$dump_dir" ] && [ "$(ls -A "$dump_dir")" ]; then
   done
 fi
 
-export OCAMLPARAM="_,profile=1,dump-into-csv=1,dump-dir=$dump_dir,regalloc=irc"
-export BUILD_OCAMLPARAM="$OCAMLPARAM"
+profile_flags="profile=1,dump-into-csv=1,dump-dir=$dump_dir"
+export OCAMLPARAM="_,$profile_flags,regalloc=irc"
+# The profile is that of the main build context: BUILD_OCAMLPARAM also
+# reaches the codegen-variant contexts, which build the libraries again.
+export BUILD_OCAMLPARAM="_,regalloc=irc"
+export MAIN_CONTEXT_OCAMLPARAM="$profile_flags"
 
 build_compiler() {
   git clean -Xdf

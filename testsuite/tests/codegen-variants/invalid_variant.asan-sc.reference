@@ -1,0 +1,2 @@
+Stack checks together with AddressSanitizer is an untested combination; disable one of them (-no-stack-checks or -no-asan, or stack-checks=0 / asan=0 in OCAMLPARAM)
+Stack checks together with AddressSanitizer is an untested combination; disable one of them (-no-stack-checks or -no-asan, or stack-checks=0 / asan=0 in OCAMLPARAM)

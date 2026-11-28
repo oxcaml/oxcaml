@@ -17,11 +17,13 @@
 (library
  (name unix)
  ; Public for the libraries of external/ast-dependent-libs (see
- ; dune-project), in the main context only: in the boot context, other
- ; projects such as merlin get the unix library of the system compiler.
+ ; dune-project), in every context but the boot one (the main context and
+ ; the codegen-variant contexts, which rebuild this library per variant):
+ ; in the boot context, other projects such as merlin get the unix library
+ ; of the system compiler.
  (public_name unix)
  (enabled_if
-  (= %{context_name} main))
+  (<> %{context_name} default))
  (wrapped false)
  (modes byte native)
  (flags
@@ -34,7 +36,11 @@
    -strict-formats
    -nolabels ; for UnixLabels
    ))
- (ocamlopt_flags (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+ ; The build contexts compile with -fno-asan, which keeps the compiler's
+ ; own code uninstrumented (see Makefile.common-ox). This library is for
+ ; user programs, so in an AddressSanitizer variant it is instrumented.
+ (ocamlopt_flags
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (library_flags (:standard -linkall))
  (modules unix unixLabels)
  (foreign_stubs (language c) (names
@@ -140,7 +146,10 @@
    wait
    write_unix
    )
-   (flags ((:include %{project_root}/oc_cflags.sexp)
+   ; OC_CFLAGS_SEXP names the C flags of the context: a codegen-variant
+   ; context compiles its stubs with the C flags of its variant (see
+   ; VARIANT_ENV_VARS in Makefile.common-ox).
+   (flags ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
            (:include %{project_root}/sharedlib_cflags.sexp)
            (:include %{project_root}/oc_cppflags.sexp)))
  ))
@@ -175,6 +184,38 @@
 (alias
  (name C-only)
  (deps libunix_stubs.a dllunix_stubs.so))
+
+; A check that the C flags above, which every stub stanza of the compiler's
+; libraries has, are those of this context's codegen variant: the file fails
+; to compile otherwise (see codegen_variant_stub_macros.c). The last line of
+; flags says what the context's variant is; its files come from the
+; _build/_bootinstall recipe in Makefile.common-ox. Only in the
+; codegen-variant contexts, where the alias below builds it with the
+; libraries.
+(foreign_library
+ (archive_name codegen_variant_stub_macros)
+ (language c)
+ (names codegen_variant_stub_macros)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (flags
+  ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
+   (:include %{project_root}/sharedlib_cflags.sexp)
+   (:include %{project_root}/oc_cppflags.sexp)
+   (:include %{project_root}/duneconf/stub_macros_%{context_name}.sexp))))
+
+; Native artifacts harvested into the codegen-variant library trees
+; (lib/ocaml/variants/<name>/) by the _install recipe in Makefile.common-ox.
+; Only enabled in the codegen-variant contexts (the complement of the
+; default and main contexts), which compile with the variant's per-axis
+; flags (see Makefile.common-ox and
+; %{project_root}/duneconf/ocamlopt_flags_main-<name>.sexp).
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps unix.cmxa unix.a unix.cmxs libunix_stubs.a
+  codegen_variant_stub_macros.o))
 
 (rule
   (targets unix.ml)

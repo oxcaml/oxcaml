@@ -1,0 +1,27 @@
+The base variant: 0 of 19 paths change
+A variant without a tree: 0 of 19 paths change
+The same variant, with the other poll-insertion setting: 0 of 19 paths change
+The base variant, with the other poll-insertion setting: 0 of 19 paths change
+A variant with a tree:
+  "<root>" -> "<root>/variants/<selected>"
+  "<root>/" -> "<root>/variants/<selected>"
+  "<root>/unix" -> "<root>/variants/<selected>/unix"
+  "<root>/unix/" -> "<root>/variants/<selected>/unix"
+  "<root>/unix/unix.cmxa" -> "<root>/variants/<selected>/unix/unix.cmxa"
+  "<root>/./unix//unix.cmxa" -> "<root>/variants/<selected>/unix/unix.cmxa"
+  "<root>/unix/../unix/unix.cmxa"
+  "<root>/../lib/unix"
+  "<root>/only_in_default"
+  "<root>/only_in_default/a.cmxa"
+  "<root>/unix/missing.cmxa"
+  "<root>/a_file_in_the_tree"
+  "<root>/variants"
+  "<root>/variants/<selected>/unix"
+  "<root>/variants/<other>/unix"
+  "<root>_sibling/unix"
+  "elsewhere/unix"
+  "unix.cmxa"
+  ""
+The same variant, with the other poll-insertion setting: the same paths: true
+Spelled like a file found in the variant's root: true
+The same variant, compiling to JavaScript: 0 of 19 paths change

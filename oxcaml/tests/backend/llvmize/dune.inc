@@ -1,7 +1,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (= %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -13,7 +13,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets const_val.cmx const_val_main.cmx const_val.output.exe)
@@ -27,7 +27,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -41,7 +41,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -52,7 +52,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_main.cmx int_ops.output.exe)
@@ -68,7 +68,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -82,7 +82,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -93,7 +93,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets gcd_data.cmx gcd.cmx gcd_main.cmx gcd.output.exe)
@@ -108,7 +108,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -122,7 +122,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -133,7 +133,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets array_rev_data.cmx array_rev.cmx array_rev_main.cmx array_rev.output.exe)
@@ -148,7 +148,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -162,7 +162,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -173,7 +173,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets float_ops.cmx float_ops_main.cmx float_ops.output.exe)
@@ -187,7 +187,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -201,7 +201,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -212,7 +212,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets many_args_defn.cmx many_args.cmx many_args_main.cmx many_args.output.exe)
@@ -227,7 +227,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -241,7 +241,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -252,7 +252,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets multi_ret.cmx multi_ret_main.cmx multi_ret.output.exe)
@@ -266,7 +266,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -280,7 +280,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -291,7 +291,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets indirect_call.cmx indirect_call_main.cmx indirect_call.output.exe)
@@ -305,7 +305,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -319,7 +319,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -330,7 +330,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets extcalls_defn.o extcalls.cmx extcalls_main.cmx extcalls.output.exe)
@@ -345,7 +345,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -359,7 +359,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -370,7 +370,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets data_decl.cmx data_decl.output.exe)
@@ -383,7 +383,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -397,7 +397,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -408,7 +408,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets exn_part1.cmx exn_part2.cmx exn_part3.cmx exn.output.exe)
@@ -423,7 +423,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -437,7 +437,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -448,7 +448,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets alloc.cmx alloc.output.exe)
@@ -461,7 +461,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -475,7 +475,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -486,7 +486,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets tailcall2.cmx tailcall.cmx tailcall.output.exe)
@@ -500,7 +500,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -514,7 +514,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -525,7 +525,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets switch.cmx switch.output.exe)
@@ -538,7 +538,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -552,7 +552,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -563,7 +563,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets csel_stub.o csel.cmx csel.output.exe)
@@ -577,7 +577,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
@@ -591,7 +591,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)

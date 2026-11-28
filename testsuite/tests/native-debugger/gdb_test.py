@@ -12,9 +12,19 @@ class PrintBacktrace (gdb.Command):
     super (PrintBacktrace, self).__init__ ("print_backtrace", gdb.COMMAND_USER)
 
   def invoke (self, arg, from_tty):
+    # A function that the C compiler split or inlined in part (as GCC does
+    # with caml_startup_common, but not Clang) shows up as several
+    # consecutive frames of the same name. Print such frames once, so that
+    # the output does not depend on the C compiler.
     frame = gdb.selected_frame ()
+    level = 0
+    previous = None
     while (not (frame is None)):
-        print("frame %i: %s"% (frame.level(), trim_basename(frame.name())))
+        name = trim_basename(frame.name())
+        if name != previous:
+            print("frame %i: %s"% (level, name))
+            level += 1
+        previous = name
         frame = frame.older();
 
 PrintBacktrace ()

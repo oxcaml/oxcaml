@@ -1352,7 +1352,9 @@ L(preemption_unhandled):
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
+        SWITCH_OCAML_TO_C
         bl      G(caml_continuation_use_noexc)
+        SWITCH_C_TO_OCAML
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
     /* Jump into the preemption-resume path (in caml_continue), which handles
@@ -1436,7 +1438,13 @@ END_FUNCTION(caml_reperform)
         b       3f
     /* This is not a preemption, so set gc_regs = null */
 2:      mov     x25, xzr                       /* x25 := NULL */
-3:      bl      G(caml_continuation_use_noexc) /* x0 := stack */
+3:
+    /* Consume the continuation on the C stack: this may scan its stacks
+       (see [caml_darken_cont]), and with stack checks the OCaml stack
+       only has the red zone to spare. */
+        SWITCH_OCAML_TO_C
+        bl      G(caml_continuation_use_noexc) /* x0 := stack */
+        SWITCH_C_TO_OCAML
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
     /* Check if stack null, then already used */
         cbz     x0, L(continuation_already_resumed)
@@ -1736,5 +1744,13 @@ OBJECT(CAMLSEP(system,frametable))
         .short  -1                    /* negative frame size => use callback link */
         .short  0                     /* no roots here */
         END_OBJECT(CAMLSEP(system,frametable))
+
+/* Like the C object files of the runtime, this one refers to the link-time
+   guard of the codegen variant that it was assembled for: see
+   caml/config.h. */
+#define EXPANDED_G(sym) G(sym)
+        .data
+        .align  3
+        .quad   EXPANDED_G(CAML_CODEGEN_VARIANT_GUARD)
 
         NONEXECSTACK_NOTE

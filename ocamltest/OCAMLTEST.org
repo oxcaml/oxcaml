@@ -611,6 +611,177 @@ For instance, given the following blocks:
 
 - The definition of =baz= is visible only in =subtest1=.
 
+*** Testing a codegen variant
+
+The native compiler can generate code for several /codegen variants/
+(frame pointers, stack checks, poll insertion, AddressSanitizer; see
+=ocamlopt -config-var codegen_variants=). Each variant is named after the
+axes it enables: =base= for none, =fp=, =sc=, =poll=, =fp-sc=, =asan-fp= and
+so on. A test block selects one by assigning the =codegen_variant= variable:
+
+#+begin_src
+(* TEST
+  {
+    codegen_variant = "fp";
+    variant_available;
+    native;
+  }
+*)
+#+end_src
+
+Everything in the block that generates or loads native code then does so
+for that variant:
+
+- Native compilations and links receive the variant's flags and library
+  tree, and the test program is linked with the variant's runtime. A test
+  names the directories of the base variant (with =include unix=,
+  =include ocamlcommon=, =include eval=, =include testing=, the
+  =directories= variable, or =-I= in =flags=); the variant's copies are
+  used instead. A directory that is given to =-I= in quotes is passed as
+  it is written, and so is a library that is named by the path of its
+  file (an operand of =-cclib=, a file in =all_modules=). Of such paths
+  the compiler only resolves those inside its library root, which the
+  copies of the libraries in the test tree are not.
+- =expect.opt=, =toplevel.opt= and =asmgen= run the build of their host
+  program (the native expect-test runner, =ocamlnat=, the =codegen= tool)
+  for the variant, from =testsuite/tools/variants/NAME=. A missing host
+  is a failure.
+- The =cc= action adds the variant's C flags and macros.
+- The commands that a test writes itself run with =OCAMLPARAM= extended
+  so that the variant is the default of the compilers they start:
+  =script=, =config_script= and hooks, the program of =run=, a native
+  compiler that is given its command line in =commandline=, and
+  =ocamlmklib=. For them, =cflags= and =mkexe= are followed by the
+  variant's C flags and macros.
+- The flags that a test gives a native compiler (=flags=,
+  =ocamlopt_flags=, and =last_flags=, which only the compilation of a
+  program reads, not that of a single =module=) see =cflags= and =mkexe=
+  in the same form. The compiler states the variant itself for the C
+  files that it compiles, but before the options of =-ccopt=, where what
+  the test added to =cflags= would have the last word, and not at all in
+  what else the flags do with the two variables, such as a preprocessor
+  given with =-pp=.
+- The =stdlib= variable is the variant's library tree.
+
+These follow the selection, wherever the block makes it: before or after
+the build environment is set up. A test may add to =cflags= and =mkexe=
+(the variant's flags come after what the variables hold), and may give
+=stdlib= a value of its own, which is then left alone. A value that
+mentions =${cflags}= or =${mkexe}= is written in one assignment: adding
+to that variable afterwards (with ~+=~, or with a modifier that appends
+to it) fixes what the two stand for at that point, without the variant's
+part.
+
+The C code that a test builds itself in a block set up for a bytecode or
+JSIR compiler or for the bytecode toplevel (=setup-ocamlc.byte-build-env=,
+=setup-ocaml-build-env= and the like) is for programs that run with the
+bytecode runtime, which is the base variant's: there, the =cc= action,
+=cflags= and =mkexe= add nothing for the variant, and the =cc= action
+does not need the compiler under test to have it. That goes for the flags
+of a native compiler that such a block runs as well: a block that gives
+a native compiler C flags is set up for it. =stdlib= is the
+variant's library tree in such a block too, for the native compilers that
+the block may start, and the C headers of that tree describe the variant:
+C code for the bytecode runtime includes the headers of =${runtime}=, not
+those of =${stdlib}=.
+
+=variant_available= skips the block when the compiler under test was not
+built with that variant. Bytecode and JSIR have no codegen variants:
+bytecode and JSIR compilations, the bytecode toplevel and bytecode expect
+tests ignore the selection and use the library root.
+
+A test that is about an axis, and not about one variant, says what it
+needs of the variant instead of naming one. The value of
+=codegen_variant= is then made of signed axes, =+AXIS= (the axis is on)
+and =-AXIS= (it is off), where =AXIS= is =asan=, =fp=, =poll= or =sc=:
+
+#+begin_src
+(* TEST
+  {
+    codegen_variant = "+fp -sc";
+    variant_available;
+    native;
+  }
+*)
+#+end_src
+
+The syntax follows the warning options of the compilers (=-w +a-4=): the
+blanks between the signed axes are optional, so =+fp-sc= and =+fp -sc=
+both ask for =fp= on and =sc= off. A value whose first character, blanks
+aside, is a sign is requirements. Any other value is the name of a
+variant: it has no blank and no =+=, and its hyphens separate the axes
+that are on, so =fp-sc= is the variant with both axes on.
+
+The block runs under the variant that the run uses anyway (the one given
+with =-codegen-variant=, else =base=) when that one meets the
+requirements, and otherwise under the variant of the compiler under test
+that meets them and differs from it on the fewest axes (of several such
+variants, =base= if it is among them, else the first by name). =variant_available= skips the block when
+there is none. A value of =codegen_variant= that is neither the name of a
+variant nor a list of requirements is a mistake, not a variant that the
+compiler lacks: it fails the block, in =variant_available= and in
+whatever else reads the selection (a compilation, a script, a predicate
+on the variant). A block that selects a variant which the compiler under
+test does not have fails as well where it would compile, link or run a
+command for that variant: guard it with =variant_available=.
+Such a test runs with every compiler that has a variant for it, whatever
+the list of variants it was built with, and under each =-codegen-variant=
+that meets the requirements. Name a variant only
+when the test is about that variant, for example because its reference
+output shows every axis.
+
+The predicates =frame_pointers=, =no-frame_pointers=, =stack-checks=,
+=no-stack-checks=, =poll-insertion=, =no-poll-insertion=,
+=no-address-sanitizer= and =multicore= (which requires poll insertion) look
+at the variant in effect: the one the block selected, else the one given
+with the =-codegen-variant= option, else =base=.
+=only-default-codegen= and =only-stack-checks-codegen= pass only for the
+variants =base= and =sc=.
+
+The option =-codegen-variant NAME= selects a variant for the whole run (the
+testsuite's =make= targets pass it when =CODEGEN_VARIANT= is set). Every
+block that does not select a variant itself then behaves as if it had
+selected =NAME=. In addition, =stdlib=, =cflags= and =mkexe=
+describe =NAME= from the start of every test, for the scripts that run
+before any compiler is set up. No test is skipped because of the option.
+
+With =-codegen-variant-only= as well (=VARIANT_ONLY=1= for the =make=
+targets), a test file in which nothing depends on the variant is skipped
+as a whole, since it would only repeat the run without the options: a
+file with no native compilation, native host, =cc= action, =run=,
+=ocamlmklib=, script or hook for the variant, and no predicate that only
+the variant satisfies. This makes for a quick run that supplements a run
+without the options.
+
+The name must be a variant that the compiler under test provides, and the
+test tree must have, for that variant, the file of every host program (the
+native expect-test runner, =ocamlnat=, the =codegen= tool) that it has for
+=base=; anything else is an error at startup. A host that the tree lacks
+for =base= as well is not asked for: the tests that use it fail when they
+get to it, with and without the option. Naming =base= is the same as not
+giving the option.
+
+So the variant in effect is, in this order: the one that the block
+selects with =codegen_variant=, the one given with =-codegen-variant=,
+=base=. The environment of ocamltest
+does not change it, and =OCAMLPARAM= there is treated in two ways.
+
+ocamltest gives the variant to the commands of a test as defaults in
+=OCAMLPARAM=: the settings of the axes (=asan=, =frame-pointers=,
+=poll-insertion=, =stack-checks=) before the =_=. It takes such defaults
+out of the =OCAMLPARAM= that it inherits itself: a test that starts
+ocamltest again, or the testsuite's makefile, does not hand its own
+variant down to the tests of that run.
+
+A setting of an axis after the =_= is one that the compilers obey
+whatever their command line and these defaults say. It would override the
+variant of every test, while the predicates, the library tree and the
+hosts follow the selection. ocamltest does not start with such a setting
+in its environment: it names the setting and stops. To run the tests
+under a variant, give =-codegen-variant NAME= (=CODEGEN_VARIANT=NAME= to
+the =make= targets) instead. (A test that assigns =OCAMLPARAM= such a
+value does so for its own commands, as the tests of these settings do.)
+
 *** Repeating similar tests with =split=
 
 You can concisely define several tests with differing initial setups with the

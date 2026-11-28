@@ -48,7 +48,8 @@ where \texttt{NNN} is a unique generated number.
 \subsection{ss:native-debugger-frame-pointers}{Frame Pointers}
 
 Frame pointers provide an alternative method for debuggers to walk the
-call stack. OCaml supports frame pointers on AMD64 and ARM64 platforms.
+call stack. OxCaml supports frame pointers on the AMD64 (x86-64)
+architecture on Linux and macOS.
 
 With frame pointers, each function maintains a \emph{frame pointer} that points to
 the base of its stack frame (the memory region allocated for that function’s
@@ -57,7 +58,8 @@ activation record). By chaining these pointers together with return addresses,
 debuggers can reconstruct the complete call stack.
 
 Frame pointers are optional (not necessary for debugging),
-and must be explicitly enabled during compiler configuration
+and are enabled per compilation by passing the \texttt{-frame-pointers}
+flag to \texttt{ocamlopt}
 (see Profiling section \ref{s:ocamlprof-compiling-perf} for details).
 
 \section{s:native-debugger-compilation}{Compiling for Debugging}

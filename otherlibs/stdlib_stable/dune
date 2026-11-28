@@ -23,8 +23,9 @@
    -bin-annot
    -safe-string
    -strict-formats))
+ ; \ -fno-asan: see otherlibs/unix/dune.
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (library_flags
   (:standard -linkall)))
 
@@ -42,3 +43,10 @@
   (META as stdlib_stable/META))
  (section lib)
  (package ocaml))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps stdlib_stable.cmxa stdlib_stable.a stdlib_stable.cmxs))

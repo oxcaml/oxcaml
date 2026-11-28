@@ -341,22 +341,65 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   end;
   ()
 
+(* One directory can hold IR saved under several configurations: a build saves
+   that of every codegen variant it builds, and both instrumented and
+   uninstrumented IR for a variant with AddressSanitizer. A run processes the
+   files saved under its own configuration and counts the others, by what
+   differs. *)
+let skipped_files : (string, int) Hashtbl.t = Hashtbl.create 8
+
+let skip_file (mismatch : Ir_config_fingerprint.configuration_mismatch)
+    (config : config) =
+  let difference =
+    String.concat ", "
+      (List.map mismatch.entries
+         ~f:(fun
+             ({ name; saved_value; current_value } :
+               Ir_config_fingerprint.mismatch)
+           ->
+           Printf.sprintf "%s: saved %s, current %s" name saved_value
+             current_value))
+  in
+  if config.debug_output then Printf.eprintf "  skipped (%s)\n%!" difference;
+  Hashtbl.replace skipped_files difference
+    (1 + Option.value (Hashtbl.find_opt skipped_files difference) ~default:0)
+
+let report_skipped_files () =
+  let skipped =
+    List.sort
+      ~cmp:(fun (difference1, _) (difference2, _) ->
+        String.compare difference1 difference2)
+      (List.of_seq (Hashtbl.to_seq skipped_files))
+  in
+  List.iter skipped ~f:(fun (difference, count) ->
+      Printf.eprintf
+        "skipped %d file(s) saved with another configuration (%s)\n%!" count
+        difference);
+  if !num_processed_files = 0 && not (List.is_empty skipped)
+  then
+    fatal
+      "no file was saved with the configuration of this run (-help lists the \
+       options that select another one)"
+
 let process_file (file : string) (config : config) =
   if config.debug_output then Printf.eprintf "processing file %S...\n%!" file;
-  incr num_processed_files;
-  let unit_info, _digest = Cfg_format.restore file in
-  List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
-      begin match item with
-      | Cfg _ -> ()
-      | Data _ -> ()
-      | Cfg_before_regalloc
-          { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
-        let cfg_with_layout, relocatable_regs =
-          cfg_with_layout_and_relocatable_regs
-        in
-        process_function config cfg_with_layout cmm_label reg_stamp
-          relocatable_regs
-      end)
+  match Cfg_format.restore file with
+  | exception Cfg_format.Error (Configuration_mismatch mismatch) ->
+    skip_file mismatch config
+  | unit_info, _digest ->
+    incr num_processed_files;
+    List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
+        begin match item with
+        | Cfg _ -> ()
+        | Data _ -> ()
+        | Cfg_before_regalloc
+            { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
+          let cfg_with_layout, relocatable_regs =
+            cfg_with_layout_and_relocatable_regs
+          in
+          process_function config cfg_with_layout cmm_label reg_stamp
+            relocatable_regs
+        end)
 
 let is_regalloc_file (file : string) =
   Filename.check_suffix file ".cmir-cfg-regalloc"
@@ -409,6 +452,37 @@ let parse_command_line () =
       ( "-linscan-threshold",
         Arg.Set_int linscan_threshold,
         "Select linscan if the number of registers is above the threshold" );
+      ( "-omit-leaf-frame-pointers",
+        Arg.Set Oxcaml_flags.omit_leaf_frame_pointers,
+        "Process IR saved with -omit-leaf-frame-pointers" );
+      ( "-no-omit-leaf-frame-pointers",
+        Arg.Clear Oxcaml_flags.omit_leaf_frame_pointers,
+        "Process IR saved without -omit-leaf-frame-pointers" );
+      ( "-frame-pointers",
+        Arg.Set Clflags.frame_pointers,
+        "Process IR saved with frame pointers enabled" );
+      ( "-no-frame-pointers",
+        Arg.Clear Clflags.frame_pointers,
+        "Process IR saved with frame pointers disabled" );
+      ( "-stack-checks",
+        Arg.Set Clflags.stack_checks,
+        "Process IR saved with stack checks enabled" );
+      ( "-no-stack-checks",
+        Arg.Clear Clflags.stack_checks,
+        "Process IR saved with stack checks disabled" );
+      ( "-enable-poll-insertion",
+        Arg.Set Clflags.poll_insertion,
+        "Process IR saved with poll insertion enabled" );
+      ( "-disable-poll-insertion",
+        Arg.Clear Clflags.poll_insertion,
+        "Process IR saved with poll insertion disabled" );
+      ( "-asan",
+        Arg.Set Clflags.address_sanitizer,
+        "Process IR saved with AddressSanitizer instrumentation" );
+      ( "-no-asan",
+        Arg.Clear Clflags.address_sanitizer,
+        "Process IR saved without AddressSanitizer instrumentation (with \
+         -no-asan or -fno-asan)" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       ( "-copy-propagation",
@@ -444,16 +518,25 @@ let parse_command_line () =
       paths = !paths
     }
 
-let () =
+let main () =
   let config = parse_command_line () in
   if config.csv_output
   then begin
     Printf.printf "%s\n%!" row_header
   end;
   let files = collect_files config.paths in
+  if List.is_empty files
+  then fatal "there is no saved IR (.cmir-cfg-regalloc file) to process";
   List.iter files ~f:(fun file -> process_file file config);
   if config.print_summary
   then begin
     Printf.printf "processed %d files(s) / %d function(s)\n%!"
       !num_processed_files !num_processed_functions
-  end
+  end;
+  report_skipped_files ()
+
+let () =
+  try main ()
+  with exn when Option.is_some (Location.error_of_exn exn) ->
+    Location.report_exception Format.err_formatter exn;
+    exit 2

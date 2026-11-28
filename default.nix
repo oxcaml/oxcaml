@@ -15,14 +15,9 @@
   },
   # Short commit hash of src, recorded in the js_of_ocaml version.
   gitRev ? null,
-  addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? addressSanitizer,
-  multidomain ? false,
   ocamltest ? true,
-  pollInsertion ? false,
-  stackChecks ? false,
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
@@ -39,8 +34,11 @@ let
   # js_of_ocaml is built on top of ppxlib.
   needsPpxlibSources = withAstDependentLibs || withJsoo;
 
-  # Select stdenv based on whether asan is enabled
-  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  # Build with clang unconditionally: the codegen-variant axes are
+  # per-invocation choices against this single install, and the
+  # AddressSanitizer variants require a Clang-built runtime (gcc-built
+  # asan runtimes never worked).
+  stdenv = pkgs.clangStdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -56,16 +54,19 @@ let
         else
           "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
       )
-      (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
-      (mkFlag framePointers "frame-pointers")
-      (mkFlag multidomain "multidomain")
-      (mkFlag pollInsertion "poll-insertion")
-      (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
       (mkFlag syntaxQuotations "syntax-quotations")
+      # Record an absolute C (and C++) compiler rather than the bare `clang`
+      # this derivation's stdenv puts on its own build PATH: consumers of the
+      # installed compiler (ocamlopt's Config.c_compiler, the -config output,
+      # and the assembler commands derived from $CC) do not have that stdenv
+      # on PATH. The store path also keeps the toolchain in the package's
+      # runtime closure.
+      "CC=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}cc"
+      "CXX=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}c++"
     ];
 
   # Boot compilers
@@ -189,12 +190,10 @@ let
 
   # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
   # revision, so construct one around the compiler used to bootstrap OxCaml.
-  # Pin the plain pkgs.stdenv for this compiler rather than the variant
+  # Pin the plain pkgs.stdenv for this compiler rather than oxcaml's clang
   # stdenv: a clangStdenv-built compiler records `clang` as its C compiler,
   # which isn't on PATH when the scope's packages build under the default gcc
-  # stdenv (e.g. findlib's `ocamlc -custom` link of ocamlfind). Pinning also
-  # keeps the dev-tool closure identical across oxcaml variants, so they share
-  # cached builds.
+  # stdenv (e.g. findlib's `ocamlc -custom` link of ocamlfind).
   bootOcamlPackages =
     let
       ocaml = mkBootOcaml_5_4_0 pkgs.stdenv;
@@ -743,9 +742,13 @@ let
     };
 
   # Check metadata and native consumers of the full bundled compiler install.
+  # Built with pkgs.stdenv rather than oxcaml's clang stdenv: the bootstrap
+  # compiler that links the checker records the C compiler of pkgs.stdenv by
+  # name (see bootOcamlPackages), so that compiler has to be on PATH. The
+  # compiler under test records an absolute C compiler (see configureFlags).
   mkInstalledLibrariesCheck =
     oxcaml:
-    stdenv.mkDerivation {
+    pkgs.stdenv.mkDerivation {
       pname = "oxcaml-installed-libraries-check";
       inherit (oxcaml) version meta;
       inherit src;
@@ -758,7 +761,7 @@ let
 
       dontConfigure = true;
       makeFlags = [
-        "SHELL=${stdenv.shell}"
+        "SHELL=${pkgs.stdenv.shell}"
         "REQUIRES_CONFIGURATION="
         "prefix=${oxcaml}"
       ];
@@ -939,7 +942,21 @@ stdenv.mkDerivation {
 
   postInstall =
     ''
-      $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
+      # Without OCAMLPARAM: a setting of the build environment would
+      # otherwise choose the variant that the archives are generated for.
+      # The library root holds base, named like the other variants below.
+      env -u OCAMLPARAM $out/bin/generate_cached_generic_functions.exe \
+        -codegen-variant base $out/lib/ocaml/cached-generic-functions
+      # Each installed codegen-variant library tree gets its own archive,
+      # generated for the variant the directory is named after. No variants
+      # directory exists when codegen variants are disabled or unsupported
+      # on this platform.
+      for variant_dir in $out/lib/ocaml/variants/*/; do
+        [ -d "$variant_dir" ] || continue
+        variant=$(basename "$variant_dir")
+        env -u OCAMLPARAM $out/bin/generate_cached_generic_functions.exe \
+          -codegen-variant "$variant" "$variant_dir/cached-generic-functions"
+      done
     ''
     + lib.optionalString withJsoo ''
       make SHELL="$SHELL" jsoo-install-shipped AST_DEPENDENT_LIBS_PREFIX="$out"
@@ -957,6 +974,8 @@ stdenv.mkDerivation {
       rm -f $out/bin/ocamlopt.byte
       rm -f $out/bin/ocamlprof
       rm -f $out/lib/ocaml/expunge
+      # The links to it in the codegen-variant library trees.
+      rm -f $out/lib/ocaml/variants/*/expunge
     '';
 
   postFixup = ''
@@ -1008,8 +1027,12 @@ stdenv.mkDerivation {
       ${astDependentLibsCommands}${jsooCommands}${merlinCommands}EOF
     '';
 
-  meta =
-    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+  # No meta.broken: the compiler builds on every platform this expression
+  # supports. configure computes the list of codegen variants that the
+  # platform has besides base (some with frame pointers and AddressSanitizer
+  # on x86-64 only), and nothing here requires a variant that it could
+  # refuse.
+  meta = { };
 
   passthru = {
     inherit

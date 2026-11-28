@@ -36,20 +36,171 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
+
+(* Where the archive of cached generic functions of a link is. *)
+type cached_generic_functions_place =
+  | Named  (** By -cached-generic-functions-path. *)
+  | In_tree of Codegen_variant.t
+      (** In a library tree that serves the selected variant: that of the given
+          variant. *)
+  | In_missing_tree
+      (** The installation has no library tree that serves the selected variant.
+      *)
+  | In_mismatched_root
+      (** The library root stands for the selected variant's tree, and is built
+          for another variant. *)
+
+(* The archive of cached generic functions that a link uses, whether or not the
+   file exists, and where that is.
+
+   The archive carries no fingerprint that the compiler can read: the linker
+   refuses one generated for other frame-pointer, stack-check or
+   AddressSanitizer settings, through the link-time guard (see
+   [Asmgen.emit_codegen_variant_guard_reference]), but less clearly than the
+   errors of [cached_generic_functions_path]. So the archive of a library tree
+   is only used when the compiler has reason to take the tree for one of the
+   selected variant. *)
+let cached_generic_functions_archive_and_place () =
+  match !Oxcaml_flags.cached_generic_functions_path with
+  | Some path ->
+    (* An explicit -cached-generic-functions-path that names the archive of the
+       library root selects the one of the selected variant's tree, like any
+       path inside that root. Any other path is used as it is: it is for the
+       linker to refuse an archive generated for another variant. *)
+    Codegen_variant.in_selected_root path, Named
+  | None -> (
+    (* The archive of the library tree that serves the selected variant. The one
+       of the tree with the other poll-insertion setting will do, like the rest
+       of that tree: generic functions never get polls (see
+       [emit_code_fully_polled]). *)
+    let archive = "cached-generic-functions" ^ Config.ext_lib in
+    let variant = Codegen_variant.current () in
+    match Codegen_variant.selected_tree () with
+    | Some (tree_variant, root) ->
+      (* A tree under variants/ is taken at its word for its own variant. The
+         root, which serves the base variant with either poll-insertion setting,
+         is checked, since OCAMLLIB can make it anything. For the base variant
+         itself it is refused when its standard library says that it is built
+         for another variant, and not when it has none to say so, as in an
+         installation that only links with -output-obj. For the other
+         poll-insertion setting std_exit.cmx has to be readable and have the
+         variant's other settings: its poll bit is not compared. *)
+      ( Filename.concat root archive,
+        if
+          (not (Codegen_variant.is_base tree_variant))
+          ||
+          if Codegen_variant.equal tree_variant variant
+          then not (Linkenv.standard_library_is_built_for_another variant)
+          else Linkenv.standard_library_is_built_for variant
+        then In_tree tree_variant
+        else In_mismatched_root )
+    | None ->
+      (* The root has no tree that serves the selected variant, but it may
+         itself be such a tree: its own archive is then the one to use, and the
+         one to generate when it is missing. Otherwise the archive would be that
+         of the variant's own tree, which does not exist: not the one of the
+         root, which is for another variant. *)
+      if Linkenv.standard_library_is_built_for variant
+      then Filename.concat Config.standard_library archive, In_tree variant
+      else
+        ( Filename.concat (Codegen_variant.variant_root variant) archive,
+          In_missing_tree ))
+
+let cached_generic_functions_archive () =
+  fst (cached_generic_functions_archive_and_place ())
+
+(* The archive, when the link can use it. Installations do not necessarily ship
+   it (make installs never do): a missing one is reported here rather than by
+   the linker. The error gives the command that generates it only for the
+   archive of a library tree, where that command writes the archive of the
+   selected variant to its own place: not for a file that is named, which the
+   generator may spell otherwise and which may be the place of another variant's
+   archive. *)
+let cached_generic_functions_path () =
+  let path, place = cached_generic_functions_archive_and_place () in
+  let selected = Codegen_variant.to_string (Codegen_variant.current ()) in
+  match place with
+  | Named ->
+    if Sys.file_exists path
+    then path
+    else
+      (* A path inside the library root was looked up in the selected variant's
+         tree first: say where. *)
+      let directory = Filename.dirname path in
+      let in_tree = Codegen_variant.in_selected_root directory in
+      let also_looked_up =
+        if String.equal in_tree directory
+        then None
+        else Some (Filename.concat in_tree (Filename.basename path))
+      in
+      raise
+        (Linkenv.Error
+           (Cached_generic_functions_file_not_found
+              { filename = path; also_looked_up }))
+  | In_tree tree_variant ->
+    if Sys.file_exists path
+    then path
+    else
+      raise
+        (Linkenv.Error
+           (Cached_generic_functions_not_found
+              { filename = path;
+                variant = Codegen_variant.to_string tree_variant
+              }))
+  | In_missing_tree ->
+    raise
+      (Linkenv.Error
+         (Cached_generic_functions_tree_not_found { variant = selected }))
+  | In_mismatched_root ->
+    raise
+      (Linkenv.Error
+         (Cached_generic_functions_root_mismatch
+            { root = Config.standard_library; variant = selected }))
 
 let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
-  let libname = "libasmrun" ^ variant ^ ext_lib in
+  (* The archives of the base variant have unsuffixed names; those of the other
+     variants are suffixed with the projection of the variant name onto the
+     runtime axes. The naming rule is described in stdlib/dune_rules/gen.ml
+     (write_runtime_dune). *)
+  let codegen_variant = Codegen_variant.current () in
+  let codegen_suffix = Codegen_variant.runtime_archive_suffix codegen_variant in
+  let libname = "libasmrun" ^ variant ^ codegen_suffix ^ ext_lib in
   try
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
-    else [Load_path.find libname]
-  with Not_found -> raise (Linkenv.Error (File_not_found libname))
+    else [Compmisc.find_input libname]
+  with Not_found ->
+    let unsuffixed_exists =
+      (not (String.equal codegen_suffix ""))
+      &&
+      match Compmisc.find_input ("libasmrun" ^ variant ^ ext_lib) with
+      | (_ : string) -> true
+      | exception Not_found -> false
+    in
+    (* Blame the codegen variant only when the runtime variant itself exists for
+       the base variant and the installation has no library tree for the
+       selected variant (and is not one itself). With such a tree, what is
+       missing is this file. *)
+    if
+      unsuffixed_exists
+      && Option.is_none (Codegen_variant.selected_tree ())
+      && not (Linkenv.standard_library_is_built_for codegen_variant)
+    then
+      raise
+        (Linkenv.Error
+           (Codegen_variant_runtime_not_found
+              { filename = libname;
+                variant = Codegen_variant.to_string codegen_variant
+              }))
+    else raise (Linkenv.Error (File_not_found libname))
 
 (* Second pass: generate the startup file and link it with everything else *)
 
@@ -80,6 +231,85 @@ let emit_ocamlrunparam ~ppf_dump =
               "caml_ocamlrunparam");
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
+(* Whether every OCaml unit being linked was compiled with poll insertion: the
+   AND of the per-unit [polled] bits over [units]. The poll-insertion setting of
+   the link itself is not part of it: it only chooses the library tree (see
+   [Codegen_variant.selected_tree]), whose units have their own bits.
+
+   Generic functions take part in the link without a [unit_link_info], the
+   cached ones from the archive of the selected tree and the others compiled
+   into this startup file, and none of them ever gets polls, under either
+   setting (see [Cfg_polling.function_is_assumed_to_never_poll]). This does not
+   weaken what the bit stands for, because none of them can run unboundedly
+   between two polls of the code that it calls: [caml_apply*], [caml_curry*] and
+   [caml_tuplify*] have no loop, and the one loop, the method lookup of
+   [caml_send*] on a cache miss ([Cmm_helpers.cache_public_method]), is a binary
+   search bounded by the size of the method table. A function added to
+   [Generic_fns] must keep that property.
+
+   The runtime reads the symbol at startup to pick the default domain cap (see
+   runtime/startup_aux.c); it is emitted only into the main startup object
+   ([make_startup_file], which also serves -output-obj), never into the
+   shared-startup object of a .cmxs, which must not carry a second definition
+   into the host program. *)
+let emit_code_fully_polled linkenv ~ppf_dump units =
+  let fully_polled = List.for_all (fun u -> u.polled) units in
+  (* A link with poll insertion asks for the libraries that have it, and gets
+     the others where the installation has none. A program that links a unit of
+     those is limited to one domain however its own units were compiled, which
+     nothing else tells whoever builds it. This is an alert and not a warning:
+     such a link has always been accepted, and must not fail where warnings are
+     errors. It is about the units that are linked and what their unit infos
+     say, not about the tree that was searched or its name: a program that takes
+     nothing from the libraries is fully polled when its own units are. And it
+     is about the standard library: the file that holds the unit Stdlib, of
+     which a link may take other units only, and the unit Std_exit, which is a
+     file of its own, wherever the link found them (a directory given with -I
+     comes before the library root) and however their paths are spelled. A unit
+     of the program without polls is the program's own business, wherever its
+     file is, unless it is named Std_exit or its file holds the unit Stdlib. *)
+  (if (Codegen_variant.current ()).poll_insertion
+   then
+     let of_the_standard_library u =
+       Linkenv.file_holds_unit linkenv u.file_name
+         (Compilation_unit.of_string "Stdlib")
+       || String.equal (Compilation_unit.full_path_as_string u.name) "Std_exit"
+     in
+     match
+       List.find_opt
+         (fun u -> (not u.polled) && of_the_standard_library u)
+         units
+     with
+     | None -> ()
+     | Some unit ->
+       Location.prerr_alert Location.none
+         { Warnings.kind = "no_polled_libraries";
+           use = Location.none;
+           def = Location.none;
+           message =
+             Printf.sprintf
+               "the libraries in %s, which this link uses for codegen variant \
+                %s, were compiled without poll insertion (%s, for one), so the \
+                program is not fully polled and is limited to one domain by \
+                default."
+               (Filename.dirname unit.file_name)
+               (Codegen_variant.to_string (Codegen_variant.current ()))
+               (Compilation_unit.full_path_as_string unit.name)
+         });
+  Asmgen.compile_phrase ~ppf_dump
+    (Cmm.Cdata
+       [ Cmm.Cdefine_symbol
+           (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+              "caml_code_fully_polled");
+         Cmm.Cint (if fully_polled then 1n else 0n) ]);
+  (* The object files of units without polls refer to this definition
+     ([Asmgen.emit_unpolled_code_reference]): the linker then refuses one in a
+     program that is fully polled by its unit infos, also when another image of
+     the process defines the symbol. *)
+  if fully_polled
+  then Asmgen.emit_unpolled_code_exclusion ()
+  else Asmgen.emit_unpolled_code_definition ~exported:true
+
 (* With [-gated-trace-pc-guard-define-gate], the startup file defines the gate
    of [Cfg_trace_pc_guard]. This definition takes precedence over the weak ones
    of instrumented units. *)
@@ -109,6 +339,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
   else Emit.begin_assembly unix;
+  Asmgen.emit_codegen_variant_guard_of_startup ();
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list = List.flatten (List.map (fun u -> u.defines) units) in
   (* In manual module init mode, entry_point and global_table should be empty *)
@@ -116,6 +347,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     if !Oxcaml_flags.manual_module_init then [] else name_list
   in
   emit_ocamlrunparam ~ppf_dump;
+  emit_code_fully_polled linkenv ~ppf_dump units;
   List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
@@ -127,8 +359,6 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   compile_phrase (Cmm_helpers.global_table init_name_list);
   let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
-  compile_phrase
-    (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
   (* CR mshinwell: We should have a separate notion of "backend compilation
      unit" really, since the units here don't correspond to .ml source files. *)
   let system_comp_unit =
@@ -140,7 +370,20 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     then Generic_fns.imported_units cached_gen @ code_comp_units
     else code_comp_units
   in
+  (* The data of every object file whose code is in the code segment table, the
+     cached generic functions included: an object file's reference to the
+     link-time guard is at the start of its data, and a linker that discards
+     unreferenced sections must keep it wherever it keeps the code. *)
+  compile_phrase (Cmm_helpers.data_segment_table code_comp_units);
   compile_phrase (Cmm_helpers.code_segment_table code_comp_units);
+  (* The runtime reads the code segment table and not the data segment table.
+     This word follows the former and belongs to it for a linker that discards
+     unreferenced symbols, which then keeps the latter. *)
+  compile_phrase
+    (Cmm.Cdata
+       [ Cmm.Csymbol_address
+           (Cmm.global_symbol ~ty:Cmm.typ_out_of_heap_data_pointer
+              "caml_data_segments") ]);
   let all_comp_units = startup_comp_unit :: system_comp_unit :: name_list in
   let all_comp_units =
     if !Oxcaml_flags.use_cached_generic_functions
@@ -189,12 +432,35 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
   else Emit.begin_assembly unix;
+  (* A plugin vouches for its units, whose headers tell the loader what they
+     were compiled for. A plugin without units has no such header: it refers to
+     the guard like other generated code, so not with the LLVM backend, and with
+     that reference it can only be opened where the guard is defined. *)
+  (match units with
+  | [] -> Asmgen.emit_codegen_variant_guard_reference ()
+  | _ :: _ -> Asmgen.emit_codegen_variant_guard_definition ());
   emit_ocamlrunparam ~ppf_dump;
   List.iter compile_phrase
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
        (Generic_fns.compile ~cache:false ~shared:true genfns));
   let dynunits = List.map (fun u -> Option.get u.dynunit) units in
   compile_phrase (Cmm_helpers.plugin_header dynunits);
+  (* A plugin whose header says that one of its units has no polls defines, for
+     itself, what the object files of such units refer to. One whose header says
+     that every unit has polls does not, and must not get the definition from
+     anywhere else: the link of the plugin fails on an object file without polls
+     in it. (Where the object format cannot say that, such an object file needs
+     a definition that is visible to the plugin when it is loaded, which a fully
+     polled program does not provide.) A plugin without units says nothing of
+     the object files that it is made of, with or without polls: it does
+     neither, and an object file without polls in it needs a definition that is
+     visible to the plugin when it is loaded. *)
+  (match units with
+  | [] -> ()
+  | _ :: _ ->
+    if List.for_all (fun u -> u.polled) units
+    then Asmgen.emit_unpolled_code_exclusion ()
+    else Asmgen.emit_unpolled_code_definition ~exported:false);
   (* In manual module init mode, global_table should be empty *)
   (* CR mshinwell: why does caml_globals need to be populated in this case?
      Note that the frametables are not registered here; they are done
@@ -247,6 +513,14 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
        until it is properly tested for shared library linking. *)
     Emitaux.binary_backend_available := false;
   let objfiles = List.rev ml_objfiles @ List.rev !Clflags.ccobjs in
+  (* The generic functions that the archives on the command line need are left
+     out of a plugin when the link selects no unit at all (as it may from an
+     archive given alone without -linkall): the plugin would hold code compiled
+     for this invocation's settings and no unit whose header tells the loader
+     what these were. *)
+  let genfns =
+    match units_tolink with [] -> Generic_fns.Tbl.make () | _ :: _ -> genfns
+  in
   let named_startup_file = named_startup_file () in
   let startup =
     if named_startup_file
@@ -310,7 +584,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
       let file_list_rev = List.map (fun f -> f.Linkenv.path) file_list_rev in
       let file_list_rev =
         if !Oxcaml_flags.use_cached_generic_functions
-        then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
+        then cached_generic_functions_path () :: file_list_rev
         else file_list_rev
       in
       let files = startup_file :: List.rev file_list_rev in
@@ -472,7 +746,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     then (
       let cached_genfns =
         if !Oxcaml_flags.use_cached_generic_functions
-        then Some !Oxcaml_flags.cached_generic_functions_path
+        then Some (cached_generic_functions_path ())
         else None
       in
       let temp_dir = mk_temp_dir "camldissector" "" in

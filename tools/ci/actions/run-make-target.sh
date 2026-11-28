@@ -14,27 +14,31 @@
 #*                                                                        *#
 #**************************************************************************#
 
-# Run `make TARGET` for a build.yml step, with core dumps enabled.
+# Run `make TARGET [ARGUMENT]...` for a build.yml step, with core dumps
+# enabled.
 #
 # Environment:
-#   COLLECT_METRICS   if "true", append flags to BUILD_OCAMLPARAM and
-#                     OCAMLPARAM so the compiler writes per-file profiling
-#                     CSVs into $GITHUB_WORKSPACE/_profile_csv
+#   COLLECT_METRICS   if "true", make the compiler write per-file profiling
+#                     CSVs into $GITHUB_WORKSPACE/_profile_csv: while it is
+#                     built, for the compilations of the main build context
+#                     only (MAIN_CONTEXT_OCAMLPARAM, see Makefile.common-ox),
+#                     and for those of the tests (OCAMLPARAM)
 #   BUILD_OCAMLPARAM, OCAMLPARAM, OCAMLRUNPARAM, USE_RUNTIME
 #                     passed through to make
 
 set -euo pipefail
-usage() { echo "Usage: $0 TARGET" >&2; exit 1; }
-[ $# -eq 1 ] || usage
-target=$1
+usage() { echo "Usage: $0 TARGET [ARGUMENT]..." >&2; exit 1; }
+[ $# -ge 1 ] || usage
 
 if [ "${COLLECT_METRICS:-}" = "true" ]; then
   profile_dir="$GITHUB_WORKSPACE/_profile_csv"
   mkdir -p "$profile_dir"
   profile_flags="dump-dir=$profile_dir,dump-into-csv=1,profile=1"
-  export BUILD_OCAMLPARAM="${BUILD_OCAMLPARAM:-},$profile_flags"
+  # Not through BUILD_OCAMLPARAM, which also reaches the codegen-variant
+  # contexts: their builds of the libraries are not part of the profile.
+  export MAIN_CONTEXT_OCAMLPARAM="$profile_flags"
   export OCAMLPARAM="${OCAMLPARAM:-},$profile_flags"
 fi
 
 ulimit -c unlimited
-make "$target"
+make "$@"

@@ -32,6 +32,7 @@ type symbol = {
   mutable sy_size : int option;
   mutable sy_binding : symbol_binding;
   mutable sy_protected : bool;
+  mutable sy_hidden : bool;
   mutable sy_sec : section;
   mutable sy_pos : int option;
   mutable sy_num : int option; (* position in .symtab *)

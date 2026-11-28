@@ -52,3 +52,7 @@ utils/target_system.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
 utils/id_counter.ml merlin-exclude
 utils/id_counter.mli merlin-exclude
+utils/codegen_variant.ml merlin-exclude
+utils/codegen_variant.mli merlin-exclude
+utils/codegen_variant_name.ml merlin-exclude
+utils/codegen_variant_name.mli merlin-exclude

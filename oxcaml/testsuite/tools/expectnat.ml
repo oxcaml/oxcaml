@@ -51,5 +51,16 @@ let () =
     ~extra_args:Options.list
     ~extra_init:(fun () ->
       Clflags.set_target Clflags.Target.Native;
-      Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler)
+      Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+      (* Phrases are compiled into expectnat's own image, so the variant
+         flag defaults must describe the variant this binary was actually
+         built for rather than the installation default from [Config] (the
+         two differ in a copy built in a codegen-variant context).
+         [extra_init] runs before [Arg.parse], so explicit
+         variant-selecting flags still override; a remaining mismatch is
+         rejected by the admission check on the phrase load path in
+         [Opttoploop].  This also makes the implicit standard library root
+         (when no -nostdlib/-I is given) resolve against the host variant's
+         library tree. *)
+      Codegen_variant.apply Opttoploop.host_variant)
     (module Toplevel)

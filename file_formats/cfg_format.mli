@@ -34,9 +34,21 @@ type cfg_unit_info =
     mutable items : cfg_item_info list;
   }
 
+type error =
+  | Wrong_format of string
+  | Wrong_version of string
+  | Corrupted of string
+  | Marshal_failed of string
+  | Configuration_mismatch of Ir_config_fingerprint.configuration_mismatch
+
+exception Error of error
+
 (* Marshal and unmarshal a compilation unit in Cfg format.
    It includes saving and restoring global state required for Emit,
    that currently consists of Cmm.label_counter.
+   [restore] raises [Error (Configuration_mismatch _)] for a file that was
+   saved under another configuration than that of the current process (see
+   [Ir_config_fingerprint]).
 *)
 val save : string -> cfg_unit_info -> unit
 val restore : string -> cfg_unit_info * Digest.t

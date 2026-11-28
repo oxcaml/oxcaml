@@ -27,7 +27,15 @@
 #include "domain_state.h"
 #include "misc.h"
 
-#ifdef MULTIDOMAIN
+/* MULTIDOMAIN is defined in m.h: it must stay visible to external
+   stubs that include only public headers, and to code that reads m.h
+   alone. */
+
+/* The default domain cap of fully-polled programs.  The runtime is
+   always multidomain-capable; whether a given program may run more than
+   one domain is decided at startup from the link-time
+   caml_code_fully_polled bit (see startup_aux.c), with OCAMLRUNPARAM d=
+   as the override. */
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else
@@ -36,14 +44,18 @@
 /* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
  * for sanity checking [max_domains] value in OCAMLRUNPARAM. */
 #define Max_domains_max 4096
-#else
-#define Max_domains_def 1
-#define Max_domains_max 1
-#endif
 
 /* Force tick thread to use usleep instead of epoll. Settable with
    OCAMLRUNPARAM */
 extern uintnat caml_tick_use_usleep;   /* Xtick_use_usleep= */
+
+/* The domain cap the per-domain structures were sized for: a snapshot of
+   caml_params->max_domains taken in caml_init_domains and immutable
+   thereafter.  Read this, never caml_params->max_domains, after startup:
+   a second caml_startup call re-runs the OCAMLRUNPARAM parse before the
+   startup-count guard, so the parameter can change while all_domains and
+   friends keep their original size. */
+extern uintnat caml_max_domains;
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)

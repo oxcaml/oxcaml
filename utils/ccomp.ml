@@ -110,10 +110,58 @@ let compile_file ?output ?(opt="") ?stable_name name =
     else
       ""
   in
+  let codegen_variant_flags =
+    (* A .c file given to ocamlopt is compiled for the invocation's codegen
+       variant, so that it matches the image it will be linked into (the
+       per-token tables are the ones the in-tree runtime and stub archives
+       use, Codegen_variant_name via Makefile.codegen-variants):
+
+       - the variant is stated on every compilation
+         (-DCAML_CODEGEN_VARIANT_EXPLICIT plus -D<macro>=1 for exactly the
+         axes that are on), also when it is base: otherwise the axis macros
+         would come from whichever m.h gets included, and the one of a
+         variant's tree, which an include directory or an OCAMLLIB override
+         can lead to, defines the macros of that variant.  The stack/fiber
+         layout macros CAML_INTERNALS stubs derive from the axis macros
+         (First_frame, Stack_padding_word, Stack_guard_stride, ...) must
+         match the enclosing program.  Bytecode compilations state base,
+         which is what the bytecode runtimes (built once) are compiled
+         for.
+
+       - the behavioral flags of the axes that are on follow: a command
+         given with -cc carries none of them, and the configured one
+         (Config.native_cflags) at most keeps the frame pointer:
+         frame pointers: -fno-omit-frame-pointer -g, because stubs that
+         can call back into OCaml (or allocate) must preserve the unbroken
+         rbp chain the fp runtime's stack-reallocation walk requires;
+         asan: the -fsanitize instrumentation flags, so the stub is
+         instrumented like the rest of the asan image. *)
+    let axis_value (v : Codegen_variant.t)
+          (token : Codegen_variant_name.token) =
+      match token with
+      | Address_sanitizer -> v.address_sanitizer
+      | Frame_pointers -> v.frame_pointers
+      | Poll_insertion -> v.poll_insertion
+      | Stack_checks -> v.stack_checks
+    in
+    let variant =
+      if Clflags.target_is_native ()
+      then Codegen_variant.current ()
+      else Codegen_variant.base
+    in
+    let enabled_tokens =
+      List.filter (axis_value variant) Codegen_variant_name.all_tokens
+    in
+    String.concat " "
+      ((Codegen_variant_name.explicit_variant_flag
+        :: List.concat_map Codegen_variant_name.cc_macro_flags enabled_tokens)
+      @ List.concat_map Codegen_variant_name.cc_behavioral_flags
+          enabled_tokens)
+  in
   let exit =
     command
       (Printf.sprintf
-         "%s%s %s %s -c %s %s %s %s %s%s"
+         "%s%s %s %s -c %s %s %s %s %s %s%s"
          (match !Clflags.c_compiler with
           | Some cc -> cc
           | None ->
@@ -128,9 +176,10 @@ let compile_file ?output ?(opt="") ?stable_name name =
           | Some o -> Printf.sprintf "%s%s" Config.c_output_obj o)
          opt
          debug_flags
+         codegen_variant_flags
          (String.concat " " (List.rev !Clflags.all_ccopts))
          (quote_prefixed ~response_files:true "-I"
-            (List.map (Misc.expand_directory Config.standard_library)
+            (List.map Codegen_variant.expand_directory
                (List.rev_map
                   (fun (e : Clflags.include_dir) -> e.path)
                   (!Clflags.hidden_include_dirs @ !Clflags.include_dirs))))
@@ -192,6 +241,25 @@ let remove_Wl cclibs =
 
 let call_linker ?(native_toplevel = false) mode output_name files extra =
   Profile.record_call "c-linker" (fun () ->
+    (* AddressSanitizer-instrumented objects reference __asan_* symbols and
+       need the compiler-rt ASan runtime, which the cc driver links into the
+       final EXECUTABLE when given -fsanitize=address.  Neither Config.mkexe
+       nor a command given with -cc carries the flags, so an asan
+       invocation injects them here, for the Exe mode only: Partial links
+       go through the pack linker (ld -r), which rejects cc-driver flags,
+       and Dll/MainDll links never carried the flags (a shared object's
+       __asan_* references resolve from the host executable at dlopen;
+       codegen-fingerprint equality guarantees that host is an asan link).
+       Consumers of -output-obj / -output-complete-obj must therefore pass
+       -fsanitize=address at their own final link.  (-fsanitize-recover is
+       compile-time-only — inert at link — and kept for symmetry with the
+       compile-side flags.) *)
+    let asan_link_flags =
+      match mode with
+      | Exe when !Clflags.address_sanitizer ->
+        "-fsanitize=address -fsanitize-recover=address"
+      | Exe | Dll | MainDll | Partial -> ""
+    in
     let cmd =
       if mode = Partial then
         let (l_prefix, files) =
@@ -207,7 +275,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
           (quote_files ~response_files:true (remove_Wl files))
           extra
       else
-        Printf.sprintf "%s -o %s %s %s %s %s %s %s"
+        Printf.sprintf "%s %s -o %s %s %s %s %s %s %s"
           (match !Clflags.c_compiler, mode with
           | Some cc, _ -> cc
           | None, Exe -> Config.mkexe
@@ -215,6 +283,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
           | None, MainDll -> Config.mkmaindll
           | None, Partial -> assert false
           )
+          asan_link_flags
           (Filename.quote output_name)
           ""  (*(Clflags.std_include_flag "-I")*)
           (if native_toplevel then ""

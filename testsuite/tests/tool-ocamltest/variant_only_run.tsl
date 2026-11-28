@@ -1,0 +1,4 @@
+(* CHILDTEST
+ program = "true";
+ run;
+*)

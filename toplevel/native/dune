@@ -30,9 +30,23 @@
   flambda2
   dynlink_internal
   unix)
- (modules genprintval_native opttoploop opttopdirs topmain))
+ (modules genprintval_native opttoploop opttopdirs topmain
+   toplevel_host_variant))
 
 (copy_files ../topmain.mli)
+
+; The whole-program axes of the codegen variant this context's ocamlnat is
+; actually built for, baked in so that opttoploop pins phrase compilation to
+; the binary's own rather than to base (the two differ in a
+; codegen-variant context).  Reuses the
+; per-context sources generated for otherlibs/dynlink's dynlink_host_variant
+; rule by the _build/_bootinstall recipe in Makefile.common-ox.
+(rule
+ (targets toplevel_host_variant.ml)
+ (action
+  (copy
+   %{project_root}/duneconf/dynlink_host_variant_%{context_name}.ml
+   %{targets})))
 
 (rule
  (targets genprintval_native.ml)
@@ -40,12 +54,28 @@
  (action
   (copy %{deps} %{targets})))
 
+(alias
+ (name codegen-variant-compiler-libs)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps ocamlopttoplevel.cmxa ocamlopttoplevel.a))
+
 (executable
  (name topstart)
  (modes native)
  (flags (:standard -linkall))
  (libraries ocamlopttoplevel)
  (modules topstart))
+
+(alias
+ (name codegen-variant-test-hosts)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps topstart.exe))
 
 (install
  (files
@@ -57,6 +87,23 @@
  (files
   (ocamlopttoplevel.a as compiler-libs/ocamlopttoplevel.a)
   (ocamlopttoplevel.cmxa as compiler-libs/ocamlopttoplevel.cmxa)
+  ; The .cmx files of the units whose interfaces are installed, and of the
+  ; units that those use: without them, a compilation that uses the library
+  ; warns that it found no .cmx file (warning 58), unless the interfaces
+  ; were compiled with -opaque, as they are in the dev profile. Not that of
+  ; Topmain: the topmain.cmi in compiler-libs is the bytecode toplevel's.
+  (.ocamlopttoplevel.objs/native/genprintval_native.cmx
+   as
+   compiler-libs/genprintval_native.cmx)
+  (.ocamlopttoplevel.objs/native/opttopdirs.cmx
+   as
+   compiler-libs/opttopdirs.cmx)
+  (.ocamlopttoplevel.objs/native/opttoploop.cmx
+   as
+   compiler-libs/opttoploop.cmx)
+  (.ocamlopttoplevel.objs/native/toplevel_host_variant.cmx
+   as
+   compiler-libs/toplevel_host_variant.cmx)
   (opttopdirs.mli as compiler-libs/opttopdirs.mli)
   (.ocamlopttoplevel.objs/byte/opttopdirs.cmi
    as

@@ -1,0 +1,5 @@
+(* CHILDTEST
+ codegen_variant = "+asan +sc";
+ script = "true";
+ script;
+*)

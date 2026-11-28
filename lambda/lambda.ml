@@ -3248,7 +3248,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
-  | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
+  | Pcpu_relax -> if !Clflags.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
   | Patomic_load_mixed_field _
   | Patomic_set_field _

@@ -59,7 +59,7 @@
 ; The dissector is only supported on Linux
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target simple.exe)
@@ -70,7 +70,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target simple.output)
@@ -80,7 +80,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps simple.expected simple.output)
@@ -90,7 +90,7 @@
 ; Uses a separate source file to avoid race conditions with simple.exe
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target simple_funcsect.exe)
@@ -101,7 +101,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target simple_funcsect.output)
@@ -111,7 +111,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps simple.expected simple_funcsect.output)
@@ -124,7 +124,7 @@
 ; Compile generated modules
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets gen_module_a.cmi gen_module_a.cmx gen_module_a.o)
@@ -134,7 +134,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets gen_module_b.cmi gen_module_b.cmx gen_module_b.o)
@@ -144,7 +144,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets gen_module_c.cmi gen_module_c.cmx gen_module_c.o)
@@ -156,7 +156,7 @@
 ; Compile gen_main.ml (needed by multiple tests, so compile once to avoid races)
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets gen_main.cmi gen_main.cmx gen_main.o)
@@ -170,7 +170,7 @@
 ; its own partition, testing cross-partition OCaml calls
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cross_partition.exe)
@@ -185,7 +185,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cross_partition.output)
@@ -195,7 +195,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cross_partition.expected cross_partition.output)
@@ -205,7 +205,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cross_partition.exe)
@@ -216,7 +216,7 @@
 ; Test 2b: Same as Test 2 but with -function-sections
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cross_partition_fs.exe)
@@ -231,7 +231,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cross_partition_fs.output)
@@ -241,7 +241,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cross_partition.expected cross_partition_fs.output)
@@ -251,7 +251,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -369,7 +369,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -418,7 +418,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
@@ -513,7 +513,7 @@
 ; Compile library modules
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets mylib_a.cmi mylib_a.cmx mylib_a.o)
@@ -523,7 +523,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets mylib_b.cmi mylib_b.cmx mylib_b.o)
@@ -535,7 +535,7 @@
 ; must not link it into the executable
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets mylib_unused.cmi mylib_unused.cmx mylib_unused.o)
@@ -546,7 +546,7 @@
 ; Create the .cmxa archive
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets mylib.cmxa mylib.a)
@@ -560,7 +560,7 @@
 ; must not link any of its members into the executable
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets unusedlib.cmi unusedlib.cmx unusedlib.o)
@@ -570,7 +570,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets unusedlib.cmxa unusedlib.a)
@@ -581,7 +581,7 @@
 ; Link with dissector using the .cmxa archives
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cmxa_test.exe)
@@ -594,7 +594,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cmxa_test.output)
@@ -604,7 +604,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cmxa_test.expected cmxa_test.output)
@@ -614,7 +614,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cmxa_test.exe)
@@ -628,7 +628,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cmxa_test.exe)
@@ -641,7 +641,7 @@
 ; Test 4: Linker flags (-cclib) should not be treated as files
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cclib_test.exe)
@@ -653,7 +653,7 @@
 
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cclib_test.output)
@@ -665,7 +665,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cclib_test.output)
@@ -676,7 +676,7 @@
 ; Compile C stub into object file
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cstub.o)
@@ -687,7 +687,7 @@
 ; Create static library from C stub
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target libcstub.a)
@@ -698,7 +698,7 @@
 ; Build executable with C stub library via -cclib
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cstub_passthrough.exe)
@@ -711,7 +711,7 @@
 ; Verify the executable runs correctly
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cstub_passthrough.output)
@@ -723,7 +723,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cstub_passthrough.output)
@@ -733,7 +733,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (deps cstub_passthrough.ml libcstub.a)

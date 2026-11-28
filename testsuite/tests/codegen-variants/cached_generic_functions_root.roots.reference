@@ -1,0 +1,5 @@
+a root built for another variant: reported as such, without a command
+the same root, the other poll setting: reported as such, without a command
+a variant without a library tree: reported as such, without a command
+a root without the unit info of its standard library: its archive is used
+the same root, the other poll setting: reported as such, without a command

@@ -4,6 +4,13 @@
  (name C-only)
  (deps libthreadsnat_stubs.a))
 
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps threadsnat.cmxa threadsnat.a libthreadsnat_stubs.a))
+
 (rule (target sync_posix.h) (action (copy %{dep:../../../runtime/sync_posix.h} %{target})))
 
 (library
@@ -13,16 +20,18 @@
  ; FIXME Fix warning 27 and -no-strict-sequence
  (flags
   (:standard -no-strict-sequence -g -bin-annot -w -27))
+ ; \ -fno-asan: see otherlibs/unix/dune.
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (libraries unix)
  (library_flags -linkall)
  (c_library_flags -lpthread)
+ ; OC_CFLAGS_SEXP: see otherlibs/unix/dune.
  (foreign_stubs
   (language c)
   (names st_stubs)
   (flags
    ((-DNATIVE_CODE)
-    (:include %{project_root}/oc_cflags.sexp)
+    (:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp)))))

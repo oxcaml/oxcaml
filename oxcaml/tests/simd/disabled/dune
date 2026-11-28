@@ -4,7 +4,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (deps disabled256.expected disabled256.corrected)
  (action
@@ -14,7 +14,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (targets disabled256.corrected)
  (deps
@@ -43,7 +43,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (deps disabled256_call.expected disabled256_call.corrected)
  (action
@@ -53,7 +53,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (targets disabled256_call.corrected)
  (deps
@@ -85,7 +85,7 @@
  (modules float32_store)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (ocamlopt_flags
   (:standard -fno-avx)))
@@ -93,7 +93,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (with-outputs-to
@@ -104,7 +104,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")))
  (action
   (diff float32_store.expected float32_store.out)))

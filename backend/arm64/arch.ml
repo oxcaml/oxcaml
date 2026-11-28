@@ -23,21 +23,27 @@ open Format
 
 let macosx = String.equal Config.system "macosx"
 
-let is_asan_enabled = ref false
-
 (* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
 let feat_cssc = ref false
 
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true
 
+(* As on amd64, [-fno-asan] turns off the instrumentation of the unit and
+   leaves its codegen variant alone. This backend emits no instrumentation
+   and the asan variant is rejected on this architecture, so the flag is
+   accepted for compatibility only. *)
+let is_asan_enabled () =
+  !Clflags.address_sanitizer && !Oxcaml_flags.asan_instrumentation
+
 (* Machine-specific command-line options *)
 
 let command_line_options = [
   "-fno-asan",
-    Arg.Clear is_asan_enabled,
-    " Disable AddressSanitizer. This is only meaningful if the compiler was \
-     built with AddressSanitizer support enabled."
+    Arg.Clear Oxcaml_flags.asan_instrumentation,
+    " Do not instrument this compilation for AddressSanitizer. This is \
+     only meaningful when AddressSanitizer is enabled (-asan), and does \
+     not change the codegen variant."
   ;
 
   "-fcssc",

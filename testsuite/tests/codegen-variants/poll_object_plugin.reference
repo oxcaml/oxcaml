@@ -1,0 +1,6 @@
+without.cmxs: refused by Dynlink, as not fully polled
+mismatched.cmxs: refused, as an object file without polls
+object.cmxs: refused, as an object file without polls
+with.cmxs: loaded
+one domain: without.cmxs: loaded
+not fully polled: object.cmxs: loaded

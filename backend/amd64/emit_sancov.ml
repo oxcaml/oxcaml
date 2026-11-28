@@ -68,7 +68,7 @@ let emit_call t ~live ~move ~emit_call ~index =
   I.mov rsp r13;
   D.cfi_remember_state ();
   D.cfi_def_cfa_register ~reg:"r13";
-  if Config.no_stack_checks
+  if not !Clflags.stack_checks
   then I.and_ (int (-16)) rsp
   else
     I.mov

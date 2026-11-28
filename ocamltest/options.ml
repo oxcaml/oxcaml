@@ -69,6 +69,10 @@ let show_timings = ref false
 
 let run_ocamlrunparam = ref ""
 
+let codegen_variant = ref ""
+
+let codegen_variant_only = ref false
+
 let translate = ref false
 let style = ref Translate.Plain
 let compact = ref false
@@ -121,6 +125,13 @@ let commandline_options =
    " Exit 0 even if a test fails (as long as it runs)");
   ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
    "<params> Append <params> to OCAMLRUNPARAM when running test programs.");
+  ("-codegen-variant", Arg.Set_string codegen_variant,
+   "<name> Run the tests for the codegen variant <name>, as if it were \
+    the default of the compiler under test, unless a test selects one \
+    itself.");
+  ("-codegen-variant-only", Arg.Set codegen_variant_only,
+   " With -codegen-variant, skip the test files in which nothing depends \
+    on the variant.");
   ("-translate", Arg.Set translate,
    " Translate the test script from old to new syntax");
   ("-compact", Arg.Set compact,
@@ -159,6 +170,8 @@ let keep_test_dir_on_success = !keep_test_dir_on_success
 let exit_0_on_failure = !exit_0_on_failure
 let show_timings = !show_timings
 let run_ocamlrunparam = !run_ocamlrunparam
+let codegen_variant = !codegen_variant
+let codegen_variant_only = !codegen_variant_only
 let translate = !translate
 let style = !style
 let compact = !compact

@@ -28,7 +28,33 @@
  (name codegen_main)
  (modes native)
  (libraries ocamlfrontend ocamloptcomp unix)
- (modules codegen_main lexcmm parsecmm parsecmmaux))
+ (modules codegen_main codegen_host_variant lexcmm parsecmm parsecmmaux))
+
+; The codegen variant of this context, for which codegen_main generates
+; code: it takes no option that selects one. These are the constants that
+; the _build/_bootinstall recipe in Makefile.common-ox generates for
+; otherlibs/dynlink.
+(rule
+ (targets codegen_host_variant.ml)
+ (action
+  (copy
+   %{project_root}/duneconf/dynlink_host_variant_%{context_name}.ml
+   %{targets})))
+
+; What ocamltest runs for the native tests that compile inside a tool
+; (expect.opt and the asmgen tests), built for a codegen variant: the
+; install_for_test recipe in Makefile.common-ox puts them where ocamltest
+; looks for the tools of that variant. Only enabled in the codegen-variant
+; contexts; see otherlibs/unix/dune. The stanzas of the same name in
+; toplevel/native and testsuite/lib add the native toplevel and the
+; libraries of the tests.
+(alias
+ (name codegen-variant-test-hosts)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps expectnat.exe codegen_main.exe))
 
 (rule
  (targets asmgen_arm64.o)

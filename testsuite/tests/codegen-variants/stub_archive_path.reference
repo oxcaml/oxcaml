@@ -1,0 +1,5 @@
+An archive: the variant's tree
+An object: the variant's tree
+An archive given with -cclib: the variant's tree
+An archive recorded in a .cmxa: the variant's tree
+An archive of the root only: linked

@@ -14,7 +14,9 @@ ocamldir = .
 toplevels_installed = top opttop
 
 CLEAN_DUNE_WORKSPACES = \
-  duneconf/main.ws
+  duneconf/main.ws \
+  duneconf/compiler.ws \
+  $(wildcard duneconf/main-*.ws)
 
 # These are getting rm -rf'd, so be careful with this.
 
@@ -33,12 +35,18 @@ CLEAN_FILES = \
   duneconf/ast-dependent-libs.ws \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
+  duneconf/ocaml \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
   ocamlopt_oxcaml_flags.sexp \
+  ocamlopt_stdlib_flags.txt \
+  $(wildcard duneconf/ocamlopt_flags_main*.sexp) \
+  $(wildcard duneconf/dynlink_host_variant_*.ml) \
   boot_oc_cflags.sexp \
   oc_cflags.sexp \
+  $(wildcard duneconf/oc_cflags_main-*.sexp) \
+  $(wildcard duneconf/stub_macros_main-*.sexp) \
   oc_cppflags.sexp \
   sharedlib_cflags.sexp \
   .rsync-output \
@@ -152,8 +160,9 @@ ci-coverage: boot-runtest coverage
 
 # Check an existing install at $(prefix); these targets do not install.
 # Both check compiler location, META paths/dependencies, native archive ownership,
-# Dune availability and native toplevel/JIT/eval consumers. The bundled target
-# also checks inventories and native consumers for the complete Nix library set.
+# Dune availability, native toplevel/JIT/eval consumers and findlib and Dune
+# consumers under each codegen variant. The bundled target also checks
+# inventories and native consumers for the complete Nix library set.
 .PHONY: check-installed
 check-installed:
 	bash tools/ci/actions/check-installed.sh "$(prefix)"
@@ -173,10 +182,15 @@ boot-minimizer:
 	cp chamelon/compat/dune.ox chamelon/compat/dune
 	$(dune) build $(ws_boot) @chamelon/all
 
+# With CODEGEN_VARIANT=<name>, the minimizer is built for that codegen
+# variant, in the variant's build context (see runtest in
+# Makefile.common-ox), which needs the variant's library tree: `make
+# compiler` builds it.
 .PHONY: minimizer
-minimizer: boot-compiler
+minimizer: check-codegen-variant \
+  $(if $(tested_codegen_variant_is_base),boot-compiler,compiler)
 	cp chamelon/compat/dune.ox chamelon/compat/dune
-	$(dune) build $(ws_main) @chamelon/all
+	$(dune) build $(tested_codegen_variant_workspace) @chamelon/all
 
 .PHONY: hacking-externals
 hacking-externals: _build/_bootinstall
@@ -225,6 +239,9 @@ _compare/config.status: ocaml/config.status
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
 	(cd _compare && ./configure $(CONFIGURE_ARGS) --prefix=$$(pwd)/_install)
 
+# Applies the promotions that the last dune build recorded, in whichever
+# build context its tests ran: that of a codegen variant included (see
+# runtest and runtest-llvmize in Makefile.common-ox).
 .PHONY: promote
 promote:
 	$(dune) promotion apply $(ws_main)
@@ -405,7 +422,7 @@ SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
 ifeq ($(WITH_JSOO),1)
-compiler_jsoo_targets = @$(ast_dependent_libs_root)/jsoo-libs
+compiler_jsoo_targets = @_build/main/$(ast_dependent_libs_root)/jsoo-libs
 compiler_jsoo_env = $(build_stdlib_jsir)
 compiler: $(PPXLIB_DEPS) $(JSOO_DEPS)
 endif
@@ -443,8 +460,12 @@ jsoo-test: install $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
 	  $(dune) build $(ws_main) --promote-install-files=false \
 	  @@$(ast_dependent_libs_root)/jsoo-test
 
+# install and jsoo-install-shipped each run dune, which refuses to run twice
+# at once in one build directory, and the second installs into what the
+# first assembles: one after the other, in this order, whatever the -j.
 ifeq ($(with_jsir),true)
 install_for_test: jsoo-install-shipped
+.NOTPARALLEL: install_for_test
 endif
 
 .PHONY: test-without-jsir

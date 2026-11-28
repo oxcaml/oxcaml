@@ -33,7 +33,7 @@ let _ = Hashtbl.add directive_table "quit" (Directive_none dir_quit)
 (* To add a directory to the load path *)
 
 let dir_directory s =
-  let d = expand_directory Config.standard_library s in
+  let d = Codegen_variant.expand_directory s in
   let dir =
     Load_path.Dir.create
       { visibility = Visible; cmx_guaranteed = true } d
@@ -49,14 +49,14 @@ let dir_directory s =
 let _ = Hashtbl.add directive_table "directory" (Directive_string dir_directory)
 (* To remove a directory from the load path *)
 let dir_remove_directory s =
-  let d = expand_directory Config.standard_library s in
+  let d = Codegen_variant.expand_directory_unchecked s in
   let keep id =
     match Load_path.find_normalized (Ident.name id ^ ".cmi") with
     | exception Not_found -> true
     | fn -> Filename.dirname fn <> d
   in
   toplevel_env := Env.filter_non_loaded_persistent keep !toplevel_env;
-  Load_path.remove_dir s
+  Load_path.remove_dir d
 
 let _ =
   Hashtbl.add directive_table "remove_directory"

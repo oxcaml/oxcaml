@@ -2,7 +2,7 @@
 (executable
  (name test_basic_dwarf)
  (modules test_basic_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -10,7 +10,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_basic_dwarf.output.corrected)
  (deps test_basic_dwarf.exe test_basic_dwarf.lldb filter_for_function_call_only.sh)
@@ -28,7 +28,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_basic_dwarf.output test_basic_dwarf.output.corrected)
  (action (run diff -u ../test_basic_dwarf.output test_basic_dwarf.output.corrected)))
@@ -36,7 +36,7 @@
 (executable
  (name test_unboxed_dwarf)
  (modules test_unboxed_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -44,7 +44,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_unboxed_dwarf.output.corrected)
  (deps test_unboxed_dwarf.exe test_unboxed_dwarf.lldb filter_for_function_call_only.sh)
@@ -62,7 +62,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)
  (action (run diff -u ../test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)))
@@ -70,7 +70,7 @@
 (executable
  (name test_datatypes_dwarf)
  (modules test_datatypes_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -78,7 +78,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_datatypes_dwarf.output.corrected)
  (deps test_datatypes_dwarf.exe test_datatypes_dwarf.lldb filter_for_function_call_only.sh)
@@ -96,7 +96,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)
  (action (run diff -u ../test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)))
@@ -104,7 +104,7 @@
 (executable
  (name test_simd_dwarf)
  (modules test_simd_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -112,7 +112,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_simd_dwarf.output.corrected)
  (deps test_simd_dwarf.exe test_simd_dwarf.lldb filter_for_function_call_only.sh)
@@ -130,7 +130,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_simd_dwarf.output test_simd_dwarf.output.corrected)
  (action (run diff -u ../test_simd_dwarf.output test_simd_dwarf.output.corrected)))
@@ -138,7 +138,7 @@
 (executable
  (name test_simple_functor_dwarf)
  (modules test_simple_functor_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -146,7 +146,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_simple_functor_dwarf.output.corrected)
  (deps test_simple_functor_dwarf.exe test_simple_functor_dwarf.lldb filter_for_function_call_only.sh)
@@ -164,7 +164,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)
  (action (run diff -u ../test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)))
@@ -172,7 +172,7 @@
 (executable
  (name test_parameters_dwarf)
  (modules test_parameters_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -180,7 +180,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_parameters_dwarf.output.corrected)
  (deps test_parameters_dwarf.exe test_parameters_dwarf.lldb filter_for_function_call_only.sh)
@@ -198,7 +198,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_parameters_dwarf.output test_parameters_dwarf.output.corrected)
  (action (run diff -u ../test_parameters_dwarf.output test_parameters_dwarf.output.corrected)))
@@ -206,7 +206,7 @@
 (executable
  (name test_callstack_dwarf)
  (modules test_callstack_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -214,7 +214,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_callstack_dwarf.output.corrected)
  (deps test_callstack_dwarf.exe test_callstack_dwarf.lldb filter_for_function_call_only.sh)
@@ -232,7 +232,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_callstack_dwarf.output test_callstack_dwarf.output.corrected)
  (action (run diff -u ../test_callstack_dwarf.output test_callstack_dwarf.output.corrected)))
@@ -240,7 +240,7 @@
 (executable
  (name test_stepping_dwarf)
  (modules test_stepping_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -248,7 +248,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_stepping_dwarf.output.corrected)
  (deps test_stepping_dwarf.exe test_stepping_dwarf.lldb filter_for_function_call_only.sh)
@@ -266,7 +266,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_stepping_dwarf.output test_stepping_dwarf.output.corrected)
  (action (run diff -u ../test_stepping_dwarf.output test_stepping_dwarf.output.corrected)))
@@ -274,7 +274,7 @@
 (executable
  (name test_closures_dwarf)
  (modules test_closures_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -282,7 +282,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_closures_dwarf.output.corrected)
  (deps test_closures_dwarf.exe test_closures_dwarf.lldb filter_for_function_call_only.sh)
@@ -300,7 +300,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_closures_dwarf.output test_closures_dwarf.output.corrected)
  (action (run diff -u ../test_closures_dwarf.output test_closures_dwarf.output.corrected)))
@@ -308,7 +308,7 @@
 (executable
  (name test_large_data_dwarf)
  (modules test_large_data_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -316,7 +316,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_large_data_dwarf.output.corrected)
  (deps test_large_data_dwarf.exe test_large_data_dwarf.lldb filter_for_function_call_only.sh)
@@ -334,7 +334,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_large_data_dwarf.output test_large_data_dwarf.output.corrected)
  (action (run diff -u ../test_large_data_dwarf.output test_large_data_dwarf.output.corrected)))
@@ -342,7 +342,7 @@
 (executable
  (name test_tailrec_dwarf)
  (modules test_tailrec_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -350,7 +350,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_tailrec_dwarf.output.corrected)
  (deps test_tailrec_dwarf.exe test_tailrec_dwarf.lldb filter_for_function_call_only.sh)
@@ -368,7 +368,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)
  (action (run diff -u ../test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
@@ -376,7 +376,7 @@
 (executable
  (name test_ocaml_and_c_dwarf)
  (modules test_ocaml_and_c_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -384,7 +384,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_ocaml_and_c_dwarf.output.corrected)
  (deps test_ocaml_and_c_dwarf.exe test_ocaml_and_c_dwarf.lldb filter_for_function_call_only.sh frames.py)
@@ -402,7 +402,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)
  (action (run diff -u ../test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))
@@ -410,7 +410,7 @@
 (executable
  (name test_addressable_dwarf)
  (modules test_addressable_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -418,7 +418,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_addressable_dwarf.output.corrected)
  (deps test_addressable_dwarf.exe test_addressable_dwarf.lldb filter_for_function_call_only.sh)
@@ -436,7 +436,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps ../test_addressable_dwarf.output test_addressable_dwarf.output.corrected)
  (action (run diff -u ../test_addressable_dwarf.output test_addressable_dwarf.output.corrected)))
@@ -444,7 +444,7 @@
 (executable
  (name test_inlined_frames_dwarf)
  (modules test_inlined_frames_dwarf)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if (<> %{context_name} "default"))
  (libraries stdlib_stable)
  (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5))
  (foreign_archives simd_stubs))
@@ -453,7 +453,7 @@
  (alias runtest-dwarf)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_LLDB=} "")))
  (deps test_inlined_frames_dwarf.exe test_inlined_frames_dwarf.py test_inlined_frames_dwarf.ml lldb_test_utils.py)
  (action

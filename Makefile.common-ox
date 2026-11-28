@@ -2,7 +2,13 @@
 # Build rules common to ocaml-ox and oxcaml
 #
 
+# The directory of the makefiles: Makefile sets it, Makefile.ox does not.
+ROOTDIR ?= .
+
 ws_main   = --workspace=duneconf/main.ws
+# The main context together with every codegen-variant context: what
+# `make compiler` builds (see the compiler rule).
+ws_compiler = --workspace=duneconf/compiler.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -21,6 +27,17 @@ ifneq ($(BUILD_OCAMLPARAM),)
 main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
 endif
 
+# MAIN_CONTEXT_OCAMLPARAM: settings for the main context alone, after those
+# of BUILD_OCAMLPARAM, which the codegen-variant contexts have too (see
+# VARIANT_ENV_VARS). It is for measuring the build of the compiler
+# (profile=1 and where to write the result, as
+# tools/ci/actions/run-make-target.sh and scripts/profile-compiler-build.sh
+# do): the variant contexts build the main context's libraries again,
+# which such a measure must not count as well.
+ifneq ($(MAIN_CONTEXT_OCAMLPARAM),)
+main_ocamlparam := $(main_ocamlparam),$(MAIN_CONTEXT_OCAMLPARAM)
+endif
+
 # Also for the libraries of external/ast-dependent-libs, as js_of_ocaml and
 # wasm_of_ocaml ship with the compiler.
 ifeq ($(main_build_profile),dev)
@@ -29,9 +46,15 @@ else
 main_ocamlopt_optimization_flags := -O3
 endif
 
-define dune_main_context
+# $(call dune_workspace,<context stanzas>): the contents of a workspace
+# file of the compiler build.
+define dune_workspace
 (lang dune 3.23)
 (using oxcaml 0.1)
+$(1)
+endef
+
+define dune_main_context
 (context (default
   (name main)
   (profile $(main_build_profile))
@@ -62,7 +85,11 @@ define dune_main_context
     ; this environment also applies to the libraries of
     ; external/ast-dependent-libs.
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
-    ; We never want to build the compiler itself with AddressSanitizer enabled.
+    ; We never want to build the compiler itself with AddressSanitizer
+    ; enabled. -fno-asan leaves the code uninstrumented and does not change
+    ; its codegen variant. It matters in the context of a variant with
+    ; AddressSanitizer, which has the same flag (below): this context is
+    ; that of base, which has none.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     ; STDLIB_JSIR_OCAMLOPT_FLAGS: for the JSIR builds of the compiler's
     ; libraries (see external/ast-dependent-libs/stdlib-jsir/dune).
@@ -71,6 +98,87 @@ define dune_main_context
       ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)"))))))
 endef
 
+# Codegen-variant library builds. The variant trees we build and install
+# are those of the variants named in $(CODEGEN_VARIANTS) (computed by
+# configure; base, which the main context builds, is not among them); names
+# are absolute (e.g. "fp"), agreeing with
+# utils/codegen_variant_name.ml, stdlib/dune_rules/gen.ml and the runtime
+# archive suffixes. Otherlibs for each variant are built in a dedicated
+# dune context main-<name>, kept out of duneconf/main.ws so that ordinary
+# $(ws_main) builds never build anything there: each has its own workspace
+# file, and duneconf/compiler.ws holds them all next to the main context.
+# Each context's OCAMLLIB points at the variant stdlib tree
+# (stdlib/build_<name>, built in the boot context by @stdlib_<name>). The
+# per-name flag tables live in Makefile.codegen-variants.
+include $(ROOTDIR)/Makefile.codegen-variants
+
+# Each variant context carries its per-axis settings BOTH as ocamlopt flags
+# (env + duneconf/ocamlopt_flags_main-<name>.sexp) and through OCAMLPARAM.
+# The latter is load-bearing: dune compiles the generated library alias
+# modules (<lib>__.ml-gen) and runs custom rules that invoke %{ocamlopt}
+# directly (e.g. dynlink.cmxa) without the configured ocamlopt_flags, and
+# only OCAMLPARAM reaches those. ocamlc silently ignores the keys. A
+# defined-but-empty BUILD_OCAMLPARAM must degrade to the "_" form: OCAMLPARAM
+# values without a "_" separator are rejected and discarded wholesale, which
+# would silently drop the axis settings.
+# The axis settings come before the "_": they are the context's defaults,
+# which a flag on a command line overrides. The tests that run in the
+# context rely on that (oxcaml/tests/backend/polls compiles with
+# -disable-poll-insertion whatever the variant); no library of the build
+# passes such a flag. OXCAML_VARIANT_OCAMLPARAM has the axis settings
+# alone, for the test rules that replace OCAMLPARAM
+# (oxcaml/tests/backend/vectorizer).
+# A variant context also compiles its C stubs for its variant: its
+# OC_CFLAGS_SEXP names its own C flags, duneconf/oc_cflags_main-<name>.sexp,
+# which the _build/_bootinstall recipe generates. (This is the
+# env-var-selected cflags sexp that the boot context already uses, see
+# dune-workspace: plain env c_flags would not reach the stub stanzas, whose
+# explicit (flags ...) lists carry no :standard.)
+# $(call stub_macros_expected,<name>): what a C stub compiled for variant
+# <name> must see, as -D flags for the check of those C flags (see
+# otherlibs/unix/dune): 1 for each axis macro of runtime/caml/m.h that has
+# to be defined, 0 for the others. It reads the name and not the flag
+# tables, which the check is there to test.
+stub_macros_expected = $(strip $(foreach t,asan fp sc,\
+  -DEXPECT_$(t)=$(if $(call codegen_variant_has,$(1),$(t)),1,0)))
+
+# $(call VARIANT_ENV_VARS,<name>)
+VARIANT_ENV_VARS = (env-vars ("OCAMLPARAM" "syntax-quotations=0,$(call codegen_variant_ocamlparam,$(1)),$(if $(BUILD_OCAMLPARAM),$(BUILD_OCAMLPARAM),_)") ("OXCAML_VARIANT_OCAMLPARAM" "$(call codegen_variant_ocamlparam,$(1)),_") ("OC_CFLAGS_SEXP" "duneconf/oc_cflags_main-$(1).sexp"))
+
+# $(call dune_variant_context,<name>)
+define dune_variant_context
+(context (default
+  (name main-$(1))
+  (profile $(main_build_profile))
+  (cms_cmt_dependency cms)
+  (paths
+    (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build_$(1)"))
+    (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
+    (OCAMLFIND_CONF ("/dev/null")))
+  (env (_
+    (binaries (duneconf/ocaml as ocaml))
+    (bin_annot_cms true)
+    (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
+    ; -fno-asan: as in the main context. The libraries that are meant to
+    ; be instrumented in an AddressSanitizer variant remove it again (see
+    ; otherlibs/unix/dune).
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan $(call codegen_variant_ocamlopt_flags,$(1))))
+    $(call VARIANT_ENV_VARS,$(1))))))
+endef
+
+# $(call dune_variant_workspace,<name>): the contents of duneconf/main-<name>.ws
+dune_variant_workspace = \
+  $(call dune_workspace,$(call dune_variant_context,$(1)))
+
+# The contexts of duneconf/compiler.ws: main and every variant context of
+# this configure. They are listed from the variant names, not collected
+# from the duneconf/main-*.ws files, some of which may be left over from an
+# earlier configure.
+define dune_compiler_contexts
+$(dune_main_context)$(foreach n,$(codegen_variant_names),
+$(call dune_variant_context,$(n)))
+endef
 
 .DEFAULT_GOAL := compiler
 .PHONY: boot-compiler boot-runtest compiler runtest runtest-llvmize runtest-dwarf runtest-sancov
@@ -89,20 +197,47 @@ boot-compiler: _build/_bootinstall
 boot-runtest: boot-compiler
 	$(dune) build $(coverage_dune_flags) --force $(runtest_targets)
 
+# Codegen-variant artifacts (variant runtime archives, the variant stdlib
+# trees and variant otherlibs) live outside the boot-compiler/main @install
+# builds (alias hygiene: @runtime_all and @stdlib stay variant-free, and
+# the variant otherlibs have their own dune contexts); `make compiler`
+# builds them so that everything downstream (e.g. `make _install`) has
+# them. @runtime_variants and each @stdlib_<name> are empty aliases when
+# codegen variants are disabled or when the name is not in the configure-
+# computed build list.
+variant_boot_aliases = @runtime_variants \
+  $(foreach n,$(codegen_variant_names),@stdlib_$(n))
+
+# The aliases that `make compiler` builds in every variant context: the
+# otherlibs, the compiler's own libraries with eval and the JIT, and what
+# ocamltest runs for the native tests that compile inside a tool.
+variant_context_aliases = otherlibs/codegen-variant-libs \
+  codegen-variant-compiler-libs codegen-variant-test-hosts
+
+# One dune invocation builds the main context and every variant context. A
+# variant context depends on the boot context only (its compiler is the boot
+# compiler and its OCAMLLIB the variant stdlib tree that the first command
+# builds), so its build runs alongside the main context's instead of after
+# it. In $(ws_compiler) every target and alias names its context
+# (_build/<context>/...): dune would build a bare one in every context.
 compiler: boot-compiler
+	$(dune) build $(coverage_dune_flags) $(variant_boot_aliases)
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
-          $(dune) build --always-show-command-line $(ws_main) \
-          --promote-install-files=false ocaml.install $(compiler_jsoo_targets) \
-          tools/regalloc/regalloc.exe \
-          oxcaml/testsuite/tools/expect.exe \
-          oxcaml/testsuite/tools/expectnat.exe \
-          oxcaml/testsuite/tools/codegen_main.exe \
-          oxcaml/testsuite/tools/asmgen_$(ARCH).o \
-          testsuite/lib/lib.cm{,x}a \
-          testsuite/lib/testing.cm{,x}a \
-          @middle_end/flambda2/tests/tools/all \
-          $(ocamldir)/tools/dumpobj.bc
+          $(dune) build --always-show-command-line $(ws_compiler) \
+          --promote-install-files=false \
+          _build/main/ocaml.install $(compiler_jsoo_targets) \
+          _build/main/tools/regalloc/regalloc.exe \
+          _build/main/oxcaml/testsuite/tools/expect.exe \
+          _build/main/oxcaml/testsuite/tools/expectnat.exe \
+          _build/main/oxcaml/testsuite/tools/codegen_main.exe \
+          _build/main/oxcaml/testsuite/tools/asmgen_$(ARCH).o \
+          _build/main/testsuite/lib/lib.cm{,x}a \
+          _build/main/testsuite/lib/testing.cm{,x}a \
+          @_build/main/middle_end/flambda2/tests/tools/all \
+          _build/main/$(ocamldir)/tools/dumpobj.bc \
+          $(foreach n,$(codegen_variant_names),\
+            $(addprefix @_build/main-$(n)/,$(variant_context_aliases)))
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler
@@ -132,11 +267,51 @@ runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
-runtest: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
+#
+# The dune tests can run for any codegen variant this tree builds:
+#   make runtest CODEGEN_VARIANT=fp
+# runs them in the build context of that variant (main-fp) instead of the
+# main context, which is that of base. See "Testing other codegen variants
+# and runtimes" in HACKING.ox.adoc for what such a run covers.
+#
+# $(call codegen_variant_workspace,<name>): the dune option that selects
+# the build context of variant <name>.
+codegen_variant_workspace = $(if $(filter base,$(1)),\
+  $(ws_main),--workspace=duneconf/main-$(1).ws)
 
-runtest-llvmize: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
+# The variant that CODEGEN_VARIANT selects for the targets that build in a
+# variant's context (runtest, minimizer): base when the variable is not
+# set.
+tested_codegen_variant = $(or $(strip $(CODEGEN_VARIANT)),base)
+tested_codegen_variant_is_base = $(filter base,$(tested_codegen_variant))
+tested_codegen_variant_workspace = \
+  $(call codegen_variant_workspace,$(tested_codegen_variant))
+
+# OXCAML_POLL_INSERTION carries the poll setting of that variant, for tests
+# that must gate on compiler-inserted polls
+# (oxcaml/tests/simd/preemption256.ml).
+runtest: check-codegen-variant compiler
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(if $(call codegen_variant_has,$(tested_codegen_variant),poll),true,false) $(dune) build $(tested_codegen_variant_workspace) $(runtest_targets)
+
+# The LLVM backend requires frame pointers and rejects stack checks and
+# AddressSanitizer (see validate_llvm_backend in driver/oxcaml_flags.ml),
+# and these tests compile, link and run against the library tree of their
+# build context. They therefore run in the context of the fp variant, which
+# this tree has to build: fail before anything is built, rather than on a
+# missing workspace file, when it does not.
+.PHONY: check-llvmize-variant
+check-llvmize-variant:
+	@test -n "$(filter fp,$(built_codegen_variants))" || { \
+	  echo "error: runtest-llvmize runs in the build context of the" \
+	    "codegen variant fp (the LLVM backend requires frame pointers)," \
+	    "which this tree does not build" >&2; \
+	  echo "  it builds: base (the default)" \
+	    "$(codegen_variant_names)" >&2; \
+	  echo "  configure with --enable-frame-pointers" >&2; \
+	  exit 1; }
+
+runtest-llvmize: check-llvmize-variant compiler
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(call codegen_variant_workspace,fp)
 
 runtest-dwarf: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
@@ -146,9 +321,21 @@ runtest-sancov: compiler
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
-duneconf/main.ws: export contents = $(dune_main_context)
-duneconf/%.ws: Makefile.common-ox
+duneconf/main.ws: export contents = \
+  $(call dune_workspace,$(dune_main_context))
+$(foreach n,$(codegen_variant_names),$(eval duneconf/main-$(n).ws: export contents = $$(call dune_variant_workspace,$(n))))
+duneconf/compiler.ws: export contents = \
+  $(call dune_workspace,$(dune_compiler_contexts))
+duneconf/%.ws: Makefile.common-ox $(ROOTDIR)/Makefile.codegen-variants
 	echo "$$contents" > $@
+
+# Only the compiler's own workspaces embed configure output (such as the
+# variant list). The pattern rule above also makes
+# duneconf/ast-dependent-libs.ws, which is built in trees that were never
+# configured.
+compiler_workspaces = duneconf/main.ws duneconf/compiler.ws \
+  $(foreach n,$(codegen_variant_names),duneconf/main-$(n).ws)
+$(compiler_workspaces): $(ROOTDIR)/Makefile.config
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
 # need to compile against the user's opam instead. Unfortunately, Dune gives us
@@ -170,13 +357,14 @@ duneconf/ocaml: Makefile.common-ox
 
 # Targets that should be prerequisites to any target that runs Dune
 dune_config_targets = \
-  duneconf/main.ws \
+  $(compiler_workspaces) \
   duneconf/ocaml \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
 
-_build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
+_build/_bootinstall: Makefile.config Makefile.common-ox \
+  $(ROOTDIR)/Makefile.codegen-variants $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
@@ -184,11 +372,32 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	$(foreach n,$(codegen_variant_names),echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,) $(call codegen_variant_ocamlopt_flags,$(n)))' > duneconf/ocamlopt_flags_main-$(n).sexp; )
+
+# Per-context host-variant constants modules for otherlibs/dynlink (see the
+# dynlink_host_variant rule there): the values of base for the default and
+# main contexts, each variant's values for its main-<name> context.
+	echo '$(call codegen_variant_dynlink_consts,base)' > duneconf/dynlink_host_variant_default.ml
+	cp duneconf/dynlink_host_variant_default.ml duneconf/dynlink_host_variant_main.ml
+	$(foreach n,$(codegen_variant_names),echo '$(call codegen_variant_dynlink_consts,$(n))' > duneconf/dynlink_host_variant_main-$(n).ml; )
 	{ for flag in $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,); do \
 	    echo "$$flag"; \
 	  done > ocamlopt_stdlib_flags.txt; }
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
+
+# The C flags of the stubs of each variant context (selected via the
+# OC_CFLAGS_SEXP env var, see VARIANT_ENV_VARS): the configured flags and
+# then the variant's own, which state the variant in full, as for its
+# runtime archives and for the .c files that ocamlopt compiles for it (see
+# Makefile.codegen-variants). The main context's stubs are compiled with
+# OC_CFLAGS alone, which turn no axis on, like the unsuffixed runtime
+# archives.
+	$(foreach n,$(codegen_variant_names),echo '( $(OC_CFLAGS) $(call codegen_variant_cc_flags,$(n)) )' > duneconf/oc_cflags_main-$(n).sexp; )
+
+# What the check of those flags expects in each variant context (see
+# otherlibs/unix/dune).
+	$(foreach n,$(codegen_variant_names),echo '( $(call stub_macros_expected,$(n)) )' > duneconf/stub_macros_main-$(n).sexp; )
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
 
@@ -212,6 +421,28 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 # save a bit of disk space in build trees by using cp -l on Linux
 # (not available on e.g. OS X)
 cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
+
+# For find: the native files of a library root, of which each
+# codegen-variant tree has its own build. The archives of the bytecode
+# runtime and of the bytecode systhreads stubs are not among them.
+variant_native_files = \( -name '*.cmx' -o -name '*.cmxa' -o -name '*.cmxs' \
+  -o -name '*.a' -o -name '*.o' \) \
+  ! -name 'libcamlrun*' ! -name libthreads_stubs.a
+
+# For find: the files of the base library root that a codegen-variant tree
+# does not have.
+variant_absent_files = -name '*-js' -o -name '*-wasm' -o -name META
+
+# From lines "<file> <destination>", the arguments of commands that put
+# many files in a directory at once: "<files> <directory>" for the files
+# that keep their name, the line itself for the others.
+group_by_directory = awk '{ \
+    n = split($$1, file, "/"); m = split($$2, destination, "/"); \
+    directory = substr($$2, 1, length($$2) - length(destination[m])); \
+    if (file[n] == destination[m]) \
+      group[directory] = group[directory] " " $$1; \
+    else print } \
+  END { for (directory in group) print group[directory], directory }'
 
 # Assemble the contents of the install directory in _install
 # This is needed to run the upstream testsuite (see runtest-upstream below)
@@ -247,21 +478,201 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
+ifneq ($(codegen_variant_names),)
+# Assemble the codegen-variant library trees: one COMPLETE library root at
+# lib/ocaml/variants/<name> per built variant, mirroring the base root's
+# shape, so a compile/link for that codegen variant can use it
+# wholesale via -I / as a remapped stdlib root. Rebuilt per variant:
+# every native artifact of the base root (.cmx/.cmxa/.a/.cmxs/std_exit) --
+# the stdlib, the otherlibs and the compiler's own libraries
+# (compiler-libs, ocaml-jit, eval), so that a program that links those can
+# be built for any variant --, the variant runtime archives (suffixed by
+# the name's projection onto the runtime axes), and the C stub archives
+# but libthreads_stubs.a (compiled in the variant context with the
+# variant's C flags, see VARIANT_ENV_VARS: its axis macros, and its
+# sanitizer flags).
+# Every other file of the base root is codegen-variant-agnostic and is a
+# relative symbolic link to the base root's file, so that it is stored
+# once however the installation is copied or packed: .cmi/.cmt*/.cms*,
+# sources, byte artifacts (.cma/.cmo, the archives of the bytecode runtime,
+# libthreads_stubs.a and the stublibs), ld.conf, Makefile.config,
+# runtime-launch-info, expunge, the toplevel support files and the caml/
+# headers. The exception is each variant's caml/m.h, which gets a prefix
+# naming that variant, so that C code compiled against the tree's headers
+# without -DCAML_CODEGEN_VARIANT_EXPLICIT sees the tree's axis macros
+# instead of none.
+# Bytecode -custom and -output-obj links use the lib<name>_stubs.a
+# archives too, and a variant tree's are that variant's builds. A bytecode
+# link takes them from the base root unless it names a variant tree itself,
+# with -I or OCAMLLIB, which it should not: the stub archives of an
+# AddressSanitizer tree are instrumented, and a bytecode link does not
+# pass -fsanitize=address, so it fails on them.
+# Deliberately absent: findlib META files (findlib and Dune find the
+# packages in the base root) and the JSIR artifacts (a JSIR compilation
+# always uses the base root). A final check asserts that the assembled
+# variants/ directory agrees with the configure-computed list (what
+# `ocamlopt -config-var codegen_variants` will report).
+	rm -rf _install/lib/ocaml/variants
+	set -e; \
+	for name in $(codegen_variant_names); do \
+	  mkdir -p _install/lib/ocaml/variants/$$name; \
+	  $(cpl) -R _build/default/stdlib/build_$$name/* \
+	    _install/lib/ocaml/variants/$$name/; \
+	  (set -e; \
+	   cd _install/lib/ocaml; \
+	   vroot=variants/$$name; \
+	   rm -f $$vroot/dynlink/dynlink.cmxa; \
+	   rm -f $$vroot/{stdlib,camlinternal}*.{o,cmo}; \
+	   rm -f $$vroot/caml/m.h; \
+	   { echo "/* Added at install time: these headers describe codegen"; \
+	     echo "   variant $$name unless CAML_CODEGEN_VARIANT_EXPLICIT is"; \
+	     echo "   defined on the command line. */"; \
+	     echo '#ifndef CAML_CODEGEN_VARIANT_EXPLICIT'; \
+	     echo '#define CAML_CODEGEN_VARIANT_EXPLICIT 1'; \
+	     case "-$$name-" in *-fp-*) \
+	       echo '#define WITH_FRAME_POINTERS 1';; esac; \
+	     case "-$$name-" in *-sc-*) \
+	       echo '#define STACK_CHECKS_ENABLED 1';; esac; \
+	     case "-$$name-" in *-asan-*) \
+	       echo '#define WITH_ADDRESS_SANITIZER 1';; esac; \
+	     echo '#endif'; \
+	     cat caml/m.h; } > $$vroot/caml/m.h); \
+	done
+# Complete each variant tree from the context of its variant and from the
+# base root.
+# - Every native file that the main context installs comes from the same
+#   place in the variant's context: the entries of the main context's
+#   install directory are links into its build directory. The interfaces that
+#   the variant's context compiled come along, to be checked.
+# - Every other file of the tree, whether the steps above took it from the
+#   variant's builds or from the base root, must be the base root's file
+#   byte for byte. This holds for the interfaces in particular: the
+#   variant's .cmx files were compiled against them, and their users will
+#   read the base root's. diff exits with status 1 when files differ and
+#   also when one tree has a file that the other lacks, which is expected
+#   here: only its "Files ... differ" lines count. A status above 1 means
+#   that diff itself failed, which is an error and not agreement.
+# - Each of those files, and every other file of the base root, is then a
+#   link to the base root's.
+# - No native file of the base root may be left without a build of it for
+#   the variant, the runtime archives aside (a variant has its own names
+#   for them).
+	set -e; \
+	built=`cd _build/install/main/lib/ocaml && find . -type l \
+	    \( $(variant_native_files) -o -name '*.cmi' \) -exec ls -l {} + \
+	  | sed 's|^.* \./\(.*\) -> [./]*main/\(.*\)$$|\1 \2|'`; \
+	cd _install/lib/ocaml; \
+	for name in $(codegen_variant_names); do \
+	  v=variants/$$name; \
+	  context=../../../_build/main-$$name; \
+	  find . -path ./variants -prune -o -type d -print \
+	    | sed "s|^|$$v/|" | xargs mkdir -p; \
+	  echo "$$built" | while read -r file path; do \
+	      case $$file in *.cmi) [ -e $$context/$$path ] || continue;; esac; \
+	      echo $$context/$$path $$v/$$file; \
+	    done | $(group_by_directory) \
+	    | while read -r files; do $(cpl) -f $$files; done; \
+	  find $$v -type f \( $(variant_absent_files) \) -delete; \
+	  status=0; \
+	  compared=`LC_ALL=C diff -rq -x variants -x m.h -x 'libasmrun*' \
+	      -x '*.cmx' -x '*.cmxa' -x '*.cmxs' -x '*.a' -x '*.o' . $$v` \
+	    || status=$$?; \
+	  if [ $$status -gt 1 ]; then \
+	    echo "error: codegen variant $$name: diff could not compare its" \
+	      "tree with the base library root (status $$status)" >&2; \
+	    exit 1; \
+	  fi; \
+	  if echo "$$compared" | grep '^Files '; then \
+	    echo "error: codegen variant $$name: these files should be" \
+	      "the base library root's" >&2; \
+	    exit 1; \
+	  fi; \
+	  find . -path ./variants -prune -o ! -type d \
+	      ! \( $(variant_native_files) \) ! \( $(variant_absent_files) \) \
+	      ! -name 'libasmrun*' ! -path ./caml/m.h -print \
+	    | awk -v v=$$v '{ path = substr($$0, 3); up = path; \
+	        sub(/[^\/]*$$/, "", up); gsub(/[^\/]+/, "..", up); \
+	        print "../../" up path, v "/" path }' \
+	    | $(group_by_directory) \
+	    | while read -r files; do ln -sf $$files; done; \
+	  find . -path ./variants -prune -o ! -type d \
+	      \( $(variant_native_files) \) ! -name 'libasmrun*' -print \
+	    | while read -r file; do \
+	        [ -f $$v/$$file ] || { \
+	          echo "error: codegen variant $$name: no build of $$file" >&2; \
+	          exit 1; }; \
+	      done; \
+	  find $$v -type d -empty -delete; \
+	done
+	@installed=`ls _install/lib/ocaml/variants | sort | tr '\n' ' '`; \
+	configured=`for n in $(codegen_variant_names); do echo $$n; done \
+	  | sort | tr '\n' ' '`; \
+	if [ "$$installed" != "$$configured" ]; then \
+	  echo "error: installed codegen variants [$$installed] disagree with" \
+	    "the configured list [$$configured]"; \
+	  exit 1; \
+	fi
+endif
 
 
-# Copy _install to the final install directory (no-op if they are the same)
+# Copy _install to the final install directory, $(DESTDIR)$(prefix), unless
+# that is _install itself, as with the development prefix: nothing is
+# compared or copied then. The files are compared by their contents
+# (--checksum): going by size and modification time, rsync would keep a
+# file of the destination that only looks like this installation's, which
+# files whose times were normalized do.
+# A prefix that already holds an installation keeps the files that this one
+# does not have, with two exceptions.
+# - Under lib/ocaml/variants: the compiler offers every codegen-variant
+#   tree that it finds there (see installed_codegen_variants in
+#   utils/config.common.ml.in), so it would compile and link against a tree
+#   that an earlier installation left behind. The second rsync only
+#   deletes: it creates no file and updates none.
+# - The cached generic functions of the library root
+#   (-use-cached-generic-functions), which are generated in the installed
+#   tree by the compiler that was installed there: an earlier installation
+#   may have had another variant in its root, and a link would take the
+#   archive as it is.
+define copy_install_to_prefix
+	mkdir -p $(install_destination)
+	set -e; \
+	if ! [ _install -ef $(install_destination) ]; then \
+	  rsync --chmod=u+rw,go+r -rl --checksum _install/ \
+	    $(install_destination); \
+	  if [ -d _install/lib/ocaml/variants ]; then \
+	    rsync -rl --delete --existing --ignore-existing \
+	      _install/lib/ocaml/variants/ \
+	      $(install_destination)/lib/ocaml/variants; \
+	  else \
+	    rm -rf $(install_destination)/lib/ocaml/variants; \
+	  fi; \
+	  [ -e _install/lib/ocaml/cached-generic-functions.a ] || rm -f \
+	    $(install_destination)/lib/ocaml/cached-generic-functions.a; \
+	fi
+endef
+
+# The destination as one word of a shell command: between single quotes,
+# with those of the name itself escaped, so that it may have spaces and
+# quotes. A `$` in DESTDIR or prefix is make's, as in any variable of make:
+# `$$` stands for the character.
+install_destination = '$(subst ','\'',$(DESTDIR)$(prefix))'
+
 install: _install
-	mkdir -p '$(prefix)'
-	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	$(copy_install_to_prefix)
 
 # Same as above, but relies on a successfull earlier _install
 install_for_opam:
-	mkdir -p '$(prefix)'
-	rsync --chmod=u+rw,go+r -rl _install/ '$(prefix)'
+	$(copy_install_to_prefix)
 
 main_prefix = _build/install/main
 main_build = _build/main
 boot_build = _build/default
+
+# The directories of the test tree that have tests, from the testsuite's
+# own makefile: in a make of its own, which takes neither the options nor
+# the variables of this one (DIR, say, or -n).
+test_dirs_of_test_tree = env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL \
+  $(MAKE) -s --no-print-directory -C _runtest/testsuite test-dirs DIR=tests
 
 # The following horror will be removed when work to allow the testsuite to
 # run on an installed tree (led by David Allsopp) is completed.
@@ -354,7 +765,7 @@ endif
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
 	 done; \
 	 $(cpl) stdlib/runtime_events/{lib,}runtime_events* otherlibs/runtime_events; \
-	 ln -s ../_build/main/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
+	 $(cpl) -R ../_build/main/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
 	)
 
 	# Various directories are put on the -I paths by tools/Makefile;
@@ -367,7 +778,6 @@ endif
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
 	cp _install/lib/ocaml/{unix,str,dynlink}/*.{cmi,cma,a,cmxa} _runtest/utils
-	cp $(main_build)/$(ocamldir)/.ocamlcommon.objs/native/config.o _runtest/utils
 	# Needed for tests/warnings
 	cp $(ocamldir)/utils/warnings.ml _runtest/utils
 	# Suppress linker errors about -I directories not existing.
@@ -421,14 +831,131 @@ ifeq ($(with_jsir),true)
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-js \
 	  $(stdlib_jsir_build)/compiler-libs/*.cm-jsir-wasm _runtest/utils
 endif
-test: install_for_test
+# The tools and the libraries of testsuite/lib for each codegen variant,
+# where ocamltest looks for them when a test or the whole run selects that
+# variant.
+	$(foreach n,$(codegen_variant_names),$(call variant_test_tree,$(n)))
+# The directories that test-no-rebuild runs: those of testsuite/tests that
+# have tests, but for the ones that oxcaml/testsuite/flambda2-test-list
+# excludes. A directory can be there without a test, for example where a
+# job of the CI deleted the tests that its configuration cannot run, and a
+# list of tests must not name it.
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  for path in `cd testsuite; ls -1 -d tests/*`; do \
-	    if [[ -d "testsuite/$$path" ]] && ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
+	  dirs=`$(test_dirs_of_test_tree)` || exit 1; \
+	  for path in $$dirs; do \
+	    if ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
 	      echo "  $$path"; \
 	    fi; \
 	  done > _runtest/flambda2-test-list; \
 	fi
+
+# $(call variant_test_tree,<name>): what ocamltest runs and links for
+# variant <name>, built in the variant's context as those of base are in
+# the main context: the tools of the native tests that compile inside a
+# tool (expect.opt, the native toplevel and the asmgen tests), in
+# _runtest/testsuite/tools/variants/<name>, and the native halves of the
+# libraries of testsuite/lib, in _runtest/testsuite/lib/variants/<name>.
+# The interfaces and the bytecode halves of those libraries do not depend
+# on the variant: they are links to the default build's, so that a test
+# block that mixes backends sees one interface.
+define variant_test_tree
+	mkdir -p _runtest/testsuite/{tools,lib}/variants/$(1)
+	$(cpl) _build/main-$(1)/oxcaml/testsuite/tools/expectnat.exe \
+	  _runtest/testsuite/tools/variants/$(1)/expectnat
+	$(cpl) _build/main-$(1)/oxcaml/testsuite/tools/codegen_main.exe \
+	  _runtest/testsuite/tools/variants/$(1)/codegen
+	$(cpl) _build/main-$(1)/toplevel/native/topstart.exe \
+	  _runtest/testsuite/tools/variants/$(1)/ocamlnat
+	$(cpl) _build/main-$(1)/testsuite/lib/{lib,testing}.{a,cmxa} \
+	  _build/main-$(1)/testsuite/lib/.{lib,testing}.objs/native/*.{cmx,o} \
+	  _runtest/testsuite/lib/variants/$(1)/
+	cd _runtest/testsuite/lib && ln -s `find . -maxdepth 1 ! -type d \
+	    ! \( $(variant_native_files) \) ! \( $(variant_absent_files) \) \
+	  | sed 's|^\.|../..|'` variants/$(1)/
+
+endef
+
+# The ocamltest suite can target any codegen variant this tree builds:
+#   make test CODEGEN_VARIANT=fp
+# runs the whole suite for that variant instead of base: the
+# native test programs are built for it, and native expect, toplevel and
+# asmgen tests run in the builds of their host programs for it (see
+# testsuite/Makefile). The variable is honored by test, test-no-rebuild,
+# test-one, test-one-no-rebuild, promote-one, promote-one-no-rebuild,
+# promote-failed and runtest-upstream. With VARIANT_ONLY=1 as well, the pass
+# leaves out the test files in which nothing depends on the variant.
+# runtest and minimizer honor the variable too: they build in the variant's
+# context (see runtest).
+CODEGEN_VARIANT ?=
+
+# $(call check_codegen_variants,<names>): fail, before anything is built or
+# run, if one of <names> is not a codegen variant this tree builds.
+built_codegen_variants = base $(codegen_variant_names)
+define check_codegen_variants
+	@unbuilt="$(filter-out $(built_codegen_variants),$(1))"; \
+	if [ -n "$$unbuilt" ]; then \
+	  echo "error: this tree does not build the codegen variant(s):" \
+	    "$$unbuilt" >&2; \
+	  echo "  it builds: base (the default)" \
+	    "$(codegen_variant_names)" >&2; \
+	  echo "  name one of those, or configure with" \
+	    "--with-codegen-variants=<comma-separated list>" >&2; \
+	  exit 1; \
+	fi
+endef
+
+.PHONY: check-codegen-variant
+check-codegen-variant:
+	$(call check_codegen_variants,$(CODEGEN_VARIANT))
+
+# The targets that run tests without rebuilding need the test tree that
+# install_for_test leaves in _runtest, with the test hosts (the native
+# expect-test runner, the native toplevel, the code generator of the asmgen
+# tests) built for the variant to test. ocamltest checks for them too; this
+# says so once, before any test is started.
+variant_test_hosts = \
+  _runtest/testsuite/tools/variants/$(CODEGEN_VARIANT)/expectnat
+
+.PHONY: check-test-tree
+check-test-tree: check-codegen-variant
+	@test -d _runtest/testsuite || { \
+	  echo "error: no test tree in _runtest; run make install_for_test" >&2; \
+	  exit 1; }
+	@test -z "$(filter-out base,$(CODEGEN_VARIANT))" \
+	  || test -x $(variant_test_hosts) || { \
+	  echo "error: the test tree in _runtest has no test hosts for the" \
+	    "codegen variant $(CODEGEN_VARIANT) ($(variant_test_hosts) is" \
+	    "missing); run make install_for_test" >&2; \
+	  exit 1; }
+
+# The targets below rebuild the test tree before they run tests. The
+# prerequisites of install_for_test each run dune, which refuses to run
+# twice at once, so that step is serial whatever the -j of this make: -j is
+# for the tests.
+install_for_test_serially = $(MAKE) -j1 install_for_test
+
+test: check-codegen-variant
+	$(install_for_test_serially)
+	$(MAKE) test-no-rebuild
+
+# The directories of testsuite/tests to run, one per line in the form
+# tests/<directory>: by default the list that install_for_test writes.
+# TEST_LIST=<file> names another list (for one shard of the suite, say).
+TEST_LIST ?=
+test_list = $(if $(TEST_LIST),$(abspath $(TEST_LIST)),$(default_test_list))
+default_test_list = $(strip $(if $(filter flambda2,$(middle_end)),\
+  $(CURDIR)/_runtest/flambda2-test-list))
+
+# The whole ocamltest suite against the compiler in _install, in the test
+# tree that install_for_test left in _runtest: nothing is built and nothing
+# is installed. Besides a checkout, this reads only _install, _runtest,
+# Makefile.config and Makefile.build_config, so it also runs on a machine
+# that received those from the machine that built them, if that machine is
+# like the builder and the checkout is at the same path: both trees contain
+# absolute paths (the configured prefix has to be this _install) and code
+# compiled against the builder's C library.
+.PHONY: test-no-rebuild
+test-no-rebuild: check-test-tree
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -438,19 +965,107 @@ test: install_for_test
 	  && if $$(which parallel > /dev/null 2>&1); \
              then \
 	       echo "Running testsuite in parallel (nproc=$$(nproc))"; \
-               if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list-parallel FILE=$$(pwd)/../flambda2-test-list; \
+               if [ -n "$(test_list)" ]; then \
+                 make --no-print-directory list-parallel FILE=$(test_list); \
 	       else \
                  make --no-print-directory parallel; \
                fi \
              else \
 	       echo "Running testsuite sequentially"; \
-               if [ "$(middle_end)" = "flambda2" ]; then \
-                 make --no-print-directory list FILE=$$(pwd)/../flambda2-test-list; \
+               if [ -n "$(test_list)" ]; then \
+                 make --no-print-directory list FILE=$(test_list); \
 	       else \
                  make --no-print-directory all; \
                fi \
              fi)
+
+# One pass of the suite per codegen variant, from one build: the default
+# variant and every other variant this tree builds
+# (TEST_VARIANTS="<names>" for a subset). The passes share _runtest and
+# are kept apart by TEST_ID=<variant>; with make -j they run at once, each
+# with its share of the processors. Each pass writes its output to
+# _runtest/test-variants.<variant>.out, and the summaries are printed
+# together at the end.
+TEST_VARIANTS ?= $(built_codegen_variants)
+
+# With make -j, the processors divided among the passes.
+test_variants_jobs = $(if $(TEST_JOBS),,$(if $(filter -j%,$(MAKEFLAGS)),\
+  TEST_JOBS=$(shell n=$(words $(TEST_VARIANTS)); \
+    echo $$(( ($$(getconf _NPROCESSORS_ONLN) + n - 1) / n )))))
+
+# The end of a pass's output: its failures, if any, and its summary. A
+# pass that stopped before its summary has an error to show instead: the
+# last lines of its output. The command fails for such a pass, whatever
+# the pass itself returned: without a summary nothing says that tests ran.
+test_variants_summary = awk \
+  '/^(List of failed tests|List of unexpected errors|Summary):/ { show = 1 } \
+   /^Summary:/ { summary = 1 } \
+   show { print; next } \
+   { last[NR % 20] = $$0 } \
+   END { if (!show) for (i = NR - 19; i <= NR; i++) \
+           if (i > 0) print last[i % 20]; \
+         exit !summary }'
+
+# The targets of the passes. With no variant to test there is no pass, and
+# the make that runs the passes would build its default goal instead.
+test_variant_passes = $(addprefix test-variant-,$(TEST_VARIANTS))
+no_test_variants = $(error TEST_VARIANTS names no codegen variant to test)
+
+# Where the passes write their output, and the command of the pass for
+# variant $*: variables, for the test of this target
+# (testsuite/tests/tool-ocamltest/test_lists.ml), which runs it on passes
+# of its own.
+test_variants_out = _runtest
+test_variant_pass = $(MAKE) --no-print-directory test-no-rebuild \
+  CODEGEN_VARIANT=$* TEST_ID=$*
+
+# The report follows the passes whatever they return, also where the shell
+# of the recipe stops at a command that fails.
+.PHONY: test-variants
+test-variants:
+	$(if $(strip $(TEST_VARIANTS)),,$(no_test_variants))
+	$(call check_codegen_variants,$(TEST_VARIANTS))
+	$(install_for_test_serially)
+	@status=0; \
+	$(MAKE) --no-print-directory -k $(test_variants_jobs) \
+	  $(test_variant_passes) || status=$$?; \
+	$(MAKE) --no-print-directory test-variants-report \
+	  test_variants_status=$$status
+
+# What test-variants ends with: what $(test_variants_summary) shows of the
+# output of each pass. It is a failure if the passes returned one (their
+# exit status is $(test_variants_status)), if a pass did not run or if a
+# pass has no summary. It is a target of its own so that the test of the
+# testsuite's targets (testsuite/tests/tool-ocamltest/test_lists.ml) can
+# run it on passes of its own.
+test_variants_status = 0
+
+.PHONY: test-variants-report
+test-variants-report:
+	@status=$(test_variants_status); \
+	for variant in $(TEST_VARIANTS); do \
+	  out="$(test_variants_out)/test-variants.$$variant.out"; \
+	  echo; \
+	  echo "==== Codegen variant $$variant ($$out)"; \
+	  if [ -f "$$out" ]; then \
+	    $(test_variants_summary) "$$out" \
+	      || { echo "The pass has no summary."; status=1; }; \
+	  else \
+	    echo "The pass did not run."; \
+	    status=1; \
+	  fi; \
+	done; \
+	exit $$status
+
+# A pass is not a file: a file named like one in this directory must not
+# stand for a pass that ran.
+ifneq "$(strip $(TEST_VARIANTS))" ""
+.PHONY: $(test_variant_passes)
+$(test_variant_passes): test-variant-%:
+	@echo "Running the testsuite for codegen variant $*"
+	+@$(test_variant_pass) \
+	  > "$(test_variants_out)/test-variants.$*.out" 2>&1
+endif
 
 .PHONY: test-typing
 test-typing: install_for_test
@@ -469,7 +1084,7 @@ test-typing: install_for_test
               make --no-print-directory all-typing; \
          fi)
 
-promote-failed:
+promote-failed: check-test-tree
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -479,7 +1094,8 @@ promote-failed:
 
 runtest-upstream: test
 
-test-one: install_for_test
+test-one: check-codegen-variant
+	$(install_for_test_serially)
 	$(MAKE) test-one-no-rebuild
 
 # If the TEST argument is passed as `testsuite/tests/foo` (as is invited by
@@ -491,7 +1107,7 @@ locate_test = \
     echo "tests/$${test}"; \
   )
 
-test-one-no-rebuild:
+test-one-no-rebuild: check-test-tree
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
@@ -499,10 +1115,11 @@ test-one-no-rebuild:
 	 fi; \
 	 cd _runtest/testsuite && make one $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
-promote-one: install_for_test
+promote-one: check-codegen-variant
+	$(install_for_test_serially)
 	$(MAKE) promote-one-no-rebuild
 
-promote-one-no-rebuild:
+promote-one-no-rebuild: check-test-tree
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
 	 if $$(which gfortran > /dev/null 2>&1); then \

@@ -23,7 +23,7 @@ open Misc
 open Arch
 open Cmm
 
-let fp = Config.with_frame_pointers
+let fp () = !Clflags.frame_pointers
 
 (* Which ABI to use *)
 
@@ -517,11 +517,17 @@ let domainstate_ptr_dwarf_register_number = 14
 let int_regs_destroyed_at_c_call_win64 =
   Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
 
-let int_regs_destroyed_at_c_call =
-  if not Config.no_stack_checks
-  then (* Clobbers R13 to hold stack pointer. See emit.ml *)
-       Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
-  else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
+(* The stack-checks flag can change between the source files of a single
+   invocation ([ocaml_compiler_internal_params]; see compenv.ml), so the
+   R13 clobber cannot be captured by a once-forced lazy: both variants are
+   precomputed and [destroyed_at_c_call] selects through the flag at each
+   call, allocation-free. *)
+let int_regs_destroyed_at_c_call_stack_checks =
+  (* Clobbers R13 to hold stack pointer. See emit.ml *)
+  Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
+
+let int_regs_destroyed_at_c_call_no_stack_checks =
+  Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
 let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
@@ -534,59 +540,86 @@ let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
   |> Array.concat)
 
-let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
-  (* Unix: rbx, rbp, r12-r15 preserved *)
-  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
-    hard_float_reg;
-    hard_float32_reg;
-    hard_vec128_reg ]
-  |> add_hard_vec256_regs ~f:(fun regs -> regs)
-  |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat)
+let destroyed_at_c_call_unix ~int_regs =
+  lazy ((* To be forced after flags are parsed. *)
+    (* Unix: rbx, rbp, r12-r15 preserved (R13 clobbered under stack checks;
+       see above) *)
+    [ Array.map (fun p -> phys_reg Int (P p)) int_regs;
+      hard_float_reg;
+      hard_float32_reg;
+      hard_vec128_reg ]
+    |> add_hard_vec256_regs ~f:(fun regs -> regs)
+    |> add_hard_vec512_regs ~f:(fun regs -> regs)
+    |> add_hard_mask_regs ~f:(fun regs -> regs)
+    |> Array.concat)
 
-let destroyed_at_c_call =
+let destroyed_at_c_call_unix_stack_checks =
+  destroyed_at_c_call_unix ~int_regs:int_regs_destroyed_at_c_call_stack_checks
+
+let destroyed_at_c_call_unix_no_stack_checks =
+  destroyed_at_c_call_unix
+    ~int_regs:int_regs_destroyed_at_c_call_no_stack_checks
+
+let destroyed_at_c_call () =
   (* C calling conventions preserve rbx, but it is clobbered
      by the code sequence used for C calls in emit.ml, so it
      is marked as destroyed. *)
-  if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
+  if win64
+  then Lazy.force destroyed_at_c_call_win64
+  else if !Clflags.stack_checks
+  then Lazy.force destroyed_at_c_call_unix_stack_checks
+  else Lazy.force destroyed_at_c_call_unix_no_stack_checks
 
 let destroyed_at_alloc_or_poll =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
 
 let destroyed_at_pushtrap = [| r11 |]
 
-let destroyed_at_large_memory_op =
-  if Config.with_address_sanitizer then
-    (* We need a scratch register [r11] to preform the address sanitizer check,
-       and [rdi] might be destroyed in the event we need to call the ASAN error
-       reporting function, since it's a C function accepting a single argument.
-       No other registers are destroyed because the ASAN report wrappers use a
-       special calling convention via the C attribute [__attribute__((preserve_all))]
-       such that all registers except for [r11] are callee-saved, in order to minimize
-       the amount of spilling we need to do. *)
-    [| rdi; r11 |]
-  else
-    [||]
-;;
+(* The AddressSanitizer flag can change between the source files of a
+   single invocation (OCAMLPARAM; see the destroyed_at_c_call comment
+   above), and [destroyed_at_basic] runs on the register-allocation hot
+   path, so both the instrumented and uninstrumented destroyed sets are
+   precomputed (lazily where they depend on other flags) and selected
+   through the flag at each call, allocation-free. *)
 
-let destroyed_at_small_memory_op =
-  if Config.with_address_sanitizer then
-    (* Everything stated above in the comment for [destroyed_at_large_memory_op]
-       applies here too, but in addition we need one more scratch register [r10]
-       in order to compute the additional [SlowPathCheck] for memory accesses that
-       are smaller than one word. *)
-    [| rdi; r10; r11 |]
-  else
-    [||]
-;;
+let destroyed_at_large_memory_op_asan =
+  (* We need a scratch register [r11] to preform the address sanitizer check,
+     and [rdi] might be destroyed in the event we need to call the ASAN error
+     reporting function, since it's a C function accepting a single argument.
+     No other registers are destroyed because the ASAN report wrappers use a
+     special calling convention via the C attribute
+     [__attribute__((preserve_all))] such that all registers except for [r11]
+     are callee-saved, in order to minimize the amount of spilling we need to
+     do. *)
+  [| rdi; r11 |]
 
-let destroyed_at_single_float64_store =
+let destroyed_at_large_memory_op () =
+  if Arch.is_asan_enabled () then destroyed_at_large_memory_op_asan
+  else [||]
+
+let destroyed_at_small_memory_op_asan =
+  (* Everything stated above in the comment for
+     [destroyed_at_large_memory_op_asan] applies here too, but in addition we
+     need one more scratch register [r10] in order to compute the additional
+     [SlowPathCheck] for memory accesses that are smaller than one word. *)
+  [| rdi; r10; r11 |]
+
+let destroyed_at_small_memory_op () =
+  if Arch.is_asan_enabled () then destroyed_at_small_memory_op_asan
+  else [||]
+
+let destroyed_at_single_float64_store_asan =
   lazy ((* To be forced after flags are parsed. *)
-    if Config.with_address_sanitizer then
-      Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
-    else
-      (destroy_xmm MM15))
+    Array.append destroyed_at_small_memory_op_asan (destroy_xmm MM15))
+
+let destroyed_at_single_float64_store_no_asan =
+  lazy ((* To be forced after flags are parsed. *)
+    destroy_xmm MM15)
+
+let destroyed_at_single_float64_store () =
+  if Arch.is_asan_enabled ()
+  then Lazy.force destroyed_at_single_float64_store_asan
+  else Lazy.force destroyed_at_single_float64_store_no_asan
 
 let all_256bit_regs = lazy ((* To be forced after flags are parsed. *)
   []
@@ -648,9 +681,13 @@ let destroyed_rax_rdx = [| rax; rdx |]
 let destroyed_rbp = [| rbp |]
 let destroyed_r10 = [| r10 |]
 
-let destroyed_at_atomic_compare_set =
+let destroyed_at_atomic_compare_set_asan =
   (* CMPXCHG overwrites rax on failure, independently of the boolean result. *)
-  Array.append destroyed_at_small_memory_op destroyed_rax
+  Array.append destroyed_at_small_memory_op_asan destroyed_rax
+
+let destroyed_at_atomic_compare_set () =
+  if Arch.is_asan_enabled () then destroyed_at_atomic_compare_set_asan
+  else destroyed_rax
 
 let may_be_destroyed_by_c_function (r : Reg.t) =
   match r.loc with
@@ -673,7 +710,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
-    Lazy.force destroyed_at_single_float64_store
+    destroyed_at_single_float64_store ()
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
                 Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed |
                 Single { reg = Float32 } ), _, _))
@@ -685,9 +722,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Intop_atomic
          { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
               | Compare_exchange; _ }) ->
-    destroyed_at_small_memory_op
+    destroyed_at_small_memory_op ()
   | Op(Intop_atomic { op = Compare_set; _ }) ->
-    destroyed_at_atomic_compare_set
+    destroyed_at_atomic_compare_set ()
   | Op(Store( (Word_int | Word_static_block | Word_code_pointer |
                Word_out_of_heap_data_pointer | Word_mask | Word_val | Double |
                Onetwentyeight_aligned | Onetwentyeight_unaligned |
@@ -702,7 +739,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->
-    destroyed_at_large_memory_op
+    destroyed_at_large_memory_op ()
   | Op(Intop(Imulh _ | Icomp _) | Intop_imm((Icomp _), _)) ->
     destroyed_rax
   | Op (Specific (Irdtsc | Irdpmc)) ->
@@ -746,7 +783,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
        | Thread_self_id | Pause)
   | Poptrap _ | Prologue | Epilogue ->
-    if fp then destroyed_rbp else [||]
+    if fp () then destroyed_rbp else [||]
   | Stack_check _ ->
     (* This case is used by [Cfg_available_regs].  r10 is actually saved and
        restored by the sequence to which [Stack_check] is expanded, but it may
@@ -763,7 +800,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _}
   ->
-    if fp then [| rbp |] else [||]
+    if fp () then [| rbp |] else [||]
   | Switch _ ->
     destroyed_rax_rdx
   | External_call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
@@ -773,12 +810,12 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0
     then Lazy.force all_phys_regs
-    else Lazy.force destroyed_at_c_call
+    else destroyed_at_c_call ()
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
     if stack_ofs > 0
     then Lazy.force all_phys_regs
-    else Lazy.force destroyed_at_c_call
+    else destroyed_at_c_call ()
   | Call_no_return _
   | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
@@ -819,7 +856,7 @@ let initial_stack_offset ~num_stack_slots:_ ~contains_calls:_ = 0
 let trap_frame_size_in_bytes = 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  (fp && not !Oxcaml_flags.omit_leaf_frame_pointers)
+  (fp () && not !Oxcaml_flags.omit_leaf_frame_pointers)
   || fun_contains_calls ||
   Stack_class.Tbl.exists
     fun_num_stack_slots
@@ -837,7 +874,7 @@ let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
       (stack_offset
        + 8
        + Stack_class.Tbl.total_size_in_bytes num_stack_slots
-       + (if fp then 8 else 0))
+       + (if fp () then 8 else 0))
     in Misc.align sz 16
   end else
     stack_offset + 8
@@ -883,7 +920,7 @@ let clear_pending_jit_run () = ()
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
   let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
-  if fp then Reg.Set.remove rbp phys_regs else phys_regs
+  if fp () then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
 

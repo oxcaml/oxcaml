@@ -1,12 +1,37 @@
 == Running the testsuite
 
-From the root directory of this repository, `make tests` will run all
+From the root directory of this repository, `make test` will run all
 the tests, which takes a few minutes.
 
 More control is available from the `testsuite/` subdirectory (here):
 `make all` runs all tests, `make parallel` runs the tests in parallel,
 and you can use `make one DIR=tests/foo` to run the tests of
 a specific sub-directory.
+
+Variables given to `make` select how the tests run:
+
+- `USE_RUNTIME=d` runs the test programs with the debug runtime.
+- `RUNPARAM=<params>` adds to `OCAMLRUNPARAM` for the test programs only
+  (not for the compilers).
+- `CODEGEN_VARIANT=<name>` runs the tests for another codegen variant of the
+  compiler under test than `base` (`fp`, `sc`, `poll`, ...; see `ocamlopt
+  -config-var codegen_variants`): the native test
+  programs are built for it, and native expect, toplevel and asmgen tests
+  run in the builds of their host programs for it. A test that selects a
+  variant itself keeps its selection. Bytecode and JSIR have no codegen
+  variant and run as usual.
+- `VARIANT_ONLY=1`, with `CODEGEN_VARIANT`, skips the test files in which
+  nothing depends on the variant, such as those that only run bytecode. Such
+  a quick run supplements a run without `CODEGEN_VARIANT`; it does not
+  replace it.
+- `TEST_ID=<label>` keeps a run apart from other runs in the same tree, so
+  that several can go on at once: its build directories are named
+  `_ocamltest.<label>` and its log `_log.<label>`.
+- `TEST_JOBS=<n>` sets how many tests the parallel targets run at once.
+
+From the root directory, `make test`, `make test-no-rebuild`, `make
+test-one`, `make test-variants` and the `promote` targets take the same
+variables; see `HACKING.ox.adoc` there.
 
 == Writing new tests
 
@@ -58,6 +83,10 @@ overwriting the `.reference` file or `expect` payload.
 Promoting a test is done using the `make promote DIR=tests/foo`
 target. In general `make promote` accepts the same arguments (`TEST`,
 `LIST`) as `make one` -- there is no analogue to `make all`.
+
+Reference files are shared by every codegen variant. `make promote` accepts
+`CODEGEN_VARIANT`, for the tests that only run under a variant, and says so
+when it is set.
 
 Typical use-cases for promotion are changes to a compiler message that
 occurs in the reference results, or code modifications that change

@@ -17,6 +17,7 @@
 
 type task_item =
   | Predicate_pass of string
+  | Depends_on_codegen_variant
   | Chdir of string
   | Check_file_exists of { filename: string; reason: string }
   | Check_file_absent of { filename: string }
@@ -37,6 +38,10 @@ type task_item =
         tool: Filecompare.tool;
         reference_exists: bool;
         promote: bool }
+
+(* [Depends_on_codegen_variant] does nothing when run.  It marks the
+   work around it as depending on a codegen variant other than base (see
+   [Ocaml_flags.variant_work]). *)
 
 type task =
   | Static of Result.t

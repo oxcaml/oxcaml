@@ -1,0 +1,3 @@
+in-process loading of code compiled without poll insertion is not permitted in a fully polled program that may run more than one domain; compile the code to load with poll insertion, which is the default in such a program, or run the program with OCAMLRUNPARAM=d=1 to permit the load
+the JIT cannot load code compiled by the LLVM backend; compile the code to load with the native backend
+the JIT cannot load code compiled by the LLVM backend; compile the code to load with the native backend

@@ -1,0 +1,57 @@
+The library root is the current directory, and OCAMLLIB is ".":
+  a unit compiled elsewhere: linked
+  pkg/marker.cmx: the variant's tree
+  ./pkg/marker.cmx: the variant's tree
+  pkg/marker_lib.cmxa: the variant's tree
+  probe.o: the variant's tree
+  own.ml: compiled by this invocation
+  ./own.ml: compiled by this invocation
+  own.ml, through an archive: compiled by this invocation
+The same with -nocwd:
+  a unit compiled elsewhere: linked
+  pkg/marker.cmx: the variant's tree
+  ./pkg/marker.cmx: the variant's tree
+  pkg/marker_lib.cmxa: the variant's tree
+  probe.o: the variant's tree
+  own.ml: compiled by this invocation
+  ./own.ml: compiled by this invocation
+  own.ml, through an archive: compiled by this invocation
+The library root is the current directory, and OCAMLLIB its path:
+  a unit compiled elsewhere: linked
+  pkg/marker.cmx: the variant's tree
+  ./pkg/marker.cmx: the variant's tree
+  pkg/marker_lib.cmxa: the variant's tree
+  probe.o: the variant's tree
+  own.ml: compiled by this invocation
+  ./own.ml: compiled by this invocation
+  own.ml, through an archive: compiled by this invocation
+The same with -nocwd:
+  a unit compiled elsewhere: linked
+  pkg/marker.cmx: the variant's tree
+  ./pkg/marker.cmx: the variant's tree
+  pkg/marker_lib.cmxa: the variant's tree
+  probe.o: the variant's tree
+  own.ml: compiled by this invocation
+  ./own.ml: compiled by this invocation
+  own.ml, through an archive: compiled by this invocation
+An interface given to -open-cmi-x: the variant's tree
+A C object named like an interface that the command compiles: the variant's tree
+A .cmx file named like an interface that the command compiles: the variant's tree
+A manifest inside the root: the variant's tree
+An interface of the invocation that a manifest names: as written
+The interface that compiling a unit wrote, named by a manifest: as written
+The same for a unit with a .mli file, which writes none: the installation's
+The same for a unit compiled with -cmi-file: the installation's
+The interface that it wrote under the name of an interface file: as written
+Two dependent sources in a directory of the root: only for the variant of the root
+Two dependent sources compiled inside the root: only for the variant of the root
+A file left in the root, given to -pack by its bare name: only for the variant of the root
+The same file, given to -pack by its path: done
+A unit of the invocation that -Hx-file names: the .cmx file that it wrote
+An archive named like a source of the invocation: the one on the load path
+The same with -nocwd: the one on the load path
+With an archive of that name in the current directory: the one in the current directory
+The same with -nocwd: the one on the load path
+A source beside a unit of its name on the load path, with -nocwd: the unit that -I leads to
+The same in a directory of the root that the variant's tree lacks: the unit that -I leads to
+The same inside the variant's tree: the unit that -I leads to

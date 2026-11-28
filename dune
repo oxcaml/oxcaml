@@ -153,6 +153,8 @@
   numbers
   arg_helper
   clflags
+  codegen_variant_name
+  codegen_variant
   debug
   profile
   priority_queue
@@ -472,6 +474,21 @@
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
+; Codegen-variant contexts (main-<name>, the complement of default/main):
+; the OxCaml flags plus the variant's per-axis flags. The per-context sexps
+; are written by the _build/_bootinstall recipe in Makefile.common-ox.
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (action
+  (copy
+   %{project_root}/duneconf/ocamlopt_flags_%{context_name}.sexp
+   %{targets})))
+
 ; The system compiler's runtime lacks some primitives of the OxCaml runtime
 
 (rule
@@ -484,7 +501,7 @@
 (rule
  (targets boot_primitives.sed)
  (enabled_if
-  (= %{context_name} "main"))
+  (<> %{context_name} "default"))
  (action
   (write-file %{targets} "")))
 
@@ -1259,6 +1276,39 @@
    (external/gc-timings/.gc_timings.objs/byte/gc_timings.{cmi,cmti} with_prefix .))
   (glob_files
    (external/gc-timings/.gc_timings.objs/native/gc_timings.cmx with_prefix .))))
+
+; The compiler's own native libraries, which the _install recipe in
+; Makefile.common-ox puts in the library tree of each codegen variant
+; (lib/ocaml/variants/<name>). Building the archives builds every .cmx that
+; the stanza above installs. Only enabled in the codegen-variant contexts;
+; see otherlibs/unix/dune. The stanzas of the same name in toplevel/native
+; and otherlibs/eval add the native toplevel and eval; the files of the
+; vendored libraries are listed here, as Dune does not look for aliases in
+; vendored directories.
+(alias
+ (name codegen-variant-compiler-libs)
+ (enabled_if
+  (and
+   (<> %{context_name} "default")
+   (<> %{context_name} "main")))
+ (deps
+  ocamlcommon.cmxa
+  ocamlcommon.a
+  ocamlfrontend.cmxa
+  ocamlfrontend.a
+  ocamlbytecomp.cmxa
+  ocamlbytecomp.a
+  ocamloptcomp_with_flambda2.cmxa
+  ocamloptcomp_with_flambda2.a
+  external/owee/libcompiler_owee_stubs.a
+  external/gc-timings/libgc_timings_stubs.a
+  external/ocaml-jit/lib/jit.cmxa
+  external/ocaml-jit/lib/jit.a
+  external/ocaml-jit/lib/jit.cmxs
+  external/ocaml-jit/lib/libjit_stubs.a
+  middle_end/flambda2/numbers/floats/libflambda2_floats_stubs.a
+  middle_end/flambda2/algorithms/libflambda2_algorithms_stubs.a
+  middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a))
 
 ; This is entirely redundant, but without it, each target in these libraries
 ; and their dependencies waits until ocamlfrontend is built, including those

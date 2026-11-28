@@ -660,7 +660,7 @@ let register_primary_file ~file_emitter ~sourcefile =
     file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
 
 let debug_line_info_enabled () =
-  is_cfi_enabled () && (!Clflags.debug || Config.with_frame_pointers)
+  is_cfi_enabled () && (!Clflags.debug || !Clflags.frame_pointers)
 
 let has_source_line dbg =
   match List.rev (Debuginfo.Dbg.to_list (Debuginfo.get_dbg dbg)) with
@@ -858,11 +858,12 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
   in
   let insert_stack_check =
-    if Config.no_stack_checks
-    then
-      Domainstate.stack_guard_stride > 0
-      && max_frame_size >= Domainstate.stack_guard_stride
-    else contains_nontail_calls || max_frame_size >= stack_threshold_size
+    if !Clflags.stack_checks
+    then contains_nontail_calls || max_frame_size >= stack_threshold_size
+    else
+      (* Only frames big enough to step over the stack's guard page need
+         probing. *)
+      max_frame_size >= Codegen_variant.stack_guard_stride ()
   in
   if insert_stack_check
   then
@@ -988,6 +989,33 @@ let emit_data_item actions (d : Cmm.data_item) =
   | Cstring s -> D.string s
   | Cskip n -> D.space ~bytes:n
   | Calign n -> D.align ~fill:Zero ~bytes:n
+
+let emit_hidden_data_symbol (s : Cmm.symbol) =
+  let module D = Asm_targets.Asm_directives in
+  let sym = symbol_of_cmm_symbol s in
+  D.data ();
+  D.global sym;
+  (match Target_system.assembler () with
+  | GAS_like -> D.hidden sym
+  | MacOS -> D.private_extern sym
+  | MASM -> ());
+  D.define_joint_label_and_symbol ~section:Data sym;
+  D.int8 Numbers.Int8.zero
+
+(* The word of data is what makes every assembler write the declaration to the
+   object file: GNU as leaves out a symbol that is declared and never referred
+   to, where the assembler of LLVM keeps it. *)
+let emit_hidden_weak_reference (s : Cmm.symbol) =
+  let module D = Asm_targets.Asm_directives in
+  let sym = symbol_of_cmm_symbol s in
+  match Target_system.assembler () with
+  | GAS_like ->
+    D.data ();
+    D.align ~fill:Zero ~bytes:8;
+    D.weak sym;
+    D.hidden sym;
+    D.symbol sym
+  | MacOS | MASM -> ()
 
 let reset () =
   reset_debug_info ();

@@ -25,8 +25,9 @@
    -strict-formats
    -extension-universe
    upstream_compatible))
+ ; \ -fno-asan: see otherlibs/unix/dune.
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp) \ -fno-asan))
  (library_flags
   (:standard -linkall)))
 
@@ -44,3 +45,13 @@
   (META as stdlib_upstream_compatible/META))
  (section lib)
  (package ocaml))
+
+; Harvested into the codegen-variant trees; see otherlibs/unix/dune.
+(alias
+ (name codegen-variant-libs)
+ (enabled_if
+  (and (<> %{context_name} "default") (<> %{context_name} "main")))
+ (deps
+  stdlib_upstream_compatible.cmxa
+  stdlib_upstream_compatible.a
+  stdlib_upstream_compatible.cmxs))

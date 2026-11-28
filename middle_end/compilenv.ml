@@ -30,6 +30,12 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | Inconsistent_codegen_variant of
+      { unit_name : CU.t;
+        filename : string;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint;
+      }
 
 exception Error of error
 
@@ -137,6 +143,8 @@ let read_unit_info filename =
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
       ui_lto_info = uir.uir_lto_info;
+      ui_codegen_fingerprint = uir.uir_codegen_fingerprint;
+      ui_polled = uir.uir_polled;
       ui_file_sections = sections;
     }
     in
@@ -209,6 +217,13 @@ let get_unit comp_unit =
           let (ui, crc) = read_unit_info filename in
           if not (CU.equal ui.ui_unit comp_unit) then
             raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
+          let current = Codegen_variant.current_fingerprint () in
+          if not (Codegen_variant.equal_fingerprint
+                    ui.ui_codegen_fingerprint current)
+          then
+            raise(Error(Inconsistent_codegen_variant
+              { unit_name = comp_unit; filename;
+                saved = ui.ui_codegen_fingerprint; current }));
           cache_zero_alloc_info ui.ui_zero_alloc_info;
           (Some ui, Some crc)
         with Not_found ->
@@ -320,15 +335,49 @@ let write_unit_info info filename =
     uir_external_symbols = Array.of_list info.ui_external_symbols;
     uir_static_data = info.ui_static_data;
     uir_lto_info = info.ui_lto_info;
+    uir_codegen_fingerprint = info.ui_codegen_fingerprint;
+    uir_polled = info.ui_polled;
     uir_sections_length = total_length;
   } in
+  (* The CRC identifies the implementation to the units that import it, and
+     poll insertion changes nothing that they see: units compiled with
+     either setting link together, against the library tree of either
+     setting (see [Codegen_variant.selected_tree]).  So the CRC is the
+     digest of the file that the same unit has without poll insertion.
+     That file is what is written and digested first; for a unit with
+     polls its unit info is then written over the other, which has the same
+     size, the two differing in one boolean.  Nothing is built in memory
+     that is the size of the file. *)
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
-  output_value oc raw_info;
+  let info_start = pos_out oc in
+  output_value oc { raw_info with uir_polled = false };
+  let info_end = pos_out oc in
   Array.iter (output_string oc) serialized_sections;
   flush oc;
   let crc = Digest.file filename in
-  Digest.output oc crc)
+  if info.ui_polled then begin
+    seek_out oc info_start;
+    output_value oc raw_info;
+    if pos_out oc <> info_end then
+      Misc.fatal_errorf
+        "Compilenv.write_unit_info: the unit info of %s has another size \
+         with the polled bit set" filename;
+    seek_out oc (out_channel_length oc)
+  end;
+  Digest.output oc crc);
+  (* A later unit of this invocation and the link read this file where it
+     is, also inside the library root. *)
+  Codegen_variant.record_product filename
+
+(* The LLVM backend discards [Poll] instructions when lowering CFG to LLVM
+   IR (see [llvmize]), so a unit it compiles is not polled no matter what
+   [Clflags.poll_insertion] says.  A JSIR compilation generates no native
+   code for the flag to change. *)
+let code_has_polls () =
+  !Clflags.poll_insertion
+  && (not !Clflags.llvm_backend)
+  && not (Clflags.target_is_jsir ())
 
 let build_unit_info ~main_module_block_format ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
@@ -358,6 +407,11 @@ let build_unit_info ~main_module_block_format ~static_data =
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
     ui_lto_info = current_unit.uib_lto_info;
+    ui_codegen_fingerprint = Codegen_variant.current_fingerprint ();
+    (* What the unit info says and what the object file says
+       ([Asmgen.emit_unpolled_code_reference]) are the same fact, so that
+       the link-time AND ([caml_code_fully_polled]) is sound. *)
+    ui_polled = code_has_polls ();
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }
@@ -385,6 +439,43 @@ let require_global global_ident =
 
 open Format_doc
 
+(* Whether [Config.standard_library] is itself a library root that serves
+   [variant] (e.g. OCAMLLIB pointing directly at a variant's tree), judged by
+   the codegen fingerprint in the unit info of the standard library there. The
+   poll-insertion setting of the root does not matter: see
+   [Codegen_variant.selected_tree]. *)
+let standard_library_is_built_for (variant : Codegen_variant.t) =
+  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
+  match read_unit_info std_exit with
+  | exception (Error _ | Sys_error _ | End_of_file | Failure _) ->
+    false
+  | info, _crc ->
+    Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
+      (Codegen_variant.fingerprint variant)
+
+(* Whether that unit info says that the root serves other settings than
+   those of [variant]. This is not the negation of the above: an installation
+   need not have the file, and a root without it is not known to be wrong. *)
+let standard_library_is_built_for_another (variant : Codegen_variant.t) =
+  let std_exit = Filename.concat Config.standard_library "std_exit.cmx" in
+  match read_unit_info std_exit with
+  | exception (Error _ | Sys_error _ | End_of_file | Failure _) ->
+    false
+  | info, _crc ->
+    not
+      (Codegen_variant.equal_fingerprint info.ui_codegen_fingerprint
+         (Codegen_variant.fingerprint variant))
+
+(* [Codegen_variant.missing_root_hint], except where the library root is itself
+   a tree that serves the selected variant: no tree is missing then, and the
+   file that a message is about was compiled for another variant. *)
+let missing_root_hint () =
+  match Codegen_variant.missing_root_hint () with
+  | Some _ as hint
+    when not (standard_library_is_built_for (Codegen_variant.current ())) ->
+    hint
+  | Some _ | None -> None
+
 let report_error_doc ppf = function
   | Not_a_unit_info filename ->
       fprintf ppf "%a@ is not a compilation unit description."
@@ -398,6 +489,16 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Inconsistent_codegen_variant { unit_name; filename; saved; current } ->
+      fprintf ppf
+        "%a,@ which contains unit %a,@ was compiled with codegen \
+         configuration@ [%s],@ which is incompatible with this \
+         invocation's@ [%s]"
+        Location.Doc.quoted_filename filename
+        CU.print_as_inline_code unit_name
+        (Codegen_variant.string_of_fingerprint saved)
+        (Codegen_variant.string_of_fingerprint current);
+      Option.iter (fprintf ppf "@ (%s)") (missing_root_hint ())
 
 let () =
   Location.register_error_of_exn

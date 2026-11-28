@@ -1,10 +1,13 @@
 #!/bin/sh
 
+# Several passes of the testsuite can run this script at once, all in the
+# same directory: each one compiles in a directory of its own.
 can_link_gfortran () {
-  echo 'int main(){}' > test_compile.c
-  gcc -o test_compile test_compile.c -lgfortran >/dev/null 2>&1
+  dir=$(mktemp -d) || return 1
+  echo 'int main(){}' > "$dir/test_compile.c"
+  gcc -o "$dir/test_compile" "$dir/test_compile.c" -lgfortran >/dev/null 2>&1
   ret=$?
-  rm -f test_compile test_compile.c
+  rm -rf "$dir"
   return $ret
 }
 

@@ -36,8 +36,6 @@ val ocamlopt : string
 
 val ocamlopt_dot_opt : string
 
-val ocamlnat : string
-
 val js_of_ocaml : string
 
 val wasm_of_ocaml : string
@@ -61,8 +59,6 @@ val cmpbyt : string
 
 val expect : string
 
-val expectnat : string
-
 val ocamllex : string
 
 val ocamlyacc : string
@@ -72,7 +68,23 @@ val ocamldebug : string
 val ocamlobjinfo : string
 val ocamlmklib : string
 val ocamlfilt : string
-val codegen : string
+(* The programs that generate native code, or compile and load it, in
+   process: the native expect-test runner, the native toplevel and the
+   code generator of the asmgen tests.  Each is built once per codegen
+   variant, for that variant. *)
+type native_host =
+  | Expectnat
+  | Ocamlnat
+  | Codegen
+
+(* The name a test author knows the program by. *)
+val native_host_name : native_host -> string
+
+(* The build of a native host for a codegen variant: the one for the
+   base variant ([~variant:None]), or the copy for the named
+   variant, which install_for_test puts under
+   testsuite/tools/variants/<variant>. *)
+val native_host : variant:string option -> native_host -> string
 
 val fexprc : string
 

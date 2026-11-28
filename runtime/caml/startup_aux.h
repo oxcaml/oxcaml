@@ -57,6 +57,11 @@ struct caml_params {
   uintnat cleanup_on_exit;
   uintnat event_trace;
   uintnat max_domains;
+  /* Whether every OCaml unit of the program was compiled with poll
+     insertion: the link-time caml_code_fully_polled constant for native
+     code, always 1 for bytecode (the interpreter polls on loop back
+     edges and applications).  Decides the default of [max_domains]. */
+  uintnat code_fully_polled;
   uintnat use_hugetlb_pages;
 };
 

@@ -106,16 +106,10 @@ let function_sections = @function_sections@
 
 let instrumented_runtime = @instrumented_runtime@
 
-let frame_pointers = @frame_pointers@
-
 let probes = @probes@
 
 let stack_allocation = @stack_allocation@
 
-let poll_insertion = @poll_insertion@
-
 let naked_pointers = false
 
 let tsan = @tsan@
-
-let address_sanitizer = @address_sanitizer@

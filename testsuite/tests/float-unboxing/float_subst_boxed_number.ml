@@ -1,8 +1,6 @@
 (* TEST
- include config;
+ include ocamlcommon;
  flags = "-w -55";
- ocamlc_flags = "config.cmo";
- ocamlopt_flags = "config.cmx";
  native;
 *)
 

@@ -1,0 +1,9 @@
+the root is the tree of the variant:
+  the error is about a file compiled for another variant
+  it says nothing of the root
+the root has no tree for the variant:
+  the error is about a file compiled for another variant
+  it notes that the root lacks the variant
+a runtime library of the base variant alone:
+  the error is about the runtime library of the variant
+  it says nothing of the root

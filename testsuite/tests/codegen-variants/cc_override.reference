@@ -1,0 +1,2 @@
+-fno-omit-frame-pointer exactly when the variant has frame pointers: true
+-fsanitize=address exactly when the variant has AddressSanitizer: true

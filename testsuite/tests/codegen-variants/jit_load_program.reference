@@ -1,0 +1,8 @@
+frame pointers unlike the caller: refused
+stack checks unlike the caller: refused
+frame pointers unlike the caller, with another target: refused
+the flags of the caller, with another target: refused for its target
+the flags of the caller, with no target set: refused for its target
+the flags of the caller: loaded
+poll insertion unlike the caller: as the rule for loaded code says
+a phrase for the LLVM backend: the JIT cannot load code compiled by the LLVM backend; compile the code to load with the native backend

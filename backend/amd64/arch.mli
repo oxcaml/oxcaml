@@ -67,7 +67,10 @@ end
 
 val trap_notes : bool ref
 val arch_check_symbols : bool ref
-val is_asan_enabled : bool ref
+
+(* Whether the code being compiled is instrumented for AddressSanitizer:
+   the asan codegen variant is selected and [-fno-asan] was not given. *)
+val is_asan_enabled : unit -> bool
 val command_line_options : (string * Arg.spec * string) list
 
 (* Specific operations for the AMD64 processor *)

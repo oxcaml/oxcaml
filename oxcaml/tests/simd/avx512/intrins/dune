@@ -9,7 +9,7 @@
   %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action
@@ -27,7 +27,7 @@
   %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action
@@ -45,7 +45,7 @@
   %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action
@@ -59,7 +59,7 @@
  (targets gen512_ia.ml)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action
@@ -69,7 +69,7 @@
  (targets gen512_mem_ia.ml)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (action
@@ -80,7 +80,7 @@
  (deps helpers.c gen512_stubs.c (source_tree %{workspace_root}/runtime/caml))
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)
    %{bin-available:clang}))
@@ -97,7 +97,7 @@
  (deps helpers.c gen512_stubs.c (source_tree %{workspace_root}/runtime/caml))
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)
    (not %{bin-available:clang})))
@@ -113,7 +113,7 @@
  (modules helpers)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (flags
@@ -127,7 +127,7 @@
  (modules gen512 gen512_mem)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (ocamlopt_flags
@@ -142,7 +142,7 @@
  (modules gen512_ia gen512_mem_ia)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)))
  (ocamlopt_flags
@@ -156,7 +156,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)
    %{bin-available:clang}))
@@ -176,7 +176,7 @@
  (alias runtest)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{architecture} "amd64")
    (<> %{system} macosx)
    %{bin-available:clang}))

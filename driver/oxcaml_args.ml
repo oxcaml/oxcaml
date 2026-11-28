@@ -225,6 +225,37 @@ let mk_no_omit_leaf_frame_pointers f =
     " Set up frames in all functions on frame-pointer-enabled builds (default)"
   )
 
+let mk_frame_pointers f =
+  ("-frame-pointers", Arg.Unit f, " Maintain frame pointers in generated code")
+
+let mk_no_frame_pointers f =
+  ( "-no-frame-pointers",
+    Arg.Unit f,
+    " Do not maintain frame pointers in generated code (default)" )
+
+let mk_stack_checks f =
+  ( "-stack-checks",
+    Arg.Unit f,
+    " Generate explicit stack-limit checks instead of relying on guard pages" )
+
+let mk_no_stack_checks f =
+  ( "-no-stack-checks",
+    Arg.Unit f,
+    " Rely on stack guard pages instead of explicit stack-limit checks \
+     (default)" )
+
+let mk_asan f =
+  ( "-asan",
+    Arg.Unit f,
+    " Expose native OCaml memory operations to AddressSanitizer; requires \
+     frame pointers" )
+
+let mk_no_asan f =
+  ( "-no-asan",
+    Arg.Unit f,
+    " Do not expose native OCaml memory operations to AddressSanitizer \
+     (default)" )
+
 let mk_cfg_merge_blocks f =
   ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
 
@@ -417,10 +448,16 @@ let mk_disable_builtin_check f =
      to the corresponding C stub, instead of compilation error." )
 
 let mk_disable_poll_insertion f =
-  ("-disable-poll-insertion", Arg.Unit f, " Do not insert poll points")
+  ( "-disable-poll-insertion",
+    Arg.Unit f,
+    " Do not insert poll points in the unit being compiled; when linking, use \
+     the libraries without poll points if they are installed (default)" )
 
 let mk_enable_poll_insertion f =
-  ("-enable-poll-insertion", Arg.Unit f, " Insert poll points")
+  ( "-enable-poll-insertion",
+    Arg.Unit f,
+    " Insert poll points in the unit being compiled; when linking, use the \
+     libraries with poll points if they are installed" )
 
 let mk_long_frames f =
   ("-long-frames", Arg.Unit f, " Allow stack frames longer than 2^16 bytes")
@@ -1360,8 +1397,9 @@ let mk_use_cached_generic_functions f =
 let mk_cached_generic_functions_path f =
   ( "-cached-generic-functions-path",
     Arg.String f,
-    "<file>  Set the path of the cached generic functions (default to \
-     cached-generic-functions.o)" )
+    "<file>  Set the path of the archive of cached generic functions (default: \
+     cached-generic-functions" ^ Config.ext_lib
+    ^ " in the library tree of the selected codegen variant)" )
 
 let mk_target f =
   ( "-target",
@@ -1517,6 +1555,12 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap_threshold : int -> unit
   val omit_leaf_frame_pointers : unit -> unit
   val no_omit_leaf_frame_pointers : unit -> unit
+  val frame_pointers : unit -> unit
+  val no_frame_pointers : unit -> unit
+  val stack_checks : unit -> unit
+  val no_stack_checks : unit -> unit
+  val asan : unit -> unit
+  val no_asan : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_block_layout : unit -> unit
@@ -1741,6 +1785,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
       mk_omit_leaf_frame_pointers F.omit_leaf_frame_pointers;
       mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
+      mk_frame_pointers F.frame_pointers;
+      mk_no_frame_pointers F.no_frame_pointers;
+      mk_stack_checks F.stack_checks;
+      mk_no_stack_checks F.no_stack_checks;
+      mk_asan F.asan;
+      mk_no_asan F.no_asan;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
       mk_cfg_block_layout F.cfg_block_layout;
@@ -2127,6 +2177,12 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
   let omit_leaf_frame_pointers = set' Oxcaml_flags.omit_leaf_frame_pointers
   let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
+  let frame_pointers = set' Clflags.frame_pointers
+  let no_frame_pointers = clear' Clflags.frame_pointers
+  let stack_checks = set' Clflags.stack_checks
+  let no_stack_checks = clear' Clflags.stack_checks
+  let asan = set' Clflags.address_sanitizer
+  let no_asan = clear' Clflags.address_sanitizer
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
   let cfg_block_layout = set' Oxcaml_flags.cfg_block_layout
@@ -2223,8 +2279,8 @@ module Oxcaml_options_impl = struct
     | None -> ()
 
   let disable_builtin_check = set' Oxcaml_flags.disable_builtin_check
-  let disable_poll_insertion = set' Oxcaml_flags.disable_poll_insertion
-  let enable_poll_insertion = clear' Oxcaml_flags.disable_poll_insertion
+  let disable_poll_insertion = clear' Clflags.poll_insertion
+  let enable_poll_insertion = set' Clflags.poll_insertion
 
   let symbol_visibility_protected =
     set' Oxcaml_flags.symbol_visibility_protected
@@ -2514,7 +2570,7 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.use_cached_generic_functions
 
   let cached_generic_functions_path file =
-    Oxcaml_flags.cached_generic_functions_path := file
+    Oxcaml_flags.cached_generic_functions_path := Some file
 
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
@@ -2726,6 +2782,9 @@ module Extra_params = struct
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
+    | "frame-pointers" -> set' Clflags.frame_pointers
+    | "stack-checks" -> set' Clflags.stack_checks
+    | "asan" -> set' Clflags.address_sanitizer
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-block-layout" -> set' Oxcaml_flags.cfg_block_layout
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
@@ -2812,7 +2871,11 @@ module Extra_params = struct
             raise (Arg.Bad (Printf.sprintf "Unexpected value %s for %s" v name))
         )
     | "builtin-check" -> set' Oxcaml_flags.disable_builtin_check
-    | "poll-insertion" -> set' Oxcaml_flags.disable_poll_insertion
+    (* poll-insertion=1 enables poll insertion.  (It used to back the
+       inverted [disable_poll_insertion] ref, so =1 DISABLED insertion;
+       the key now matches every other boolean OCAMLPARAM axis key and
+       the codegen-variant OCAMLPARAM fragments rely on it.) *)
+    | "poll-insertion" -> set' Clflags.poll_insertion
     | "symbol-visibility-protected" ->
         set' Oxcaml_flags.symbol_visibility_protected
     | "long-frames" -> set' Oxcaml_flags.allow_long_frames
@@ -2998,7 +3061,7 @@ module Extra_params = struct
     | "use-cached-generic-functions" ->
         set' Oxcaml_flags.use_cached_generic_functions
     | "cached-generic-functions-path" ->
-        Oxcaml_flags.cached_generic_functions_path := v;
+        Oxcaml_flags.cached_generic_functions_path := Some v;
         true
     | "target" -> (
         let set target =

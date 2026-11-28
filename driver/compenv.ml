@@ -781,7 +781,20 @@ let apply_config_file ppf position =
   List.iter (fun { name; value } -> read_one_param ppf position name value)
     config
 
+(* The axes of the codegen variant choose the library tree, the runtime and
+   the fingerprint of everything that follows, so a setting for one file
+   (a line of ocaml_compiler_internal_params that names it) holds for that
+   file only: the axes are put back to what they were before it when the
+   settings of the next position are read, those for another file or for
+   the link.  Every other setting stays, as it always did. *)
+let axes_before_file = ref None
+
 let readenv ppf position =
+  Option.iter Codegen_variant.apply !axes_before_file;
+  axes_before_file :=
+    (match position with
+     | Before_compile _ -> Some (Codegen_variant.flags_variant ())
+     | Before_args | Before_link -> None);
   last_include_dirs := [];
   last_ccopts := [];
   List.iter (fun phase -> last_jsoo_opts phase := []) Clflags.Jsoo_phase.all;
@@ -863,12 +876,21 @@ let process_action
       | Some target -> warn_jsir_ignore target ("C source file " ^ name)
       | None ->
         Location.input_name := name;
+        (* The file is compiled for the selected codegen variant, with its
+           macros and flags (see [Ccomp.compile_file]), so the selection
+           has to be one that a unit could be compiled for. *)
+        if Clflags.target_is_native () then
+          Result.iter_error fatal
+            (Codegen_variant.check_supported (Codegen_variant.current ()));
         let obj_name = match !output_name with
           | None -> c_object_of_filename name
           | Some n -> n
         in
         if Ccomp.compile_file ?output:!output_name name <> 0
         then raise (Exit_with_status 2);
+        (* The link reads this object back: it is not a file of the
+           installation, even inside the library root. *)
+        Codegen_variant.record_product obj_name;
         ccobjs := obj_name :: !ccobjs
       end
   | ProcessObjects names ->

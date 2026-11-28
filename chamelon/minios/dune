@@ -8,4 +8,4 @@
 (library
  (name minios)
  (libraries unix)
- (enabled_if (= %{context_name} "main")))
+ (enabled_if (<> %{context_name} "default")))

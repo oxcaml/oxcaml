@@ -117,19 +117,34 @@ let hasstr = make
     "str library available"
     "str library not available")
 
-(* Upstream's multicore predicate is merged with our older multidomain predicate
-   meaning that tests marked multicore will only run if it both possible and
-   permitted to spawn domains. *)
-let multicore_possible_and_allowed =
-  Domain.recommended_domain_count () >= 2 && Config.multidomain
+(* Upstream's multicore predicate is merged with our older multidomain
+   predicate, meaning that tests marked multicore run only when it is both
+   possible and permitted to spawn domains.  With the multidomain build
+   axis gone, permission is per-program: a native program's runtime allows
+   more than one domain only when every linked unit was compiled with poll
+   insertion, which in the testsuite means the effective codegen variant
+   (the codegen_variant variable, else -codegen-variant, else base)
+   enables poll insertion.  One predicate guards both
+   the byte and native legs of a test block, so it conservatively requires
+   the native condition even though bytecode is always fully polled; set
+     codegen_variant = "+poll";  (or the name of a variant that polls)
+   before this predicate to opt a test in when the variant of the run
+   does not poll. *)
+let multicore_possible_and_allowed variant =
+  Domain.recommended_domain_count () >= 2
+  && (match Codegen_variant_name.of_string variant with
+      | Some variant ->
+        Codegen_variant_name.mem Codegen_variant_name.Poll_insertion variant
+      | None -> false)
 
 let multicore = make
   ~name:"multicore"
-  ~description:"Pass if running on multicore"
+  ~description:"Pass if running on multicore and the effective codegen \
+                variant inserts polls (so spawned domains are permitted)"
   ~does_something:false
-  (Actions_helpers.predicate multicore_possible_and_allowed
-    "running on multicore"
-    "not running on multicore")
+  (Ocaml_flags.codegen_variant_predicate multicore_possible_and_allowed
+     "running on multicore"
+     "not running on multicore")
 
 let windows_OS = "Windows_NT"
 
@@ -325,21 +340,28 @@ let function_sections = make
      "Target supports function sections"
      "Target does not support function sections")
 
+(* The per-axis predicates below read the EFFECTIVE codegen variant
+   ([Ocaml_flags.effective_codegen_variant]: the block's [codegen_variant]
+   when set, else the run's -codegen-variant, else base): each predicate's
+   meaning is the axis's value in the variant that the block's native
+   compilations actually use. *)
 let frame_pointers = make
   ~name:"frame_pointers"
-  ~description:"Pass if frame pointers are available"
+  ~description:"Pass if the effective codegen variant has frame pointers"
   ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.frame_pointers)
-     "frame-pointers available"
-     "frame-pointers not available")
+  (Ocaml_flags.codegen_variant_axis_predicate
+      Codegen_variant_name.Frame_pointers ~enabled:true
+      "frame-pointers available"
+      "frame-pointers not available")
 
 let no_frame_pointers = make
   ~name:"no-frame_pointers"
-  ~description:"Pass if frame pointers are available"
+  ~description:"Pass if the effective codegen variant has no frame pointers"
   ~does_something:false
-  (Actions_helpers.predicate (not Ocamltest_config.frame_pointers)
-     "frame-pointers not available"
-     "frame-pointers available")
+  (Ocaml_flags.codegen_variant_axis_predicate
+      Codegen_variant_name.Frame_pointers ~enabled:false
+      "frame-pointers not available"
+      "frame-pointers available")
 
 let probes = make
   ~name:"probes"
@@ -375,11 +397,13 @@ let no_tsan = make
 
 let no_address_sanitizer = make
   ~name:"no-address-sanitizer"
-  ~description:"Pass if address sanitizer is not supported"
+  ~description:"Pass if the effective codegen variant has no \
+                AddressSanitizer instrumentation"
   ~does_something:false
-  (Actions_helpers.predicate (not Ocamltest_config.address_sanitizer)
-     "address-sanitizer not available"
-     "address-sanitizer available")
+  (Ocaml_flags.codegen_variant_axis_predicate
+      Codegen_variant_name.Address_sanitizer ~enabled:false
+      "address-sanitizer not available"
+      "address-sanitizer available")
 
 let has_symlink = make
   ~name:"has_symlink"
@@ -391,11 +415,12 @@ let has_symlink = make
 
 let poll_insertion = make
   ~name:"poll_insertion"
-  ~description:"Pass if poll-insertion is enabled"
+  ~description:"Pass if the effective codegen variant inserts polls"
   ~does_something:false
-  (Actions_helpers.predicate (Ocamltest_config.poll_insertion)
-    "poll insertion enabled"
-    "poll insertion not enabled")
+  (Ocaml_flags.codegen_variant_axis_predicate
+      Codegen_variant_name.Poll_insertion ~enabled:true
+      "poll insertion enabled"
+      "poll insertion not enabled")
 
 let setup_build_env = make
   ~name:"setup-build-env"
@@ -414,13 +439,13 @@ let run = make
   ~name:"run"
   ~description:"Run the program"
   ~does_something:true
-  Actions_helpers.run_program
+  (Ocaml_flags.run_for_variant Actions_helpers.run_program)
 
 let script = make
   ~name:"script"
   ~description:"Run the script specified by the script variable"
   ~does_something:true
-  Actions_helpers.run_script
+  (Ocaml_flags.run_for_variant Actions_helpers.run_script)
 
 let config_script = make
   ~name:"config_script"
@@ -428,7 +453,7 @@ let config_script = make
                 checking test dependencies. The script may result in TEST_SKIP \
                 but does not have build artifacts available."
   ~does_something:false
-  Actions_helpers.run_config_script
+  (Ocaml_flags.run_for_variant Actions_helpers.run_config_script)
 
 let check_program_output = make
   ~name:"check-program-output"

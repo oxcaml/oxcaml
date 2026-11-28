@@ -82,18 +82,16 @@ let build_cfg_info : Cfg.t -> cfg_info =
         block_preproc_stack_check_result block ~frame_size
       in
       let block_needs_stack_checks =
-        if Config.no_stack_checks
+        if !Clflags.stack_checks
         then
-          (* Only frames big enough to step over the stack's guard page need
-             probing; [stack_guard_stride = 0] means there is no guard page to
-             defend, so nothing is inserted. *)
-          Domainstate.stack_guard_stride > 0
-          && preproc_stack_check_result.max_frame_size
-             >= Domainstate.stack_guard_stride
-        else
           preproc_stack_check_result.contains_nontail_calls
           || preproc_stack_check_result.max_frame_size
              >= Stack_check.stack_threshold_size
+        else
+          (* Only frames big enough to step over the stack's guard page need
+             probing. *)
+          preproc_stack_check_result.max_frame_size
+          >= Codegen_variant.stack_guard_stride ()
       in
       let max_frame_size =
         Int.max max_frame_size preproc_stack_check_result.max_frame_size

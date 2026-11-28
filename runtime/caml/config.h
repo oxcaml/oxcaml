@@ -142,6 +142,18 @@ typedef uint64_t uintnat;
 #define CAML_UINTNAT_MIN UINTPTR_MIN
 #define CAML_UINTNAT_MAX UINTPTR_MAX
 
+#if defined(IN_CAML_RUNTIME) && defined(NATIVE_CODE) && defined(__GNUC__)
+/* Every object file of the native runtime refers to the link-time guard of
+   the codegen variant that it was compiled for, which
+   codegen_variant_guard.c defines next to a symbol that has the same name
+   in every variant.  A link that takes object files from the runtime
+   libraries of two variants then takes that file from both, and fails on
+   the duplicate definition. */
+extern const char CAML_CODEGEN_VARIANT_GUARD;
+__attribute__((used)) static const char * const
+  caml_codegen_variant_guard_of_this_object_file = &CAML_CODEGEN_VARIANT_GUARD;
+#endif
+
 #endif /* CAML_CONFIG_H_NO_TYPEDEFS */
 
 /* Endianness of floats */

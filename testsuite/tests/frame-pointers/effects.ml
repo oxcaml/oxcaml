@@ -1,5 +1,8 @@
 (* TEST
-   frame_pointers;
+   codegen_variant = "+fp";
+   variant_available;
+   script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+   config_script;
    readonly_files = "fp_backtrace.c";
    all_modules = "${readonly_files} effects.ml";
    flags = " -no-flambda2-simplify-stubs";

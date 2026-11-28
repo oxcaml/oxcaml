@@ -1,0 +1,2 @@
+[ocaml] Warning: max_domains (OCAMLRUNPARAM d) is 2 but this program is not fully polled: a domain running a non-allocating loop compiled without poll insertion can block the other domains' garbage collection indefinitely.
+spawned: 42

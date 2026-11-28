@@ -39,6 +39,14 @@ val show_timings : bool
 
 val run_ocamlrunparam : string
 
+(* The operand of -codegen-variant ("" when the option is absent). *)
+val codegen_variant : string
+
+(* Whether -codegen-variant-only was given: a quick run under
+   -codegen-variant, which leaves out the test files in which nothing
+   depends on the variant. *)
+val codegen_variant_only : bool
+
 val translate : bool
 val style : Translate.style
 val compact : bool

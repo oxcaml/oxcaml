@@ -5,7 +5,7 @@
 (executable
  (name test_verify)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "arm64")))
  (modules test_verify)
  (libraries ocamloptcomp unix))
@@ -13,7 +13,7 @@
 ; Assemble ARM64 test files
 (rule
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "arm64")))
  (targets reference.o match.o mismatch_text_content.o mismatch_text_size.o
           mismatch_text_reloc.o mismatch_data_reloc.o mismatch_data_content.o
@@ -39,7 +39,7 @@
 (rule
  (alias runtest)
  (enabled_if
-  (and (= %{context_name} "main")
+  (and (<> %{context_name} "default")
        (= %{architecture} "arm64")))
  (deps test_verify.exe reference.o match.o mismatch_text_content.o
        mismatch_text_size.o mismatch_text_reloc.o mismatch_data_reloc.o

@@ -1930,6 +1930,13 @@ G(caml_system__frametable):
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
 
+/* Like the C object files of the runtime, this one refers to the link-time
+   guard of the codegen variant that it was assembled for: see
+   caml/config.h. */
+#define EXPANDED_G(r) G(r)
+        .align  EIGHT_ALIGN
+        .quad   EXPANDED_G(CAML_CODEGEN_VARIANT_GUARD)
+
 #if defined(SYS_macosx)
         .literal16
 #elif defined(SYS_mingw64) || defined(SYS_cygwin)

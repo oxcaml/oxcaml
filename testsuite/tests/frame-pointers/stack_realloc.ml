@@ -1,17 +1,61 @@
 (* TEST
- frame_pointers;
- readonly_files = "fp_backtrace.c stack_realloc_.c";
- all_modules = "${readonly_files} stack_realloc.ml";
  {
+   codegen_variant = "+fp -sc";
+   variant_available;
+   script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+   config_script;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc.ml";
+   compiler_directory_suffix = ".fp";
+   {
  (* NOTE clang on macOS and gcc on Linux are less eager to inline
          certain C functions in the runtime. *)
-   reference = "${test_source_directory}/stack_realloc.arm64.reference";
-   arch_arm64;
-   native;
- } {
-   reference = "${test_source_directory}/stack_realloc.reference";
-   arch_amd64;
-   native;
+     reference = "${test_source_directory}/stack_realloc.arm64.reference";
+     arch_arm64;
+     native;
+   } {
+     reference = "${test_source_directory}/stack_realloc.reference";
+     arch_amd64;
+     native;
+   }
+ }{
+ (* Under fp-sc the fiber actually grows during [consume_stack] (the
+    guard-page variants never reallocate), so this block executes the
+    frame-pointer chain rewrite in caml_try_realloc_stack
+    (runtime/fiber.c) across the C stub's frame: the backtrace below the
+    growth cannot come out identical if the reallocation fails (the fiber
+    is too small for the recursion) or rewrites the chain incorrectly. *)
+   codegen_variant = "+fp +sc";
+   variant_available;
+   script = "sh ${test_source_directory}/has-backtrace-symbols.sh";
+   config_script;
+   readonly_files = "fp_backtrace.c stack_realloc_.c";
+   all_modules = "${readonly_files} stack_realloc.ml";
+   compiler_directory_suffix = ".fp-sc";
+   {
+     reference = "${test_source_directory}/stack_realloc.arm64.reference";
+     arch_arm64;
+     native;
+   } {
+ (* Trace the stack reallocations of [consume_stack] (see the
+    [trace-stack-growth] handling below). The script fails unless the
+    fiber grew there: without a reallocation this leg would not be
+    exercising the chain rewrite at all. It then takes the trace out of
+    the output, which leaves the backtrace of the other legs: how often
+    the stack grows, and to what sizes, is not what this test is about. *)
+     arguments = "trace-stack-growth";
+     reference = "${test_source_directory}/stack_realloc.reference";
+     arch_amd64;
+     setup-ocamlopt.opt-build-env;
+     ocamlopt.opt;
+     check-ocamlopt.opt-output;
+     run;
+     stdout = "stack-growth.stdout";
+     stderr = "stack-growth.stderr";
+     script = "sh ${test_source_directory}/stack-growth.sh ${output}";
+     script;
+     check-program-output;
+   }
  }
 *)
 
@@ -48,7 +92,15 @@ let[@inline never] consume_stack () =
   ignore (gobbler count)
 
 let[@inline never] callback () =
+  (* The fp-sc leg (see the TEST block) passes [trace-stack-growth] to
+     trace the stack reallocations that happen in [consume_stack]: 0x800 is
+     CAML_GC_MSG_STACKS and 0x10000000 is CAML_GC_MSG_NO_TIMESTAMP
+     (runtime/caml/misc.h), so each growth of the fiber's stack prints a
+     "Growing stack to ..." line for the test to find. *)
+  let trace = Array.exists (String.equal "trace-stack-growth") Sys.argv in
+  if trace then Gc.set { (Gc.get ()) with verbose = 0x10000800 };
   consume_stack ();
+  if trace then Gc.set { (Gc.get ()) with verbose = 0 };
   fp_backtrace Sys.argv.(0);
   0
 

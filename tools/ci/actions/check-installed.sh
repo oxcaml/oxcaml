@@ -26,6 +26,9 @@ esac
 script_dir=$(cd "$(dirname "$0")" && pwd)
 prefix=$(cd -- "$1" && pwd)
 shift
+# The caller's OCAMLPARAM is for another compiler than the bootstrap one,
+# which need not know its settings, and no check runs under it.
+unset OCAMLPARAM
 # Resolve bootstrap tools before the checker prepends the installed bin to PATH.
 ocamlfind=$(command -v ocamlfind)
 dune=$(command -v dune)

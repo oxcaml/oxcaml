@@ -13,7 +13,7 @@
    ocamlopt.byte;
    script = "sh ${test_source_directory}/link.sh \
      ${test_build_directory} ${ocamlrun} ${ocamlopt_byte} \
-     ${ocamlsrcdir}/stdlib ${ocamlsrcdir}/${runtime_dir} \
+     ${stdlib} ${ocamlsrcdir}/${runtime_dir} \
      cmx";
    output = "${compiler_output}";
    script;

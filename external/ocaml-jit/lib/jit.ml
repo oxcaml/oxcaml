@@ -321,6 +321,13 @@ let jit_load_lambda ~phrase_name ppf (program : Lambda.program) =
       res
 
 let jit_load_program ~phrase_name ppf program =
+  (* What is loaded is what the native backend emits through the callback
+     registered below. *)
+  Opttoploop.check_backend_for_jit_load ();
+  (* The code is compiled with the current flags and runs in this program's
+     image, whoever the caller is. *)
+  Opttoploop.check_codegen_variant_for_in_process_load ();
+  Opttoploop.check_poll_insertion_for_in_process_load ();
   set_debug ();
   Jit_backend.register (jit_callback ~phrase_name ~outcome_ref:outcome_global);
   match jit_load_lambda ~phrase_name ppf program with

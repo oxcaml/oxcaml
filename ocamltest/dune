@@ -26,6 +26,8 @@
 
 (copy_files# ../utils/config.ml)
 
+(copy_files# ../utils/codegen_variant_name.ml)
+
 (executable
  (name main)
  (modes native)

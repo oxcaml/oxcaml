@@ -1,0 +1,5 @@
+(* CHILDTEST
+ setup-ocamlopt.byte-build-env;
+ program = "empty";
+ ocamlmklib;
+*)

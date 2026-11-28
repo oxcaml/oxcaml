@@ -1,0 +1,5 @@
+The LLVM backend emits no AddressSanitizer instrumentation; pass -fno-asan to leave this unit uninstrumented, select a variant without AddressSanitizer with -no-asan (or asan=0 in OCAMLPARAM), or remove -llvm-backend
+An instrumented unit: refused
+A unit compiled with -fno-asan: accepted
+The LLVM backend does not support stack checks; disable them with -no-stack-checks (or stack-checks=0 in OCAMLPARAM)
+A unit with stack checks: refused

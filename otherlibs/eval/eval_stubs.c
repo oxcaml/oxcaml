@@ -34,13 +34,15 @@ extern char caml_bundled_cmxs[] __attribute__((weak));
 // CR mshinwell: it's a shame that "cmxs" clashes with the extension of
 // a shared library file
 
-value caml_bundled_cmis_this_exe()
+value caml_bundled_cmis_this_exe(value unit)
 {
+  (void)unit;
   return (value) &caml_bundled_cmis;
 }
 
-value caml_bundled_cmxs_this_exe()
+value caml_bundled_cmxs_this_exe(value unit)
 {
+  (void)unit;
   return (value) &caml_bundled_cmxs;
 }
 

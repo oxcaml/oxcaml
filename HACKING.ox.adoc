@@ -2,6 +2,15 @@
 
 See HACKING.md.
 
+`make compiler` also builds what is installed in the library tree of each
+codegen variant that `configure` selected (it prints the list): the stdlib,
+the otherlibs and the compiler's own libraries. So a change to the compiler is
+compiled once more per variant, in the same dune invocation as the compiler
+itself. If you do not need the variants, or have few cores, configure with
+`--with-codegen-variants=NAME,NAME` to build only those, or with
+`--disable-codegen-variants` to build none; tests that need a variant that
+was not built are skipped.
+
 ## Testing
 
 You can
@@ -36,11 +45,165 @@ from all failed tests in that run, use `promote-failed`:
 
 To run just one test without running a full dune build, you can use
 `*-no-rebuild` versions of `test-one` and `promote-one`. Note that these
-targets won't pick up changes you've made to compiler code, though they will
-faithfully pick up changes you've made to test files.
+targets won't pick up changes you've made to compiler code. They run in the
+test tree `_runtest`, which hard-links the test files: they see a change to
+an existing test file when your editor rewrites the file in place, but not a
+new file, nor a file that your editor replaced. `make install_for_test`
+rebuilds the compiler and the test tree without running anything.
 
     $ make test-one-no-rebuild TEST=typing-local/local.ml
     $ make promote-one-no-rebuild DIR=typing-local
+
+Likewise, `test-no-rebuild` runs the whole testsuite again against the
+compiler in `_install` and the test tree in `_runtest`:
+
+    $ make test-no-rebuild
+
+It needs nothing else from the build: `make test` is `make install_for_test`
+followed by `make test-no-rebuild`.
+
+So the suite also runs on another machine, one that received `_install`,
+`_runtest`, `Makefile.config` and `Makefile.build_config` from the machine
+that built them. That takes more than the four: both trees contain absolute
+paths and code compiled against the builder's C library, so the build must
+have been configured with `--prefix=$PWD/_install`, and the other machine
+needs a checkout of the same commit at the same path, and the same
+architecture, C compiler and C library. `tools/ci/actions/test-build.sh`
+packs the four, and unpacks them only on such a machine.
+
+`TEST_LIST=<file>` restricts `test` and `test-no-rebuild` to the directories
+listed in `<file>`, one per line, in the form `tests/<directory>`. A list
+with any other entry, or with none, is an error before any test runs, and so
+is a list with a directory that has no test, that is listed twice or that is
+inside another directory of the list.
+
+### Testing other codegen variants and runtimes
+
+One build serves every codegen variant it was configured with (see `ocamlopt
+-config-var codegen_variants`), and the testsuite can target any of them:
+
+    $ make test CODEGEN_VARIANT=fp
+    $ make test-one DIR=effects CODEGEN_VARIANT=sc
+    $ make test-one-no-rebuild TEST=effects/test1.ml CODEGEN_VARIANT=fp-sc
+    $ make test-no-rebuild CODEGEN_VARIANT=poll
+
+Without the variable the testsuite targets `base`, which is what `ocamlopt`
+compiles for when nothing selects a variant. Under `CODEGEN_VARIANT=<name>`
+it targets that variant instead. Everything that generates or loads native
+code does so for the variant:
+
+- The native programs that the tests compile and link are built for it: with
+  its flags, against its library tree (the compiler's own libraries and `eval`
+  included) and its runtime.
+- Native expect tests, native toplevel tests and asmgen tests run in the
+  builds of `expect.opt`, `ocamlnat` and the `codegen` tool for the variant,
+  which `make install_for_test` puts in
+  `_runtest/testsuite/tools/variants/<name>`.
+- C code that a test compiles for a native program gets the variant's flags
+  and macros (the `cc` action, `${cflags}`, `${mkexe}`).
+- Scripts, hooks and the other commands that a test writes itself (the
+  program of `run`, a compiler given its command line, `ocamlmklib`) run with
+  the variant as the default of the compilers that they start, and `${stdlib}`
+  is the variant's library tree.
+
+This is how the tests that need poll insertion (everything guarded by
+`multicore;`) or stack checks run at all: no build has another default
+variant than `base`. A test that selects a variant itself, with the
+`codegen_variant` variable, keeps its selection.
+
+Bytecode and JSIR have no codegen variant: bytecode steps, bytecode expect and
+toplevel tests and JSIR tests run as they do without the variable, against the
+library root. No test is skipped because of the variable: what a pass
+skips is what the tests' own guards (`no-stack-checks;`,
+`only-default-codegen;`, ...) exclude for that variant.
+
+The dune tests take the same variable:
+
+    $ make runtest CODEGEN_VARIANT=fp
+
+builds and runs them in the build context of the variant (`main-fp`) instead
+of the main context, and `make minimizer CODEGEN_VARIANT=fp` builds the
+minimizer there. In the context of a variant:
+
+- The programs that dune compiles for the tests are compiled by the boot
+  compiler, as in the main context, with the variant's flags, against the
+  variant's library tree and runtime.
+- The tests that run a compiler themselves run the `ocamlopt.opt` of that
+  context: the compiler's own code, compiled for the variant and linked with
+  the variant's libraries and runtime. Its default is the variant: the
+  context sets every axis in `OCAMLPARAM`, before the `_`, so a flag that a
+  test passes on purpose still wins (`-disable-poll-insertion`, say).
+- Bytecode has no variant here either: bytecode programs run under the
+  `ocamlrun` that the build installs, as in the main context.
+- The AddressSanitizer backend tests check instrumented code in the context
+  of a variant with AddressSanitizer (`make runtest CODEGEN_VARIANT=asan-fp`)
+  and reduce to one line of output in the others. The tests of the LLVM
+  backend, `make runtest-llvmize`, always run in the context of `fp`, which
+  the build has to include.
+
+Two things remain that no pass covers: the installed compiler executables and
+the bytecode runtime (`ocamlrun`, and what `-custom` links) are always built
+for `base`. The upstream testsuite is never driven by an installed compiler
+that is itself compiled for another variant, and never runs bytecode under a
+runtime built with another variant's C flags (an instrumented `ocamlrun`,
+say).
+
+For a quick pass, add `VARIANT_ONLY=1`:
+
+    $ make test CODEGEN_VARIANT=fp VARIANT_ONLY=1
+
+It skips the test files in which nothing depends on the variant (those that
+only run bytecode, say). Such a pass supplements the pass without
+`CODEGEN_VARIANT`; it does not replace it.
+
+`CODEGEN_VARIANT` composes with the other knobs of the testsuite:
+
+    $ make test CODEGEN_VARIANT=sc USE_RUNTIME=d OCAMLRUNPARAM=v=0,V=1
+    $ make test-one DIR=parallel CODEGEN_VARIANT=poll RUNPARAM=v=0x400
+
+`USE_RUNTIME=d` links the test programs with the debug runtime of the selected
+variant. Do not select a variant through `OCAMLPARAM` (`frame-pointers=1` and
+the like): the testsuite passes the library tree explicitly, and its
+predicates would not know.
+
+Naming a variant that this tree does not build is an error before anything
+runs; naming `base` is the same as not setting the variable.
+
+The `promote-*` targets accept `CODEGEN_VARIANT` too, because a test that
+only runs under a variant can only be promoted there:
+
+    $ make promote-one TEST=parallel/join.ml CODEGEN_VARIANT=poll
+    $ make test CODEGEN_VARIANT=sc; make promote-failed CODEGEN_VARIANT=sc
+
+Reference files are shared by all variants. If the output of a test really
+depends on the variant, the test needs a guard (`no-frame_pointers;`,
+`stack-checks;`, ...) or its own `codegen_variant` blocks, not a promotion.
+
+To run the whole testsuite for every variant of the build, one pass per
+variant:
+
+    $ make test-variants
+    $ make -j test-variants
+    $ make test-variants TEST_VARIANTS="base fp sc"
+
+With `-j` the passes run at the same time and share the processors. Each pass
+writes its output to `_runtest/test-variants.<variant>.out`, and the summaries
+are printed together at the end.
+
+Passes can also be run side by side by hand: `TEST_ID=<label>` gives a pass
+its own build directories (`_ocamltest.<label>`), log
+(`_runtest/testsuite/_log.<label>`) and failure stamp, so that it does not
+disturb another pass in the same tree. `promote-failed` with the same
+`TEST_ID` promotes the failures of that pass. `TEST_JOBS=<n>` sets how many
+tests a pass runs at once (by default one per processor, or the `-j` of
+`make`).
+
+    $ make install_for_test
+    $ make test-no-rebuild CODEGEN_VARIANT=fp TEST_ID=fp TEST_JOBS=16 &
+    $ make test-no-rebuild CODEGEN_VARIANT=sc TEST_ID=sc TEST_JOBS=16 &
+
+`test`, `test-one` and `promote-one` rebuild `_runtest` first: do not start
+them while another pass is running in the same tree.
 
 ## Debugging
 
@@ -70,6 +233,669 @@ To add a new printer, simply add a line of the form
 
 to `tools/debug_printers.ml`, and then run `make debug_printers` in the `tools`
 directory to regenerate the printing script.
+
+## Codegen variants
+
+Frame pointers, stack checks, poll insertion and AddressSanitizer are chosen
+each time `ocamlopt` runs, not when OxCaml is configured. With no flag,
+`ocamlopt` compiles for the variant that has all four off, `base`, on every
+installation: no `configure` option changes that. Pass the axis flag
+(`-frame-pointers`, `-stack-checks`, `-enable-poll-insertion`, `-asan`), or
+set the corresponding `OCAMLPARAM` key (e.g. `OCAMLPARAM=_,frame-pointers=1`),
+for every compilation and for the link of the program you want to profile
+or check (`OCAMLPARAM` reaches both). A single OxCaml
+installation serves all of its built variants: the library root, `lib/ocaml`,
+holds the runtimes and the libraries of `base`, and those of every other
+variant are installed under `lib/ocaml/variants/<name>` (names are the sorted
+enabled-axis tokens, e.g. `fp`, `fp-sc`, `asan-fp`; `base` is the name of
+all-off, and has no directory there).
+
+`configure` decides which variants are built besides `base`:
+
+* With no option, `fp`, `sc`, `poll` and `fp-sc` on x86-64, and `poll` and
+  `sc` on arm64. On x86-64 Linux, `asan-fp` as well where the C compiler is
+  a Clang that can link AddressSanitizer executables.
+* `--enable-frame-pointers`, `--enable-stack-checks`,
+  `--enable-poll-insertion` and `--enable-address-sanitizer` are
+  requirements: `configure` fails when an enabled axis is not supported, and
+  it builds the variant that has exactly the enabled axes
+  (`--enable-frame-pointers --enable-poll-insertion` adds `fp-poll` to the
+  list above). AddressSanitizer brings frame pointers with it, and is
+  refused together with stack checks.
+* `--disable-<axis>` builds no variant with that axis:
+  `--disable-frame-pointers` leaves `fp`, `fp-sc` and `asan-fp` out.
+* `--with-codegen-variants=NAME,NAME` gives the list itself, under the same
+  two rules: the variant that the `--enable-<axis>` options require has to be
+  in it, and a variant with a disabled axis must not be.
+* `--disable-codegen-variants` builds `base` alone, and so cannot be combined
+  with an `--enable-<axis>` option.
+
+The `--enable-<axis>` options used to make their settings the default of the
+compiler. They no longer do: a compiler configured with
+`--enable-frame-pointers` compiles for `base` when it is given no flag, like
+any other. When `configure` is given one of these options, or its negation,
+it ends by saying so, with the variants that it builds and the `OCAMLPARAM`
+setting that makes one of them the default of a build (see "Another default
+than `base`", below).
+
+Variants are built on Linux and macOS only, with gcc or Clang, for the two
+architectures that have a native backend. arm64 has stack checks and poll
+insertion, and neither frame pointers nor AddressSanitizer. AddressSanitizer
+requires x86-64 Linux, Clang and frame pointers, and cannot be combined with
+stack checks. It also requires the AddressSanitizer runtime library of
+compiler-rt, `libclang_rt.asan`, which some distributions package apart from
+Clang: without it `configure` leaves the AddressSanitizer variants out of the
+list it selects, and says so. What is supported is decided from the native
+backend that `configure` selects and not from the name of the target alone: a
+build without the native compiler has no variants.
+
+An installation configured with `--enable-mmap-map-stack` cannot grow a
+stack, under any variant: with that option the runtime library of every
+variant allocates each stack once with `mmap`, at its initial size (4096
+words) and without a guard page. Code compiled with stack checks then raises
+`Stack_overflow` at that size, and code compiled without them runs off the
+end of its stack (a segmentation fault, where the memory below it is not
+mapped).
+
+The trees under `lib/ocaml/variants` belong to the compiler's installation.
+Each holds a build for its variant of the libraries of the compiler
+distribution, C stubs included: the stub archives of a tree are compiled with
+its variant's macros and sanitizer flags. Installing the compiler again over
+the same prefix replaces the trees whole: it deletes what something else put
+in `lib/ocaml/variants/<name>`. Other files added under the prefix stay, but
+for a `cached-generic-functions.a` in the library root itself, which goes
+when the new installation has none. That is for a prefix outside the source
+directory: `_install` there, the prefix of a development build
+(`--prefix="$PWD/_install"`), is deleted and assembled again as a whole.
+A build of another library for a variant belongs in a directory of its own
+outside the library root.
+
+Frame pointers, stack checks and AddressSanitizer are properties of a whole
+program: all its units, the libraries and the runtime have to agree, and
+`ocamlopt` refuses to mix them. Poll insertion is a property of each unit, as
+it was before there were variants:
+
+* When compiling, `-enable-poll-insertion` and `-disable-poll-insertion` say
+  whether the unit gets polls. They also choose the tree in which `ocamlopt`
+  looks up the libraries of the installation (the standard library, `+dir`,
+  a path inside the library root), as for a link: a directory that only the
+  other tree has is not found ("'+dir' does not exist in the library root
+  selected for codegen variant 'poll'"). They put no condition on what the
+  unit imports: units compiled with either setting link together, and every
+  installation accepts both flags, whatever variants it has.
+* When linking, the same flags choose the libraries: those with polls (the
+  tree of `poll`, `fp-poll`, ...) or those without. An installation that has
+  only one of the two trees uses that one for both settings.
+* A program gets more than one domain by default only when every unit in it
+  was compiled with poll insertion, the units of the libraries included. So
+  for such a program, compile and link everything with
+  `-enable-poll-insertion` (or `OCAMLPARAM=_,poll-insertion=1`) on an
+  installation that has libraries with polls, and with the native backend:
+  the LLVM backend inserts no polls, whatever the flag. Where the
+  installation has none, as on the systems without variants, the link still
+  succeeds, with the libraries
+  it has, and prints the alert `no_polled_libraries`: the program is limited
+  to one domain. Alerts are not errors where warnings are; `-alert
+  -no_polled_libraries` silences this one.
+* Code that a program loads into itself follows the rule of a link. A
+  phrase of `ocamlnat`, of eval or of the JIT gets polls by default when
+  the program is fully polled, and `ocamlnat` accepts both flags. Loading
+  code without polls, a phrase or a `Dynlink` plugin, is refused only by a
+  fully polled program that may run more than one domain
+  (`OCAMLRUNPARAM=d=1` permits it). For a plugin this goes by what its
+  header says of its units, so make a plugin from the `.cmx` files of its
+  units: what becomes of an object file without polls that the header does
+  not account for (one given to `ocamlopt -shared` as a `.o` file) depends
+  on the rest of the plugin, below, and `OCAMLRUNPARAM=d=1` is not about it.
+  Nor is it about the code of the LLVM backend, which the JIT, and eval
+  through it, do not load in any program.
+
+The two trees of such a pair are the same libraries but for the polls in their
+code: every unit has the same implementation CRC in both and both define the
+same symbols, which is what lets a unit compiled against one be linked against
+the other. `testsuite/tests/codegen-variants/poll_tree_pairs.ml` checks it. If
+it fails, something recorded in a `.cmx` file, or the name of a symbol, has
+come to depend on poll insertion.
+
+Code and a runtime built with different settings for frame pointers, stack
+checks or AddressSanitizer must not end up in one program. `ocamlopt` refuses
+a `.cmx` file compiled with other settings than the ones it is invoked with,
+and a unit with other settings that a link takes from a `.cmxa` archive ("was
+compiled with codegen configuration ..."). The settings of a unit that the
+link leaves in its archive are not compared. But a link checks what all the
+units of an archive import, taken or not, against its other files, as it did
+before there were variants, and the libraries of two variants do not have the
+same implementation CRCs. So an archive with a unit compiled for another
+variant is refused with the same error when that unit imports the
+implementation of a unit with another CRC than the one that another file of
+the link defines or imports (a unit of the standard library, typically),
+whether or not the link takes it.
+`Dynlink` refuses a `.cmxs` plugin built with other settings than the program.
+For what the compiler cannot read (a runtime
+library, an archive of cached generic functions, an object file) the system
+linker does the checking, with the _link-time guard_ of the variant: every
+runtime library defines one symbol named after its settings,
+
+    caml_runtime_codegen_variant_is_<axes>
+
+where `<axes>` is `base`, `fp`, `sc`, `fp_sc`, `asan_fp`, ... (the name of the
+variant without `poll`, which does not change the runtime, and with `_` for
+`-`), and every object file that `ocamlopt` generates refers to the symbol of
+the settings it was compiled for (not with the LLVM backend, whose object
+files are linked with those of the standard library, which do). A link that
+combines generated code with a runtime library, or with other generated code,
+built for other settings fails on that symbol when it makes an executable (a
+link with `-shared` or `-output-obj` may succeed, and what it makes is then
+checked when it is loaded or linked into a program). GNU ld, lld and the
+macOS linker report it as
+
+    ld: camlcode.o: in function `caml_startup_codegen_variant_guard':
+    (.data+0x0): undefined reference to `caml_runtime_codegen_variant_is_fp'
+
+    ld.lld: error: undefined symbol: caml_runtime_codegen_variant_is_fp
+    >>> referenced by camlcode.o:(.data+0x0)
+
+    Undefined symbols for architecture arm64:
+      "_caml_runtime_codegen_variant_is_fp", referenced from:
+
+and the loader of a shared object as `undefined symbol:
+caml_runtime_codegen_variant_is_fp`. The symbol names what the code needs:
+here the runtime library of `fp`, `libasmrun_fp.a`. (GNU ld and lld may also
+name
+the startup code of the runtime library, `startup_nat`, in that message: on
+ELF systems it refers weakly to the guard of every variant, for the check
+that it makes when the program starts. If the message names another file,
+that is the one to look at. If it names the startup code alone, as GNU ld
+does under `--warn-once` when the runtime library comes before the file in
+the link, and as both do for an object file whose reference the linker
+discarded (below), `nm` finds the file among those of the link:
+the symbol is undefined there (`U`), and weak (`w`) in the startup code.
+`-Wl,--trace-symbol=caml_runtime_codegen_variant_is_fp` lists the files that
+refer to it, the startup code included. Whichever file is named, the symbol
+is the guard that the code needs; the fatal errors of the runtime, below,
+name the one that the running runtime defines.) The reference is in the data
+of the object file, which the startup code of the program refers to: a linker
+that discards unreferenced sections or symbols (`--gc-sections`,
+`-dead_strip`) keeps it wherever it keeps the code. An OCaml object file
+given to the linker by itself, without its `.cmx` file, is not known to the
+startup code: such a linker discards its reference with its data, unless
+something else keeps that data, as the export of every symbol does in a
+program that `ocamlopt` links (`-Wl,-E`). So under `--gc-sections` with
+`--no-export-dynamic` an object file given that way is outside what the guard
+promises. As things are, a link with a static runtime library on an ELF
+system is refused there all the same: the discarded reference leaves the
+guard of the object file an undefined symbol, and the startup code of the
+runtime library, which stays, refers weakly to the guard of every variant.
+With a shared runtime library, linked by hand, an object file of another
+variant given that way links, and nothing refuses it where the runtime has
+no such references (they are made in ELF object files only).
+
+A link that takes object files from the runtime libraries of two variants is
+refused too. Every object file of a runtime library refers to the guard of
+its own variant, which is defined in an object file of its own, next to a
+symbol that has the same name in every variant: the linker then takes that
+object file from both libraries and fails on the duplicate definition of
+`caml_runtime_codegen_variant_must_be_unique`. A second runtime library from
+which the linker takes nothing does no harm, and a C program can take a
+function from one runtime library without an OCaml program to start.
+
+Shared runtime libraries of two variants can be linked together, since each
+may define what the other defines. So the runtime that starts the program
+checks two things, and stops if either fails. The guard that the program's
+startup object refers to must be its own ("this program was started by a
+runtime of another codegen variant than the one its OCaml code was compiled
+for"). A startup object without that reference, which another build of the
+compiler generated, is not checked on ELF systems; elsewhere the reference is
+required, by the linker with a static runtime library and by the dynamic
+linker with a shared one. And no guard of another variant may be defined
+where the dynamic linker looks symbols up for that runtime ("the runtime of
+another codegen variant is loaded in this program"): an object file that
+refers to such a guard would otherwise link, and run with the wrong runtime.
+This second check finds a guard that is defined when the program starts: in
+another shared library, or in the executable itself, taken from the static
+runtime library of another variant. It does not find one that is loaded
+later, or one whose symbols the runtime does not see (`dlopen` without
+`RTLD_GLOBAL`).
+
+A plugin defines the guard of the settings it was linked for, for its own
+object files only (the symbol is not exported), so that `Dynlink` can open it
+and compare its units with the program. A plugin that contains no unit has
+nothing for `Dynlink` to compare: its startup code refers to the guard like
+other generated code (not when the plugin is linked with the LLVM backend,
+which emits no such reference in that startup code), and with that reference
+the plugin can only be opened where the dynamic linker finds that guard when
+it loads it. That is in a program of its variant, as a rule; any definition
+that is visible to the dynamic linker then serves, such as one that the
+plugin brings with it, or that of a runtime library loaded since the program
+started (see the limit above). Such a plugin is made from object files alone,
+or from archives of
+which `ocamlopt` takes no unit. It goes through the files of the command line
+from the last to the first, and through the units of an archive in the same
+way, and takes a unit of an archive under `-linkall`, when the unit was
+compiled or put in the archive with `-linkall`, and when a unit that it has
+taken by then needs it: one of a file later on the command line, or a later
+unit of the same archive. Those are the units that the header of the plugin
+lists, for `Dynlink` to check. What the system linker extracts from the
+archive is another matter: for a unit that only a file before the archive
+needs, GNU ld leaves the symbols of the unit undefined, and lld extracts its
+object file, which the header does not list. So put an archive before the
+units that use it when the plugin is to contain it.
+
+Whether a unit has polls is not a matter for that guard, since units with and
+without them link together. But a program is taken to be fully polled on the
+word of its `.cmx` files, and an object file compiled without polls must not
+pass for one compiled with them: one left behind by an earlier compilation,
+one taken from another archive than the `.cmxa` file that was read, one given
+to the linker as it is. So every object file of OCaml code without polls
+refers to the symbol `caml_code_not_fully_polled`, which the startup code of a
+program defines only when the program is not fully polled. In a fully polled
+program such an object file is an undefined symbol, reported like the guard.
+An object file given to the linker as it is, under `--gc-sections` with
+`--no-export-dynamic`, is outside that promise as it is outside the guard's:
+the linker discards its reference with its data. As things are, such a link
+is refused all the same where the declaration described next is made, since
+the startup code of the program then refers to the symbol itself and the
+discarded reference leaves it undefined; where the declaration is not made
+(below), nothing refuses the object file.
+The startup code of a fully polled program also says that the symbol may
+only be defined inside the program (it declares it weak and hidden), so that
+the definition of another OCaml image of the process, such as a shared object
+made with `-output-complete-obj`, does not serve. For a plugin, what its
+header says of its units decides. A plugin defines the symbol, for all its
+object files and for them only, when its header says that one of its units
+has no polls: an object file without polls that `ocamlopt -shared` was given
+without its `.cmx` file then goes with that unit, and `Dynlink` judges the
+plugin by the header (refused by a fully polled program that may run more
+than one domain, loaded with one). A plugin whose header says that every unit
+has polls makes the same declaration as a fully polled program, and does not
+link with an object file without polls in it: give the `.cmx` file of that
+object file instead, and the header tells `Dynlink` what the plugin is. A
+plugin made of object files alone, without a unit, says nothing: an object
+file without polls in it needs a definition that is visible to the plugin
+when it is loaded. A fully polled program provides none, so the plugin does
+not load into it, with one domain either, unless another image does (below).
+A program that is not fully polled provides one if it exports its symbols, as
+the programs that `ocamlopt` links do (a program linked by hand needs
+`-rdynamic`; `-Wl,--export-dynamic-symbol=caml_code_not_fully_polled` is
+enough for a plugin that needs nothing else of the program).
+`OCAMLRUNPARAM=d=1` changes what `Dynlink` accepts, not what the linkers do.
+(With lld, the startup code must also come before the shared objects of the
+link, as it does in the links that `ocamlopt` runs.)
+The declaration needs ELF and the system assembler. On macOS it is not made,
+and two of the outcomes above are weaker there:
+
+* An executable. An object file without polls in a link that is fully
+  polled by its `.cmx` files is an undefined symbol, as above, when nothing
+  else in the link defines `caml_code_not_fully_polled`. But a shared library
+  given to the link that exports a definition, as the OCaml image of an
+  `-output-complete-obj` library does when it is not fully polled, satisfies
+  the reference: the program links, starts as a fully polled program and
+  runs that object file's code with more than one domain. Nothing reports
+  it, at link time or at run time.
+* A plugin. One whose header says that every unit has polls links with an
+  object file without (the linker leaves the undefined symbols of a plugin
+  to the dynamic linker there), and the dynamic linker refuses it in a fully
+  polled program when no definition is visible to the plugin. Where one is
+  visible, the plugin loads, and `Dynlink` takes it for what its header
+  says.
+
+What a link's own `.cmx` files say is checked the same way on every system:
+a program with a unit that was compiled without polls is not fully polled,
+and is limited to one domain.
+All of this is about the files that a link takes: a fully polled program
+vouches for the units that its link took from the files it was given, and a
+plugin for its own. Neither says anything of code that another image of the
+process supplies under the same names. A shared object that holds an OCaml
+image (`-output-complete-obj`) and exports a unit that the program or a
+plugin also has can give them its own code for that unit, with or without
+polls: to a program whose link names it before the archive of the unit (the
+linker then has no need of that member of the archive), and to a plugin
+loaded after it (the dynamic linker binds the plugin's references to the
+definition that the process already has, unless the plugin was linked to
+prefer its own, with `-Wl,-Bsymbolic`). And when such an image is not fully
+polled and its definition of the symbol above is visible to a plugin when it
+is loaded, a plugin made of object files alone, without polls, can load into
+a fully polled program. Both depend on the symbols that the dynamic linker
+sees at that moment: an image can export a unit and not that symbol. Two
+images that define the same units, in one process, are no more supported
+with variants than without.
+The functions that the linker generates, and the phrases that a
+program compiles and loads into itself, have no such reference. Nor have the
+object files of the LLVM backend. That backend inserts no polls and the unit
+info of what it compiles says so, whatever the flag: a program linked from
+such a unit in the ordinary way is not marked fully polled. Apart from the
+limits above, only an object file of that backend that stands beside the
+unit info of another compilation, or comes with none, escapes the linker.
+
+`-use-cached-generic-functions` links the archive `cached-generic-functions.a`
+of the selected variant's tree (`-cached-generic-functions-path` names another
+one; a path to the archive of the library root is redirected to the variant's
+tree like the other paths inside that root). Installations do not necessarily
+have these archives. `generate_cached_generic_functions.exe <file>` writes
+one: for the variant that `-codegen-variant <name>` names, whatever else is
+selected, and otherwise for the variant that `ocamlopt` would compile for
+with the same axis flags and the same `OCAMLPARAM`. It always emits the
+archive itself, also where `OCAMLPARAM` selects the LLVM backend. The
+linker refuses an archive in a link for a variant with other settings, as
+above. `Asmlink.cached_generic_functions_archive ()`, in compiler-libs,
+returns the archive that a link would use, for a build that wants to depend
+on it.
+
+## Building a dune or findlib project for a codegen variant
+
+An installation serves `base` and the codegen variants that
+`ocamlopt -config-var codegen_variants` lists (and a variant that differs
+from one of these only in poll insertion, with that one's libraries). To
+build a project for one of them, select it for every compiler invocation with
+`OCAMLPARAM`; nothing else has to change:
+
+    $ OCAMLPARAM=_,frame-pointers=1 dune build
+    $ OCAMLPARAM=_,frame-pointers=1 ocamlfind opt -package unix -linkpkg main.ml
+    $ OCAMLPARAM=_,asan=1,frame-pointers=1 dune build
+
+The keys are `asan`, `frame-pointers`, `poll-insertion` and `stack-checks`; an
+axis that is not mentioned is off, unless a flag of the command line turns it
+on.
+
+`ocamlopt -config` and `-config-var` do not tell which variant is selected:
+they print the same with any axis flags and any `OCAMLPARAM`. The fields
+`with_frame_pointers`, `no_stack_checks`, `with_address_sanitizer` and
+`poll_insertion` describe `base`, which is what `ocamlopt` compiles for when
+nothing selects a variant: they are `false`, `true`, `false` and `false` on
+every installation, whatever options it was configured with. (That includes
+an architecture other than x86-64 and arm64, which has no native compiler
+and no variants. The C runtime is built with stack checks there, as its
+`caml/m.h` says by defining `STACK_CHECKS_ENABLED`: that is a setting of
+the runtime, which these fields do not describe.)
+`standard_library` is the library root (`OCAMLLIB`, when it is set), and
+`codegen_variants` lists the variant trees found in it: the variants that
+the installation serves besides `base`.
+
+`ocamlc -where` and `-config` report the same library root for every variant,
+so dune and findlib name the libraries of the compiler distribution by path
+inside that root (`-I <root>/unix`, `<root>/unix/unix.cmxa`), as they always
+did. `ocamlopt` looks such a path up in the tree of the variant it compiles
+for, `<root>/variants/<name>`, and uses the copy there if there is one. This
+holds for `-I`, `-Ix`, `-H` and `-Hx` directories (also when they serve as C
+include directories for a `.c` file given to `ocamlopt`), for the files that a
+manifest (`-I-manifest`, `-H-manifest`) or an `-H-file` or `-Hx-file` option
+names, for `.cmx` files given to a link, to `-a` or to `-pack`, for `.cmxa`
+files given to a link,
+for the C objects and archives (`.o`, `.a`) of a link, whether they are on the
+command line, given with `-cclib` or recorded in a `.cmxa`, and for
+`#directory`, `#remove_directory` and `#load` in `ocamlnat`. A path that
+already names a variant's tree is used as it is, and so is a file that the
+same invocation of `ocamlopt` wrote: a source in a directory of the root
+that the variant's tree also has, compiled and linked in one command, is
+linked from the `.cmx` file and the object written next to it (a source in a
+directory below it that only the root has is another matter, see
+below), and a manifest that names the interface or the
+`.cmx` file that the command has just written leads to that file. An
+interface given to `-open-cmi` or `-open-cmi-x` and a manifest that is itself
+inside the root are looked up in the variant's tree as well; the file given
+to `-cmi-file` is not, it is read as it is named. The current
+directory is searched like an `-I` directory: when it is a directory of the
+root, the one of the variant's tree is searched in its place.
+
+A name that `ocamlopt` searches for (`unix.cmxa`, `unix/unix.cmxa`) is
+searched for as it always was, in the current directory, the `-I` directories
+and the standard library directory, and the file that the search finds is
+then looked up in the variant's tree like one named by its path. A C object
+is not searched for: its name is a path from the current directory. Every
+file that is looked up is looked up on its own. The object of a `.cmx` or
+`.cmxa` file is not looked up when the file that was found keeps that
+extension, whatever else its name is: the linker takes the `.o` or `.a` file
+next to it, as it always did, whatever a manifest says of the object. When
+the file that was found does not keep the extension, as the file that a
+manifest entry, `-H-file` or `-Hx-file` names for it need not, the object is
+searched for by its name on the load path. So when a `.cmx` file and its
+object are found apart in that way and only one of the two has a copy in the
+variant's tree, the link gets the description of one build and the code of
+another. Where the two builds differ in frame pointers, stack checks or
+AddressSanitizer, `ocamlopt` refuses the `.cmx` file of the root
+when it reads it. A link that takes the object file of the root
+fails on the link-time guard when it makes an executable; with `-shared` or
+`-output-obj` it may succeed, and what it makes is then checked when it is
+loaded or linked into a program. Where they differ in poll insertion, the
+link of an executable fails on `caml_code_not_fully_polled` when a program
+that would be fully polled gets an object without polls. The two symbols
+tell settings apart, not implementations: a program that is not fully polled
+anyway is linked, with the description of one build and the code of the
+other. So the trees have to hold the same units, each with its description
+and its object together, as the trees of an installation do.
+
+What to keep in mind:
+
+* The path and the root are compared as absolute paths, a relative one taken
+  from the current directory as the system reports it (`.` components and
+  repeated or trailing separators aside). A root reached through a symbolic
+  link, or through `..`, is not recognized, and the file of `base` is
+  then
+  refused by the usual checks ("make inconsistent assumptions over
+  implementation", or "was compiled with codegen configuration"). Under
+  `poll`, which differs from `base` in poll insertion alone, nothing
+  refuses it: it is linked, and the program is not fully polled.
+* A directory of the root is replaced as a whole by its counterpart in the
+  variant's tree, which holds what was installed with the compiler. A file
+  added later to the root or to one of its directories (`<root>/unix`, say)
+  is therefore not found when another tree than the root serves the requested
+  variant ("Unbound module"),
+  neither with `-I`, nor in the standard library directory that `ocamlopt`
+  searches by itself, nor in the current directory when `ocamlopt` runs in
+  such a directory. Install such a file in a directory of its own and name
+  that directory by its path: a directory with no counterpart in the
+  variant's tree is used as it is. The native toplevel decides what its
+  implicit entry for the current directory stands for when it starts: after
+  `#cd` out of such a directory, or into one, the entry still means what it
+  meant then, in the spelling that it had (with a relative library root that
+  is a relative path, which then names a directory below the new one, and so
+  does the entry of the standard library). `#directory` puts its directory
+  after the visible directories that are there, and before the hidden ones
+  (those of `-H`), so a file of that name which a visible one has is still
+  the one found. Name the file by a path from the working directory instead:
+  `#load "./unit.cmxs"` after `#cd`, `#load "./added/unit.cmxs"` after
+  `#directory "added"`.
+* For the same reason, do not compile for a variant that another tree than
+  the root serves inside one of
+  the compiler's own library directories (the root, `<root>/unix`, ...),
+  whether it is the current directory or is named with `-I`, and do not
+  write an output there with `-o`. What this
+  command or an earlier one left there is not found there. A source does not
+  see the interface of a unit compiled before it ("Unbound module"), or it
+  sees the installed unit of that name, and the link then reports the two as
+  making inconsistent assumptions. A file that a link, `-a` or `-pack` is
+  given by its bare name is not found either. Named by its path
+  (`./unit.cmx`), such a file is found if the variant's tree has no file of
+  that name in its place; if it has one, that one is taken. `-pack` reads the
+  interface that lies next to a member, which there need not be the one that
+  the member was compiled against, however the member is named. A module that
+  a source refers to is searched for in the directories as they are replaced:
+  naming a `.cmx` file by its path elsewhere on the command line does not put
+  its directory on that search path. So
+  compile sources that depend on each other outside these directories, or
+  for a variant that the root itself serves: `base`, or `poll` where the
+  installation has no tree for it. (A variant's tree that `OCAMLLIB` names
+  directly is the root, and
+  serves its own variant in the same way.) One source compiled and linked
+  there by one
+  command works if it lies in that directory itself or is named by a path. A
+  replaced directory hides a directory below it that is not replaced: from
+  the root, `ocamlopt ./local/u.ml -o prog` links what it wrote in `local`,
+  which only the root has, whereas `ocamlopt local/u.ml -o prog`
+  writes `local/u.cmx` and then searches for that name from the variant's
+  tree ("Cannot find file local/u.cmx", or the file of that name that an `-I`
+  directory leads to). A command that runs in a directory of the root that
+  the variant's tree does not have, and names no replaced directory, works as
+  it always did.
+* Only the files and directories that `ocamlopt` resolves itself are looked
+  up in the variant's tree. A search option of the C linker is passed on as
+  it is: with `-ccopt -L<root>/pkg -cclib -lfoo`, on the command line or
+  recorded in a `.cmxa`, the linker finds the `libfoo.a` of the root
+  under every variant. Name the directory with `-I <root>/pkg` instead
+  (`ocamlopt` gives its `-I` directories to the linker as well), name the
+  archive by its path, or record `-ccopt '-L"$CAMLORIGIN"'` in a `.cmxa`
+  that is installed next to the C library in each tree. Both pairs of quotes
+  are needed: the outer ones keep the shell from expanding `$CAMLORIGIN`,
+  which the link replaces by the directory of the `.cmxa`, and the inner ones
+  keep that directory one argument when its name has a space.
+* Do not select the variant with flags in dune files. dune compiles some
+  modules without the flags of their stanza (the alias module of a wrapped
+  library, for one), so `(ocamlopt_flags (:standard -frame-pointers))` ends
+  with "... was compiled with codegen configuration ..." when the library is
+  archived. `OCAMLPARAM` reaches every invocation. The flags for poll
+  insertion are the exception: they are per unit, so a stanza may have them.
+  (That does not guarantee a fully polled program: the modules that dune
+  compiles without the flags of the stanza have no polls, and the program is
+  not fully polled when the link takes one of them, as it does with
+  `-linkall`. `OCAMLPARAM` reaches them too.)
+* dune does not rebuild when only `OCAMLPARAM` changes. Use one build
+  directory per variant (`dune build --build-dir _build-fp`), or one context
+  per variant in `dune-workspace`:
+
+      (context
+       (default
+        (name fp)
+        (env (_ (env-vars (OCAMLPARAM _,frame-pointers=1))))))
+
+* Only native code has variants: `ocamlc` and `ocamldep` ignore these keys,
+  and bytecode builds are the same under every setting.
+* The C stubs that dune compiles itself (`foreign_stubs`) go to the C compiler
+  directly, with the headers of the library root: they are compiled as for
+  `base`. A stub that tests `WITH_FRAME_POINTERS`,
+  `STACK_CHECKS_ENABLED` or `WITH_ADDRESS_SANITIZER` needs
+  `-DCAML_CODEGEN_VARIANT_EXPLICIT` and a `-D` for each axis that is on in its
+  flags (or `-I <root>/variants/<name>` ahead of the library root).
+* For a variant with frame pointers, a stub that can call back into OCaml or
+  allocate must keep its frame pointer, whatever it tests: compile it with
+  `-fno-omit-frame-pointer`. With stack checks as well (`fp-sc`), the runtime
+  walks the frame-pointer chain through the stub's frame when it reallocates
+  the stack; if the stub has none, the debug runtime fails an assertion and
+  the release runtime leaves the chain unrepaired without a word. The C flags
+  that `ocamlc -config` reports contain the option on an installation that
+  has such a variant, so a stanza that keeps them (`(flags (:standard ...))`)
+  is fine. One that replaces them is not, nor is a stub built by other means
+  with the macros or the headers of the variant alone (`gcc -O2` uses the
+  frame-pointer register as an ordinary register). `ocamlopt` adds the option
+  to a `.c` file that it compiles for such a variant.
+* The C flags that `ocamlc -config` reports never instrument a stub for
+  AddressSanitizer, whatever the installation was configured with. So a
+  stub that dune compiles itself is not instrumented under a variant with
+  `asan`, and AddressSanitizer does not check it: the macros and the
+  variant's headers do not instrument anything, `-fsanitize=address` in the
+  flags of the stub does. That option is not a way to select the variant,
+  though: given to `ocamlopt` with `-ccopt` it instruments the `.c` files of
+  the command and links the AddressSanitizer runtime into a program whose
+  OCaml code and runtime library are built without it. Select the variant
+  with `-asan` or `OCAMLPARAM`: `ocamlopt` then gives the `.c` files that it
+  compiles the macros and the flags of that variant, and the link the
+  AddressSanitizer runtime, also with `-cc`, which replaces the configured
+  command.
+* In the tree of a variant with `asan`, the stdlib, the otherlibs and the C
+  stubs that native programs link are instrumented. The OCaml code of the
+  compiler's own libraries (compiler-libs, the native toplevel, eval, the
+  JIT) is not: AddressSanitizer does not check it.
+* Only the libraries in the compiler's own library root have a build per
+  variant. A library installed elsewhere was built for one variant. Under a
+  variant with another setting for frame pointers, stack checks or
+  AddressSanitizer, a link that uses a unit of its archive is refused ("was
+  compiled with codegen configuration"), and so is one that only names the
+  archive when a unit in it imports an implementation of the standard
+  library, as most do (see what a link checks of an archive, above). The C
+  objects and the stub archives that come with it carry no fingerprint: they
+  are linked as they are, whether or not a unit of the archive is used. Poll
+  insertion does not count: such an archive links under either setting.
+  Whether the program is fully polled depends on the units of the archive
+  that the link takes (all of them with `-linkall`), not on the flag that
+  `-a` was given. A pack is one unit: it has polls only if all its members
+  have them and `-pack` itself ran with poll insertion.
+* `Dynlink.loadfile` loads the file it is given: a program built for a variant
+  names `<root>/variants/<name>/...` itself. A plugin built with another
+  setting for frame pointers, stack checks or AddressSanitizer is refused
+  with both configurations in the message. One built with AddressSanitizer
+  for a program without it may fail earlier, in the dynamic linker, when its
+  code calls the AddressSanitizer runtime that the program does not have
+  (an undefined `caml_asan_*` symbol). As after any other refusal by `Dynlink`,
+  the refused file stays loaded in the process: do not load another build of
+  the same units into it afterwards. A plugin that contains no unit (see the
+  link-time guard, above), unless it was linked with the LLVM backend, is
+  opened only where the dynamic linker finds its guard when it loads the
+  plugin, which is in a program of its variant as a rule. Elsewhere the
+  dynamic linker lacks the
+  `caml_runtime_codegen_variant_is_...` symbol. Poll insertion is not part of
+  that: a plugin with polls loads into any program, and one whose header says
+  that a unit has no polls loads into any program but a fully polled one that
+  may run more than one domain. An object file without polls that the header
+  does not account for is not `Dynlink`'s to judge: what becomes of it
+  depends on the rest of the header (see the paragraph on
+  `caml_code_not_fully_polled`), so make the plugin from the `.cmx` file of
+  the unit.
+* `ocamlopt` links the runtime library of the selected variant itself, also
+  with `-output-complete-obj`. A link that you write yourself, after
+  `-output-obj`, has to name the runtime library of the variant that the code
+  was compiled for: the `libasmrun*.a` of `<root>/variants/<name>`
+  (`variants/fp/libasmrun_fp.a`, `variants/fp-sc/libasmrun_fp_sc.a`), with the
+  C libraries of that directory. The name follows the settings that change
+  the runtime, which poll insertion does not: `variants/poll/libasmrun.a`,
+  `variants/fp-poll/libasmrun_fp.a`. `-L <root> -lasmrun` names the runtime
+  library of `base`, on every installation. Naming the wrong one is a link
+  error (see the link-time guard, above).
+
+`make check-installed` builds and runs a findlib and a dune consumer of every
+such library under each variant of an installation.
+
+## Another default than `base`
+
+A compiler configured with `--enable-frame-pointers`, `--enable-stack-checks`,
+`--enable-poll-insertion` or `--enable-address-sanitizer` used to compile with
+that setting when it was given no flag. No installation does that now: these
+options only say what has to be built (see "Codegen variants", above). What
+comes closest is to give the settings in `OCAMLPARAM`, before the underscore:
+
+    $ export OCAMLPARAM=frame-pointers=1,_
+    $ export OCAMLPARAM=frame-pointers=1,poll-insertion=1,_
+
+A setting before the underscore is a default: a flag of the command line
+overrides it (`-no-frame-pointers` gives `base` again). A setting after the
+underscore, as in `_,frame-pointers=1` above, overrides the command line.
+
+In both forms this is a default of the `ocamlopt` commands that run in that
+environment, for native compilation and linking. It changes nothing in the
+installation, and so it is less than the configured default was:
+
+* `ocamlopt -config` and `ocamlc -config` describe `base` whatever
+  `OCAMLPARAM` says (`with_frame_pointers: false`), and nothing else in the
+  configuration tells which variant a build selects. A tool that reads the
+  configuration to compile C stubs compiles them for `base`: see the items
+  about stubs, above.
+* The compiler executables, `ocamlnat`, the bytecode runtime and what
+  `ocamlc -custom` links are built for `base`. `ocamlnat` compiles its
+  phrases for `base` whatever the variable says, and refuses a plugin that
+  was compiled for another setting of frame pointers, stack checks or
+  AddressSanitizer (`#load "unit.cmxs"` ends with "was compiled with codegen
+  configuration ..., which is incompatible with the host program's").
+* Only the libraries of the compiler distribution have a tree per variant. A
+  library that was installed in a directory of the library root alone
+  (`<root>/pkg`) is found by a compilation for `base` and not under another
+  variant ("'+pkg' does not exist in the library root selected for codegen
+  variant 'fp'"), and a library installed elsewhere was built for one
+  variant. Each needs a build per variant, outside the library root (see
+  above).
+* An installation that was not built with the variant refuses the first
+  compilation ("... was compiled with codegen configuration ... (note:
+  `<root>` does not contain codegen variant 'fp')"). Poll insertion is the
+  exception: where neither tree of the pair is there, as with
+  `--disable-codegen-variants`, the link uses the libraries of the root and
+  prints the alert `no_polled_libraries`.
+* dune does not rebuild when only `OCAMLPARAM` changes: keep one build
+  directory or one context per variant (above).
+* The linker checks frame pointers, stack checks and AddressSanitizer, and
+  not poll insertion. A unit compiled under `poll-insertion=1` and linked by
+  a command that lost the setting is linked with the libraries without
+  polls, and a unit compiled without the setting is linked by a command
+  that has it. Neither link prints anything, and either program is limited
+  to one domain: `Domain.spawn` fails when it runs. For the other three
+  axes, a command that lost the setting fails ("was compiled with codegen
+  configuration ..., which is incompatible with this invocation's").
 
 ## Benchmarking
 

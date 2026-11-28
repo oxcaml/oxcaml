@@ -189,3 +189,20 @@ type emit_data_item_actions =
   }
 
 val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit
+
+(** Defines the symbol as one byte of data that the other object files of the
+    executable or shared object being linked can refer to, and that is not
+    exported from it (where the assembler can say so). *)
+val emit_hidden_data_symbol : Cmm.symbol -> unit
+
+(** Declares the symbol as one that the object file being emitted does not need
+    (a weak reference) and that nothing outside the executable or shared object
+    being linked may provide (hidden visibility), and refers to it in one word
+    of data, which the linker sets to zero when nothing defines the symbol. ELF
+    linkers give a symbol the most restrictive visibility that any object file
+    of the link states for it, so the references of the other object files of
+    that link can then only be satisfied by a definition inside it. Nothing is
+    emitted where the object format has no visibility for an undefined symbol.
+    Not for the internal assembler, which writes every undefined symbol as an
+    ordinary reference. *)
+val emit_hidden_weak_reference : Cmm.symbol -> unit

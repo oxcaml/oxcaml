@@ -13,9 +13,13 @@ type t = entry list
 
 let current () =
   [ { name = "with_frame_pointers";
-      value = string_of_bool Config.with_frame_pointers };
+      value = string_of_bool !Clflags.frame_pointers };
+    { name = "stack_checks";
+      value = string_of_bool !Clflags.stack_checks };
+    { name = "poll_insertion";
+      value = string_of_bool !Clflags.poll_insertion };
     { name = "with_address_sanitizer";
-      value = string_of_bool Config.with_address_sanitizer };
+      value = string_of_bool (Arch.is_asan_enabled ()) };
     { name = "omit_leaf_frame_pointers";
       value = string_of_bool !Oxcaml_flags.omit_leaf_frame_pointers } ]
 

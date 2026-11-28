@@ -1843,6 +1843,65 @@ With "ocamlopt", you should do:
            camlcode.o -L`ocamlc -where` -lunix -lasmrun
 \end{alltt}
 
+The runtime library must be the one built for the settings that the
+native code was compiled with. "libasmrun.a" in the standard library
+directory is for code compiled without frame pointers, stack checks and
+AddressSanitizer, which is what "ocamlopt" does on every installation
+unless it is told otherwise. Code compiled with one of these settings on
+(the options "-frame-pointers", "-stack-checks" and "-asan", or the
+corresponding keys of "OCAMLPARAM"), that is for another
+\emph{codegen variant} than "base", needs the runtime library and the C
+libraries of that variant. They are in the directory "variants/"\var{name}
+of the standard library directory, where \var{name} lists the settings that
+are on ("fp", "sc", "fp-sc", \ldots), and the runtime
+library there is named after them: "variants/fp/libasmrun_fp.a",
+"variants/fp-sc/libasmrun_fp_sc.a". These names are the same on every
+installation: how it was configured decides which of the directories it
+has, and nothing else. An installation can also provide the
+libraries of a variant only as compiled with poll insertion, in a
+directory whose name includes "poll" ("variants/fp-poll" and no
+"variants/fp"), or only as compiled without it: "ocamlopt" then takes the
+libraries from the directory that exists, and so must the final link. The
+runtime library has the same name in both directories
+("variants/fp-poll/libasmrun_fp.a", and "variants/poll/libasmrun.a" for
+code with poll insertion and none of the other settings), since poll
+insertion does not change it. The system libraries that the runtime library
+needs come after it;
+"ocamlopt -config-var native_c_libraries" prints them. Code compiled with
+AddressSanitizer needs the option "-fsanitize=address" of the C compiler
+at the final link as well. For code compiled with "-frame-pointers" on an
+installation that has a directory "variants/fp":
+\begin{alltt}
+        ocamlopt -frame-pointers -output-obj -o camlcode.o {\it{.cmx and .cmxa files}}
+        cc -o myprog {\it{C objects and libraries}} \char92
+           camlcode.o -L`ocamlc -where`/variants/fp -lasmrun_fp \char92
+           `ocamlopt -config-var native_c_libraries`
+\end{alltt}
+The linker checks this. Every runtime library defines one symbol named
+after the settings it was built for
+("caml_runtime_codegen_variant_is_base", "caml_runtime_codegen_variant_is_fp",
+"caml_runtime_codegen_variant_is_fp_sc", \ldots), and the native code refers to
+the symbol of the settings it was compiled for. Linking it with another
+runtime library fails on that symbol, which GNU ld, lld and the macOS
+linker report as
+\begin{verbatim}
+ld: camlcode.o: in function `caml_startup_codegen_variant_guard':
+(.data+0x0): undefined reference to `caml_runtime_codegen_variant_is_fp'
+
+ld.lld: error: undefined symbol: caml_runtime_codegen_variant_is_fp
+>>> referenced by camlcode.o:(.data+0x0)
+
+Undefined symbols for architecture arm64:
+  "_caml_runtime_codegen_variant_is_fp", referenced from:
+\end{verbatim}
+The end of the symbol names the settings of the code, and so the
+runtime library to link: "libasmrun_fp.a" here. GNU ld and lld may also
+list the startup code of the runtime library that was given
+("startup_nat") among the places that refer to the symbol, before or
+after the object file of the code. "ocamlopt" selects the
+runtime library by itself when it links a program or a file with
+"-output-complete-obj".
+
 % -- This seems completely wrong -- Damien
 % The shared libraries produced by "ocamlc -output-obj" or by "ocamlopt
 % -output-obj" already contains the OCaml runtime library as

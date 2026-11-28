@@ -24,6 +24,8 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    codegen_fingerprint : Codegen_variant.fingerprint;
+    polled : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -52,12 +54,40 @@ type error =
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
   | Requires_metaprogramming_without_flag of filepath
+  | Inconsistent_codegen_variant of
+      { unit_name : Compilation_unit.t;
+        filename : filepath;
+        saved : Codegen_variant.fingerprint;
+        current : Codegen_variant.fingerprint
+      }
+  | Codegen_variant_runtime_not_found of
+      { filename : filepath;
+        variant : string
+      }
+  | Cached_generic_functions_not_found of
+      { filename : filepath;
+        variant : string
+      }
+  | Cached_generic_functions_tree_not_found of { variant : string }
+  | Cached_generic_functions_root_mismatch of
+      { root : filepath;
+        variant : string
+      }
+  | Cached_generic_functions_file_not_found of
+      { filename : filepath;
+        also_looked_up : filepath option
+      }
 
 exception Error of error
+
+(* What a file says of the codegen variant that it was compiled for: the
+   fingerprint of each of its units. *)
+type file_codegen = { fingerprints : (CU.t * Codegen_variant.fingerprint) list }
 
 type t =
   { crc_interfaces : Cmi_consistbl.t;
     crc_implementations : Cmx_consistbl.t;
+    codegen_of_files : (filepath, file_codegen) Hashtbl.t;
     mutable implementations : CU.Set.t;
     mutable cmx_required : CU.Set.t;
     interfaces : unit CU.Name.Tbl.t;
@@ -79,6 +109,7 @@ let create () =
   in
   { crc_interfaces = Cmi_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
+    codegen_of_files = Hashtbl.create 100;
     implementations = CU.Set.empty;
     cmx_required = CU.Set.empty;
     interfaces = CU.Name.Tbl.create 100;
@@ -106,6 +137,43 @@ let get_quoted_cmx t = t.quoted_cmx
 
 (* Consistency check between interfaces and implementations: *)
 
+(* The libraries of two codegen variants that differ in more than poll insertion
+   do not have the same CRCs, so a file that was compiled for a variant with
+   another fingerprint than this invocation's disagrees with the other files on
+   what it imports. That is what to report then, whichever of the two files of
+   an inconsistency it is: the check of each unit's fingerprint comes too late
+   for an archive, whose imports are checked before any of its units is, and
+   never for a unit that the link does not use. *)
+let unit_of_another_variant t ~user ~auth =
+  let current = Codegen_variant.current_fingerprint () in
+  List.find_map
+    (fun file_name ->
+      match Hashtbl.find_opt t.codegen_of_files file_name with
+      | None -> None
+      | Some { fingerprints } ->
+        List.find_map
+          (fun (unit_name, saved) ->
+            if Codegen_variant.equal_fingerprint saved current
+            then None
+            else
+              Some
+                (Inconsistent_codegen_variant
+                   { unit_name; filename = file_name; saved; current }))
+          fingerprints)
+    [user; auth]
+
+let interface_inconsistency t name ~user ~auth =
+  Error
+    (Option.value
+       (unit_of_another_variant t ~user ~auth)
+       ~default:(Inconsistent_interface (name, user, auth)))
+
+let implementation_inconsistency t name ~user ~auth =
+  Error
+    (Option.value
+       (unit_of_another_variant t ~user ~auth)
+       ~default:(Inconsistent_implementation (name, user, auth)))
+
 let check_cmi_consistency t file_name cmis =
   try
     Array.iter
@@ -122,29 +190,60 @@ let check_cmi_consistency t file_name cmis =
   | Cmi_consistbl.Inconsistency
       { unit_name = name; inconsistent_source = user; original_source = auth }
   ->
-    raise (Error (Inconsistent_interface (name, user, auth)))
+    raise (interface_inconsistency t name ~user ~auth)
 
-let check_cmx_consistency t file_name cmxs =
-  try
-    Array.iter
-      (fun import ->
-        let name = Import_info.cu import in
-        let crco = Import_info.crc import in
-        t.implementations <- CU.Set.add name t.implementations;
-        match crco with
-        | None ->
-          if CU.Set.mem name t.cmx_required
-          then raise (Error (Missing_cmx (file_name, name)))
-        | Some crc ->
-          Cmx_consistbl.check t.crc_implementations name () crc file_name)
-      cmxs
+let check_implementation_crc t name crc file_name =
+  try Cmx_consistbl.check t.crc_implementations name () crc file_name
   with
   | Cmx_consistbl.Inconsistency
       { unit_name = name; inconsistent_source = user; original_source = auth }
   ->
-    raise (Error (Inconsistent_implementation (name, user, auth)))
+    raise (implementation_inconsistency t name ~user ~auth)
+
+let check_cmx_consistency t file_name cmxs =
+  Array.iter
+    (fun import ->
+      let name = Import_info.cu import in
+      let crco = Import_info.crc import in
+      t.implementations <- CU.Set.add name t.implementations;
+      match crco with
+      | None ->
+        if CU.Set.mem name t.cmx_required
+        then raise (Error (Missing_cmx (file_name, name)))
+      | Some crc -> check_implementation_crc t name crc file_name)
+    cmxs
+
+let check_codegen_variant_consistency ~unit =
+  let current = Codegen_variant.current_fingerprint () in
+  if not (Codegen_variant.equal_fingerprint unit.codegen_fingerprint current)
+  then
+    raise
+      (Error
+         (Inconsistent_codegen_variant
+            { unit_name = unit.name;
+              filename = unit.file_name;
+              saved = unit.codegen_fingerprint;
+              current
+            }))
+
+let check_library_consistency t file_name (infos : library_infos) =
+  Hashtbl.replace t.codegen_of_files file_name
+    { fingerprints =
+        List.map
+          (fun unit -> unit.li_name, unit.li_codegen_fingerprint)
+          infos.lib_units
+    };
+  check_cmi_consistency t file_name infos.lib_imports_cmi;
+  check_cmx_consistency t file_name infos.lib_imports_cmx
 
 let check_consistency t ~unit cmis cmxs =
+  check_codegen_variant_consistency ~unit;
+  (* The file of a unit of an archive is the archive, which
+     [check_library_consistency] has recorded with all its units. *)
+  if not (Hashtbl.mem t.codegen_of_files unit.file_name)
+  then
+    Hashtbl.add t.codegen_of_files unit.file_name
+      { fingerprints = [unit.name, unit.codegen_fingerprint] };
   check_cmi_consistency t unit.file_name cmis;
   check_cmx_consistency t unit.file_name cmxs;
   let ui_unit = CU.name unit.name in
@@ -153,10 +252,16 @@ let check_consistency t ~unit cmis cmxs =
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
    with Not_found -> ());
   t.implementations <- CU.Set.add unit.name t.implementations;
-  Cmx_consistbl.check t.crc_implementations unit.name () unit.crc unit.file_name;
+  check_implementation_crc t unit.name unit.crc unit.file_name;
   CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
   if CU.is_packed unit.name
   then t.cmx_required <- CU.Set.add unit.name t.cmx_required
+
+let file_holds_unit t file_name unit_name =
+  match Hashtbl.find_opt t.codegen_of_files file_name with
+  | None -> false
+  | Some { fingerprints } ->
+    List.exists (fun (name, _) -> CU.equal name unit_name) fingerprints
 
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold
@@ -245,6 +350,13 @@ let lib_ccopts t = t.lib_ccopts
 
 (* Error report *)
 
+let standard_library_is_built_for = Compilenv.standard_library_is_built_for
+
+let standard_library_is_built_for_another =
+  Compilenv.standard_library_is_built_for_another
+
+let missing_root_hint = Compilenv.missing_root_hint
+
 open Format_doc
 
 let report_error ppf = function
@@ -313,6 +425,60 @@ let report_error ppf = function
       "@[<hov>The library %a@ requires metaprogramming support@ but \
        -uses-metaprogramming was not passed@]"
       Location.Doc.quoted_filename filename
+  | Inconsistent_codegen_variant { unit_name; filename; saved; current } ->
+    fprintf ppf
+      "@[<hov>File %a,@ which contains unit %a,@ was compiled with codegen \
+       configuration@ [%s],@ which is incompatible with this invocation's@ \
+       [%s]%t@]"
+      Location.Doc.quoted_filename filename CU.print_as_inline_code unit_name
+      (Codegen_variant.string_of_fingerprint saved)
+      (Codegen_variant.string_of_fingerprint current) (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)") (missing_root_hint ()))
+  | Codegen_variant_runtime_not_found { filename; variant } ->
+    fprintf ppf
+      "@[<hov>Cannot find the runtime library %a:@ this installation does not \
+       provide codegen variant %s%t@]"
+      Location.Doc.quoted_filename filename variant (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)")
+          (Codegen_variant.missing_root_hint ()))
+  | Cached_generic_functions_not_found { filename; variant } ->
+    let generator_flag =
+      match Codegen_variant.of_string variant with
+      | Some _ -> " -codegen-variant " ^ variant
+      | None -> ""
+    in
+    fprintf ppf
+      "@[<hov>Cannot find %a,@ the cached-generic-functions archive for \
+       codegen variant '%s';@ generate it with@ \
+       @[<h>generate_cached_generic_functions.exe%s %s@]@ or drop \
+       -use-cached-generic-functions@]"
+      Location.Doc.quoted_filename filename variant generator_flag
+      (Filename.quote filename)
+  | Cached_generic_functions_tree_not_found { variant } ->
+    fprintf ppf
+      "@[<hov>This installation has no library tree for codegen variant '%s',@ \
+       and so no cached-generic-functions archive for it%t;@ name one with \
+       -cached-generic-functions-path@ or drop -use-cached-generic-functions@]"
+      variant (fun ppf ->
+        Option.iter (fprintf ppf "@ (%s)") (missing_root_hint ()))
+  | Cached_generic_functions_root_mismatch { root; variant } ->
+    fprintf ppf
+      "@[<hov>The library root %a@ is not built for codegen variant '%s':@ its \
+       cached-generic-functions archive is not for that variant either;@ name \
+       one with -cached-generic-functions-path@ or drop \
+       -use-cached-generic-functions@]"
+      Location.Doc.quoted_filename root variant
+  | Cached_generic_functions_file_not_found { filename; also_looked_up } ->
+    fprintf ppf
+      "@[<hov>Cannot find %a,@ the cached-generic-functions archive that \
+       -cached-generic-functions-path names%t@]"
+      Location.Doc.quoted_filename filename (fun ppf ->
+        Option.iter
+          (fprintf ppf
+             ",@ nor %a,@ where a path inside the library root is looked up \
+              first for the selected codegen variant"
+             Location.Doc.quoted_filename)
+          also_looked_up)
 
 let () =
   Location.register_error_of_exn (function

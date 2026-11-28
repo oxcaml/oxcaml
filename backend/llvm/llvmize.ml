@@ -1829,6 +1829,12 @@ let data (ds : Cmm.data_item list) =
   with _ ->
     fail_msg ~name:"data" "error while decoding data items: %a" Printcmm.data ds
 
+let hidden_data_symbol (symbol : Cmm.symbol) =
+  let t = get_current_compilation_unit "hidden_data_symbol" in
+  add_data_def t
+    (LL.Data.constant ~hidden:true symbol.sym_name (V.of_int ~typ:T.i8 0));
+  add_defined_symbol t symbol.sym_name
+
 (* Wrapping up loose ends *)
 
 let define_c_call_wrappers t =
@@ -1923,7 +1929,8 @@ let define_auxiliary_functions t =
 (* Interface with the rest of the compiler *)
 
 let init ~output_prefix ~ppf_dump =
-  fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
+  fail_if_not ~msg:"stack checks not supported" "init"
+    (not !Clflags.stack_checks);
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
@@ -1948,7 +1955,7 @@ let invoke_clang_with_llvmir ~output_filename ~input_filename ~extra_flags =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
   let fp_flags =
-    if Config.with_frame_pointers
+    if !Clflags.frame_pointers
     then ["-fno-omit-frame-pointer"]
     else ["-fomit-frame-pointer"; "-momit-leaf-frame-pointer"]
   in

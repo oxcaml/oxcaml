@@ -756,6 +756,14 @@
        output = "ref_indirect.cmx.ocamlobjinfo.output";
        ocamlobjinfo;
 
+       (* Strip the lines of the dump that depend on the codegen variant,
+          so that the reference holds for every variant.  They are checked
+          by tool-ocamlobjinfo/codegen_fingerprint.ml. *)
+       stdout = "strip-codegen-fingerprint.stdout";
+       stderr = "strip-codegen-fingerprint.stderr";
+       script = "sh ${test_source_directory}/../../tool-ocamlobjinfo/strip-codegen-fingerprint.sh ${output}";
+       script;
+
        reference = "ref_indirect.cmx.ocamlobjinfo.reference";
        check-program-output;
      }{

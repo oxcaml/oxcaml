@@ -8,7 +8,7 @@
  (alias runtest-sancov)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (= %{env:OXCAML_CLANG=} "")))
  (action
   (progn
@@ -21,7 +21,7 @@
 (rule
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets sancov_test.output.corrected)
  (deps sancov_lib.ml sancov_test.ml stubs.c run.sh)
@@ -34,7 +34,7 @@
  (alias runtest-sancov)
  (enabled_if
   (and
-   (= %{context_name} "main")
+   (<> %{context_name} "default")
    (<> %{env:OXCAML_CLANG=} "")))
  (action
   (diff sancov_test.output sancov_test.output.corrected)))

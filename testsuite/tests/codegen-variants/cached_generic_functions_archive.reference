@@ -1,0 +1,12 @@
+The base variant:
+  by default: <root>/cached-generic-functions.a
+  the root's, by name: <root>/cached-generic-functions.a
+  another, by name: elsewhere/cached-generic-functions.a
+A variant with a tree:
+  by default: <root>/variants/<with a tree>/cached-generic-functions.a
+  the root's, by name: <root>/variants/<with a tree>/cached-generic-functions.a
+  another, by name: elsewhere/cached-generic-functions.a
+A variant without a tree:
+  by default: <root>/variants/<without a tree>/cached-generic-functions.a
+  the root's, by name: <root>/cached-generic-functions.a
+  another, by name: elsewhere/cached-generic-functions.a

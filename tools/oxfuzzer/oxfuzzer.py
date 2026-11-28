@@ -198,6 +198,11 @@ COMPILE_TIMEOUT_SEC = 400.0
 RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
 MAX_PROGRAM_BYTES = 1024 * 1024
+# What the compilers and the programs inherit from this process and a
+# reproducer has to restore. OCAMLPARAM can select another codegen variant
+# of the same compiler; the runtime reads CAMLRUNPARAM when OCAMLRUNPARAM is
+# unset.
+INHERITED_VARIABLES = ("OCAMLPARAM", "OCAMLRUNPARAM", "CAMLRUNPARAM")
 
 
 class Fatal(Exception):
@@ -593,8 +598,10 @@ def run_metadata(base_seed: str, toolchain: Toolchain, revision: str) -> str:
         f"ocamlopt version: {command_output([str(toolchain.ocamlopt), '-version']) or 'unknown'}",
         f"ocamlc version: {command_output([str(toolchain.ocamlc), '-version']) or 'unknown'}",
         f"OCAMLLIB: {toolchain.ocamllib}",
-        f"OCAMLPARAM: {os.environ.get('OCAMLPARAM', '(unset)')}",
-        f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '(unset)')}",
+        *(
+            f"{variable}: {os.environ.get(variable, '(unset)')}"
+            for variable in INHERITED_VARIABLES
+        ),
         f"compile timeout: {COMPILE_TIMEOUT_SEC}s",
         f"run timeout: {RUN_TIMEOUT_SEC}s",
     ]
@@ -628,6 +635,15 @@ def write_command_result(directory: Path, prefix: str, result: CommandResult) ->
     (directory / f"{prefix}.stderr").write_bytes(result.stderr)
 
 
+# The shell command that gives [variable] the value that the compilers and
+# the programs inherit from this process.
+def inherited_setting(variable: str) -> str:
+    value = os.environ.get(variable)
+    if value is None:
+        return f"unset {variable}"
+    return f"export {variable}={shlex.quote(value)}"
+
+
 def reproduction_script(
     configuration: Configuration,
     seed: int,
@@ -648,9 +664,6 @@ def reproduction_script(
     command = compile_command(
         configuration, source=source, executable=Path("program.exe")
     )
-    # CR-soon xclerc: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
-    # which are inherited by compilation and execution by default, but may differ
-    # in the shell, which executes run.bash.
     # No #! line, and the file is not named *.sh: some download filters reject
     # an archive of failures that contains either.
     return "\n".join(
@@ -660,6 +673,7 @@ def reproduction_script(
             "set -eu",
             'cd "$(dirname "$0")"',
             f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}",
+            *map(inherited_setting, INHERITED_VARIABLES),
             # Keep program.ml editable for minimization, but preserve the basename.
             shlex.join(["cp", "../program.ml", str(source)]),
             shlex.join(command),

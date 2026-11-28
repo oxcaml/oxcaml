@@ -113,7 +113,6 @@ val function_layout : Function_layout.t ref
 val float_op_fusion : bool ref
 
 val disable_builtin_check : bool ref
-val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
 val long_frames_threshold : int ref
@@ -142,7 +141,13 @@ val verify_binary_emitter : bool ref
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref
-val cached_generic_functions_path : string ref
+
+(** Set by -cached-generic-functions-path.  When unset, the archive is looked
+    up in the selected codegen variant's standard-library root.  Either way,
+    [Asmlink.cached_generic_functions_archive] is the file that a link uses:
+    a path given here that lies inside the library root is redirected
+    to the selected variant's tree like any other. *)
+val cached_generic_functions_path : string option ref
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
@@ -156,6 +161,13 @@ val dump_llvmir : bool ref
 val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
+
+(** Cleared by [-fno-asan], which leaves the unit uninstrumented without
+    changing its codegen variant: an asan-variant unit ([-asan], see
+    [Clflags.address_sanitizer]) still compiles against the asan library
+    tree, records the asan fingerprint and links only into AddressSanitizer
+    programs. *)
+val asan_instrumentation : bool ref
 
 val fdo_counters : bool ref
 
@@ -357,3 +369,13 @@ module Flambda2 : sig
 end
 
 val opt_flag_handler : Clflags.Opt_flag_handler.t
+
+(** Check that the codegen-variant axis settings of the current invocation
+    ([Clflags.frame_pointers], [Clflags.stack_checks],
+    [Clflags.address_sanitizer]) are supported on this target and mutually
+    consistent ([Codegen_variant.check_supported]), and that the backend
+    selected for OCaml code can generate code for them; exits with an error
+    otherwise.  Run at the start of the compilation of a unit to native
+    code and of a link; does nothing when the target is JSIR, which ignores
+    the settings. *)
+val validate_codegen_variant : unit -> unit
