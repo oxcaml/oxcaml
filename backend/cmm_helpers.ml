@@ -5719,19 +5719,47 @@ let make_untagged_int8_array_payload dbg untagged_int8_list =
   in
   aux [] untagged_int8_list
 
-let allocate_array ~make_payload ~tag_of_length ~alloc_kind ~elements mode dbg =
+(* Allocation of a block with no scannable fields (an unboxed array) whose
+   contents are [payload]: one expression per element of [memory_chunks], [size]
+   words in all. *)
+let allocate_non_scannable_block ~tag ~size ~alloc_kind ~memory_chunks payload
+    (mode : Cmm.Alloc_mode.t) dbg =
+  let block_kind = Mixed_block { scannable_prefix = 0 } in
+  if Cmm.Alloc_mode.is_local mode || size <= Config.max_young_wosize
+  then
+    let header =
+      match mode with
+      | Heap -> white_mixed_block_header tag size ~scannable_prefix_len:0
+      | Local -> local_block_header tag size ~block_kind
+    in
+    Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
+  else
+    (* The block is too large for the minor heap. The payload is evaluated
+       first, from right to left as for [Calloc]; the block is then allocated
+       and filled. *)
+    let rec bind_right_to_left bound = function
+      | [] ->
+        make_alloc_generic ~block_kind ~mode ~alloc_block_kind:alloc_kind dbg
+          tag size bound memory_chunks
+      | last :: rest ->
+        bind "elt" last (fun last -> bind_right_to_left (last :: bound) rest)
+    in
+    bind_right_to_left [] (List.rev payload)
+
+let allocate_array ?(memory_chunk_of_last_word = Word_int)
+    ?(memory_chunk = Word_int) ~make_payload ~tag_of_length ~alloc_kind
+    ~elements mode dbg =
   let payload = make_payload dbg elements in
   let tag = tag_of_length (List.length elements) in
-  let header =
-    let size = List.length payload in
-    match mode with
-    | Cmm.Alloc_mode.Heap ->
-      white_mixed_block_header tag size ~scannable_prefix_len:0
-    | Cmm.Alloc_mode.Local ->
-      local_block_header tag size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
+  let size = List.length payload in
+  let memory_chunks =
+    List.mapi
+      (fun i _ ->
+        if i = size - 1 then memory_chunk_of_last_word else memory_chunk)
+      payload
   in
-  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
+  allocate_non_scannable_block ~tag ~size ~alloc_kind ~memory_chunks payload
+    mode dbg
 
 let allocate_untagged_int8_array ~elements mode dbg =
   allocate_array ~make_payload:make_untagged_int8_array_payload
@@ -5815,7 +5843,13 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_array ~make_payload:make_unboxed_float32_array_payload
+  (* Each word holds two packed elements, except for the last one when the
+     number of elements is odd. *)
+  let memory_chunk_of_last_word : memory_chunk =
+    if List.length elements mod 2 = 0 then Double else Single { reg = Float32 }
+  in
+  allocate_array ~memory_chunk:Double ~memory_chunk_of_last_word
+    ~make_payload:make_unboxed_float32_array_payload
     ~alloc_kind:Alloc_block_kind_float32_u_array
     ~tag_of_length:Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
     ~elements mode dbg
@@ -5845,40 +5879,39 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     ~elements mode dbg
 
 let allocate_unboxed_mask_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_array
+  allocate_array ~memory_chunk:Word_mask ~memory_chunk_of_last_word:Word_mask
     ~make_payload:(fun _ l -> l)
     ~alloc_kind:Alloc_block_kind_mask_u_array
     ~tag_of_length:(fun _ ->
       Unboxed_or_untagged_array_tags.unboxed_mask_array_tag)
     ~elements mode dbg
 
-let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
-    (mode : Cmm.Alloc_mode.t) dbg =
-  let header =
-    let size = ints_per_vec * List.length elements in
-    match mode with
-    | Heap -> white_mixed_block_header tag size ~scannable_prefix_len:0
-    | Local ->
-      local_block_header tag size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: elements, dbg)
+let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~memory_chunk ~tag
+    ~elements mode dbg =
+  allocate_non_scannable_block ~tag
+    ~size:(ints_per_vec * List.length elements)
+    ~alloc_kind
+    ~memory_chunks:(List.map (fun _ -> memory_chunk) elements)
+    elements mode dbg
 
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
     ~alloc_kind:Alloc_block_kind_vec128_u_array
+    ~memory_chunk:Onetwentyeight_unaligned
     ~tag:Unboxed_or_untagged_array_tags.unboxed_vec128_array_tag ~elements mode
     dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
     ~alloc_kind:Alloc_block_kind_vec256_u_array
+    ~memory_chunk:Twofiftysix_unaligned
     ~tag:Unboxed_or_untagged_array_tags.unboxed_vec256_array_tag ~elements mode
     dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
     ~alloc_kind:Alloc_block_kind_vec512_u_array
+    ~memory_chunk:Fivetwelve_unaligned
     ~tag:Unboxed_or_untagged_array_tags.unboxed_vec512_array_tag ~elements mode
     dbg
 
