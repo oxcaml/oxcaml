@@ -673,6 +673,7 @@ let ocaml_ignored_flags =
     "-instantiate";
     "-dflambda-heavy-invariants";
     "-module-entry-functions-section";
+    "-jump-table-sections";
     "-zero-alloc-checker-details-extra";
     "-no-zero-alloc-checker-details-extra";
     "-favx512f";
