@@ -122,6 +122,7 @@ void caml_empty_minor_heap_setup(caml_domain_state* domain, void*);
  * currently on the minor heap. We may wish to do a minor GC
  * first. Returns `true` if a minor GC was done. */
 bool caml_maybe_minor_gc_before_writes(mlsize_t count);
+void caml_ev_minor_allocated(uintnat bytes);
 
 #ifdef DEBUG
 extern int caml_debug_is_minor(value val);
