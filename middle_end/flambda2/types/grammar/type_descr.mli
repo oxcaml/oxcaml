@@ -47,10 +47,10 @@ val is_obviously_unknown : _ t -> bool
 val get_alias_exn : 'head t -> Simple.t
 
 val apply_coercion :
-  apply_coercion_head:('head -> Coercion.t -> 'head Or_bottom.t) ->
+  apply_coercion_head:('head -> Coercion.t -> 'head) ->
   Coercion.t ->
   'head t ->
-  'head t Or_bottom.t
+  'head t
 
 val apply_renaming :
   apply_renaming_head:('head -> Renaming.t -> 'head) ->

@@ -38,8 +38,7 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
           Coercion.change_depth ~from:rec_info ~to_:(Rec_info_expr.var my_depth)
         in
         let callee =
-          Simple.apply_coercion_exn callee
-            coercion_from_callee_to_unrolled_callee
+          Simple.apply_coercion callee coercion_from_callee_to_unrolled_callee
         in
         Some callee, unrolled_rec_info)
   in

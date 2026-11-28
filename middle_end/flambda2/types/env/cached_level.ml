@@ -107,7 +107,7 @@ let canonicalise t simple =
   Simple.pattern_match simple
     ~const:(fun _ -> simple)
     ~name:(fun name ~coercion ->
-      Simple.apply_coercion_exn
+      Simple.apply_coercion
         (Aliases.get_canonical_ignoring_name_mode t.aliases name)
         coercion)
 

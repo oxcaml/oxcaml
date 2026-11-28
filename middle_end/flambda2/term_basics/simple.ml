@@ -81,17 +81,10 @@ let without_coercion t =
 
 let apply_coercion t applied_coercion =
   if Coercion.is_id applied_coercion || is_const t
-  then Some t
+  then t
   else
-    Coercion.compose (coercion t) ~then_:applied_coercion
-    |> Option.map (fun coercion -> with_coercion (without_coercion t) coercion)
-
-let apply_coercion_exn t applied_coercion =
-  match apply_coercion t applied_coercion with
-  | Some t -> t
-  | None ->
-    Misc.fatal_errorf "Cannot@ apply@ coercion@ %a@ to@ %a" Coercion.print
-      applied_coercion print t
+    with_coercion (without_coercion t)
+      (Coercion.compose (coercion t) ~then_:applied_coercion)
 
 (* CR mshinwell: Make naming consistent with [Name] re. the option type *)
 

@@ -996,7 +996,7 @@ let get_canonical_simple_ignoring_name_mode t simple =
       let canonical_of_name =
         Aliases.get_canonical_ignoring_name_mode (aliases t) name
       in
-      Simple.apply_coercion_exn canonical_of_name coercion)
+      Simple.apply_coercion canonical_of_name coercion)
 
 let get_canonical_simple_exn t ?min_name_mode ?name_mode_of_existing_simple
     simple =

@@ -19,7 +19,7 @@ let compose_map_values_exn map ~then_:coercion =
   then map
   else
     Name.Map.map_sharing
-      (fun old_coercion -> Coercion.compose_exn old_coercion ~then_:coercion)
+      (fun old_coercion -> Coercion.compose old_coercion ~then_:coercion)
       map
 
 module Map_to_canonical = struct
@@ -191,7 +191,7 @@ end = struct
     t
 
   let compose { aliases; all } ~then_ =
-    let f m = Name.Map.map_sharing (Coercion.compose_exn ~then_) m in
+    let f m = Name.Map.map_sharing (Coercion.compose ~then_) m in
     let aliases = Name_mode.Map.map_sharing f aliases in
     let all = f all in
     { aliases; all }
@@ -510,7 +510,7 @@ let canonical t element : canonical =
           Coercion.inverse coercion_from_bare_element_to_element
         in
         let coercion_from_element_to_canonical =
-          Coercion.compose_exn coercion_from_element_to_bare_element
+          Coercion.compose coercion_from_element_to_bare_element
             ~then_:coercion_from_bare_element_to_canonical
         in
         if Flambda_features.check_invariants ()
@@ -611,7 +611,7 @@ let add_alias_between_canonical_elements ~binding_time_resolver
       |> Name.Map.fold
            (fun alias coercion_to_to_be_demoted canonical_elements ->
              let coercion_to_canonical =
-               Coercion.compose_exn coercion_to_to_be_demoted
+               Coercion.compose coercion_to_to_be_demoted
                  ~then_:coercion_to_canonical
              in
              Name.Map.add alias
@@ -755,7 +755,7 @@ let add0 ~binding_time_resolver ~binding_times_and_modes t
   let canonical_element1 = element1_with_coercion |> Simple.without_coercion in
   let canonical_element2 = element2_with_coercion |> Simple.without_coercion in
   let coercion_from_canonical_element2_to_canonical_element1 =
-    Coercion.compose_exn
+    Coercion.compose
       (Simple.coercion element2_with_coercion)
       ~then_:(Coercion.inverse (Simple.coercion element1_with_coercion))
   in
@@ -786,7 +786,7 @@ let add ~binding_time_resolver ~binding_times_and_modes t ~canonical_element1
     ~const:(fun _ -> Misc.fatal_error "Cannot demote a constant")
     ~name:(fun name ~coercion ->
       let canonical_element =
-        Simple.apply_coercion_exn canonical_element (Coercion.inverse coercion)
+        Simple.apply_coercion canonical_element (Coercion.inverse coercion)
       in
       let add_result = { t; canonical_element; demoted_name = name } in
       if Flambda_features.check_invariants ()
@@ -846,7 +846,7 @@ let find_earliest_alias t ~canonical_element ~binding_times_and_modes
         (Name.Map.min_binding at_earliest_mode)
     in
     let coercion_from_earliest_to_element =
-      Coercion.compose_exn coercion_from_earliest_to_canonical
+      Coercion.compose coercion_from_earliest_to_canonical
         ~then_:coercion_from_canonical_to_element
     in
     Simple.with_coercion (Simple.name earliest)
@@ -929,7 +929,7 @@ let get_aliases t element =
     (if Flambda_features.check_invariants ()
      then
        let element_coerced_to_canonical =
-         Simple.apply_coercion_exn element coercion_from_element_to_canonical
+         Simple.apply_coercion element coercion_from_element_to_canonical
        in
        (* These aliases are all equivalent to the canonical element, and so is
           our original [element] if we coerce it first, so the coerced form of
@@ -938,7 +938,7 @@ let get_aliases t element =
          Name.Map.exists
            (fun name coercion_from_name_to_canonical ->
              let name_coerced_to_canonical =
-               Simple.apply_coercion_exn (Simple.name name)
+               Simple.apply_coercion (Simple.name name)
                  coercion_from_name_to_canonical
              in
              Simple.equal element_coerced_to_canonical name_coerced_to_canonical)
@@ -952,7 +952,7 @@ let get_canonical_ignoring_name_mode t name =
   | Is_canonical -> elt
   | Alias_of_canonical { canonical_element; coercion_to_canonical } ->
     let coercion_from_canonical = Coercion.inverse coercion_to_canonical in
-    Simple.apply_coercion_exn canonical_element coercion_from_canonical
+    Simple.apply_coercion canonical_element coercion_from_canonical
 
 let add_alias_set ~binding_time_resolver ~binding_times_and_modes t name aliases
     =
@@ -989,7 +989,7 @@ let add_alias_set ~binding_time_resolver ~binding_times_and_modes t name aliases
     Name.Map.fold
       (fun name coercion (t, canonical) ->
         let elt = get_canonical_ignoring_name_mode t name in
-        add_alias (t, canonical) (Simple.apply_coercion_exn elt coercion))
+        add_alias (t, canonical) (Simple.apply_coercion elt coercion))
       names acc
   in
   t

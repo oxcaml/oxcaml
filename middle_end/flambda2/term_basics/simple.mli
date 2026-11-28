@@ -25,9 +25,7 @@ include Contains_names.S with type t := t
 
 val has_coercion : t -> bool
 
-val apply_coercion : t -> Coercion.t -> t option
-
-val apply_coercion_exn : t -> Coercion.t -> t
+val apply_coercion : t -> Coercion.t -> t
 
 val without_coercion : t -> t
 
