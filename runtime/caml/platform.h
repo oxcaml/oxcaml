@@ -69,21 +69,6 @@ Caml_inline void cpu_relax(void) {
 }
 
 
-/* If we're using glibc, use a custom condition variable implementation to
-   avoid this bug: https://sourceware.org/bugzilla/show_bug.cgi?id=25847
-
-   For now we only have this on linux because it directly uses the linux futex
-   syscalls. */
-#if defined(__linux__) && defined(__GNU_LIBRARY__) && defined(__GLIBC__) && defined(__GLIBC_MINOR__)
-typedef struct {
-  volatile unsigned counter;
-} custom_condvar;
-#define CUSTOM_COND_INITIALIZER {0}
-#else
-typedef pthread_cond_t custom_condvar;
-#define CUSTOM_COND_INITIALIZER PTHREAD_COND_INITIALIZER
-#endif
-
 /* Warning: blocking functions.
 
    Blocking functions are for use in the runtime outside of the
@@ -130,8 +115,8 @@ void caml_plat_assert_all_locks_unlocked(void);
 Caml_inline void caml_plat_unlock(caml_plat_mutex*);
 void caml_plat_mutex_free(caml_plat_mutex*);
 CAMLextern void caml_plat_mutex_reinit(caml_plat_mutex*);
-typedef custom_condvar caml_plat_cond;
-#define CAML_PLAT_COND_INITIALIZER CUSTOM_COND_INITIALIZER
+typedef pthread_cond_t caml_plat_cond;
+#define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
 void caml_plat_cond_init(caml_plat_cond*);
 void caml_plat_wait(caml_plat_cond*, caml_plat_mutex*); /* blocking */
 void caml_plat_broadcast(caml_plat_cond*);
