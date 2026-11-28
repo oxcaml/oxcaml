@@ -102,18 +102,18 @@ let runtime_archive_suffix t =
 let runtime_guard_symbol t = Codegen_variant_name.runtime_guard_symbol (name t)
 
 (* The target checks mirror the cases of configure.ac that decide which
-   variants can be built: frame pointers need the amd64 backend, the C
-   runtime's stack checks are mandatory everywhere but on amd64 and arm64,
-   and AddressSanitizer is Clang-only (the runtime's report wrappers rely
-   on Clang-only attributes, see runtime/memory.c). *)
+   variants can be built: frame pointers need the amd64 backend, and
+   AddressSanitizer is Clang-only (the runtime's report wrappers rely on
+   Clang-only attributes, see runtime/memory.c).  Stack checks can be on
+   or off wherever native code is generated, which is on amd64 and arm64.
+   (The C runtime of every other architecture is built with stack checks,
+   whatever the variant: that is a setting of that runtime, see
+   configure.ac, and there is no backend to generate code for it.) *)
 let check_supported t =
   let frame_pointers_supported =
     match Config.architecture, Config.system with
     | "amd64", ("linux" | "macosx") -> true
     | _, _ -> false
-  in
-  let stack_checks_optional =
-    match Config.architecture with "amd64" | "arm64" -> true | _ -> false
   in
   if t.frame_pointers && not frame_pointers_supported
   then
@@ -126,11 +126,6 @@ let check_supported t =
       "Stack checks together with AddressSanitizer is an untested \
        combination; disable one of them (-no-stack-checks or -no-asan, or \
        stack-checks=0 / asan=0 in OCAMLPARAM)"
-  else if not (t.stack_checks || stack_checks_optional)
-  then
-    Error
-      "Stack checks cannot be disabled on this architecture; remove \
-       -no-stack-checks (or stack-checks=0 in OCAMLPARAM)"
   else if not t.address_sanitizer
   then Ok ()
   else if not t.frame_pointers
