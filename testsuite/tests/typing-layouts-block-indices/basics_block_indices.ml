@@ -87,6 +87,16 @@ val a : unit -> (t1, string) idx_mut = <fun>
 val b : unit -> (t1, int) idx_imm = <fun>
 |}]
 
+(* Disambiguate by an expected idx_atomic type *)
+type at1 = { mutable at : string [@atomic] }
+type at2 = { mutable at : string [@atomic] }
+let at1 () : (at1, _) idx_atomic = (.at)
+[%%expect{|
+type at1 = { mutable at : string [@atomic]; }
+type at2 = { mutable at : string [@atomic]; }
+val at1 : unit -> (at1, string) idx_atomic = <fun>
+|}]
+
 (* Block access disambiguates the unboxed access *)
 type u = #{ x : int }
 type u2 = #{ x : string }
@@ -549,7 +559,7 @@ Line 1, characters 31-37:
 1 | let invalidImm2 = (.idx_atomic((.imm)))
                                    ^^^^^^
 Error: This expression has type "(t, int) idx_imm"
-       but an expression was expected of type "('a, 'b) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_atomic"
 |}]
 
 let invalidMut1 = (.idx_imm((.mut)))
@@ -572,7 +582,7 @@ Line 1, characters 31-37:
 1 | let invalidMut2 = (.idx_atomic((.mut)))
                                    ^^^^^^
 Error: This expression has type "(t, int) idx_mut"
-       but an expression was expected of type "('a, 'b) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_atomic"
 |}]
 
 let invalidAtomic1 = (.idx_imm((.atomic)))
