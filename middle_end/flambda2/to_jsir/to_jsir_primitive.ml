@@ -232,13 +232,31 @@ let flip_sign_bit ~env ~res ~(kind : Flambda_kind.Standard_int.t)
    int8s can have such a base, whether through a block index or a pointer (as
    for the string-like indices of [caml_get_idx_bytecode] and
    [caml_set_idx_bytecode]). They go through [caml_idx_base_get_int8] and
-   [caml_idx_base_set_int8] in the runtime, which dispatch on the base. *)
+   [caml_idx_base_set_int8] in the runtime, which dispatch on the base.
+
+   The byte offset of a field of a large base may not fit in the integers of
+   JavaScript, which are 32 bits wide, even though its index does. The high bits
+   of the index are then taken from the upper half of the offset. *)
 let field_index_of_byte_offset ~env ~res offset =
   let offset, res = prim_arg ~env ~res offset in
-  let offset, env, res =
+  let low, env, res =
     use_prim0 ~env ~res (Extern ("caml_int64_to_int", None)) [offset]
   in
-  use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv offset; int_const 3]
+  let index, env, res =
+    use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv low; int_const 3]
+  in
+  match Clflags.jsir_target_exn () with
+  | Wasm -> index, env, res
+  | Js ->
+    let high, env, res =
+      use_prim0 ~env ~res (Extern ("caml_int64_hi32", None)) [offset]
+    in
+    let high, env, res =
+      use_prim0 ~env ~res
+        (Extern ("%int_lsl", None))
+        [Pv high; int_const (Targetint.num_bits () - 3)]
+    in
+    use_prim0 ~env ~res (Extern ("%int_or", None)) [Pv index; Pv high]
 
 (* The index of a string-like access. Flambda gives this as a naked nativeint,
    which are ints in JavaScript but boxed 64-bit integers in WASM. *)
