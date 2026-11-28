@@ -379,6 +379,7 @@ let print_cmx_infos (uir, sections, crc) =
   if Option.is_some uir.uir_lto_info then
     printf "Flambda 2 unit with LTO information\n";
   print_generic_fns uir.uir_generic_fns;
+  if uir.uir_opaque then printf "Opaque interface: YES\n";
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
     (Format_doc.compat Slambda.CU_data.print)
