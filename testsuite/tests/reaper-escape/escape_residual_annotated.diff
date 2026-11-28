@@ -1,0 +1,17 @@
+66c66,67
+< and code inline(never) loopify(never) size(53) newer_version_of(run_6) run_6_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let `region` = %begin_region () in 
+---
+> and code inline(never) loopify(never) size(53) newer_version_of(run_6) run_6_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let base_1 = %project_value_slot.[run].[base_1] ($camlTest__run_17) in 
+> let `region` = %begin_region () in 
+68d68
+< let base_1 = %project_value_slot.[run].[base_1] ($camlTest__run_17) in 
+78,79c78
+< where k2 (apply_result_1 : imm tagged) = (apply direct(printf_13 &my_alloc_region) inlined(never) $Stdlib__Printf.camlStdlib__Printf__printf_13_12 ($camlTest__const_block_10) -> k2 * k1
+< where k2 (full_apply) = let `unit` = %end_region (`region`) in 
+---
+> where k2 (apply_result_1 : imm tagged) = let `unit` = %end_region (`region`) in 
+81c80,81
+< apply &my_alloc_region inlined(never) full_apply (apply_result_1, apply_result, u1, int_sub) -> k * k1))))))) with { base_1 = base } in 
+---
+> (apply direct(printf_13 &my_alloc_region) inlined(never) $Stdlib__Printf.camlStdlib__Printf__printf_13_12 ($camlTest__const_block_10) -> k2 * k1
+> where k2 (full_apply) = apply &my_alloc_region inlined(never) full_apply (apply_result_1, apply_result, u1, int_sub) -> k * k1))))))) with { base_1 = base } in 

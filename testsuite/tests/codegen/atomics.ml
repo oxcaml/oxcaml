@@ -1,7 +1,7 @@
 (* TEST
  include stdlib_stable;
  flags += " -O3";
- flags += " -experimental-optimizations";
+ flags += " -test-optimizations";
  only-default-codegen;
  expect.opt;
 *)

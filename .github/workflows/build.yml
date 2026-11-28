@@ -172,10 +172,10 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
-          - name: experimental-optimizations (x86_64-linux)
+          - name: test-optimizations (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
-            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            build_ocamlparam: "_,w=-46,test-optimizations=1"
+            ocamlparam: "_,w=-46,test-optimizations=1"
             check_arch: true
             sysdeps: gdb
 

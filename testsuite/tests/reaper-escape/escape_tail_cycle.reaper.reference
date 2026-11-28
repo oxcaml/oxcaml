@@ -1,0 +1,159 @@
+let code sum_pair_0 deleted in
+let code pong_2 deleted and code ping_1 deleted in
+let code run_3 deleted in
+let $camlEscape_tail_cycle__immstring_0 = "; stack growth " in
+let $camlEscape_tail_cycle__const_block_1 = Block 12 (10, 0) in
+let $camlEscape_tail_cycle__const_block_2 =
+  Block 4 (0, 0, 0, $camlEscape_tail_cycle__const_block_1)
+in
+let $camlEscape_tail_cycle__const_block_3 =
+  Block 11 ($camlEscape_tail_cycle__immstring_0,
+            $camlEscape_tail_cycle__const_block_2)
+in
+let $camlEscape_tail_cycle__const_block_4 =
+  Block 4 (0, 0, 0, $camlEscape_tail_cycle__const_block_3)
+in
+let $camlEscape_tail_cycle__immstring_5 = "%d; stack growth %d\n" in
+let $camlEscape_tail_cycle__const_block_6 =
+  Block 0 ($camlEscape_tail_cycle__const_block_4,
+           $camlEscape_tail_cycle__immstring_5)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+      sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_tail_cycle__sum_pair_7 =
+  closure sum_pair_0_1 @sum_pair &toplevel
+in
+let peak = %block.mut.[`0`].`toplevel` (0) in
+let $camlEscape_tail_cycle__ping_8 =
+  closure ping_1_1 @ping &toplevel
+and $camlEscape_tail_cycle__pong_9 =
+  closure pong_2_1 @pong &toplevel
+and code rec loopify(never) size(56) newer_version_of(pong_2)
+      pong_2_1 (n : imm tagged, acc : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let `region` = %begin_region () in
+  let peak_1 =
+    %project_value_slot.[pong].[unboxed_field_peak]
+      ($camlEscape_tail_cycle__pong_9)
+  in
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      (apply ccall
+         ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k3 * k1
+         where k3 (Pccall) =
+           let Psetfield = %block_set.`imm`.[`0`] (peak_1, Pccall) in
+           let Pmakeblock = %block.[`0`].my_alloc_region (acc, n) in
+           let `unit` = %end_region (`region`) in
+           cont k (Pmakeblock))
+    where k2 =
+      let tmp = %block.[`0`].my_alloc_region.local[`region`] (acc, n) in
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_tail_cycle__sum_pair_7 : _ -> imm tagged)
+           (tmp)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_and = %int_barith.`and` (apply_result, 65535) in
+           let int_sub = %int_barith.sub (n, 1) in
+           let `unit` = %end_region (`region`) in
+           apply direct(ping_1_1 &my_alloc_region)
+             ($camlEscape_tail_cycle__ping_8 ~ depth my_depth -> succ my_depth
+              : _ -> [ 0 of imm tagged * imm tagged ])
+               (int_sub, int_and)
+               -> k * k1)
+and code rec loopify(never) size(56) newer_version_of(ping_1)
+      ping_1_1 (n : imm tagged, acc : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let `region` = %begin_region () in
+  let peak_1 =
+    %project_value_slot.[ping].[unboxed_field_peak]
+      ($camlEscape_tail_cycle__ping_8)
+  in
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      (apply ccall
+         ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k3 * k1
+         where k3 (Pccall) =
+           let Psetfield = %block_set.`imm`.[`0`] (peak_1, Pccall) in
+           let Pmakeblock = %block.[`0`].my_alloc_region (acc, acc) in
+           let `unit` = %end_region (`region`) in
+           cont k (Pmakeblock))
+    where k2 =
+      let tmp = %block.[`0`].my_alloc_region.local[`region`] (n, acc) in
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_tail_cycle__sum_pair_7 : _ -> imm tagged)
+           (tmp)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_and = %int_barith.`and` (apply_result, 65535) in
+           let int_sub = %int_barith.sub (n, 1) in
+           let `unit` = %end_region (`region`) in
+           apply direct(pong_2_1 &my_alloc_region)
+             ($camlEscape_tail_cycle__pong_9 ~ depth my_depth -> succ my_depth
+              : _ -> [ 0 of imm tagged * imm tagged ])
+               (int_sub, int_and)
+               -> k * k1)
+  with { unboxed_field_peak = peak }
+in
+let code inline(never) loopify(never) size(8) newer_version_of(run_3)
+      run_3_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(ping_1_1 &my_alloc_region)
+    ($camlEscape_tail_cycle__ping_8 : _ -> [ 0 of imm tagged * imm tagged ])
+      (n, 0)
+      -> k2 * k1
+    where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_tail_cycle__sum_pair_7 : _ -> imm tagged) (p) -> k * k1
+in
+let $camlEscape_tail_cycle__run_10 = closure run_3_1 @run &toplevel in
+let $camlEscape_tail_cycle__Pmakeblock_11 =
+  Block 0 ($camlEscape_tail_cycle__run_10)
+in
+apply ccall
+  ($`*extern*`.caml_local_stack_offset : val -> val) (0) -> k1 * error
+  where k1 (before) =
+    (apply direct(run_3_1 &toplevel)
+       ($camlEscape_tail_cycle__run_10 : _ -> imm tagged)
+         (1000000)
+         -> k1 * error
+       where k1 (r : imm tagged) =
+         let Pfield = %block_load.mut.[`0`] (peak) in
+         let int_sub = %int_barith.sub (Pfield, before) in
+         (apply direct(printf_13 &toplevel) inlined(never)
+            $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+              ($camlEscape_tail_cycle__const_block_6)
+              -> k1 * error
+            where k1 (full_apply) =
+              (apply &toplevel inlined(never)
+                 full_apply (r, int_sub) -> k2 * error
+                 where k2 (function_return : imm tagged) =
+                   cont k1
+                 where k1 =
+                   cont k)))
+  where k =
+    let $camlEscape_tail_cycle =
+      Block 0 ($camlEscape_tail_cycle__sum_pair_7,
+               peak,
+               $camlEscape_tail_cycle__Pmakeblock_11)
+    in
+    cont done ($camlEscape_tail_cycle)

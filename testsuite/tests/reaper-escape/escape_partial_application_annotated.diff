@@ -1,0 +1,8 @@
+25c25
+< (let h = closure h_3_1 @h &my_alloc_region &`region` with { unboxed_field_b = b; unboxed_field_a = a } in 
+---
+> (let h = closure h_3_1 @h &my_alloc_region &`region` with { unboxed_field_a = a; unboxed_field_b = b } in 
+38c38
+< let code inline(never) loopify(never) size(27) newer_version_of(g2_4) g2_4_1 (a : imm tagged, b : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : val = let h = closure h_5_1 @h_1 &my_alloc_region with { unboxed_field_b_1 = b; unboxed_field_a_1 = a } in 
+---
+> let code inline(never) loopify(never) size(27) newer_version_of(g2_4) g2_4_1 (a : imm tagged, b : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : val = let h = closure h_5_1 @h_1 &my_alloc_region with { unboxed_field_a_1 = a; unboxed_field_b_1 = b } in 

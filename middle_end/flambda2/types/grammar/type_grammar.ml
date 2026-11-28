@@ -1179,6 +1179,123 @@ and apply_renaming_variant_extensions extensions renaming =
     then extensions
     else Ext { when_immediate = when_immediate'; when_block = when_block' }
 
+(* Only types of kind [Value] have allocation modes. *)
+let rec map_alloc_modes t ~f =
+  match t with
+  | Value ty -> (
+    match TD.descr ty with
+    | Unknown | Bottom | Ok (Equals _) -> t
+    | Ok (No_alias head) ->
+      Value (TD.create (map_alloc_modes_head_of_kind_value head ~f)))
+  | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
+    t
+
+and map_alloc_modes_head_of_kind_value ({ non_null; is_null } as head) ~f =
+  match non_null with
+  | Unknown | Bottom -> head
+  | Ok non_null ->
+    { non_null = Ok (map_alloc_modes_head_of_kind_value_non_null non_null ~f);
+      is_null
+    }
+
+and map_alloc_modes_head_of_kind_value_non_null head ~f =
+  match head with
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique } ->
+    let blocks =
+      Or_unknown.map blocks ~f:(map_alloc_modes_row_like_for_blocks ~f)
+    in
+    let extensions =
+      match extensions with
+      | No_extensions -> extensions
+      | Ext { when_immediate; when_block } ->
+        Ext
+          { when_immediate = map_alloc_modes_env_extension when_immediate ~f;
+            when_block = map_alloc_modes_env_extension when_block ~f
+          }
+    in
+    Variant { is_int; get_tag; blocks; immediates; extensions; is_unique }
+  | Mutable_block { alloc_mode } -> Mutable_block { alloc_mode = f alloc_mode }
+  | Boxed_float32 (ty, alloc_mode) -> Boxed_float32 (ty, f alloc_mode)
+  | Boxed_float (ty, alloc_mode) -> Boxed_float (ty, f alloc_mode)
+  | Boxed_int32 (ty, alloc_mode) -> Boxed_int32 (ty, f alloc_mode)
+  | Boxed_int64 (ty, alloc_mode) -> Boxed_int64 (ty, f alloc_mode)
+  | Boxed_nativeint (ty, alloc_mode) -> Boxed_nativeint (ty, f alloc_mode)
+  | Boxed_vec128 (ty, alloc_mode) -> Boxed_vec128 (ty, f alloc_mode)
+  | Boxed_vec256 (ty, alloc_mode) -> Boxed_vec256 (ty, f alloc_mode)
+  | Boxed_vec512 (ty, alloc_mode) -> Boxed_vec512 (ty, f alloc_mode)
+  | Boxed_mask (ty, alloc_mode) -> Boxed_mask (ty, f alloc_mode)
+  | Closures { by_function_slot = { known_closures }; alloc_mode } ->
+    let known_closures =
+      Function_slot.Map.map
+        (map_alloc_modes_row_like_case
+           ~map_maps_to:(map_alloc_modes_closures_entry ~f)
+           ~f)
+        known_closures
+    in
+    Closures
+      { by_function_slot = { known_closures }; alloc_mode = f alloc_mode }
+  | String _ -> head
+  | Array { element_kind; length; contents; alloc_mode } ->
+    let contents : _ Or_unknown.t =
+      match contents with
+      | Known (Immutable { fields }) ->
+        Known
+          (Immutable
+             { fields = Array.map (fun ty -> map_alloc_modes ty ~f) fields })
+      | Unknown | Known Mutable -> contents
+    in
+    Array { element_kind; length; contents; alloc_mode = f alloc_mode }
+
+and map_alloc_modes_row_like_case :
+    'lattice 'shape 'maps_to.
+    map_maps_to:('maps_to -> 'maps_to) ->
+    f:(Alloc_mode.For_types.t -> Alloc_mode.For_types.t) ->
+    ('lattice, 'shape, 'maps_to) row_like_case ->
+    ('lattice, 'shape, 'maps_to) row_like_case =
+ fun ~map_maps_to ~f { index; maps_to; env_extension } ->
+  { index;
+    maps_to = map_maps_to maps_to;
+    env_extension = map_alloc_modes_env_extension env_extension ~f
+  }
+
+and map_alloc_modes_row_like_for_blocks ~f
+    { known_tags; other_tags; alloc_mode } =
+  let map_case =
+    map_alloc_modes_row_like_case
+      ~map_maps_to:(Array.map (fun ty -> map_alloc_modes ty ~f))
+      ~f
+  in
+  { known_tags = Tag.Map.map (Or_unknown.map ~f:map_case) known_tags;
+    other_tags = Or_bottom.map other_tags ~f:map_case;
+    alloc_mode = f alloc_mode
+  }
+
+and map_alloc_modes_closures_entry ~f
+    { function_types;
+      closure_types = { function_slot_components_by_index };
+      value_slot_types = { value_slot_components_by_index }
+    } =
+  { function_types;
+    closure_types =
+      { function_slot_components_by_index =
+          Function_slot.Map.map
+            (fun ty -> map_alloc_modes ty ~f)
+            function_slot_components_by_index
+      };
+    value_slot_types =
+      { value_slot_components_by_index =
+          Value_slot.Map.map
+            (fun ty -> map_alloc_modes ty ~f)
+            value_slot_components_by_index
+      }
+  }
+
+and map_alloc_modes_env_extension { equations } ~f =
+  { equations = Name.Map.map (fun ty -> map_alloc_modes ty ~f) equations }
+
 let print_field ?prefix:(print_prefix = Format.pp_print_space)
     ?(is_default = fun _ -> false) ?label:(print_label = Format.pp_print_string)
     ?sep:(print_sep = Format.pp_print_space) label prj print ppf r =

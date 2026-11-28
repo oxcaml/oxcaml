@@ -1,0 +1,149 @@
+124c124
+< | 1 -> k2 (0)
+---
+> | 1 -> k2
+129,131c129,130
+< where k2 (region_return : [ 0
+< | 0 of [ 0 of imm tagged * imm tagged ] ]) = let `unit` = %end_region (`region`) in 
+< cont k (region_return) in 
+---
+> where k2 = let `unit` = %end_region (`region`) in 
+> cont k (0) in 
+142,143c141,142
+< where k2 (s : imm tagged) = ((let `unit` = %end_region (`region`) in 
+< apply direct(after_call_3_1 &my_alloc_region &my_region &my_ghost_region) ($camlTest__after_call_66 : _ -> [ 0 of imm tagged * imm tagged ]) (s, y) -> k2 * k1)
+---
+> where k2 (s : imm tagged) = let `unit` = %end_region (`region`) in 
+> (apply direct(after_call_3_1 &my_alloc_region &my_region &my_ghost_region) ($camlTest__after_call_66 : _ -> [ 0 of imm tagged * imm tagged ]) (s, y) -> k2 * k1
+177,178c176,177
+< | 0 of imm tagged * val ] ] stack = let `region` = %begin_region (my_region) in 
+< let peak_1 = %project_value_slot.[build].[unboxed_field_peak] ($camlTest__build_73) in 
+---
+> | 0 of imm tagged * val ] ] stack = let peak_1 = %project_value_slot.[build].[unboxed_field_peak] ($camlTest__build_73) in 
+> let `region` = %begin_region (my_region) in 
+191,192c190,191
+< where k2 (s : imm tagged) = ((let int_sub = %int_barith.sub (n, 1) in 
+< let `unit` = %end_region (`region`) in 
+---
+> where k2 (s : imm tagged) = let `unit` = %end_region (`region`) in 
+> ((let int_sub = %int_barith.sub (n, 1) in 
+208c207
+< | 1 -> k2 (0)
+---
+> | 1 -> k2
+213,214c212,213
+< where k3 (s : imm tagged) = ((let int_sub = %int_barith.sub (n, 1) in 
+< (let `unit` = %end_region (`region`) in 
+---
+> where k3 (s : imm tagged) = let `unit` = %end_region (`region`) in 
+> ((let int_sub = %int_barith.sub (n, 1) in 
+218c217
+< | 0 of val * imm tagged * val ] ]) (int_sub) -> k4 * k1)
+---
+> | 0 of val * imm tagged * val ] ]) (int_sub) -> k4 * k1
+236,240c235,236
+< where k2 (region_return : [ 0
+< | 0 of [ 0
+< | 0 of val * imm tagged * val ] * imm tagged * [ 0
+< | 0 of val * imm tagged * val ] ]) = let `unit` = %end_region (`region`) in 
+< cont k (region_return) in 
+---
+> where k2 = let `unit` = %end_region (`region`) in 
+> cont k (0) in 
+300,302c296
+< and code inline(never) loopify(never) size(228) newer_version_of(run_16) run_16_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let `region` = %begin_region () in 
+< let ghost_region = %begin_ghost_region () in 
+< let base_1 = %project_value_slot.[run].[base_1] ($camlTest__run_79) in 
+---
+> and code inline(never) loopify(never) size(228) newer_version_of(run_16) run_16_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let base_1 = %project_value_slot.[run].[base_1] ($camlTest__run_79) in 
+303a298,299
+> let `region` = %begin_region () in 
+> let ghost_region = %begin_ghost_region () in 
+307c303
+< where k2 (`*match*` : [ 0 of imm tagged * imm tagged ]) = (apply direct(used_2_1 &my_alloc_region) ($camlTest__used_65 : _ -> imm tagged) (0) -> k2 * k1
+---
+> where k2 (ab : [ 0 of imm tagged * imm tagged ]) = (apply direct(used_2_1 &my_alloc_region) ($camlTest__used_65 : _ -> imm tagged) (0) -> k2 * k1
+310c306
+< where k3 (`*match*_1` : [ 0
+---
+> where k3 (`*match*` : [ 0
+313c309
+< where k3 (`*match*_2` : [ 0
+---
+> where k3 (`*match*_1` : [ 0
+316,317c312,313
+< where k3 (`*match*_3` : [ 0
+< | 0 of [ 0 of imm tagged * imm tagged ] ]) = let prim = %is_int (`*match*_1`) in 
+---
+> where k3 (`*match*_2` : [ 0
+> | 0 of [ 0 of imm tagged * imm tagged ] ]) = let prim = %is_int (`*match*`) in 
+321c317
+< where k3 = let prim_1 = %is_int (`*match*_2`) in 
+---
+> where k3 = let prim_1 = %is_int (`*match*_1`) in 
+325c321
+< where k3 = let prim_2 = %is_int (`*match*_3`) in 
+---
+> where k3 = let prim_2 = %is_int (`*match*_2`) in 
+329,334c325,330
+< where k3 = let `*match*_4` = %block_load.[`0`] (`*match*_3`) in 
+< let `*match*_5` = %block_load.[`0`] (`*match*_1`) in 
+< let Pmixedfield = %block_load.[`1`] (`*match*_4`) in 
+< let Pmixedfield_1 = %block_load.[`0`] (`*match*_4`) in 
+< let Pmixedfield_2 = %block_load.[`1`] (`*match*_5`) in 
+< let Pmixedfield_3 = %block_load.[`0`] (`*match*_5`) in 
+---
+> where k3 = let `*match*_3` = %block_load.[`0`] (`*match*_2`) in 
+> let `*match*_4` = %block_load.[`0`] (`*match*`) in 
+> let Pmixedfield = %block_load.[`1`] (`*match*_3`) in 
+> let Pmixedfield_1 = %block_load.[`0`] (`*match*_3`) in 
+> let Pmixedfield_2 = %block_load.[`1`] (`*match*_4`) in 
+> let Pmixedfield_3 = %block_load.[`0`] (`*match*_4`) in 
+340c336
+< where k2 (`*match*_1` : [ 0 of imm tagged * imm tagged ]) = (apply direct(used_2_1 &my_alloc_region) ($camlTest__used_65 : _ -> imm tagged) (0) -> k2 * k1
+---
+> where k2 (cd : [ 0 of imm tagged * imm tagged ]) = (apply direct(used_2_1 &my_alloc_region) ($camlTest__used_65 : _ -> imm tagged) (0) -> k2 * k1
+342c338
+< where k2 (`Pmakeblock_into_*match*_field_0`, `Pmakeblock_into_*match*_field_1`) = let `*match*_2` = `Pmakeblock_into_*match*_field_0` in 
+---
+> where k2 (Pmakeblock_into_efg_field_0, Pmakeblock_into_efg_field_1) = let `*match*` = Pmakeblock_into_efg_field_0 in 
+347,360c343,356
+< where k2 (`*match*_3` : [ 0 of imm tagged * imm tagged ]) = (apply direct(nested_9_1 &my_alloc_region &`region` &ghost_region) ($camlTest__nested_72 : _ -> val * val) (n, 6) -> k2 * k1
+< where k2 (`Pmakeblock_into_*match*_field_0_1`, `Pmakeblock_into_*match*_field_1_1`) = let `*match*_4` = `Pmakeblock_into_*match*_field_0_1` in 
+< ((let Pmixedfield = `Pmakeblock_into_*match*_field_1_1` in 
+< let Pmixedfield_1 = %block_load.[`1`] (`*match*_4`) in 
+< let Pmixedfield_2 = %block_load.[`0`] (`*match*_4`) in 
+< let Pmixedfield_3 = %block_load.[`1`] (`*match*_3`) in 
+< let Pmixedfield_4 = %block_load.[`0`] (`*match*_3`) in 
+< let Pmixedfield_5 = `Pmakeblock_into_*match*_field_1` in 
+< let Pmixedfield_6 = %block_load.[`1`] (`*match*_2`) in 
+< let Pmixedfield_7 = %block_load.[`0`] (`*match*_2`) in 
+< let Pmixedfield_8 = %block_load.[`1`] (`*match*_1`) in 
+< let Pmixedfield_9 = %block_load.[`0`] (`*match*_1`) in 
+< let Pmixedfield_10 = %block_load.[`1`] (`*match*`) in 
+< let Pmixedfield_11 = %block_load.[`0`] (`*match*`) in 
+---
+> where k2 (jk : [ 0 of imm tagged * imm tagged ]) = (apply direct(nested_9_1 &my_alloc_region &`region` &ghost_region) ($camlTest__nested_72 : _ -> val * val) (n, 6) -> k2 * k1
+> where k2 (Pmakeblock_into_lmo_field_0, Pmakeblock_into_lmo_field_1) = let `*match*_1` = Pmakeblock_into_lmo_field_0 in 
+> ((let Pmixedfield = Pmakeblock_into_lmo_field_1 in 
+> let Pmixedfield_1 = %block_load.[`1`] (`*match*_1`) in 
+> let Pmixedfield_2 = %block_load.[`0`] (`*match*_1`) in 
+> let Pmixedfield_3 = %block_load.[`1`] (jk) in 
+> let Pmixedfield_4 = %block_load.[`0`] (jk) in 
+> let Pmixedfield_5 = Pmakeblock_into_efg_field_1 in 
+> let Pmixedfield_6 = %block_load.[`1`] (`*match*`) in 
+> let Pmixedfield_7 = %block_load.[`0`] (`*match*`) in 
+> let Pmixedfield_8 = %block_load.[`1`] (cd) in 
+> let Pmixedfield_9 = %block_load.[`0`] (cd) in 
+> let Pmixedfield_10 = %block_load.[`1`] (ab) in 
+> let Pmixedfield_11 = %block_load.[`0`] (ab) in 
+399,400c395
+< where k2 (apply_result_1 : imm tagged) = (apply direct(printf_13 &my_alloc_region) inlined(never) $Stdlib__Printf.camlStdlib__Printf__printf_13_12 ($camlTest__const_block_62) -> k2 * k1
+< where k2 (full_apply) = let `unit` = %end_region (`region`) in 
+---
+> where k2 (apply_result_1 : imm tagged) = let `unit` = %end_region (`region`) in 
+402c397,398
+< apply &my_alloc_region inlined(never) full_apply (apply_result_1, apply_result, int_div_1) -> k * k1))))))))))))))))))))) with { base_1 = base; peak = peak } in 
+---
+> (apply direct(printf_13 &my_alloc_region) inlined(never) $Stdlib__Printf.camlStdlib__Printf__printf_13_12 ($camlTest__const_block_62) -> k2 * k1
+> where k2 (full_apply) = apply &my_alloc_region inlined(never) full_apply (apply_result_1, apply_result, int_div_1) -> k * k1))))))))))))))))))))) with { base_1 = base; peak = peak } in 

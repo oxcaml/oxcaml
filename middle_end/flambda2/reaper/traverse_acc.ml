@@ -256,17 +256,20 @@ type t =
     mutable continuation_info : Continuation_info.t Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
     mutable all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    escape : Escape_graph.t
   }
 
 let code_deps t = t.code_deps
+
+let escape t = t.escape
 
 let applications t = t.applications
 
 let record_apply_for_rebuild t apply =
   t.applications <- Applications.add_apply t.applications apply
 
-let create () =
+let create ?(escape = Escape_graph.disabled) () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
     delayed_deps =
@@ -279,7 +282,8 @@ let create () =
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
     set_of_closures_graph = Code_id.Map.empty;
-    all_sets_of_closures = []
+    all_sets_of_closures = [];
+    escape
   }
 
 (* CR-someday ncourant: it would be great if we kept constants and symbols from
@@ -558,6 +562,11 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
     ~from:keep_tuple_alive_var;
   [witness]
 
+(* [Escape_analysis] relies on the shape of the nodes created here to recognise
+   partial applications (see [Escape_analysis.partial_application_node]), and on
+   the one of the widgets of [make_known_arity_apply_widget] to find the callees
+   of an application (see [Escape_analysis.call_result_of_code]); it must be
+   updated if they change, or it would make unsound decisions. *)
 let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
     ~returns ~exn =
   let rec add_deps params_and_witnesses =

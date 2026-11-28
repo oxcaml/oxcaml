@@ -1,0 +1,4 @@
+35c35
+< let h = closure h_3_1 @h &my_alloc_region &`region` with { unboxed_field_b = b; unboxed_field_a = a } in 
+---
+> let h = closure h_3_1 @h &my_alloc_region &`region` with { unboxed_field_a = a; unboxed_field_b = b } in 

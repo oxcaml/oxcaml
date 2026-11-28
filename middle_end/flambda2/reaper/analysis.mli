@@ -22,8 +22,14 @@ module Solution : sig
   val apply_renaming : [`Without_types] t -> Renaming.t -> [`Without_types] t
 end
 
+(** If [escape] is given, the escape analysis is also run, on the facts it holds
+    (which must have been recorded by the traversal that built the problem); its
+    results are recorded there (see [Escape_analysis.perform_analysis]). *)
 val solve :
-  'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f Solution.t
+  ?escape:Escape_graph.t ->
+  'f Traverse.Problem.t ->
+  analysis_scope:Analysis_scope.t ->
+  'f Solution.t
 
 val get_unboxed_fields :
   'f Solution.t -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

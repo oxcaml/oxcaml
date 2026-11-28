@@ -1,0 +1,61 @@
+let code f_0 deleted in
+let $camlEscape_partial_escape__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_partial_escape__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_partial_escape__const_block_0)
+in
+let $camlEscape_partial_escape__const_block_2 =
+  Block 12 (32, $camlEscape_partial_escape__const_block_1)
+in
+let $camlEscape_partial_escape__const_block_3 =
+  Block 4 (0, 0, 0, $camlEscape_partial_escape__const_block_2)
+in
+let $camlEscape_partial_escape__const_block_4 =
+  Block 12 (32, $camlEscape_partial_escape__const_block_3)
+in
+let $camlEscape_partial_escape__const_block_5 =
+  Block 4 (0, 0, 0, $camlEscape_partial_escape__const_block_4)
+in
+let $camlEscape_partial_escape__immstring_6 = "%d %d %d\n" in
+let $camlEscape_partial_escape__const_block_7 =
+  Block 0 ($camlEscape_partial_escape__const_block_5,
+           $camlEscape_partial_escape__immstring_6)
+in
+let code inline(never) loopify(never) size(15) newer_version_of(f_0)
+      f_0_1 (x, y, z)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 of val * val ] * val ] =
+  let inner = %block.[`0`].my_alloc_region (x, y) in
+  let Pmakeblock = %block.[`0`].my_alloc_region (inner, z) in
+  cont k (Pmakeblock)
+in
+let $camlEscape_partial_escape__f_8 = closure f_0_1 @f &toplevel in
+apply direct(f_0_1 &toplevel)
+  ($camlEscape_partial_escape__f_8
+   : _ -> [ 0 of [ 0 of imm tagged * imm tagged ] * imm tagged ])
+    (1, 2, 3)
+    -> k1 * error
+  where k1
+          (`*match*` : [ 0 of [ 0 of imm tagged * imm tagged ] * imm tagged ]) =
+    let `*match*_1` = %block_load.[`0`] (`*match*`) in
+    let Pmixedfield = %block_load.[`1`] (`*match*`) in
+    let Pmixedfield_1 = %block_load.[`1`] (`*match*_1`) in
+    let Pmixedfield_2 = %block_load.[`0`] (`*match*_1`) in
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_partial_escape__const_block_7)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply
+              (Pmixedfield_2, Pmixedfield_1, Pmixedfield)
+              -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_partial_escape =
+      Block 0 ($camlEscape_partial_escape__f_8)
+    in
+    cont done ($camlEscape_partial_escape)

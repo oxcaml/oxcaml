@@ -1,0 +1,22 @@
+40,41c40
+< let region_1 = %begin_region () in 
+< let l = %block.[`0`].my_alloc_region.local[region_1] (x, x) in 
+---
+> let l = %block.[`0`].my_alloc_region.local[`region`] (x, x) in 
+44c43,44
+< where k2 (apply_result : [ 0 of imm tagged * imm tagged ]) = let `unit` = %end_region (region_1) in 
+---
+> where k2 (apply_result : [ 0 of imm tagged * imm tagged ]) = let `unit` = %end_region (`region`) in 
+> let region_1 = %begin_region () in 
+46c46
+< let q = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in 
+---
+> let q = %block.[`0`].my_alloc_region.local[region_1] (n, int_add) in 
+49c49
+< let r = %block.[`0`].my_alloc_region.local[`region`] (int_add_2, int_add_1) in 
+---
+> let r = %block.[`0`].my_alloc_region.local[region_1] (int_add_2, int_add_1) in 
+55c55
+< let unit_1 = %end_region (`region`) in 
+---
+> let unit_1 = %end_region (region_1) in 

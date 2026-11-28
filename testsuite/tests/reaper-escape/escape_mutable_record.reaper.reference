@@ -1,0 +1,74 @@
+let code bump_0 deleted in
+let code f_1 deleted in
+let $camlEscape_mutable_record__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_mutable_record__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_mutable_record__const_block_0)
+in
+let $camlEscape_mutable_record__immstring_2 = "%d\n" in
+let $camlEscape_mutable_record__const_block_3 =
+  Block 0 ($camlEscape_mutable_record__const_block_1,
+           $camlEscape_mutable_record__immstring_2)
+in
+let code inline(never) loopify(never) size(16) newer_version_of(bump_0)
+      bump_0_1 (r : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.mut.[`0`] (r) in
+  let int_add = %int_barith.add (Pfield, 1) in
+  let Psetfield = %block_set.`imm`.[`0`] (r, int_add) in
+  let Pfield_1 = %block_load.mut.[`0`] (r) in
+  let Pfield_2 = %block_load.mut.[`1`] (r) in
+  let int_add_1 = %int_barith.add (Pfield_2, Pfield_1) in
+  let Psetfield_1 = %block_set.`imm`.[`1`] (r, int_add_1) in
+  cont k (0)
+in
+let $camlEscape_mutable_record__bump_4 = closure bump_0_1 @bump &toplevel in
+let code inline(never) loopify(never) size(24) newer_version_of(f_1)
+      f_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let r = %block.mut.[`0`].my_alloc_region (x, 0) in
+  apply direct(bump_0_1 &my_alloc_region)
+    ($camlEscape_mutable_record__bump_4 : _ -> imm tagged) (r) -> k4 * k1
+    where k4 (function_return : imm tagged) =
+      cont k3
+    where k3 =
+      cont k2
+    where k2 =
+      (apply direct(bump_0_1 &my_alloc_region)
+         ($camlEscape_mutable_record__bump_4 : _ -> imm tagged)
+           (r)
+           -> k4 * k1
+         where k4 (function_return : imm tagged) =
+           cont k3
+         where k3 =
+           cont k2
+         where k2 =
+           let Pfield = %block_load.mut.[`1`] (r) in
+           let Pfield_1 = %block_load.mut.[`0`] (r) in
+           let int_add = %int_barith.add (Pfield_1, Pfield) in
+           cont k (int_add))
+in
+let $camlEscape_mutable_record__f_5 = closure f_1_1 @f &toplevel in
+apply direct(f_1_1 &toplevel)
+  ($camlEscape_mutable_record__f_5 : _ -> imm tagged) (1) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_mutable_record__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_mutable_record =
+      Block 0 ($camlEscape_mutable_record__bump_4,
+               $camlEscape_mutable_record__f_5)
+    in
+    cont done ($camlEscape_mutable_record)

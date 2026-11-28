@@ -266,6 +266,10 @@ let cannot_change_witness_calling_convention =
 let cannot_change_calling_convention =
   rel1 "cannot_change_calling_convention" Cols.[n]
 
+(* Exposed under this name for [Escape_analysis], since the name above is reused
+   below. *)
+let cannot_change_calling_convention_relation = cannot_change_calling_convention
+
 let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 
 let cannot_change_representation1 = rel1 "cannot_change_representation1" Cols.[n]

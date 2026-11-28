@@ -198,7 +198,7 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-let solve (type f) (problem : f Traverse.Problem.t)
+let solve (type f) ?escape (problem : f Traverse.Problem.t)
     ~(analysis_scope : Analysis_scope.t) : f Solution.t =
   let { Traverse.Problem.deps;
         delayed_deps;
@@ -217,6 +217,9 @@ let solve (type f) (problem : f Traverse.Problem.t)
   | Lto_participants _ -> ());
   Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
   let unboxing = fixpoint deps ~analysis_scope in
+  Option.iter
+    (fun escape -> Escape_analysis.perform_analysis escape unboxing)
+    escape;
   let db = unboxing.db in
   let ~directly_called, ~known_masks, ~unknown_masks =
     answer_call_queries db applications

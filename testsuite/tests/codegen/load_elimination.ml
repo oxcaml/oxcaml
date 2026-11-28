@@ -1,7 +1,7 @@
 (* TEST
  only-default-codegen;
  flags = " -O3";
- flags += " -experimental-optimizations";
+ flags += " -test-optimizations";
  flags += " -flambda2-simplify-stubs";
  flags += " -g -gdwarf-inlined-frames";
  expect.opt;

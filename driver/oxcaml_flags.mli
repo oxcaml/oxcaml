@@ -16,6 +16,18 @@
 
 (** OxCaml specific command line flags *)
 
+module Experimental : sig
+  (** All registered features are initially disabled. *)
+  val is_enabled : Experimental_feature_registry.t -> bool
+
+  val set_enabled : Experimental_feature_registry.t -> enabled:bool -> unit
+
+  (** Reset the selection to features at or above the given review level.
+      [None] disables all registered features. Ordinary compiler flags are
+      unaffected. *)
+  val set_universe : Experimental_feature_registry.review_level option -> unit
+end
+
 val dump_cfg : bool ref
 val dump_ssa : bool ref
 val cfg_invariants : bool ref

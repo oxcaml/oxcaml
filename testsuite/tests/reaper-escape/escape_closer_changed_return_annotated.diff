@@ -1,0 +1,30 @@
+19,21c19,21
+< and code inline(never) loopify(never) size(45) newer_version_of(unused_result_1) unused_result_1_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : unit = let `region` = %begin_region () in 
+< (let r_1 = %project_value_slot.[unused_result].[unboxed_field_r] ($camlTest__unused_result_7) in 
+< let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in 
+---
+> and code inline(never) loopify(never) size(44) newer_version_of(unused_result_1) unused_result_1_1 (x : imm tagged, y : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : unit = let r_1 = %project_value_slot.[unused_result].[unboxed_field_r] ($camlTest__unused_result_7) in 
+> let `region` = %begin_region () in 
+> (let t = %block.[`0`].my_alloc_region.local[`region`] (x, y) in 
+34,35c34
+< let `unit` = %end_region (`region`) in 
+< cont k)))
+---
+> cont k2)))
+50c49
+< | 0 -> k2 ($camlTest__const_block_0)
+---
+> | 0 -> k2
+55,56c54,55
+< where k2 (region_return : [ 0 of imm tagged * imm tagged ]) = let `unit` = %end_region (`region`) in 
+< cont k (region_return) in 
+---
+> where k2 = let `unit` = %end_region (`region`) in 
+> cont k ($camlTest__const_block_0) in 
+78c77,78
+< and code inline(never) loopify(never) size(127) newer_version_of(run_4) run_4_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let `region` = %begin_region () in 
+---
+> and code inline(never) loopify(never) size(127) newer_version_of(run_4) run_4_1 (n : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged = let r_1 = %project_value_slot.[run].[r] ($camlTest__run_10) in 
+> let `region` = %begin_region () in 
+80d79
+< let r_1 = %project_value_slot.[run].[r] ($camlTest__run_10) in 
