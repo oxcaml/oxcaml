@@ -97,7 +97,7 @@ let to_string t = Codegen_variant_name.to_string (name t)
 let of_string s = Option.map of_name (Codegen_variant_name.of_string s)
 
 let runtime_archive_suffix t =
-  Codegen_variant_name.runtime_archive_suffix (name t) ~default:(name default)
+  Codegen_variant_name.runtime_archive_suffix (name t)
 
 let runtime_guard_symbol t = Codegen_variant_name.runtime_guard_symbol (name t)
 

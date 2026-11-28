@@ -389,10 +389,9 @@ _build/_bootinstall: Makefile.config Makefile.common-ox \
 # OC_CFLAGS_SEXP env var, see VARIANT_ENV_VARS): the configured flags and
 # then the variant's own, which state the variant in full, as for its
 # runtime archives and for the .c files that ocamlopt compiles for it (see
-# Makefile.codegen-variants). They come after OC_CFLAGS, as the last of
-# -fsanitize and -fno-sanitize on a command line wins. The main context's
-# stubs are compiled with OC_CFLAGS alone and get the default variant from
-# m.h, like the default runtime archives.
+# Makefile.codegen-variants). The main context's stubs are compiled with
+# OC_CFLAGS alone, which turn no axis on, like the unsuffixed runtime
+# archives.
 	$(foreach n,$(codegen_variant_names),echo '( $(OC_CFLAGS) $(call codegen_variant_cc_flags,$(n)) )' > duneconf/oc_cflags_main-$(n).sexp; )
 
 # What the check of those flags expects in each variant context (see

@@ -74,10 +74,10 @@ val to_string : t -> string
 
 val of_string : string -> t option
 
-(** The suffix of the runtime archives [t] links ("" for archives shared
-    with the default variant): the projection of [t]'s name onto the
-    runtime axes, relative to the default's; see
-    [Codegen_variant_name.runtime_archive_suffix]. *)
+(** The suffix of the runtime archives [t] links ("" for the archives of
+    the base variant, which a variant that differs from it in poll
+    insertion alone shares): the projection of [t]'s name onto the runtime
+    axes; see [Codegen_variant_name.runtime_archive_suffix]. *)
 val runtime_archive_suffix : t -> string
 
 (** The link-time guard symbol of [t]; see

@@ -39,70 +39,61 @@ codegen_variant_names := $(strip $(CODEGEN_VARIANTS))
 codegen_tokens := asan fp poll sc
 
 # Passed by every C or assembler compilation that states its codegen
-# variant on the command line; m.h then skips the configure defaults.
+# variant on the command line; the headers of a variant's tree then leave
+# the axis macros to the command line.
 codegen_variant_explicit := -DCAML_CODEGEN_VARIANT_EXPLICIT
 
 # Per-token tables.
-# The cc/aspp macro columns define an axis macro (-D<macro>=1) when the
-# axis is on and say nothing when it is off: with
-# $(codegen_variant_explicit) on the command line m.h defines none of
-# them itself, so absence means off whatever the configure default is.
+# The cc and aspp columns turn an axis on: they define its macro
+# (-D<macro>=1) and, for cc, make the C compiler generate code for it. An
+# axis is off when nothing is said: with $(codegen_variant_explicit) on the
+# command line no header defines an axis macro, and the configured C flags
+# turn no axis on.
 # The asan -D rides along even though no .S file tests the macro today
-# (same safety margin as the fp precedent); the -fno-sanitize direction
-# only matters on asan-default configures, where it strips the
-# configure-provided -fsanitize flags (command-line order wins).
+# (same safety margin as the fp precedent).
 codegen_token_asan_ocamlopt_on  := -asan
 codegen_token_asan_ocamlopt_off := -no-asan
 codegen_token_asan_param := asan
-codegen_token_asan_cc_on  := -DWITH_ADDRESS_SANITIZER=1 -fsanitize=address -fsanitize-recover=address
-codegen_token_asan_cc_off := -fno-sanitize=address -fno-sanitize-recover=address
-codegen_token_asan_aspp_on  := -DWITH_ADDRESS_SANITIZER=1
-codegen_token_asan_aspp_off :=
+codegen_token_asan_cc := -DWITH_ADDRESS_SANITIZER=1 -fsanitize=address -fsanitize-recover=address
+codegen_token_asan_aspp := -DWITH_ADDRESS_SANITIZER=1
 
 codegen_token_fp_ocamlopt_on  := -frame-pointers
 codegen_token_fp_ocamlopt_off := -no-frame-pointers
 codegen_token_fp_param := frame-pointers
-codegen_token_fp_cc_on  := -DWITH_FRAME_POINTERS=1 -fno-omit-frame-pointer -g
-codegen_token_fp_cc_off :=
-codegen_token_fp_aspp_on  := -DWITH_FRAME_POINTERS=1
-codegen_token_fp_aspp_off :=
+codegen_token_fp_cc := -DWITH_FRAME_POINTERS=1 -fno-omit-frame-pointer -g
+codegen_token_fp_aspp := -DWITH_FRAME_POINTERS=1
 
 # Poll insertion changes only OCaml code generation (not the runtime), so
 # its cc/aspp columns are empty.
 codegen_token_poll_ocamlopt_on  := -enable-poll-insertion
 codegen_token_poll_ocamlopt_off := -disable-poll-insertion
 codegen_token_poll_param := poll-insertion
-codegen_token_poll_cc_on  :=
-codegen_token_poll_cc_off :=
-codegen_token_poll_aspp_on  :=
-codegen_token_poll_aspp_off :=
+codegen_token_poll_cc :=
+codegen_token_poll_aspp :=
 
 codegen_token_sc_ocamlopt_on  := -stack-checks
 codegen_token_sc_ocamlopt_off := -no-stack-checks
 codegen_token_sc_param := stack-checks
-codegen_token_sc_cc_on  := -DSTACK_CHECKS_ENABLED=1
-codegen_token_sc_cc_off :=
-codegen_token_sc_aspp_on  := -DSTACK_CHECKS_ENABLED=1
-codegen_token_sc_aspp_off :=
+codegen_token_sc_cc := -DSTACK_CHECKS_ENABLED=1
+codegen_token_sc_aspp := -DSTACK_CHECKS_ENABLED=1
 
 # $(call codegen_variant_has,<name>,<token>): <token> if enabled in <name>,
 # empty otherwise ("base" has no tokens).
 codegen_variant_has = $(filter $(2),$(subst -, ,$(1)))
 
-# Absolute per-axis flag lists for variant <name>: one entry per supported
-# token, the enabled or disabled form per membership in the name.  The
-# cc/aspp lists start with $(codegen_variant_explicit).
+# Flag lists for variant <name>.  The ocamlopt list is absolute: one entry
+# per supported token, the enabled or disabled form per membership in the
+# name.  The cc/aspp lists start with $(codegen_variant_explicit) and have
+# the flags of the tokens of the name.
 codegen_variant_ocamlopt_flags = $(strip $(foreach t,$(codegen_tokens),\
   $(if $(call codegen_variant_has,$(1),$(t)),\
     $(codegen_token_$(t)_ocamlopt_on),$(codegen_token_$(t)_ocamlopt_off))))
 codegen_variant_cc_flags = $(strip $(codegen_variant_explicit) \
   $(foreach t,$(codegen_tokens),\
-  $(if $(call codegen_variant_has,$(1),$(t)),\
-    $(codegen_token_$(t)_cc_on),$(codegen_token_$(t)_cc_off))))
+  $(if $(call codegen_variant_has,$(1),$(t)),$(codegen_token_$(t)_cc))))
 codegen_variant_aspp_flags = $(strip $(codegen_variant_explicit) \
   $(foreach t,$(codegen_tokens),\
-  $(if $(call codegen_variant_has,$(1),$(t)),\
-    $(codegen_token_$(t)_aspp_on),$(codegen_token_$(t)_aspp_off))))
+  $(if $(call codegen_variant_has,$(1),$(t)),$(codegen_token_$(t)_aspp))))
 
 # $(call codegen_variant_ocamlparam,<name>): the comma-joined OCAMLPARAM
 # fragment setting every axis, e.g. "frame-pointers=1".

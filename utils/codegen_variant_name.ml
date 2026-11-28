@@ -101,41 +101,30 @@ let ocamlparam token ~enabled =
   | Stack_checks -> "stack-checks=" ^ value
 
 (* Passed by every C or assembler compilation that states its codegen
-   variant on the command line; m.h then skips the configure defaults. *)
+   variant on the command line; the headers of a variant's tree then leave
+   the axis macros to the command line (see runtime/caml/m.h.in). *)
 let explicit_variant_flag = "-DCAML_CODEGEN_VARIANT_EXPLICIT"
 
-(* The cc/aspp macro flags define an axis macro (-D<macro>=1) when the
-   axis is on and say nothing when it is off: with [explicit_variant_flag]
-   on the command line m.h defines none of them itself, so absence means
-   off whatever the configure default is.  The asan -D rides along even
-   though no .S file tests the macro today (same safety margin as the fp
-   precedent). *)
-let cc_macro_flags token ~enabled =
-  match token, enabled with
-  | Address_sanitizer, true -> ["-DWITH_ADDRESS_SANITIZER=1"]
-  | Frame_pointers, true -> ["-DWITH_FRAME_POINTERS=1"]
-  | Stack_checks, true -> ["-DSTACK_CHECKS_ENABLED=1"]
-  | Poll_insertion, true -> []
-  | (Address_sanitizer | Frame_pointers | Poll_insertion | Stack_checks),
-    false ->
-    []
+(* The flags of a token are those that turn its axis on: an axis is off
+   when nothing is said, in the macros (with [explicit_variant_flag] on
+   the command line no header defines one) and in the code that the C
+   compiler generates (the configured flags turn no axis on).
 
-(* The -fno-sanitize direction only matters on asan-default configures,
-   where it strips the configure-provided -fsanitize flags (command-line
-   order wins). *)
-let cc_behavioral_flags token ~enabled =
-  match token, enabled with
-  | Address_sanitizer, true ->
-    ["-fsanitize=address"; "-fsanitize-recover=address"]
-  | Address_sanitizer, false ->
-    ["-fno-sanitize=address"; "-fno-sanitize-recover=address"]
-  | Frame_pointers, true -> ["-fno-omit-frame-pointer"; "-g"]
-  | Frame_pointers, false -> []
-  | Poll_insertion, (true | false) -> []
-  | Stack_checks, (true | false) -> []
+   The cc/aspp macro flags define the axis macro (-D<macro>=1).  The asan
+   -D rides along even though no .S file tests the macro today (same
+   safety margin as the fp precedent). *)
+let cc_macro_flags = function
+  | Address_sanitizer -> ["-DWITH_ADDRESS_SANITIZER=1"]
+  | Frame_pointers -> ["-DWITH_FRAME_POINTERS=1"]
+  | Stack_checks -> ["-DSTACK_CHECKS_ENABLED=1"]
+  | Poll_insertion -> []
 
-let cc_flags token ~enabled =
-  cc_macro_flags token ~enabled @ cc_behavioral_flags token ~enabled
+let cc_behavioral_flags = function
+  | Address_sanitizer -> ["-fsanitize=address"; "-fsanitize-recover=address"]
+  | Frame_pointers -> ["-fno-omit-frame-pointer"; "-g"]
+  | Poll_insertion | Stack_checks -> []
+
+let cc_flags token = cc_macro_flags token @ cc_behavioral_flags token
 
 let aspp_flags = cc_macro_flags
 
@@ -194,10 +183,10 @@ let runtime_projection_identifier t =
     (fun c -> if c = '-' then '_' else c)
     (to_string (runtime_projection t))
 
-let runtime_archive_suffix t ~default =
-  if equal (runtime_projection t) (runtime_projection default)
-  then ""
-  else "_" ^ runtime_projection_identifier t
+let runtime_archive_suffix t =
+  match runtime_projection t with
+  | [] -> ""
+  | _ :: _ -> "_" ^ runtime_projection_identifier t
 
 (* runtime/caml/m.h.in spells the same names, for the runtime that defines
    these symbols: keep the two in step. *)
@@ -210,14 +199,7 @@ let ocamlopt_flags t =
 let ocamlparams t =
   List.map (fun token -> ocamlparam token ~enabled:(mem token t)) all_tokens
 
-let variant_cc_flags t =
-  explicit_variant_flag
-  :: List.concat_map
-       (fun token -> cc_flags token ~enabled:(mem token t))
-       all_tokens
+let variant_cc_flags t = explicit_variant_flag :: List.concat_map cc_flags t
 
 let variant_aspp_flags t =
-  explicit_variant_flag
-  :: List.concat_map
-       (fun token -> aspp_flags token ~enabled:(mem token t))
-       all_tokens
+  explicit_variant_flag :: List.concat_map aspp_flags t

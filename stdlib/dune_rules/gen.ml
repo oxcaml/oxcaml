@@ -355,7 +355,6 @@ let[@inline never] [@local never] write_stdlib_dune ~variant ppf =
     | None -> ""
     | Some r ->
        Codegen_variant_name.runtime_archive_suffix r.cv_name
-         ~default:Codegen_variant_name.base
   in
   let runtime_archives =
     [ "libcamlrun.a"; "libcamlrund.a"; "libcamlrun_pic.a";
@@ -529,15 +528,12 @@ let write_runtime_dune ppf =
      lines, written by Makefile.upstream from Makefile.config).
 
      The per-record cc/aspp flags state the variant in full:
-     -DCAML_CODEGEN_VARIANT_EXPLICIT, which makes m.h skip its definitions
-     for the configure default, plus -D<macro>=1 for exactly the axes that
-     are on.  The default archives pass neither and take m.h's
-     definitions.  The flags are appended AFTER the configure-provided
-     flags so that e.g. on an asan-default configure the appended
-     -fno-sanitize strips the earlier -fsanitize (command-line order
-     wins).  Assembly (.S) files need the macros too (amd64.S and arm64.S
-     include m.h and test WITH_FRAME_POINTERS), hence the separate aspp
-     list. *)
+     -DCAML_CODEGEN_VARIANT_EXPLICIT plus -D<macro>=1 for exactly the axes
+     that are on.  The unsuffixed archives pass neither and take what m.h
+     says, which defines no axis macro where there are variants.  The
+     flags are appended after the configure-provided flags.  Assembly (.S)
+     files need the macros too (amd64.S and arm64.S include m.h and test
+     WITH_FRAME_POINTERS), hence the separate aspp list. *)
   let codegen_archive_sets =
     match codegen_variant_records () with
     | [] -> []
@@ -546,7 +542,6 @@ let write_runtime_dune ppf =
          (fun r ->
            let suffix =
              Codegen_variant_name.runtime_archive_suffix r.cv_name
-               ~default:Codegen_variant_name.base
            in
            if suffix = "" then None
            else
