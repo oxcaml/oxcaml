@@ -1585,10 +1585,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
        is not included in
          sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ write end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b @ write
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ write -> 'a * 'b @ write"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ write"
@@ -1613,10 +1610,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ write -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ immutable
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ write -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ read"
@@ -1641,10 +1635,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
        is not included in
          sig val f : 'a @ read -> 'b @ write -> 'a * 'b end
-       Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
-       is not included in
-         val f : 'a @ read -> 'b @ write -> 'a * 'b
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ write -> 'a * 'b @ write"
        is not compatible with the type "'a @ read -> 'b @ write -> 'a * 'b"
        Type "'b @ write -> 'a * 'b @ write" is not compatible with type
@@ -1668,10 +1659,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ read -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ immutable
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ read -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ write"
@@ -1696,10 +1684,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
        is not included in
          sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ read end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b @ read
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ read -> 'a * 'b @ read"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ read"
@@ -1724,10 +1709,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
        is not included in
          sig val f : 'a @ write -> 'b @ read -> 'a * 'b end
-       Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
-       is not included in
-         val f : 'a @ write -> 'b @ read -> 'a * 'b
+       The value "f" does not match its expected declaration
        The type "'a -> 'b @ read -> 'a * 'b @ read"
        is not compatible with the type "'a @ write -> 'b @ read -> 'a * 'b"
        Type "'b @ read -> 'a * 'b @ read" is not compatible with type
@@ -1768,10 +1750,7 @@ Error: Signature mismatch:
          sig val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
-       Values do not match:
-         val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
+       The value "f" does not match its expected declaration
        The type "'a @ stateless -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
@@ -1794,10 +1773,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading end
-       Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ reading
+       The value "f" does not match its expected declaration
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ reading"
        Type "'b -> 'a * 'b" is not compatible with type
@@ -1821,10 +1797,7 @@ Error: Signature mismatch:
          sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
-       Values do not match:
-         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
-       is not included in
-         val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
@@ -1849,10 +1822,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'b -> 'a * 'b end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing end
-       Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ writing
+       The value "f" does not match its expected declaration
        The type "'a -> 'b -> 'a * 'b" is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ writing"
        Type "'b -> 'a * 'b" is not compatible with type
@@ -1876,10 +1846,7 @@ Error: Signature mismatch:
          sig val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
-       Values do not match:
-         val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
+       The value "f" does not match its expected declaration
        The type "'a @ stateless -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
@@ -1902,10 +1869,7 @@ Error: Signature mismatch:
          sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
-       Values do not match:
-         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
-       is not included in
-         val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
+       The value "f" does not match its expected declaration
        The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
@@ -1952,10 +1916,7 @@ Error: Signature mismatch:
          sig val f : 'a * 'b @ read -> 'a read * 'b write @ read end
        is not included in
          sig val f : 'a * 'b @ read -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ read -> 'a read * 'b write @ read
-       is not included in
-         val f : 'a * 'b @ read -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ read -> 'a read * 'b write @ read"
        is not compatible with the type "'a * 'b @ read -> 'a read * 'b write"
        The return mode was expected to be "read_write" but is "read"
@@ -1982,10 +1943,7 @@ Error: Signature mismatch:
          sig val f : 'a * 'b @ write -> 'a read * 'b write @ write end
        is not included in
          sig val f : 'a * 'b @ write -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ write -> 'a read * 'b write @ write
-       is not included in
-         val f : 'a * 'b @ write -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ write -> 'a read * 'b write @ write"
        is not compatible with the type "'a * 'b @ write -> 'a read * 'b write"
        The return mode was expected to be "read_write" but is "write"
@@ -2014,10 +1972,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig val f : 'a * 'b @ immutable -> 'a read * 'b write end
-       Values do not match:
-         val f : 'a * 'b @ immutable -> 'a read * 'b write @ immutable
-       is not included in
-         val f : 'a * 'b @ immutable -> 'a read * 'b write
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ immutable -> 'a read * 'b write @ immutable"
        is not compatible with the type
          "'a * 'b @ immutable -> 'a read * 'b write"
@@ -2065,10 +2020,7 @@ Error: Signature mismatch:
          sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
          sig val f : 'a * 'b @ reading -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b @ reading -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ reading -> 'a reading * 'b writing"
@@ -2091,10 +2043,7 @@ Error: Signature mismatch:
          sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
          sig val f : 'a * 'b @ writing -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b @ writing -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ writing -> 'a reading * 'b writing"
@@ -2117,10 +2066,7 @@ Error: Signature mismatch:
          sig val f : 'a * 'b @ stateless -> 'a reading * 'b writing end
        is not included in
          sig val f : 'a * 'b -> 'a reading * 'b writing end
-       Values do not match:
-         val f : 'a * 'b @ stateless -> 'a reading * 'b writing
-       is not included in
-         val f : 'a * 'b -> 'a reading * 'b writing
+       The value "f" does not match its expected declaration
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type "'a * 'b -> 'a reading * 'b writing"
        The argument mode was expected to be stronger than "reading" but is "stateful"

@@ -94,12 +94,7 @@ Error: Signature mismatch:
                [ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ]
            val a : t -> t
          end
-       Values do not match:
-         val a :
-           [> `A of int ] ->
-           [> `B of [> `BA | `BB of int list ] | `C of unit ]
-       is not included in
-         val a : t -> t
+       The value "a" does not match its expected declaration
        The type
          "[ `A of int | `B of [ `BA | `BB of unit list ] | `C of unit ] ->
          [> `B of [> `BA | `BB of int list ] | `C of unit ]"

@@ -196,15 +196,7 @@ Error: Signature mismatch:
            val f :
              (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
          end
-       Values do not match:
-         val f :
-           (< m : 'c @ [< global many uncontended forkable unyielding read_write] ->
-                  'd @ [< global many uncontended forkable unyielding read_write] ->
-                  'a @ [> 'm mod global many forkable unyielding] as 'b >
-            as 'a) @ [< 'm mod aliased] ->
-           'b @ [> close('m) mod many | stateful]
-       is not included in
-         val f : (< m : 'c -> 'd -> 'a > as 'a) @ contended -> 'c -> 'd -> 'a
+       The value "f" does not match its expected declaration
        The type
          "(< m : 'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
                 ('d @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
@@ -236,17 +228,7 @@ Error: Signature mismatch:
              (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
              'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
          end
-       Values do not match:
-         val f :
-           < m : 'b @ [< global many uncontended forkable unyielding read_write] ->
-                 'c @ [< global many uncontended forkable unyielding read_write] ->
-                 < m : 'a > @ [> 'm mod global many forkable unyielding]
-                 as 'a > @ [< 'm mod aliased] ->
-           'a @ [> close('m) mod many | stateful]
-       is not included in
-         val f :
-           (< m : 'c -> 'd -> 'a > as 'a) @ contended ->
-           'c -> 'd -> (< m : 'c -> 'd -> 'b > as 'b)
+       The value "f" does not match its expected declaration
        The type
          "< m : 'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
                ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->

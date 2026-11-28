@@ -50,10 +50,7 @@ Error: Signature mismatch:
          end
        is not included in
          sig type t val create : unit -> t end
-       Values do not match:
-         val create : elt -> t
-       is not included in
-         val create : unit -> t
+       The value create does not match its expected declaration
        The type elt -> t is not compatible with the type unit -> t
        Type elt = string is not compatible with type unit
        File "test_loc_type_subst.ml", line 1, characters 11-47:
@@ -71,10 +68,7 @@ Error: Signature mismatch:
          end
        is not included in
          S
-       Values do not match:
-         val create : elt -> t
-       is not included in
-         val create : unit -> t
+       The value create does not match its expected declaration
        The type elt -> t is not compatible with the type unit -> t
        Type elt = string is not compatible with type unit
        File "test_loc_modtype_type_subst.ml", line 1, characters 16-52:

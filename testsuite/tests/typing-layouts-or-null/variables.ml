@@ -59,10 +59,7 @@ Error: Signature mismatch:
          sig val should_not_work : 'a -> unit end
        is not included in
          sig val should_not_work : 'a -> unit end
-       Values do not match:
-         val should_not_work : 'a -> unit
-       is not included in
-         val should_not_work : 'a -> unit
+       The value "should_not_work" does not match its expected declaration
        The type "'a -> unit" is not compatible with the type "'b -> unit"
        The layout of 'a is value_or_null
          because of the definition of should_not_work at line 6, characters 2-57.
@@ -160,10 +157,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
@@ -187,10 +181,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-40.
@@ -215,10 +206,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
@@ -243,10 +231,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.
@@ -272,10 +257,7 @@ Error: Signature mismatch:
          sig val f : 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
-       Values do not match:
-         val f : 'a -> 'a
-       is not included in
-         val f : 'a -> 'a
+       The value "f" does not match its expected declaration
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is value_or_null
          because of the definition of f at line 2, characters 2-41.

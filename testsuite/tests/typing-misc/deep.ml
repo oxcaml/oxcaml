@@ -17,10 +17,7 @@ Error: Signature mismatch:
          sig val x : bool * string end
        is not included in
          sig val x : bool * int end
-       Values do not match:
-         val x : bool * string
-       is not included in
-         val x : bool * int
+       The value "x" does not match its expected declaration
        The type "bool * string" is not compatible with the type "bool * int"
        Type "string" is not compatible with type "int"
 |}]
@@ -40,10 +37,7 @@ Error: Signature mismatch:
          sig val f : int -> int end
        is not included in
          sig val f : int -> (float * string option) list end
-       Values do not match:
-         val f : int -> int
-       is not included in
-         val f : int -> (float * string option) list
+       The value "f" does not match its expected declaration
        The type "int -> int" is not compatible with the type
          "int -> (float * string option) list"
        Type "int" is not compatible with type "(float * string option) list"
@@ -65,10 +59,7 @@ Error: Signature mismatch:
          sig val f : ('c : any) ('d : any). 'c list * 'd option -> int end
        is not included in
          sig val f : 'a list * 'b list -> int end
-       Values do not match:
-         val f : ('c : any) ('d : any). 'c list * 'd option -> int
-       is not included in
-         val f : 'a list * 'b list -> int
+       The value "f" does not match its expected declaration
        The type "'a list * 'b option -> int" is not compatible with the type
          "'a list * 'c list -> int"
        Type "'b option" is not compatible with type "'c list"

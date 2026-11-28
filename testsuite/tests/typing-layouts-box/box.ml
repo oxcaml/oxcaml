@@ -1508,10 +1508,7 @@ Error: Signature mismatch:
          sig val f : ('a : any) 'c. 'a box -> 'c end
        is not included in
          sig val f : 'b -> 'c end
-       Values do not match:
-         val f : ('a : any) 'c. 'a box -> 'c
-       is not included in
-         val f : 'b -> 'c
+       The value "f" does not match its expected declaration
        The type "'a box -> 'b" is not compatible with the type "'c -> 'd"
        Type "'a box" is not compatible with type "'c"
 |}]

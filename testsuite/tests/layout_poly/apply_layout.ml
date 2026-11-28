@@ -49,10 +49,7 @@ Error: Signature mismatch:
          sig val g : 'a -> 'b -> unit end
        is not included in
          sig val g : int end
-       Values do not match:
-         val g : 'a -> 'b -> unit
-       is not included in
-         val g : int
+       The value "g" does not match its expected declaration
        The type "'a -> 'b -> unit" is not compatible with the type "int"
 |}]
 
@@ -119,10 +116,7 @@ Error: Signature mismatch:
          sig val g : '_weak1 -> unit end
        is not included in
          sig val poly_ g : 'b -> unit end
-       Values do not match:
-         val g : '_weak1 -> unit
-       is not included in
-         val poly_ g : 'b -> unit
+       The value "g" does not match its expected declaration
        The type "'_weak1 -> unit" is not compatible with the type "'a -> unit"
        Type "'_weak1" is not compatible with type "'a"
 |}]
