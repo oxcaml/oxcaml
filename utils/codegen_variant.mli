@@ -203,11 +203,11 @@ val is_product : string -> bool
 
 (** Whether [path] is a file that this invocation wrote ([is_product]) in a
     directory that [in_selected_root] replaces by another: a directory of
-    the library root that the tree of the selected variant also has.  That is the one case in which a search does not find such a file
-    where it was written: the other directory is searched in its place, and
-    can have a file of that name.  A directory of the root without a
-    counterpart, and one inside a variant's tree, are searched as they
-    are. *)
+    the library root that the tree of the selected variant also has.  That
+    is the one case in which a search does not find such a file where it was
+    written: the other directory is searched in its place, and can have a
+    file of that name.  A directory of the root without a counterpart, and
+    one inside a variant's tree, are searched as they are. *)
 val is_product_in_replaced_directory : string -> bool
 
 (** Whether two paths name the same file, as far as their spelling tells:
