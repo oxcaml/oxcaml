@@ -1,0 +1,21 @@
+let code f_0 deleted in
+let code loopify(never) size(17) newer_version_of(f_0)
+      f_0_1 (g : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  cont k4 push(k2)
+    where k4 =
+      apply g (0) -> k3 * k2
+    where k3 (body_result : imm tagged) =
+      cont k pop(k2) (body_result)
+    where k2 exn (`exn` : val) =
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      cont k (0)
+in
+let $camlTrap__f_1 = closure f_0_1 @f in
+let $camlTrap = Block 0 ($camlTrap__f_1) in
+cont done ($camlTrap)
