@@ -100,6 +100,11 @@ let numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not ~to_bits
     let expr : Jsir.expr = Block (tag, values, array_or_not, Immutable) in
     bind_expr_to_symbol ~env ~res symbol expr
 
+(* As in bytecode, arrays of unboxed numbers other than floats have tag 0, like
+   the ones that the runtime creates (see [Make_array] in
+   [To_jsir_primitive]). *)
+let unboxed_number_array_tag = 0
+
 let block_like ~env ~res symbol (const : Static_const.t) =
   match const with
   | Set_of_closures _closures ->
@@ -142,10 +147,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       ~bits_to_constant:(fun bits -> Float bits)
       ~bits_to_array:(fun bits -> Float_array bits)
   | Immutable_float32_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.float32_to_jsir_const
       ~bits_to_array:(fun bits ->
@@ -154,9 +156,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
     simple_block_or_array ~env ~res ~symbol ~tag:Tag.zero ~mut:Immutable
       ~array_or_not:Array values
   | Immutable_int_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id
       ~bits_to_constant:To_jsir_shared.target_ocaml_int_to_jsir_const
@@ -166,44 +166,31 @@ let block_like ~env ~res symbol (const : Static_const.t) =
             Array.map To_jsir_shared.target_ocaml_int_to_jsir_const bits,
             Array ))
   | Immutable_int8_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int8_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int8_to_jsir_const bits, Array))
   | Immutable_int16_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int16_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int16_to_jsir_const bits, Array))
   | Immutable_int32_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
-        (List.length values)
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
-    let tag =
-      Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
-    in
+    let tag = unboxed_number_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.nativeint_to_jsir_const
       ~bits_to_array:(fun bits ->
@@ -305,85 +292,46 @@ let initialise_block_like ~env ~res ~symbols_in_cycle symbol const =
   in
   res
 
-let prepare_code ~env ~res ~code_id code =
-  let params_and_body = Code0.params_and_body code in
-  Flambda.Function_params_and_body.pattern_match params_and_body
-    ~f:(fun
-        ~return_continuation:_
-        ~exn_continuation:_
-        bound_params
-        ~body:_
-        ~my_closure:_
-        ~is_my_closure_used:_
-        ~my_alloc_mode:_
-        ~my_depth:_
-        ~free_names_of_body:_
-      ->
-      let params =
-        List.init (Bound_parameters.cardinal bound_params) (fun _ ->
-            Jsir.Var.fresh ())
-      in
-      let res, addr = To_jsir_result.reserve_address res in
-      let closure = Jsir.Var.fresh () in
-      let free_names = Code0.free_names code in
-      (* Code that does not use [my_closure] or project from any closure can
-         share a single closure, bound by [code_closure]. This also provides a
-         binding when the reaper unboxes a closure and deletes its
-         [Set_of_closures]. *)
-      let closure_bound_with_code =
-        (not (Code0.is_my_closure_used code))
-        && Function_slot.Set.is_empty
-             (Name_occurrences.function_slots_in_normal_projections free_names)
-        && Value_slot.Set.is_empty
-             (Name_occurrences.value_slots_in_normal_projections free_names)
-      in
-      let hint =
-        To_jsir_shared.closure_hint (Code0.code_metadata code) ~params
-      in
-      (* As for bytecode, the location of a closure is the end of its
-         function. *)
-      let loc =
-        To_jsir_result.parse_info_of_debuginfo (Code0.dbg code) ~pos:`End
-      in
-      let env =
-        To_jsir_env.add_code_id env code_id ~addr ~params ~closure
-          ~closure_bound_with_code ~hint ~loc
-      in
-      let function_slots =
-        Name_occurrences.all_function_slots_at_normal_mode free_names
-      in
-      let value_slots =
-        Name_occurrences.all_value_slots_at_normal_mode free_names
-      in
-      (* We create new variables that represent each function and value slots,
-         if they don't exist already, and use them everywhere that the
-         corresponding slot is used. We will make sure later (when translating
-         [Set_of_closures]) that the closures or values representing these slots
-         are bound to the correct variables. *)
-      let env =
-        Function_slot.Set.fold
-          (fun slot env -> To_jsir_env.add_function_slot_if_not_found env slot)
-          function_slots env
-      in
-      let env =
-        Value_slot.Set.fold
-          (fun slot env -> To_jsir_env.add_value_slot_if_not_found env slot)
-          value_slots env
-      in
-      env, res)
+(* Code that neither uses [my_closure] nor projects from any closure can reuse a
+   single closure defined with the code. This also ensures a closure binding
+   exists when the reaper unboxes a closure and removes its
+   [Set_of_closures]. *)
+let code_is_shared code =
+  let free_names = Code0.free_names code in
+  (not (Code0.is_my_closure_used code))
+  && Function_slot.Set.is_empty
+       (Name_occurrences.function_slots_in_normal_projections free_names)
+  && Value_slot.Set.is_empty
+       (Name_occurrences.value_slots_in_normal_projections free_names)
 
-let code_closure ~env ~res code_id =
-  let ({ addr; params; closure; closure_bound_with_code; hint; loc }
-        : To_jsir_env.code_id) =
-    To_jsir_env.get_code_id_exn env code_id
+let closure_loc code =
+  To_jsir_result.parse_info_of_debuginfo (Code0.dbg code) ~pos:`End
+
+let new_closure ~res code : To_jsir_env.closure * To_jsir_result.t =
+  let code_metadata = Code0.code_metadata code in
+  let params =
+    List.init
+      (Flambda_arity.cardinal_unarized
+         (Code_metadata.params_arity code_metadata))
+      (fun _ -> Jsir.Var.fresh ())
   in
-  if closure_bound_with_code
-  then
-    To_jsir_result.add_instr_exn res
-      (Let (closure, Closure (params, (addr, []), (hint, loc))))
-  else res
+  let res, addr = To_jsir_result.reserve_address res in
+  let var = Jsir.Var.fresh () in
+  let hint = To_jsir_shared.closure_hint code_metadata ~params in
+  { addr; params; var; hint; loc = closure_loc code }, res
 
-let code ~env ~res ~translate_body ~code_id code =
+let closure_expr ({ addr; params; var = _; hint; loc } : To_jsir_env.closure) :
+    Jsir.expr =
+  Closure (params, (addr, []), (hint, loc))
+
+let prepare_code ~env ~res ~code_id code =
+  if code_is_shared code
+  then
+    let closure, res = new_closure ~res code in
+    To_jsir_env.add_code env code_id (Shared closure), res
+  else To_jsir_env.add_code env code_id (Instantiated code), res
+
+let code ~env ~res ~translate_body ~(closure : To_jsir_env.closure) code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
     ~f:(fun
@@ -397,34 +345,21 @@ let code ~env ~res ~translate_body ~code_id code =
         ~my_depth:_
         ~free_names_of_body:_
       ->
-      (* All code in this static group has already been prepared. *)
-      let ({ addr;
-             params = params_jvar;
-             closure;
-             closure_bound_with_code = _;
-             hint = _;
-             loc = _
-           }
-            : To_jsir_env.code_id) =
-        To_jsir_env.get_code_id_exn env code_id
+      let res =
+        To_jsir_result.new_block_with_addr_exn res ~addr:closure.addr ~params:[]
       in
-      let res = To_jsir_result.new_block_with_addr_exn res ~addr ~params:[] in
       let res = To_jsir_result.add_event_exn res (Code0.dbg code) ~pos:`Start in
-      let params_fvar =
+      let params =
         Bound_parameters.to_list bound_params |> List.map Bound_parameter.var
       in
-      let env_with_params =
-        List.fold_left2 To_jsir_env.add_var env params_fvar params_jvar
-      in
-      let env_with_params =
-        To_jsir_env.set_my_closure env_with_params my_closure closure
-      in
-      let _env_with_params, res =
+      let env = List.fold_left2 To_jsir_env.add_var env params closure.params in
+      let env = To_jsir_env.add_var env my_closure closure.var in
+      let _env, res =
         (* Throw away the environment after translating the body *)
         translate_body
           ~env:
-            (To_jsir_env.enter_function_body env_with_params
-               ~return_continuation ~exn_continuation)
+            (To_jsir_env.enter_function_body env ~return_continuation
+               ~exn_continuation)
           ~res body
       in
-      env, res)
+      res)

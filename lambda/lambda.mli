@@ -35,6 +35,7 @@ type compile_time_constant =
   | Backend_type
   | Arch_amd64
   | Arch_arm64
+  | Target_is_jsir
 
 type immediate_or_pointer =
   | Immediate

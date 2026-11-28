@@ -129,7 +129,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       To_jsir_result.with_debuginfo_exn res dbg ~event_after:true ~f:(fun res ->
           create_let_prim ~env ~res fvar p)
     | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
-      To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
+      To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res
+        ~translate_body:expr ~bound_vars soc
     | Static bound_static, Static_consts consts ->
       To_jsir_static_const_group.translate ~env ~res ~translate_body:expr
         bound_static consts
@@ -356,17 +357,16 @@ and apply_expr0 ~env ~res e =
     apply_fn ~res ~f ~args ~exact ~yielding
   | None, Function { function_call = Direct code_id } ->
     let args, res = To_jsir_shared.simples ~env ~res args in
-    let ({ closure;
-           addr = _;
-           params = _;
-           closure_bound_with_code = _;
-           hint = _;
-           loc = _
-         }
-          : To_jsir_env.code_id) =
-      To_jsir_env.get_code_id_exn env code_id
+    let f =
+      match To_jsir_env.get_code_exn env code_id with
+      | Shared closure -> closure.var
+      | Instantiated _ ->
+        Misc.fatal_errorf
+          "Missing callee for a direct call to code that depends on its \
+           closure: %a"
+          Apply_expr.print e
     in
-    apply_fn ~res ~f:closure ~args ~exact:true ~yielding
+    apply_fn ~res ~f ~args ~exact:true ~yielding
   | None, Effect effect_ ->
     if List.length args <> 0
     then Misc.fatal_error "Found non-empty argument list for effects";
@@ -493,24 +493,19 @@ and apply_cont0 ~env ~res apply_cont =
   in
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
-    | (Toplevel_return | Define_root_symbol) as sort ->
+    | Toplevel_return ->
       let module_symbol =
         match args with
         | [arg] -> arg
-        | [] ->
-          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
-            sort
-        | _ :: _ ->
-          Misc.fatal_errorf "Found %a with multiple arguments"
-            Continuation.Sort.print sort
+        | [] | _ :: _ :: _ ->
+          Misc.fatal_errorf
+            "Expected one argument for the toplevel return continuation:@ %a"
+            Apply_cont.print apply_cont
       in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in
-      let module_name =
-        Compilation_unit.name compilation_unit
-        |> Compilation_unit.Name.to_string
-      in
+      let module_name = To_jsir_result.compilation_unit_name compilation_unit in
       let var = Jsir.Var.fresh () in
       let res =
         To_jsir_result.add_instr_exn res
@@ -545,7 +540,10 @@ and apply_cont0 ~env ~res apply_cont =
         "Apply_cont to %a, which has sort [Return] but is not the return \
          continuation of the function being translated"
         Continuation.print continuation
-    | Normal_or_exn -> (
+    | Normal_or_exn | Define_root_symbol -> (
+      (* The [Define_root_symbol] continuation acts like a normal continuation,
+         since its handler defines the module symbol and then applies the
+         [Toplevel_return] continuation. *)
       match raise_kind_and_exn_handler with
       | None ->
         let addr = To_jsir_env.get_continuation_exn env continuation in

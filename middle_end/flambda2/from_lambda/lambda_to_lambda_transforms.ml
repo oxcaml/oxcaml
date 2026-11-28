@@ -397,10 +397,13 @@ let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
     (mode : L.locality_mode)
     ~length ~init:None loc
 
-let makearray_dynamic_unboxed_products_only_64_bit () =
+let makearray_dynamic_unboxed_products_only_64_bit ~machine_width =
   (* To keep things simple in the C stub as regards array length, we currently
      restrict to 64-bit targets. *)
-  if not (Target_system.is_64_bit ())
+  if
+    not
+      (Target_system.Machine_width.is_64_bit machine_width
+      || Clflags.target_is_jsir ())
   then
     Misc.fatal_error
       "Cannot compile Pmakearray_dynamic at unboxed product layouts for 32-bit \
@@ -422,7 +425,8 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
 let makearray_dynamic_non_scannable_unboxed_product env
     (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
     loc =
-  makearray_dynamic_unboxed_products_only_64_bit ();
+  makearray_dynamic_unboxed_products_only_64_bit
+    ~machine_width:(Env.machine_width env);
   let is_local =
     L.of_bool (match mode with Alloc_heap -> false | Alloc_local -> true)
   in
@@ -468,10 +472,10 @@ let makearray_dynamic_non_scannable_unboxed_product env
          all float32_u or int32_u. *)
       Sixty_four_or_more ~init term
 
-let makearray_dynamic_scannable_unboxed_product0
+let makearray_dynamic_scannable_unboxed_product0 ~machine_width
     (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
     loc =
-  makearray_dynamic_unboxed_products_only_64_bit ();
+  makearray_dynamic_unboxed_products_only_64_bit ~machine_width;
   (* Trick: use the local stack as a way of getting the variable argument list
      to the C function. *)
   if not Config.stack_allocation
@@ -541,8 +545,9 @@ let makearray_dynamic_scannable_unboxed_product env
   if must_be_scanned
   then
     ( env,
-      makearray_dynamic_scannable_unboxed_product0 lambda_array_kind mode
-        ~length ~init loc )
+      makearray_dynamic_scannable_unboxed_product0
+        ~machine_width:(Env.machine_width env) lambda_array_kind mode ~length
+        ~init loc )
   else
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init:(Some init) loc
@@ -1196,23 +1201,24 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           "Lambda_to_flambda.transform_primitive: Pbigarrayset with unknown \
            layout and elements should only have dimensions between 1 and 3 \
            (see translprim).")
-  | Pctconst const, _ when Clflags.target_is_jsir () ->
-    let name =
-      match const with
-      | Big_endian -> "big_endian"
-      | Word_size -> "word_size"
-      | Int_size -> "int_size"
-      | Max_wosize -> "max_wosize"
-      | Ostype_unix -> "ostype_unix"
-      | Ostype_win32 -> "ostype_win32"
-      | Ostype_cygwin -> "ostype_cygwin"
-      | Backend_type -> "backend_type"
-      | Arch_amd64 -> "arch_amd64"
-      | Arch_arm64 -> "arch_arm64"
+  | Pctconst const, _ when Clflags.target_is_jsir () -> (
+    let runtime name =
+      let name = Format.sprintf "caml_sys_const_%s" name in
+      let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
+      Primitive (L.Pccall desc, [L.lambda_unit], loc)
     in
-    let name = Format.sprintf "caml_sys_const_%s" name in
-    let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in
-    Primitive (L.Pccall desc, [L.lambda_unit], loc)
+    match const with
+    | Big_endian -> runtime "big_endian"
+    | Word_size -> runtime "word_size"
+    | Int_size -> runtime "int_size"
+    | Max_wosize -> runtime "max_wosize"
+    | Ostype_unix -> runtime "ostype_unix"
+    | Ostype_win32 -> runtime "ostype_win32"
+    | Ostype_cygwin -> runtime "ostype_cygwin"
+    | Backend_type -> runtime "backend_type"
+    | Arch_amd64 -> runtime "arch_amd64"
+    | Arch_arm64 -> runtime "arch_arm64"
+    | Target_is_jsir -> Primitive (prim, args, loc))
   | ( Pstring_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )

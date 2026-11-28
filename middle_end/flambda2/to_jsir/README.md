@@ -57,6 +57,14 @@ This is a convention specific to JSIR, and as such normal debuggers will not be 
 
 `-g` does not change the `js_of_ocaml` commands: what `js_of_ocaml` does with this information is chosen with `-jsoo-opt`, for example `--source-map`, `--pretty`, or `--debuginfo` (which puts the locations in comments in the generated JavaScript).
 
+The WebAssembly archive of the standard library is compiled with `--pretty`, so that its functions have names in stack traces.
+
+The separate-compilation archives shipped with the compiler contain inline maps.
+A link that requests a map includes their mappings and available source text; a link without maps discards them.
+`--source-map-no-source` is a compile option: it does not strip text already embedded in an archive.
+The JSIR of these libraries records a source as `/oxcaml/stdlib/` followed by its path below the standard library directory. `ocamlopt` runs `js_of_ocaml` with a `BUILD_PATH_PREFIX_MAP` entry from that prefix to the standard library directory, so `js_of_ocaml` reads the sources that are installed there, and names them by the recorded path in source maps. Sources that are not installed, such as those of `Sys`, `unix`, `str` and compiler-libs, have no text in the map of a `-link-jsir` link.
+When `-directory` is below that prefix, as when these libraries are compiled, `ocamlopt` also adds an entry from it to the current directory.
+
 For source maps, pass `-jsoo-opt --source-map-inline`.
 `--source-map` (a separate `.map` file) only works for the link of an executable, as `js_of_ocaml link` ignores source maps that are not inline in the files it is given. To get the source map of an executable in a separate file:
 
@@ -79,7 +87,7 @@ The JSIR linker renumbers the variables and block addresses of each unit so that
 
 The JSIR of a unit refers to the symbols of other units through the runtime's symbol table: a unit binds `caml_get_symbol` (or `caml_get_global`, for a module block) to a fresh variable at the start of its entry block, and registers its own symbols with `caml_register_symbol` (`caml_register_global` for its module block) where they are defined.
 JSIR files record these variables (`symbol_imports` and `symbol_exports` in [`Code.jsir_file`](../../../external/js_of_ocaml/compiler/lib/code.mli)), and the linker substitutes the importing unit's variable with the exporting unit's, deleting the `caml_get_symbol` binding.
-The `caml_register_global` calls are deleted too unless `-linkall` is given (as `js_of_ocaml` does for bytecode executables), so that `js_of_ocaml` can remove the fields of module blocks that are not used.
+The `caml_register_global` calls are deleted too, so that `js_of_ocaml` can remove the fields of module blocks that are not used.
 
 A unit whose toplevel code never exits normally (it always raises) makes the units after it unreachable, and the linker leaves them out.
 
@@ -135,11 +143,28 @@ The following are not yet supported in JSIR translation, and will raise an excep
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
 
+### Classic mode
+The translation does not support the Flambda 2 classic mode, so `-Oclassic` (and the `[@@@flambda_oclassic]` attribute) is ignored: the unit is compiled as if no optimisation flag was given.
+
 ### Partial applications of functions of void parameters
 Void parameters are erased in JSIR, so a function all of whose parameters are void is a closure of arity 0.
 When the callee is unknown, the generic application of `js_of_ocaml` and `wasm_of_ocaml` (`caml_call_gen`, `caml_apply0`) cannot tell a partial application supplying only some of its void arguments from a full one, and evaluates the function immediately (native and bytecode defer it).
 For example, given `let[@inline never] g (v : void) (w : void) = print_string "g"; 1` and `let[@inline never] partial2 (k : void -> void -> int) = let p = k (void ()) in print_string "a"; p (void ())`, `print_int (partial2 g)` prints `ga1` instead of `ag1` (and fails at runtime with the JavaScript target).
 Functions with at least one non-void parameter are unaffected.
+
+## Inlining
+Each function slot and value slot is translated to a single JavaScript variable, which is bound where the
+corresponding set of closures is created and read wherever the slot is projected. A function body that mentions
+slots, either because it projects from a closure (its own or any other one) or because it defines a set of
+closures, therefore cannot be copied into another function. As such, when compiling to JSIR, Flambda only inlines
+a function if its body contains no function or value slots at all (see `Code.can_be_inlined_for_jsir`).
+
+For functions that do mention slots, `[@inline]`, `[@inlined]`, `[@inlined hint]` and `[@unrolled n]` are ignored.
+`[@inline never]` and `[@inlined never]` work as usual.
+
+In classic mode the decision is made once, during closure conversion, and is therefore more conservative than in
+simplify mode: for example, a function that defines a constant local closure which is later lifted to a symbol is
+still never inlined.
 
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.

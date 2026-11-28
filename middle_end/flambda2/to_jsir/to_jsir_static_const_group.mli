@@ -26,8 +26,10 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Translate code bodies, then initialise the group's values in dependency
-    order. Cyclic blocks are allocated before closures and filled afterwards. *)
+(** Translate [To_jsir_env.Shared] code bodies, then initialise the group's
+    definitions in dependency order. [To_jsir_env.Instantiated] code is
+    translated where its closures are created (see [To_jsir_set_of_closures]).
+    Cyclic blocks are allocated before closures and populated afterwards. *)
 val translate :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->

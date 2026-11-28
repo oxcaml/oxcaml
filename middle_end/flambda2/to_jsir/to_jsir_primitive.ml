@@ -225,13 +225,38 @@ let flip_sign_bit ~env ~res ~(kind : Flambda_kind.Standard_int.t)
 
    The base may be null, in which case the offset is a raw address (an external
    pointer). As in bytecode, this is unsupported and raises [Failure] at
-   runtime; see [caml_check_idx_base] in the JS runtime. *)
+   runtime; see [caml_check_idx_base] in the JS runtime.
+
+   The base may also be a string, bytes or one-dimensional bigarray of bytes, in
+   which case the field index is the position of a byte. Only accesses to naked
+   int8s can have such a base, whether through a block index or a pointer (as
+   for the string-like indices of [caml_get_idx_bytecode] and
+   [caml_set_idx_bytecode]). They go through [caml_idx_base_get_int8] and
+   [caml_idx_base_set_int8] in the runtime, which dispatch on the base.
+
+   The byte offset of a field of a large base may not fit in the integers of
+   JavaScript, which are 32 bits wide, even though its index does. The high bits
+   of the index are then taken from the upper half of the offset. *)
 let field_index_of_byte_offset ~env ~res offset =
   let offset, res = prim_arg ~env ~res offset in
-  let offset, env, res =
+  let low, env, res =
     use_prim0 ~env ~res (Extern ("caml_int64_to_int", None)) [offset]
   in
-  use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv offset; int_const 3]
+  let index, env, res =
+    use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv low; int_const 3]
+  in
+  match Clflags.jsir_target_exn () with
+  | Wasm -> index, env, res
+  | Js ->
+    let high, env, res =
+      use_prim0 ~env ~res (Extern ("caml_int64_hi32", None)) [offset]
+    in
+    let high, env, res =
+      use_prim0 ~env ~res
+        (Extern ("%int_lsl", None))
+        [Pv high; int_const (Targetint.num_bits () - 3)]
+    in
+    use_prim0 ~env ~res (Extern ("%int_or", None)) [Pv index; Pv high]
 
 (* The index of a string-like access. Flambda gives this as a naked nativeint,
    which are ints in JavaScript but boxed 64-bit integers in WASM. *)
@@ -258,18 +283,46 @@ let checked_block_index_base ~env ~res base =
   let base, res = prim_arg ~env ~res base in
   use_prim0 ~env ~res (Extern ("caml_check_idx_base", None)) [base]
 
-let read_offset ~env ~res ~base ~offset =
-  let base, env, res = checked_block_index_base ~env ~res base in
-  let index, env, res = field_index_of_byte_offset ~env ~res offset in
-  use_prim ~env ~res (Extern ("caml_array_unsafe_get", None)) [Pv base; Pv index]
+let is_naked_int8 (kind : Flambda_kind.With_subkind.t) =
+  match Flambda_kind.With_subkind.kind kind with
+  | Naked_number Naked_int8 -> true
+  | Value
+  | Naked_number
+      ( Naked_immediate | Naked_float32 | Naked_float | Naked_int16
+      | Naked_int32 | Naked_int64 | Naked_nativeint | Naked_vec128
+      | Naked_vec256 | Naked_vec512 | Naked_mask )
+  | Region | Rec_info ->
+    false
 
-let write_offset ~env ~res ~base ~offset new_value =
-  let base, env, res = checked_block_index_base ~env ~res base in
-  let index, env, res = field_index_of_byte_offset ~env ~res offset in
-  let new_value, res = prim_arg ~env ~res new_value in
-  use_prim ~env ~res
-    (Extern ("caml_array_unsafe_set", None))
-    [Pv base; Pv index; new_value]
+let read_offset ~env ~res ~kind ~base ~offset =
+  if is_naked_int8 kind
+  then
+    let base, res = prim_arg ~env ~res base in
+    let index, env, res = field_index_of_byte_offset ~env ~res offset in
+    use_prim ~env ~res (Extern ("caml_idx_base_get_int8", None)) [base; Pv index]
+  else
+    let base, env, res = checked_block_index_base ~env ~res base in
+    let index, env, res = field_index_of_byte_offset ~env ~res offset in
+    use_prim ~env ~res
+      (Extern ("caml_array_unsafe_get", None))
+      [Pv base; Pv index]
+
+let write_offset ~env ~res ~kind ~base ~offset new_value =
+  if is_naked_int8 kind
+  then
+    let base, res = prim_arg ~env ~res base in
+    let index, env, res = field_index_of_byte_offset ~env ~res offset in
+    let new_value, res = prim_arg ~env ~res new_value in
+    use_prim ~env ~res
+      (Extern ("caml_idx_base_set_int8", None))
+      [base; Pv index; new_value]
+  else
+    let base, env, res = checked_block_index_base ~env ~res base in
+    let index, env, res = field_index_of_byte_offset ~env ~res offset in
+    let new_value, res = prim_arg ~env ~res new_value in
+    use_prim ~env ~res
+      (Extern ("caml_array_unsafe_set", None))
+      [Pv base; Pv index; new_value]
 
 let atomic_field ~env ~res
     (offset_units : Flambda_primitive.atomic_offset_units) extern_name ~base
@@ -352,26 +405,17 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
       } ->
     raise Primitive_not_supported
 
-let check_my_closure ~env x =
-  (* It is not possible to project values out of other functions' closures in
-     Jsoo, but certain inlining simplifications in Flambda may cause this. For
-     now we disable inlining so this case should never occur. *)
+(* JSOO has no general closure-slot projection. We can only project from
+   closures whose set of closures is in scope and recorded in the environment,
+   where each slot maps directly to a JSIR variable.
+
+   This always holds for projections from a function's own closure. Flambda
+   inlining could introduce projections from other closures, so is currently
+   restricted. *)
+let closure_to_project_from ~env ~res x =
   Simple.pattern_match' x
-    ~var:(fun name ~coercion:_ ->
-      if not (To_jsir_env.is_my_closure env name)
-      then
-        Misc.fatal_error
-          "Trying to project from a closure that doesn't belong to the body of \
-           the function being translated")
-    ~symbol:(fun _symbol ~coercion:_ ->
-      (* CR selee: We should check here that this is indeed the correct closure
-         symbol for the current function being translated, but we don't yet keep
-         track of this. We plan to refactor the handling of closures and pieces
-         of code so that we only translate the code once we see the
-         corresponding closure (treating each closure as a new instance of the
-         code), which should make this check much easier. For now, we assume
-         that we have the correct symbol. *)
-      ())
+    ~var:(fun _ ~coercion:_ -> To_jsir_shared.simple ~env ~res x)
+    ~symbol:(fun _ ~coercion:_ -> To_jsir_shared.simple ~env ~res x)
     ~const:(fun const ->
       Misc.fatal_errorf
         "Trying to project from a closure, but found a constant %a (must be a \
@@ -552,12 +596,10 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint")
   | Boolean_not (Tagged_bool | Naked_bool) -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret -> (
-    let int63 () =
+    let int63 ~bytecode_name lower =
       match Clflags.jsir_target_exn () with
-      | Wasm -> ()
-      | Js ->
-        (* JS doesn't have tagged int63 since it's a 32-bit target *)
-        raise Primitive_not_supported
+      | Wasm -> lower ()
+      | Js -> use_prim' (Extern (bytecode_name, None))
     in
     let one : Jsir.prim_arg = Pc (Int64 1L) in
     match reinterpret with
@@ -566,35 +608,38 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Unboxed_float64_as_unboxed_int64 ->
       use_prim' (Extern ("caml_int64_bits_of_float", None))
     | Unboxed_int64_as_tagged_int63 ->
-      int63 ();
-      let x, res = prim_arg ~env ~res x in
-      let shifted, env, res =
-        use_prim0 ~env ~res
-          (Extern ("caml_int64_shift_right", None))
-          [x; int_const 1]
-      in
-      use_prim ~env ~res (Extern ("caml_int64_to_int", None)) [Pv shifted]
+      int63 ~bytecode_name:"caml_reinterpret_unboxed_int64_as_tagged_int63"
+        (fun () ->
+          let x, res = prim_arg ~env ~res x in
+          let shifted, env, res =
+            use_prim0 ~env ~res
+              (Extern ("caml_int64_shift_right", None))
+              [x; int_const 1]
+          in
+          use_prim ~env ~res (Extern ("caml_int64_to_int", None)) [Pv shifted])
     | Tagged_int63_as_unboxed_int64 ->
-      int63 ();
-      let n, env, res =
-        use_prim0' ~env ~res (Extern ("caml_int64_of_int", None)) [x]
-      in
-      let shifted, env, res =
-        use_prim0 ~env ~res
-          (Extern ("caml_int64_shift_left", None))
-          [Pv n; int_const 1]
-      in
-      use_prim ~env ~res (Extern ("caml_int64_or", None)) [Pv shifted; one])
+      int63 ~bytecode_name:"caml_reinterpret_tagged_int63_as_unboxed_int64"
+        (fun () ->
+          let n, env, res =
+            use_prim0' ~env ~res (Extern ("caml_int64_of_int", None)) [x]
+          in
+          let shifted, env, res =
+            use_prim0 ~env ~res
+              (Extern ("caml_int64_shift_left", None))
+              [Pv n; int_const 1]
+          in
+          use_prim ~env ~res (Extern ("caml_int64_or", None)) [Pv shifted; one])
+    )
   | Reinterpret_boxed_vector -> identity ~env ~res x
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
     (* everything is untagged and "unboxed" in JS: see README *)
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
-    check_my_closure ~env x;
-    Some (To_jsir_env.get_function_slot_exn env move_to), env, res
+    let closure, res = closure_to_project_from ~env ~res x in
+    Some (To_jsir_env.get_function_slot_exn env ~closure move_to), env, res
   | Project_value_slot { project_from = _; value_slot } ->
-    check_my_closure ~env x;
-    Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
+    let closure, res = closure_to_project_from ~env ~res x in
+    Some (To_jsir_env.get_value_slot_exn env ~closure value_slot), env, res
   | Is_boxed_float -> (
     match Clflags.jsir_target_exn () with
     | Js ->
@@ -615,10 +660,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       in
       use_prim ~env ~res Eq [Pv tag; int_const Obj.double_array_tag])
   | End_region _ | End_try_region _ -> no_op ~env ~res
-  | Get_header ->
-    (* CR selee: check [js_of_ocaml/compiler/tests_check_prim/main.output], this
-       primitive ("caml_get_header") seems to be missing from jsoo *)
-    raise Primitive_not_supported
+  | Get_header -> use_prim' (Extern ("caml_get_header", None))
   | Peek _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
@@ -895,7 +937,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Poke _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Read_offset _ -> read_offset ~env ~res ~base:x ~offset:y
+  | Read_offset (kind, _) -> read_offset ~env ~res ~kind ~base:x ~offset:y
 
 let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
@@ -981,7 +1023,8 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Atomic_exchange (offset_units, _, _) ->
     atomic_field ~env ~res offset_units "caml_atomic_exchange_field" ~base:x
       ~offset:y [z]
-  | Write_offset _ -> write_offset ~env ~res ~base:x ~offset:y z
+  | Write_offset (_, kind, _) ->
+    write_offset ~env ~res ~kind ~base:x ~offset:y z
 
 let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
     z =
@@ -1007,31 +1050,16 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     let var = Jsir.Var.fresh () in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Make_array (kind, mut, _mode) ->
+    (* As in the bytecode path, every array other than a flat float array has
+       tag 0. This is because the tags that native code gives arrays of unboxed
+       numbers encode how they are packed, which doesn't apply here. *)
     let tag =
       match kind with
-      | Immediates | Gc_ignorable_values | Values -> 0
-      | Naked_ints ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int_array_tag
-      | Naked_int8s ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int8_array_tag
-          (List.length xs)
-      | Naked_int16s ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.untagged_int16_array_tag
-          (List.length xs)
-      | Naked_int32s ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
-          (List.length xs)
-      | Naked_int64s ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
-      | Naked_nativeints ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
-      | Naked_masks ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_mask_array_tag
+      | Immediates | Gc_ignorable_values | Values | Naked_ints | Naked_int8s
+      | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
+      | Naked_masks | Naked_float32s | Unboxed_product _ ->
+        0
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
-      | Naked_float32s ->
-        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
-          (List.length xs)
-      | Unboxed_product _ -> 0
       | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         (* No SIMD *)
         raise Primitive_not_supported

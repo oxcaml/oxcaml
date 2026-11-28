@@ -34,13 +34,21 @@ type exn_handler =
     extra_args : Jsir.Var.t list
   }
 
-type code_id =
+type closure =
   { addr : Jsir.Addr.t;
     params : Jsir.Var.t list;
-    closure : Jsir.Var.t;
-    closure_bound_with_code : bool;
+    var : Jsir.Var.t;
     hint : Optimization_hint.closure_hint option;
     loc : Parse_info.t option
+  }
+
+type code =
+  | Shared of closure
+  | Instantiated of Code.t
+
+type slots =
+  { function_slots : Jsir.Var.t Function_slot.Map.t;
+    value_slots : Jsir.Var.t Value_slot.Map.t
   }
 
 type t =
@@ -51,11 +59,8 @@ type t =
     exn_handlers : exn_handler Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
-    code_ids : code_id Code_id.Map.t;
-    function_slots : Jsir.Var.t Function_slot.Map.t;
-    value_slots : Jsir.Var.t Value_slot.Map.t;
-    traps : Continuation.t list;
-    my_closure : Variable.t option
+    code : code Code_id.Map.t;
+    closure_slots : slots Jsir.Var.Map.t
   }
 
 let create ~module_symbol ~return_continuation ~exn_continuation =
@@ -66,11 +71,8 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     exn_handlers = Continuation.Map.empty;
     vars = Variable.Map.empty;
     symbols = Symbol.Map.empty;
-    code_ids = Code_id.Map.empty;
-    function_slots = Function_slot.Map.empty;
-    value_slots = Value_slot.Map.empty;
-    traps = [];
-    my_closure = None
+    code = Code_id.Map.empty;
+    closure_slots = Jsir.Var.Map.empty
   }
 
 let module_symbol t = t.module_symbol
@@ -117,20 +119,11 @@ let add_symbol t ~res symbol jvar =
   let t = add_symbol_without_registering t symbol jvar in
   t, To_jsir_result.register_symbol res symbol jvar
 
-let add_code_id t code_id ~addr ~params ~closure ~closure_bound_with_code ~hint
-    ~loc =
-  let code_ids =
-    Code_id.Map.add code_id
-      { addr; params; closure; closure_bound_with_code; hint; loc }
-      t.code_ids
-  in
-  { t with code_ids }
+let add_code t code_id code =
+  { t with code = Code_id.Map.add code_id code t.code }
 
-let add_function_slot t fslot jvar =
-  { t with function_slots = Function_slot.Map.add fslot jvar t.function_slots }
-
-let add_value_slot t vslot jvar =
-  { t with value_slots = Value_slot.Map.add vslot jvar t.value_slots }
+let add_closure_slots t ~closure slots =
+  { t with closure_slots = Jsir.Var.Map.add closure slots t.closure_slots }
 
 let get_continuation_exn t cont = Continuation.Map.find cont t.continuations
 
@@ -156,22 +149,37 @@ let register_symbol_exn t ~res ?loc symbol =
   To_jsir_result.register_symbol res ?loc symbol
     (Symbol.Map.find symbol t.symbols)
 
-let get_code_id_exn t code_id =
-  match Code_id.Map.find_opt code_id t.code_ids with
-  | Some code_id -> code_id
+let get_code_exn t code_id =
+  match Code_id.Map.find_opt code_id t.code with
+  | Some code -> code
   | None ->
     Misc.fatal_errorf "Code ID %a not found in the environment" Code_id.print
       code_id
 
-let get_function_slot t fslot =
-  Function_slot.Map.find_opt fslot t.function_slots
+let get_closure_slots_exn t ~closure =
+  match Jsir.Var.Map.find_opt closure t.closure_slots with
+  | Some slots -> slots
+  | None ->
+    Misc.fatal_errorf
+      "Cannot project from the closure %a: the set of closures that it belongs \
+       to is not known"
+      Jsir.Var.print closure
 
-let get_function_slot_exn t fslot =
-  Function_slot.Map.find fslot t.function_slots
+let get_function_slot_exn t ~closure slot =
+  let slots = get_closure_slots_exn t ~closure in
+  match Function_slot.Map.find_opt slot slots.function_slots with
+  | Some var -> var
+  | None ->
+    Misc.fatal_errorf "Function slot %a not found in the set of closures of %a"
+      Function_slot.print slot Jsir.Var.print closure
 
-let get_value_slot t vslot = Value_slot.Map.find_opt vslot t.value_slots
-
-let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
+let get_value_slot_exn t ~closure slot =
+  let slots = get_closure_slots_exn t ~closure in
+  match Value_slot.Map.find_opt slot slots.value_slots with
+  | Some var -> var
+  | None ->
+    Misc.fatal_errorf "Value slot %a not found in the set of closures of %a"
+      Value_slot.print slot Jsir.Var.print closure
 
 let add_var_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
@@ -190,33 +198,3 @@ let add_var_alias_of_symbol_exn t ~res ~var ~alias_of =
     | Some (v, res) -> v, res
   in
   add_var t var jvar, res
-
-let add_if_not_found map item ~mem ~add =
-  if mem item map
-  then map
-  else
-    let var = Jsir.Var.fresh () in
-    add item var map
-
-let add_function_slot_if_not_found t slot =
-  { t with
-    function_slots =
-      add_if_not_found t.function_slots slot ~mem:Function_slot.Map.mem
-        ~add:Function_slot.Map.add
-  }
-
-let add_value_slot_if_not_found t slot =
-  { t with
-    value_slots =
-      add_if_not_found t.value_slots slot ~mem:Value_slot.Map.mem
-        ~add:Value_slot.Map.add
-  }
-
-let set_my_closure t my_closure var =
-  let t = { t with my_closure = Some my_closure } in
-  add_var t my_closure var
-
-let is_my_closure t var =
-  match t.my_closure with
-  | None -> false
-  | Some my_closure -> Variable.equal var my_closure
