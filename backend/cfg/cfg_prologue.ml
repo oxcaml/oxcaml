@@ -40,13 +40,14 @@ module Instruction_requirements = struct
     | Epilogue
     | Requirements of t
 
-  let instr_uses_stack_slots (instr : _ Cfg.instruction) =
+  let instr_uses_stack_slots (instr : _ Cfg.instruction)
+      ~incoming_needs_prologue =
     let regs_use_stack_slots =
       Array.exists (fun reg ->
           match reg.Reg.loc with
           | Stack (Local _) -> true
-          | Stack (Incoming _ | Outgoing _ | Domainstate _) | Reg _ | Unknown ->
-            false)
+          | Stack (Incoming _) -> incoming_needs_prologue
+          | Stack (Outgoing _ | Domainstate _) | Reg _ | Unknown -> false)
     in
     regs_use_stack_slots instr.Cfg.arg || regs_use_stack_slots instr.Cfg.res
 
@@ -54,7 +55,12 @@ module Instruction_requirements = struct
      [Cfg.basic_block_contains_calls], but as soon as shrink wrapping is
      implemented and enabled, we can remove [Cfg.basic_block_contains_calls]. *)
   let terminator (instr : Cfg.terminator Cfg.instruction) fun_name =
-    if instr_uses_stack_slots instr
+    (* Terminators never access [Incoming] slots themselves: such slots are
+       written by moves preceding the terminator (results of a [Return], or
+       arguments of a [Tailcall_self] with stack-passed arguments), and those
+       moves carry the prologue requirement. [Return] must still be classified
+       below as requiring the prologue to have been removed. *)
+    if instr_uses_stack_slots instr ~incoming_needs_prologue:false
     then Requires_prologue
     else
       match instr.desc with
@@ -78,8 +84,16 @@ module Instruction_requirements = struct
       | Int_test _ | Switch _ ->
         No_requirements
 
-  let basic (instr : Cfg.basic Cfg.instruction) =
-    if instr_uses_stack_slots instr
+  let basic (instr : Cfg.basic Cfg.instruction) ~fun_prologue_required =
+    (* Incoming offsets include the full frame size, so their accesses must
+       follow the prologue unless the function is entirely frameless. *)
+    (* CR-someday xclerc: Incoming parameter moves are in the entry block, so
+       this prevents shrink wrapping for functions with stack-passed parameters
+       that need a frame. Track whether the frame is active when emitting
+       [Incoming] accesses so that these moves can precede the prologue. *)
+    if
+      instr_uses_stack_slots instr
+        ~incoming_needs_prologue:fun_prologue_required
     then Requirements Requires_prologue
     else
       match instr.desc with
@@ -105,12 +119,13 @@ module Instruction_requirements = struct
         Requirements No_requirements
 end
 
-let prologue_needed_block (block : Cfg.basic_block) ~fun_name =
+let prologue_needed_block (block : Cfg.basic_block) ~fun_name
+    ~fun_prologue_required =
   (* CR-soon cfalas: Move to [Proc] so that it's arch-dependent and
      frame_pointers only affects the output for amd64. *)
   Config.with_frame_pointers || block.is_trap_handler
   || DLL.exists block.Cfg.body ~f:(fun instr ->
-      match Instruction_requirements.basic instr with
+      match Instruction_requirements.basic instr ~fun_prologue_required with
       | Requirements Requires_prologue -> true
       | Prologue | Epilogue
       | Requirements (No_requirements | Requires_no_prologue) ->
@@ -177,7 +192,10 @@ let descendants (cfg : Cfg.t) (block : Cfg.basic_block) : Label.Set.t =
 module Path_needs_prologue = struct
   type state = bool
 
-  type context = { fun_name : string }
+  type context =
+    { fun_name : string;
+      fun_prologue_required : bool
+    }
 
   (* The domain represents whether the path leading to a specific block needs a
      prologue or not. *)
@@ -214,8 +232,10 @@ module Path_needs_prologue = struct
       | domain, (No_requirements | Requires_no_prologue) -> domain
 
     let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
-     fun domain instr _ ->
-      match domain, Instruction_requirements.basic instr with
+     fun domain instr { fun_name = _; fun_prologue_required } ->
+      match
+        domain, Instruction_requirements.basic instr ~fun_prologue_required
+      with
       | _, (Prologue | Epilogue) ->
         Misc.fatal_error
           "found prologue or epilogue instruction before prologue addition \
@@ -224,7 +244,7 @@ module Path_needs_prologue = struct
 
     let terminator :
         domain -> Cfg.terminator Cfg.instruction -> context -> image =
-     fun domain instr { fun_name } ->
+     fun domain instr { fun_name; fun_prologue_required = _ } ->
       let res =
         transfer domain (Instruction_requirements.terminator instr fun_name)
       in
@@ -240,10 +260,12 @@ module Path_needs_prologue = struct
   type t = bool Label.Tbl.t
 
   let build (cfg : Cfg.t) : t =
-    match
-      run ~init:false ~handlers_are_entry_points:true cfg
-        { fun_name = cfg.fun_name }
-    with
+    let context =
+      { fun_name = cfg.fun_name;
+        fun_prologue_required = cfg.fun_prologue_required
+      }
+    in
+    match run ~init:false ~handlers_are_entry_points:true cfg context with
     | Ok res_at_entry ->
       (* The result returned by the forward analysis is the state at the entry
          of each block, but we want the state just before the terminator, i.e.
@@ -254,7 +276,6 @@ module Path_needs_prologue = struct
          terminator). This can be done for both forward and backward
          analysis. *)
       let res_at_exit = Label.Tbl.copy res_at_entry in
-      let context = { fun_name = cfg.fun_name } in
       Label.Tbl.iter
         (fun label at_entry ->
           let block = Cfg.get_block_exn cfg label in
@@ -370,7 +391,10 @@ let find_prologue_and_epilogues_shrink_wrapped
           || Path_needs_prologue.needs_prologue path_needs_prologue label)
         epilogue_blocks
     in
-    if prologue_needed_block block ~fun_name:cfg.fun_name || all_need_prologue
+    if
+      prologue_needed_block block ~fun_name:cfg.fun_name
+        ~fun_prologue_required:cfg.fun_prologue_required
+      || all_need_prologue
     then Label.Set.singleton tree.label, epilogue_blocks
     else
       let children_prologue_block =
@@ -401,9 +425,7 @@ let find_prologue_and_epilogues_shrink_wrapped
      was computed before CFG simplification, which can remove calls if they are
      dead, making the prologue unnecessary). *)
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if cfg.fun_prologue_required
   then (
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     (* note: the other entries in the forest are dead code *)
@@ -425,9 +447,7 @@ let find_prologue_and_epilogues_shrink_wrapped
 
 let find_prologue_and_epilogues_at_entry (cfg_with_infos : Cfg_with_infos.t) =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  if
-    Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
-      ~fun_num_stack_slots:cfg.fun_num_stack_slots
+  if cfg.fun_prologue_required
   then
     let epilogue_blocks =
       Cfg.fold_blocks cfg
@@ -544,7 +564,10 @@ module Validator = struct
     let less_equal = State_set.subset
   end
 
-  type context = { fun_name : string }
+  type context =
+    { fun_name : string;
+      fun_prologue_required : bool
+    }
 
   module Transfer :
     Cfg_dataflow.Forward_transfer
@@ -565,10 +588,12 @@ module Validator = struct
         msg
 
     let basic : domain -> Cfg.basic Cfg.instruction -> context -> domain =
-     fun domain instr _ ->
+     fun domain instr { fun_name = _; fun_prologue_required } ->
       State_set.map
         (fun domain ->
-          match domain, Instruction_requirements.basic instr with
+          match
+            domain, Instruction_requirements.basic instr ~fun_prologue_required
+          with
           | No_prologue_on_stack, Prologue when instr.stack_offset <> 0 ->
             error_with_instruction "prologue has a non-zero stack offset" instr
           | No_prologue_on_stack, Prologue -> Prologue_on_stack
@@ -596,7 +621,7 @@ module Validator = struct
 
     let terminator :
         domain -> Cfg.terminator Cfg.instruction -> context -> image =
-     fun domain instr { fun_name } ->
+     fun domain instr { fun_name; fun_prologue_required = _ } ->
       let res =
         State_set.map
           (fun domain ->
@@ -651,7 +676,8 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
     match
       Validator.run cfg
         ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
+        ~handlers_are_entry_points:false
+        { fun_name; fun_prologue_required = cfg.fun_prologue_required }
     with
     | Ok block_states ->
       Label.Tbl.iter
