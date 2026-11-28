@@ -936,7 +936,7 @@ static uintnat sweep_work_done_between_slices(void)
  * - `allocated_direct_words` is the number of words allocated directly to
  *   the major heap (not promoted) since the last slice.
  * - `dependent_words` is the number of words allocated off-heap by this
- *    domain since the last slice.
+ *    domain since the last slice (adjusted for ramping).
  * - `minor_words` is the number of words allocated on the minor heap since
  *   the last slice. */
 
@@ -1009,6 +1009,16 @@ update_major_slice_work(intnat howmuch,
   uintnat my_dependent_count = Wsize_bsize (dom_st->allocated_dependent_bytes);
   uintnat my_suspended_count = dom_st->allocated_words_suspended;
   uintnat my_resumed_count = dom_st->allocated_words_resumed;
+  uintnat my_dependent_suspended_count =
+    Wsize_bsize(dom_st->allocated_dependent_bytes_suspended);
+  uintnat my_dependent_resumed_count =
+    Wsize_bsize(dom_st->allocated_dependent_bytes_resumed);
+  /* The suspended bytes are a subset of the allocated bytes, so this
+     cannot wrap. */
+  uintnat my_dependent_work_count =
+    Wsize_bsize(dom_st->allocated_dependent_bytes -
+                dom_st->allocated_dependent_bytes_suspended +
+                dom_st->allocated_dependent_bytes_resumed);
   uintnat last_minor_words = dom_st->minor_words_at_last_slice;
   uintnat curr_minor_words = caml_minor_words_allocated();
   uintnat my_minor_count = curr_minor_words - last_minor_words;
@@ -1016,19 +1026,23 @@ update_major_slice_work(intnat howmuch,
   dom_st->stat_major_dependent_bytes += dom_st->allocated_dependent_bytes;
   dom_st->current_ramp_up_allocated_words_diff +=
     dom_st->allocated_words_suspended;
+  dom_st->current_ramp_up_dependent_bytes_diff +=
+    dom_st->allocated_dependent_bytes_suspended;
   dom_st->allocated_words = 0;
   dom_st->allocated_words_direct = 0;
   dom_st->allocated_dependent_bytes = 0;
   dom_st->minor_words_at_last_slice = curr_minor_words;
   dom_st->allocated_words_suspended = 0;
   dom_st->allocated_words_resumed = 0;
+  dom_st->allocated_dependent_bytes_suspended = 0;
+  dom_st->allocated_dependent_bytes_resumed = 0;
 
   uintnat heap_words = Wsize_bsize(caml_heap_size(dom_st->shared_heap));
 
   uintnat new_work =
     gc_slice_work(my_alloc_count - my_suspended_count + my_resumed_count,
                   my_alloc_direct_count,
-                  my_dependent_count,
+                  my_dependent_work_count,
                   my_minor_count);
 
   if (new_work > 0)
@@ -1048,7 +1062,8 @@ update_major_slice_work(intnat howmuch,
   CAML_GC_MESSAGE(POLICY, "Major slice [%c] work. "
                   "Allocation: "F_U" words "
                   "(suspended "F_U", resumed "F_U", "
-                  F_U" direct, "F_U" dependent, "
+                  F_U" direct, "F_U" dependent "
+                  "(suspended "F_U", resumed "F_U"), "
                   F_U" minor). Heap: "F_U" words. "
                   "Work: "F_D" work, "F_D" new_work, "
                   F_D" slice_budget\n",
@@ -1058,6 +1073,8 @@ update_major_slice_work(intnat howmuch,
                   my_resumed_count,
                   my_alloc_direct_count,
                   my_dependent_count,
+                  my_dependent_suspended_count,
+                  my_dependent_resumed_count,
                   my_minor_count,
                   heap_words,
                   diffmod(atomic_load(&total_work_incurred),
@@ -2717,11 +2734,15 @@ void caml_finish_marking (void)
       Caml_state->allocated_dependent_bytes;
     Caml_state->current_ramp_up_allocated_words_diff +=
       Caml_state->allocated_words_suspended;
+    Caml_state->current_ramp_up_dependent_bytes_diff +=
+      Caml_state->allocated_dependent_bytes_suspended;
     Caml_state->allocated_words = 0;
     Caml_state->allocated_words_direct = 0;
     Caml_state->allocated_dependent_bytes = 0;
     Caml_state->allocated_words_suspended = 0;
     Caml_state->allocated_words_resumed = 0;
+    Caml_state->allocated_dependent_bytes_suspended = 0;
+    Caml_state->allocated_dependent_bytes_resumed = 0;
     CAMLassert(Caml_state->marking_done);
     CAML_EV_END(EV_MAJOR_FINISH_MARKING);
   }

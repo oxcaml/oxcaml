@@ -261,6 +261,9 @@ CAMLexport void caml_alloc_dependent_memory (value v, mlsize_t nbytes)
   } else {
     caml_add_dependent_bytes (Caml_state->shared_heap, nbytes);
     Caml_state->allocated_dependent_bytes += nbytes;
+    if (Caml_state->gc_policy & CAML_GC_RAMP_UP) {
+      Caml_state->allocated_dependent_bytes_suspended += nbytes;
+    }
     if (Caml_state->allocated_dependent_bytes > max_alloc){
       CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
       caml_request_major_slice(1);
