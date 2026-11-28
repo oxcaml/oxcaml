@@ -5857,6 +5857,7 @@ let rec is_nonexpansive exp =
   | Texp_array_comprehension _
   | Texp_while _
   | Texp_for _
+  | Texp_break _
   | Texp_send _
   | Texp_instvar _
   | Texp_mutvar _
@@ -6034,6 +6035,7 @@ let rec maybe_computation exp =
   | Texp_sequence _
   | Texp_while _
   | Texp_for _
+  | Texp_break _
   | Texp_send _
   | Texp_new _
   | Texp_instvar _
@@ -6462,7 +6464,7 @@ let check_partial_application ~statement exp =
             | Texp_overwrite _ | Texp_hole _
             | Texp_field _ | Texp_setfield _ | Texp_array _ | Texp_idx _
             | Texp_list_comprehension _ | Texp_array_comprehension _
-            | Texp_while _ | Texp_for _ | Texp_instvar _
+            | Texp_while _ | Texp_for _ | Texp_break _  | Texp_instvar _
             | Texp_mutvar _ | Texp_setmutvar _
             | Texp_setinstvar _ | Texp_override _ | Texp_assert _
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
@@ -8736,13 +8738,16 @@ and type_expect_
         | Texp_construct(_, {cstr_name="true"}, _, _, _) -> instance ty_expected
         | _ -> instance Predef.type_unit
       in
+      let (wh_label, body_env) =
+        Env.add_loop_label body_env ~loop_type:exp_type ~loop_loc:loc
+      in
       let wh_body, wh_body_sort =
         type_statement ~explanation:While_loop_body
           ~position body_env sbody
       in
       rue {
         exp_desc =
-          Texp_while {wh_cond; wh_body; wh_body_sort};
+          Texp_while {wh_cond; wh_body; wh_body_sort; wh_label};
         exp_loc = loc; exp_extra = [];
         exp_type;
         exp_attributes = sexp.pexp_attributes;
@@ -8764,16 +8769,20 @@ and type_expect_
         type_for_loop_index ~loc ~env ~param
       in
       let new_env = Env.add_region_lock new_env in
+      let exp_type = instance Predef.type_unit in
+      let (for_label, new_env) =
+        Env.add_loop_label new_env ~loop_type:exp_type ~loop_loc:loc
+      in
       let position = RTail (Regionality.disallow_left Regionality.local, FNontail) in
       let for_body, for_body_sort =
         type_statement ~explanation:For_loop_body ~position new_env sbody
       in
       rue {
         exp_desc = Texp_for {for_id; for_debug_uid = for_uid; for_pat = param;
-                             for_from; for_to; for_dir = dir; for_body;
-                             for_body_sort };
+                             for_from; for_to; for_dir = dir;
+                             for_body; for_body_sort; for_label };
         exp_loc = loc; exp_extra = [];
-        exp_type = instance Predef.type_unit;
+        exp_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constraint (sarg, None, modes) ->
@@ -9717,6 +9726,17 @@ and type_expect_
           exp_env = env }
       | _ -> Error.log_and_raise loc env Unexpected_hole;
       end
+  | Pexp_break ->
+      let (id, loop_type, loop_loc) = Env.find_loop_label_exn loc env in
+      unify_exp_types loop_loc env (instance Predef.type_unit) loop_type;
+      rue {
+        exp_desc = Texp_break id;
+        exp_loc = loc;
+        exp_extra = [];
+        exp_type = instance ty_expected;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env;
+      }
 
 and type_block_access env expected_base_ty principal
     (ba : Parsetree.block_access) : type_block_access_result =

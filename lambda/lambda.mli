@@ -1169,6 +1169,28 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+module Loop_label_map : sig
+  type t
+
+  val empty : t
+
+  val add : Ident.t -> static_label -> t -> t
+
+  (* Will [fatal_error] if the label is missing *)
+  val find : Ident.t -> t -> static_label
+end
+
+type transl_ctx =
+  {
+    scopes: Debuginfo.Scoped_location.scopes;
+    enclosing_loops : Loop_label_map.t
+    (* Maps each loop label to the static exception that breaks out of it *)
+  }
+
+(* Clears the map containing the loop labels. Used defensively in places where a
+   closure lock is crossed and so [break_] should not be allowed anyway. *)
+val clear_enclosing_loops : transl_ctx:transl_ctx -> transl_ctx
+
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
    that produces an instance when invoked. [-instantiate] reads these as

@@ -201,7 +201,8 @@ let classify_expression : Typedtree.expression -> sd =
         (* Unit-returning expressions *)
         Static
 
-    | Texp_unreachable ->
+    | Texp_unreachable
+    | Texp_break _ ->
         Static
 
     | Texp_record_unboxed_product { representation = Record_unboxed_product;
@@ -1122,6 +1123,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_splice e ->
         expression e << Dereference
+    | Texp_break _ -> empty
 
 (* Function bodies.
     G |-{body} b : m

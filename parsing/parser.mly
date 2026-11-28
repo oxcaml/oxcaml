@@ -1007,6 +1007,7 @@ let maybe_pmod_constraint mode expr =
 %token BARRBRACKET            "|]"
 %token BEGIN                  "begin"
 %token BORROW                 "borrow_"
+%token BREAK                  "break_"
 %token <char> CHAR            "'a'" (* just an example *)
 %token <char> HASH_CHAR       "#'a'" (* just an example *)
 %token CLASS                  "class"
@@ -1232,7 +1233,7 @@ The precedences must be listed from low to high.
           HASH_CHAR HASH_FLOAT HASH_INT
           LBRACKETCOLON LESSLBRACKET DOLLAR
           HASHLBRACE HASHLPAREN UNDERSCORE
-          HASHFALSE HASHTRUE
+          HASHFALSE HASHTRUE BREAK
 
 /* Entry points */
 
@@ -3284,6 +3285,8 @@ block_access:
       { unclosed "<[" $loc($1) "]>" $loc($3) }
   | UNDERSCORE
       { Pexp_hole }
+  | BREAK
+      { Pexp_break }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
