@@ -103,6 +103,19 @@ end = struct
   let bump_scope t = { t with scope = Scope.next t.scope }
 end
 
+type name_info = { param_projection : Param_projection.t } [@@unboxed]
+
+let update_name_info ~new_name_info prev_name_info =
+  match prev_name_info with
+  | None -> Some new_name_info
+  | Some { param_projection = _ } ->
+    (* param projection can't represent unions of projections, and neither the
+       new one or the old one is expected to be more precise.
+
+       This function is here mostly to force extensions of name_info to take
+       this into account. *)
+    Some new_name_info
+
 type t =
   { machine_width : Target_system.Machine_width.t;
     resolver : Compilation_unit.t -> serializable option;
@@ -116,7 +129,10 @@ type t =
     next_binding_time : Binding_time.t;
     min_binding_time : Binding_time.t;
         (* Earlier variables have mode In_types *)
-    is_bottom : bool
+    is_bottom : bool;
+    name_info : name_info Name.Map.t
+        (* [name_info] should contain entries only for true canonical elements
+           (ignoring name mode) *)
   }
 
 and serializable =
@@ -144,7 +160,7 @@ let [@ocamlformat "disable"] print ppf
       ({ resolver = _; binding_time_resolver = _;
          prev_levels; current_level; next_binding_time = _;
          defined_symbols; code_age_relation; min_binding_time;
-         is_bottom; machine_width = _
+         is_bottom; machine_width = _; name_info
        } as t) =
   if is_empty t then
     Format.pp_print_string ppf "Empty"
@@ -158,12 +174,20 @@ let [@ocamlformat "disable"] print ppf
       List.filter (fun level -> not (One_level.is_empty level))
         levels
     in
+    let pp_name_info ppf =
+      if not (Name.Map.is_empty name_info) then
+        Format.fprintf ppf "@ @[<hov 1>(name_info@ %a)@]"
+          (Name.Map.print (fun ppf { param_projection } ->
+               Param_projection.print ppf param_projection))
+          name_info
+    in
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(defined_symbols@ %a)@]@ \
          @[<hov 1>(code_age_relation@ %a)@]@ \
          @[<hov 1>(levels@ %a)@]@ \
          @[<hov 1>(aliases@ %a)@]\
+         %t\
        )@]"
       Symbol.Set.print defined_symbols
       Code_age_relation.print code_age_relation
@@ -171,6 +195,7 @@ let [@ocamlformat "disable"] print ppf
          (One_level.print ~min_binding_time))
       levels
       Aliases.print (aliases t)
+      pp_name_info
 
 let [@ocamlformat "disable"] print_serializable ppf
     { defined_symbols_without_equations; code_age_relation; names_to_types } =
@@ -356,8 +381,27 @@ let create ~machine_width ~resolver =
     defined_symbols = Symbol.Set.empty;
     code_age_relation = Code_age_relation.empty;
     min_binding_time = Binding_time.earliest_var;
-    is_bottom = false
+    is_bottom = false;
+    name_info = Name.Map.empty
   }
+
+let add_param_projection t name param_projection =
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> t)
+    ~name:(fun canonical ~coercion:_ ->
+      { t with
+        name_info = Name.Map.add canonical { param_projection } t.name_info
+      })
+
+let is_param_projection t name =
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> None)
+    ~name:(fun canonical ~coercion:_ ->
+      Option.map
+        (fun (x : name_info) -> x.param_projection)
+        (Name.Map.find_opt canonical t.name_info))
 
 let machine_width t = t.machine_width
 
@@ -891,7 +935,20 @@ let add_alias t ~canonical_element1 ~canonical_element2 :
        equation. *)
     Unknown
   | Ok { canonical_element; demoted_name; t = aliases } ->
-    Ok { canonical_element; demoted_name; t = with_aliases t ~aliases }
+    let name_info =
+      match Name.Map.find_opt demoted_name t.name_info with
+      | None -> t.name_info
+      | Some prev_info ->
+        let name_info = Name.Map.remove demoted_name t.name_info in
+        Simple.pattern_match canonical_element
+          ~name:(fun canonical ~coercion:_ ->
+            Name.Map.update canonical
+              (update_name_info ~new_name_info:prev_info)
+              name_info)
+          ~const:(fun _ -> name_info)
+    in
+    let t = with_aliases t ~aliases in
+    Ok { canonical_element; demoted_name; t = { t with name_info } }
 
 let add_definitions_of_params t ~params =
   List.fold_left
@@ -1077,7 +1134,11 @@ let compute_joined_aliases base_env alias_candidates envs_at_uses =
     with_aliases base_env ~aliases:new_aliases
 
 let closure_env t =
-  increment_scope { t with min_binding_time = t.next_binding_time }
+  increment_scope
+    { t with
+      min_binding_time = t.next_binding_time;
+      name_info = Name.Map.empty
+    }
 
 let rec free_names_transitive_of_type_of_name t name ~result =
   let result = Name_occurrences.add_name result name Name_mode.in_types in
