@@ -50,6 +50,11 @@ jobs:
             sysdeps: gdb
 
           - name: multidomain (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          - name: multidomain stack-checks (x86_64-linux)
             config: --enable-stack-checks --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
@@ -91,7 +96,7 @@ jobs:
             disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml testsuite/tests/reaper/unboxed_closure_not_needed.ml testsuite/tests/reaper/static_const_or_variable.ml'
 
           - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+            config: --enable-frame-pointers --enable-poll-insertion --enable-multidomain --enable-flambda-invariants
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
@@ -137,7 +142,7 @@ jobs:
             sysdeps: gdb
 
           - name: frame-pointers irc (x86_64-linux)
-            config: --enable-frame-pointers
+            config: --enable-frame-pointers --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
@@ -145,6 +150,7 @@ jobs:
             sysdeps: gdb
 
           - name: cfg-invariants (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1'
@@ -152,6 +158,7 @@ jobs:
             sysdeps: gdb
 
           - name: cfg-invariants (aarch64-linux)
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
             ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1"
@@ -159,6 +166,7 @@ jobs:
             sysdeps: gdb
 
           - name: vectorizer (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
@@ -166,6 +174,7 @@ jobs:
             sysdeps: gdb
 
           - name: x86-peephole (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
             ocamlparam: '_,w=-46,x86-peephole-optimize=1'
@@ -173,6 +182,7 @@ jobs:
             sysdeps: gdb
 
           - name: experimental-optimizations (x86_64-linux)
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
             ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
@@ -217,6 +227,7 @@ jobs:
           # some tests rely on explicitely controlling whether the reaper is
           # enabled.
           - name: reaper
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
@@ -224,6 +235,7 @@ jobs:
             sysdeps: gdb
 
           - name: reaper with local value slots
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
@@ -234,6 +246,7 @@ jobs:
           # lifting and specialization, also it's pointless to test match-in-match without O3 (or more)
           # because it requires join points.
           - name: match-in-match
+            config: --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
             ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
