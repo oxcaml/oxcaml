@@ -20,45 +20,44 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
     ($`*extern*`.caml_string_notequal : val * val -> val)
       (str, $camlString_switch__immstring_0)
       -> k2 * k1
-    where k2 (Pccall) =
-      ((let untagged = %untag_imm (Pccall) in
-        switch untagged
-          | 0 -> k (1)
-          | 1 -> k2)
-         where k2 =
-           (apply ccall noalloc &my_alloc_region
-              ($`*extern*`.caml_string_notequal : val * val -> val)
-                (str, $camlString_switch__immstring_1)
-                -> k2 * k1
-              where k2 (Pccall_1) =
-                ((let untagged = %untag_imm (Pccall_1) in
+  where k2 (Pccall) =
+    ((let untagged = %untag_imm (Pccall) in
+      switch untagged
+        | 0 -> k (1)
+        | 1 -> k2)
+     where k2 =
+       (apply ccall noalloc &my_alloc_region
+          ($`*extern*`.caml_string_notequal : val * val -> val)
+            (str, $camlString_switch__immstring_1)
+            -> k2 * k1
+        where k2 (Pccall_1) =
+          ((let untagged = %untag_imm (Pccall_1) in
+            switch untagged
+              | 0 -> k (2)
+              | 1 -> k2)
+           where k2 =
+             (apply ccall noalloc &my_alloc_region
+                ($`*extern*`.caml_string_notequal : val * val -> val)
+                  (str, $camlString_switch__immstring_2)
+                  -> k2 * k1
+              where k2 (Pccall_2) =
+                ((let untagged = %untag_imm (Pccall_2) in
                   switch untagged
-                    | 0 -> k (2)
+                    | 0 -> k (3)
                     | 1 -> k2)
-                   where k2 =
-                     (apply ccall noalloc &my_alloc_region
-                        ($`*extern*`.caml_string_notequal : val * val -> val)
-                          (str, $camlString_switch__immstring_2)
-                          -> k2 * k1
-                        where k2 (Pccall_2) =
-                          ((let untagged = %untag_imm (Pccall_2) in
-                            switch untagged
-                              | 0 -> k (3)
-                              | 1 -> k2)
-                             where k2 =
-                               (apply ccall noalloc &my_alloc_region
-                                  ($`*extern*`.caml_string_notequal
-                                   : val * val -> val)
-                                    (str, $camlString_switch__immstring_3)
-                                    -> k2 * k1
-                                  where k2 (Pccall_3) =
-                                    let untagged = %untag_imm (Pccall_3) in
-                                    switch untagged
-                                      | 0 -> k (0)
-                                      | 1 ->
-                                        k1
-                                          pop(regular k1)
-                                          ($camlString_switch__Pmakeblock_6)))))))
+                 where k2 =
+                   (apply ccall noalloc &my_alloc_region
+                      ($`*extern*`.caml_string_notequal : val * val -> val)
+                        (str, $camlString_switch__immstring_3)
+                        -> k2 * k1
+                    where k2 (Pccall_3) =
+                      let untagged = %untag_imm (Pccall_3) in
+                      switch untagged
+                        | 0 -> k (0)
+                        | 1 ->
+                          k1
+                            pop(regular k1)
+                            ($camlString_switch__Pmakeblock_6)))))))
 in
 let $camlString_switch__of_string_7 =
   closure of_string_0_1 @of_string &toplevel

@@ -42,9 +42,9 @@ let code loopify(never) size(12) newer_version_of(gadt_match_3)
    switch untagged
      | 0 -> k (n)
      | 1 -> k2)
-    where k2 =
-      let Popaque = %opaque (n) in
-      cont k (Popaque)
+  where k2 =
+    let Popaque = %opaque (n) in
+    cont k (Popaque)
 in
 let $camlTests14__gadt_match_4 = closure gadt_match_3_1 @gadt_match &toplevel
 in

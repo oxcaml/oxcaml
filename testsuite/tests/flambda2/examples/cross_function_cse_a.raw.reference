@@ -16,9 +16,9 @@
     let x_1 = x in
     let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
     cont k3 (Pmakeblock))
-     where k3 (b : [ 0 | 0 of val ]) =
-       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+   where k3 (b : [ 0 | 0 of val ]) =
+     let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+     cont k1 (Pmakeblock)
  in
  let code size(21)
        g_2 (x)
@@ -29,10 +29,10 @@
     let x_1 = x in
     let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
     cont k3 (Pmakeblock))
-     where k3 (a : [ 0 | 0 of val ]) =
-       let b = %block.[`0`].my_alloc_region (x) in
-       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+   where k3 (a : [ 0 | 0 of val ]) =
+     let b = %block.[`0`].my_alloc_region (x) in
+     let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+     cont k1 (Pmakeblock)
  in
  let $camlCross_function_cse_a__s0 = closure some_0 @some &toplevel in
  let $camlCross_function_cse_a__s1 = closure f_1 @f &toplevel in
@@ -43,10 +43,10 @@
             $camlCross_function_cse_a__s2)
  in
  cont k ($camlCross_function_cse_a__s3))
-  where k define_root_symbol (module_block) =
-    let $camlCross_function_cse_a =
-      Block 0 ($camlCross_function_cse_a__s0,
-               $camlCross_function_cse_a__s1,
-               $camlCross_function_cse_a__s2)
-    in
-    cont done ($camlCross_function_cse_a)
+where k define_root_symbol (module_block) =
+  let $camlCross_function_cse_a =
+    Block 0 ($camlCross_function_cse_a__s0,
+             $camlCross_function_cse_a__s1,
+             $camlCross_function_cse_a__s2)
+  in
+  cont done ($camlCross_function_cse_a)

@@ -42,54 +42,50 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
   switch prim
     | 0 -> k2
     | 1 -> k3
-    where k3 =
-      let untagged = %untag_imm (b) in
-      switch untagged
-        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_2)
-        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_4)
-    where k2 =
-      ((let Pfield = %block_load.[`0`] (b) in
-        let Pmixedfield = %block_load.[`0`] (Pfield) in
-        let Popaque = %opaque (0) in
-        let Pobj_magic = %opaque (Popaque) in
-        apply &my_alloc_region Pobj_magic (Pmixedfield) -> k3 * k1
-          where k3 (param : [ 0 |1 ]) =
-            let unboxed_field = %untag_imm (param) in
-            cont k2 (unboxed_field))
-         where k2 (unboxed_field : imm) =
-           let naked_immediate = unboxed_field in
-           (switch naked_immediate
+  where k3 =
+    let untagged = %untag_imm (b) in
+    switch untagged
+      | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_2)
+      | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_4)
+  where k2 =
+    ((let Pfield = %block_load.[`0`] (b) in
+      let Pmixedfield = %block_load.[`0`] (Pfield) in
+      let Popaque = %opaque (0) in
+      let Pobj_magic = %opaque (Popaque) in
+      apply &my_alloc_region Pobj_magic (Pmixedfield) -> k3 * k1
+      where k3 (param : [ 0 |1 ]) =
+        let unboxed_field = %untag_imm (param) in
+        cont k2 (unboxed_field))
+     where k2 (unboxed_field : imm) =
+       let naked_immediate = unboxed_field in
+       (switch naked_immediate
+          | 0 -> k2
+          | 1 -> k (1)
+        where k2 =
+          ((let prim_1 = %get_tag (b) in
+            switch prim_1
               | 0 -> k2
-              | 1 -> k (1)
-              where k2 =
-                ((let prim_1 = %get_tag (b) in
-                  switch prim_1
-                    | 0 -> k2
-                    | 1 -> k3)
-                   where k3 =
-                     let Pfield = %block_load.[`0`] (b) in
-                     let Pmixedfield = %block_load.[`1`] (Pfield) in
-                     let Popaque = %opaque (0) in
-                     let Pobj_magic = %opaque (Popaque) in
-                     let Pmakeblock =
-                       %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
-                     in
-                     let Pmakeblock_1 =
-                       %block.[`1`].my_alloc_region (Pmakeblock)
-                     in
-                     cont k (Pmakeblock_1)
-                   where k2 =
-                     let Pfield = %block_load.[`0`] (b) in
-                     let Pmixedfield = %block_load.[`1`] (Pfield) in
-                     let Popaque = %opaque (0) in
-                     let Pobj_magic = %opaque (Popaque) in
-                     let Pmakeblock =
-                       %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
-                     in
-                     let Pmakeblock_1 =
-                       %block.[`0`].my_alloc_region (Pmakeblock)
-                     in
-                     cont k (Pmakeblock_1))))
+              | 1 -> k3)
+           where k3 =
+             let Pfield = %block_load.[`0`] (b) in
+             let Pmixedfield = %block_load.[`1`] (Pfield) in
+             let Popaque = %opaque (0) in
+             let Pobj_magic = %opaque (Popaque) in
+             let Pmakeblock =
+               %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
+             in
+             let Pmakeblock_1 = %block.[`1`].my_alloc_region (Pmakeblock) in
+             cont k (Pmakeblock_1)
+           where k2 =
+             let Pfield = %block_load.[`0`] (b) in
+             let Pmixedfield = %block_load.[`1`] (Pfield) in
+             let Popaque = %opaque (0) in
+             let Pobj_magic = %opaque (Popaque) in
+             let Pmakeblock =
+               %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
+             in
+             let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock) in
+             cont k (Pmakeblock_1))))
 in
 let $camlAlt_ergo__inv_borne_sup_10 =
   closure inv_borne_sup_1_1 @inv_borne_sup &toplevel
@@ -111,12 +107,12 @@ let code loopify(never) size(14) newer_version_of(inv_bornes_2)
       )
        (u, is_int, Pmixedfield)
        -> k2 * k1)
-    where k2
-            (apply_result :
-               [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
-               |1 of [ 0 of imm tagged * imm tagged ] ]) =
-      let Pmakeblock = %block.[`0`].my_alloc_region (apply_result, u) in
-      cont k (Pmakeblock)
+  where k2
+          (apply_result :
+             [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
+             |1 of [ 0 of imm tagged * imm tagged ] ]) =
+    let Pmakeblock = %block.[`0`].my_alloc_region (apply_result, u) in
+    cont k (Pmakeblock)
 in
 let $camlAlt_ergo__inv_bornes_11 =
   closure inv_bornes_2_1 @inv_bornes &toplevel
@@ -130,35 +126,33 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
   switch prim
     | 0 -> k2
     | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_6)
-    where k2 =
-      let Pfield = %block_load.[`1`] (param) in
-      let prim_1 = %is_int (Pfield) in
-      (switch prim_1
-         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_6)
-         | 1 -> k2
-         where k2 =
-           let `*match*` = %block_load.[`0`] (param) in
-           ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
-             let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
-             let Pmakeblock =
-               %block.[`0`].my_alloc_region (Pmixedfield_1, Pmixedfield)
-             in
-             apply direct(inv_bornes_2_1 &my_alloc_region)
-               ($camlAlt_ergo__inv_bornes_11
-                : _ ->
-                  [ 0 of [ 0 |1 | 0 of val |1 of val ] *
-                      [ 0 |1 | 0 of val |1 of val ] ]
-                )
-                 (Pmakeblock, param_1)
-                 -> k2 * k1)
-              where k2
-                      (apply_result :
-                         [ 0 of [ 0 |1 | 0 of val |1 of val ] *
-                             [ 0 |1 | 0 of val |1 of val ] ]) =
-                let Pmakeblock =
-                  %block.[`0`].my_alloc_region (apply_result, 0)
-                in
-                cont k (Pmakeblock)))
+  where k2 =
+    let Pfield = %block_load.[`1`] (param) in
+    let prim_1 = %is_int (Pfield) in
+    (switch prim_1
+       | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_6)
+       | 1 -> k2
+     where k2 =
+       let `*match*` = %block_load.[`0`] (param) in
+       ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
+         let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+         let Pmakeblock =
+           %block.[`0`].my_alloc_region (Pmixedfield_1, Pmixedfield)
+         in
+         apply direct(inv_bornes_2_1 &my_alloc_region)
+           ($camlAlt_ergo__inv_bornes_11
+            : _ ->
+              [ 0 of [ 0 |1 | 0 of val |1 of val ] *
+                  [ 0 |1 | 0 of val |1 of val ] ]
+            )
+             (Pmakeblock, param_1)
+             -> k2 * k1)
+        where k2
+                (apply_result :
+                   [ 0 of [ 0 |1 | 0 of val |1 of val ] *
+                       [ 0 |1 | 0 of val |1 of val ] ]) =
+          let Pmakeblock = %block.[`0`].my_alloc_region (apply_result, 0) in
+          cont k (Pmakeblock)))
 in
 let $camlAlt_ergo__inv_12 = closure inv_3_1 @inv &toplevel in
 let code loopify(never) size(11) newer_version_of(div_4)
@@ -173,12 +167,11 @@ let code loopify(never) size(11) newer_version_of(div_4)
       : _ -> [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ])
        (tuple_field, tuple_field_1, tuple_field_2)
        -> k3 * k1
-     where k3
-             (param :
-                [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
-       cont k2)
-    where k2 =
-      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_8)
+   where k3
+           (param : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
+     cont k2)
+  where k2 =
+    cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_8)
 in
 let $camlAlt_ergo__div_13 = closure div_4_1 @div &toplevel in
 let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_13) in

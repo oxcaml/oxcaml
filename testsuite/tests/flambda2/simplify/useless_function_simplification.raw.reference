@@ -32,8 +32,8 @@ let $camlUseless_function_simplification__first_const_0 = Block 0 () in
  let h = closure h_2 @h &toplevel with { make = make } in
  let Pmakeblock = %block.[`0`].`toplevel` (make, h) in
  cont k (Pmakeblock))
-  where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
-    let $camlUseless_function_simplification = Block 0 (field_0, field_1) in
-    cont done ($camlUseless_function_simplification)
+where k define_root_symbol (module_block) =
+  let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
+  let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
+  let $camlUseless_function_simplification = Block 0 (field_0, field_1) in
+  cont done ($camlUseless_function_simplification)

@@ -61,52 +61,51 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
         -> k * k1
         : [ 0 | 0 of val * val ] =
   apply &my_alloc_region seq (0) -> k2 * k1
-    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
-      let prim = %is_int (`*match*`) in
-      (switch prim
-         | 0 -> k2
-         | 1 -> k (0)
-         where k2 =
-           ((let Popaque = %opaque (0) in
-             (let untagged = %untag_imm (Popaque) in
-              switch untagged
-                | 0 -> k3
-                | 1 -> k4)
-               where k4 =
-                 let `fn[tests13.ml:27,2--118]` =
-                   closure `fn[tests13.ml:27,2--118]_1_3`
-                     @`fn[tests13.ml:27,2--118]` &my_alloc_region
-                 with {
-                   i = 10;
-                   map_foo =
-                     $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
-                 }
-                 in
-                 cont k2 (`fn[tests13.ml:27,2--118]`)
-               where k3 =
-                 let `fn[tests13.ml:27,2--118]` =
-                   closure `fn[tests13.ml:27,2--118]_1_2`
-                     @`fn[tests13.ml:27,2--118]` &my_alloc_region
-                 with {
-                   i = 20;
-                   map_foo =
-                     $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
-                 }
-                 in
-                 cont k2 (`fn[tests13.ml:27,2--118]`))
-              where k2 (g : val) =
-                (apply &my_alloc_region inlined(always) g (0) -> k2 * k1
-                   where k2 (g_result : [ 0 | 0 of val * val ]) =
-                     let Popaque = %opaque (g_result) in
-                     ((let Pfield = %block_load.[`0`] (`*match*`) in
-                       apply &my_alloc_region f (Pfield) -> k2 * k1)
-                        where k2 (apply_result : val) =
-                          let Pmakeblock =
-                            %block.[`0`].my_alloc_region
-                              (apply_result,
-                               $`camlTests13__fn[tests13.ml:41,15--28]_5`)
-                          in
-                          cont k (Pmakeblock)))))
+  where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+    let prim = %is_int (`*match*`) in
+    (switch prim
+       | 0 -> k2
+       | 1 -> k (0)
+     where k2 =
+       ((let Popaque = %opaque (0) in
+         (let untagged = %untag_imm (Popaque) in
+          switch untagged
+            | 0 -> k3
+            | 1 -> k4)
+         where k4 =
+           let `fn[tests13.ml:27,2--118]` =
+             closure `fn[tests13.ml:27,2--118]_1_3`
+               @`fn[tests13.ml:27,2--118]` &my_alloc_region
+           with {
+             i = 10;
+             map_foo =
+               $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
+           }
+           in
+           cont k2 (`fn[tests13.ml:27,2--118]`)
+         where k3 =
+           let `fn[tests13.ml:27,2--118]` =
+             closure `fn[tests13.ml:27,2--118]_1_2`
+               @`fn[tests13.ml:27,2--118]` &my_alloc_region
+           with {
+             i = 20;
+             map_foo =
+               $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
+           }
+           in
+           cont k2 (`fn[tests13.ml:27,2--118]`))
+        where k2 (g : val) =
+          (apply &my_alloc_region inlined(always) g (0) -> k2 * k1
+           where k2 (g_result : [ 0 | 0 of val * val ]) =
+             let Popaque = %opaque (g_result) in
+             ((let Pfield = %block_load.[`0`] (`*match*`) in
+               apply &my_alloc_region f (Pfield) -> k2 * k1)
+              where k2 (apply_result : val) =
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region
+                    (apply_result, $`camlTests13__fn[tests13.ml:41,15--28]_5`)
+                in
+                cont k (Pmakeblock)))))
 and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
       `fn[tests13.ml:27,2--118]_1_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth

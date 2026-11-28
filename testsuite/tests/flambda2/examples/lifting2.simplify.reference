@@ -1,10 +1,9 @@
 apply ccall &toplevel ($`*extern*`.rand : val -> val) (0) -> k * error
-  where k (r0) =
-    (apply ccall &toplevel ($`*extern*`.rand : val -> val) (0) -> k * error
-       where k (r1) =
-         (apply ccall &toplevel
-            ($`*extern*`.rand : val -> val) (0) -> k * error
-            where k (r2) =
-              let $camlLifting2__t_1 = Block 0 (r0, r1, r2) in
-              let $camlLifting2 = Block 0 (r2, $camlLifting2__t_1) in
-              cont done ($camlLifting2)))
+where k (r0) =
+  (apply ccall &toplevel ($`*extern*`.rand : val -> val) (0) -> k * error
+   where k (r1) =
+     (apply ccall &toplevel ($`*extern*`.rand : val -> val) (0) -> k * error
+      where k (r2) =
+        let $camlLifting2__t_1 = Block 0 (r0, r1, r2) in
+        let $camlLifting2 = Block 0 (r2, $camlLifting2__t_1) in
+        cont done ($camlLifting2)))

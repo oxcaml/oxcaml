@@ -10,11 +10,11 @@ let code loopify(never) size(21) newer_version_of(send_0)
   switch prim
     | 0 -> k2
     | 1 -> k (0)
-    where k2 =
-      let `*match*_1` = %block_load.[`0`] (`*match*`) in
-      let Pfield = %block_load.[`1`] (`*match*_1`) in
-      let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-      apply &my_alloc_region c (Pfield_1, Pfield) -> k * k1
+  where k2 =
+    let `*match*_1` = %block_load.[`0`] (`*match*`) in
+    let Pfield = %block_load.[`1`] (`*match*_1`) in
+    let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+    apply &my_alloc_region c (Pfield_1, Pfield) -> k * k1
 in
 let $camlDirect_app_parameter_kind_check_simplify__send_1 =
   closure send_0_1 @send &toplevel
@@ -36,12 +36,12 @@ in
  switch prim
    | 0 -> k1
    | 1 -> k
-   where k1 =
-     invalid)
-  where k =
-    let $camlDirect_app_parameter_kind_check_simplify =
-      Block 0 (0,
-               $camlDirect_app_parameter_kind_check_simplify__send_1,
-               $camlDirect_app_parameter_kind_check_simplify__create_2)
-    in
-    cont done ($camlDirect_app_parameter_kind_check_simplify)
+ where k1 =
+   invalid)
+where k =
+  let $camlDirect_app_parameter_kind_check_simplify =
+    Block 0 (0,
+             $camlDirect_app_parameter_kind_check_simplify__send_1,
+             $camlDirect_app_parameter_kind_check_simplify__create_2)
+  in
+  cont done ($camlDirect_app_parameter_kind_check_simplify)

@@ -16,35 +16,33 @@ let code loopify(never) size(50) newer_version_of(f_0)
    switch untagged
      | 0 -> k3
      | 1 -> k4)
-    where k4 =
-      let prim = %unbox_num.`int64` (y) in
-      let prim_1 = %int_barith.`int64`.add (prim, prim) in
-      let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
-      let int32_add = poison.val.reaper_unused_boxed_number in
-      cont k2 (int32_add, int64_add)
-    where k3 =
-      let prim = %unbox_num.`int64` (y) in
-      let prim_1 = %int_barith.`int64`.mul (prim, prim) in
-      let int64_mul = %box_num.`int64`.my_alloc_region (prim_1) in
-      let int32_mul = poison.val.reaper_unused_boxed_number in
-      cont k2 (int32_mul, int64_mul)
-    where k2 (a : val, b_1 : int64 boxed) =
-      (apply direct(merge_usages_1_1 &my_alloc_region)
-         $camlBoxed_number_subkind_erasure__merge_usages_2 (a) -> k4 * k1
-         where k4 (function_return_0_merge_usages_1) =
-           cont k3
-         where k3 =
-           cont k2
-         where k2 =
-           (apply direct(merge_usages_1_1 &my_alloc_region)
-              $camlBoxed_number_subkind_erasure__merge_usages_2
-                (b_1)
-                -> k2 * k1
-              where k2 (b_2 : int64 boxed) =
-                let prim = %unbox_num.`int64` (b_2) in
-                let prim_1 = %int_barith.`int64`.add (prim, prim) in
-                let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
-                cont k (int64_add)))
+  where k4 =
+    let prim = %unbox_num.`int64` (y) in
+    let prim_1 = %int_barith.`int64`.add (prim, prim) in
+    let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
+    let int32_add = poison.val.reaper_unused_boxed_number in
+    cont k2 (int32_add, int64_add)
+  where k3 =
+    let prim = %unbox_num.`int64` (y) in
+    let prim_1 = %int_barith.`int64`.mul (prim, prim) in
+    let int64_mul = %box_num.`int64`.my_alloc_region (prim_1) in
+    let int32_mul = poison.val.reaper_unused_boxed_number in
+    cont k2 (int32_mul, int64_mul)
+  where k2 (a : val, b_1 : int64 boxed) =
+    (apply direct(merge_usages_1_1 &my_alloc_region)
+       $camlBoxed_number_subkind_erasure__merge_usages_2 (a) -> k4 * k1
+     where k4 (function_return_0_merge_usages_1) =
+       cont k3
+     where k3 =
+       cont k2
+     where k2 =
+       (apply direct(merge_usages_1_1 &my_alloc_region)
+          $camlBoxed_number_subkind_erasure__merge_usages_2 (b_1) -> k2 * k1
+        where k2 (b_2 : int64 boxed) =
+          let prim = %unbox_num.`int64` (b_2) in
+          let prim_1 = %int_barith.`int64`.add (prim, prim) in
+          let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
+          cont k (int64_add)))
 in
 let $camlBoxed_number_subkind_erasure__f_1 = closure f_0_1 @f &toplevel in
 let $camlBoxed_number_subkind_erasure =

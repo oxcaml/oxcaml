@@ -720,8 +720,7 @@ let rec expr scope ppf = function
       } ->
     parens ~if_scope_is:Continuation_body scope ppf (fun _scope ppf ->
         Format.fprintf ppf
-          "@[<v 2>%a@ @[<v>@[<v 2>@[%twhere%t%a @]@[<hv 2>%a%a%a@] =@ \
-           %a@]%a@]@]"
+          "@[<v>%a@ @[<v>@[<v 2>@[%twhere%t%a @]@[<hv 2>%a%a%a@] =@ %a@]%a@]@]"
           (expr Where_body) body Flambda_colours.expr_keyword
           Flambda_colours.pop
           (cont_recursive ~space:Before)

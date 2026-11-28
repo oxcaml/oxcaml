@@ -30,19 +30,19 @@ let code loopify(never) size(64) newer_version_of(foobar_0)
    switch untagged
      | 0 -> k3
      | 1 -> k4)
-    where k4 =
-      let bar1 = closure bar1_2_1 @bar1 &my_alloc_region with { x = x } in
-      let Pmakeblock = %block.[`0`].my_alloc_region (bar1) in
-      cont k2 (Pmakeblock)
-    where k3 =
-      let bar2 = closure bar2_1_1 @bar2 &my_alloc_region
-      with { x_1 = x; z = z }
-      in
-      let Pmakeblock = %block.[`1`].my_alloc_region (bar2) in
-      cont k2 (Pmakeblock)
-    where k2 (f : [ 0 of val |1 of val ]) =
-      let Pfield = %block_load.[`0`] (f) in
-      apply &my_alloc_region Pfield (x) -> k * k1
+  where k4 =
+    let bar1 = closure bar1_2_1 @bar1 &my_alloc_region with { x = x } in
+    let Pmakeblock = %block.[`0`].my_alloc_region (bar1) in
+    cont k2 (Pmakeblock)
+  where k3 =
+    let bar2 = closure bar2_1_1 @bar2 &my_alloc_region
+    with { x_1 = x; z = z }
+    in
+    let Pmakeblock = %block.[`1`].my_alloc_region (bar2) in
+    cont k2 (Pmakeblock)
+  where k2 (f : [ 0 of val |1 of val ]) =
+    let Pfield = %block_load.[`0`] (f) in
+    apply &my_alloc_region Pfield (x) -> k * k1
 in
 let $camlUnbox_closure2__foobar_1 = closure foobar_0_1 @foobar &toplevel in
 let $camlUnbox_closure2 = Block 0 ($camlUnbox_closure2__foobar_1) in

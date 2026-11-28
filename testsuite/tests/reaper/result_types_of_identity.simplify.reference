@@ -9,8 +9,8 @@ let code loopify(never) size(5) newer_version_of(always_0_0)
      : _ -> imm tagged)
       (0)
       -> k2 * k1
-    where k2 (param_1) =
-      cont k (0)
+  where k2 (param_1) =
+    cont k (0)
 in
 let $camlResult_types_of_identity__always_0_3 =
   closure always_0_0_1 @always_0 &toplevel

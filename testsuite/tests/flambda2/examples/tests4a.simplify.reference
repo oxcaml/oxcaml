@@ -8,13 +8,13 @@ let code loopify(never) size(21) newer_version_of(pr2162_3_as_int64_0)
    switch untagged
      | 0 -> k2 (x)
      | 1 -> k3)
-    where k3 =
-      let int_mul = %int_barith.mul (x, 2) in
-      cont k2 (int_mul)
-    where k2 (y : imm tagged) =
-      let prim = %phys_eq (y, x) in
-      let eq = %tag_imm (prim) in
-      cont k (eq)
+  where k3 =
+    let int_mul = %int_barith.mul (x, 2) in
+    cont k2 (int_mul)
+  where k2 (y : imm tagged) =
+    let prim = %phys_eq (y, x) in
+    let eq = %tag_imm (prim) in
+    cont k (eq)
 in
 let $camlTests4a__pr2162_3_as_int64_1 =
   closure pr2162_3_as_int64_0_1 @pr2162_3_as_int64 &toplevel

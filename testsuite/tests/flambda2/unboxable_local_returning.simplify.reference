@@ -9,11 +9,11 @@ let code loopify(never) size(13) stub
    in
    apply &my_alloc_region &my_region &my_ghost_region
      (ret_local_unboxed : imm tagged -> float) (param) -> k2 * k1)
-    where k2 (unboxed_return : float) =
-      let boxed_return =
-        %box_num.`float`.my_alloc_region.local[my_region] (unboxed_return)
-      in
-      cont k (boxed_return)
+  where k2 (unboxed_return : float) =
+    let boxed_return =
+      %box_num.`float`.my_alloc_region.local[my_region] (unboxed_return)
+    in
+    cont k (boxed_return)
 in
 let code ret_heap_3 deleted in
 let code loopify(never) size(13) stub
@@ -26,9 +26,9 @@ let code loopify(never) size(13) stub
    in
    apply &my_alloc_region
      (ret_heap_unboxed : imm tagged -> float) (param) -> k2 * k1)
-    where k2 (unboxed_return : float) =
-      let boxed_return = %box_num.`float`.my_alloc_region (unboxed_return) in
-      cont k (boxed_return)
+  where k2 (unboxed_return : float) =
+    let boxed_return = %box_num.`float`.my_alloc_region (unboxed_return) in
+    cont k (boxed_return)
 in
 let $camlUnboxable_local_returning__immstring_7 = "ok" in
 let code loopify(never) size(1) newer_version_of(ret_local_1)
@@ -60,11 +60,11 @@ apply direct(print_endline_47 &toplevel) inlined(never)
   ($Stdlib.camlStdlib__print_endline_47_98 : _ -> imm tagged)
     ($camlUnboxable_local_returning__immstring_7)
     -> k1 * error
-  where k1 (param : imm tagged) =
-    cont k
-  where k =
-    let $camlUnboxable_local_returning =
-      Block 0 ($camlUnboxable_local_returning__ret_local_8,
-               $camlUnboxable_local_returning__ret_heap_10)
-    in
-    cont done ($camlUnboxable_local_returning)
+where k1 (param : imm tagged) =
+  cont k
+where k =
+  let $camlUnboxable_local_returning =
+    Block 0 ($camlUnboxable_local_returning__ret_local_8,
+             $camlUnboxable_local_returning__ret_heap_10)
+  in
+  cont done ($camlUnboxable_local_returning)

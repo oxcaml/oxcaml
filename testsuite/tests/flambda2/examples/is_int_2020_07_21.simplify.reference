@@ -16,20 +16,20 @@ let code loopify(never) size(28) newer_version_of(test_1)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
   apply &my_alloc_region f (0) -> k4 * k1
-    where k4 (param : [ 0 |1 ]) =
-      let unboxed_field = %untag_imm (param) in
-      cont k3 (unboxed_field)
-    where k3 (unboxed_field : imm) =
-      let naked_immediate = unboxed_field in
-      (switch naked_immediate
-         | 0 -> k2 (2)
-         | 1 -> k3
-         where k3 =
-           let prim = %is_int (src) in
-           let Pisint = %tag_imm (prim) in
-           cont k2 (Pisint))
-    where k2 (dst : imm tagged) =
-      apply &my_alloc_region g (dst) -> k * k1
+  where k4 (param : [ 0 |1 ]) =
+    let unboxed_field = %untag_imm (param) in
+    cont k3 (unboxed_field)
+  where k3 (unboxed_field : imm) =
+    let naked_immediate = unboxed_field in
+    (switch naked_immediate
+       | 0 -> k2 (2)
+       | 1 -> k3
+     where k3 =
+       let prim = %is_int (src) in
+       let Pisint = %tag_imm (prim) in
+       cont k2 (Pisint))
+  where k2 (dst : imm tagged) =
+    apply &my_alloc_region g (dst) -> k * k1
 in
 let $camlIs_int_2020_07_21__test_2 = closure test_1_1 @test &toplevel in
 let $camlIs_int_2020_07_21 =

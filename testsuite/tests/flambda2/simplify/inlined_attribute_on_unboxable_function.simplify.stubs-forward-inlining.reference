@@ -10,11 +10,11 @@ let code loopify(never) size(15) stub
      (f_unboxed : imm tagged * imm tagged -> imm tagged * imm tagged)
        (x, y)
        -> k2 * k1)
-    where k2 (unboxed_return : imm tagged, unboxed_return_1 : imm tagged) =
-      let boxed_return =
-        %block.[`0`].my_alloc_region (unboxed_return, unboxed_return_1)
-      in
-      cont k (boxed_return)
+  where k2 (unboxed_return : imm tagged, unboxed_return_1 : imm tagged) =
+    let boxed_return =
+      %block.[`0`].my_alloc_region (unboxed_return, unboxed_return_1)
+    in
+    cont k (boxed_return)
 in
 let code loopify(never) size(3) newer_version_of(helper_0)
       helper_0_1 (x : imm tagged, y : imm tagged)
@@ -37,8 +37,8 @@ let code loopify(never) size(5) newer_version_of(f_2)
      )
       (x, y)
       -> k1 * k
-    where k1 (apply_result : imm tagged) =
-      cont unboxed_return (x, apply_result)
+  where k1 (apply_result : imm tagged) =
+    cont unboxed_return (x, apply_result)
 in
 let $camlInlined_attribute_on_unboxable_function__f_2 =
   closure f_2_1 @f &toplevel
@@ -49,10 +49,10 @@ apply direct(helper_0_1 &toplevel) inlining_state(depth(1))
   ($camlInlined_attribute_on_unboxable_function__helper_1 : _ -> imm tagged)
     (0, 0)
     -> k * error
-  where k (apply_result : imm tagged) =
-    let $camlInlined_attribute_on_unboxable_function =
-      Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1,
-               $camlInlined_attribute_on_unboxable_function__f_2,
-               apply_result)
-    in
-    cont done ($camlInlined_attribute_on_unboxable_function)
+where k (apply_result : imm tagged) =
+  let $camlInlined_attribute_on_unboxable_function =
+    Block 0 ($camlInlined_attribute_on_unboxable_function__helper_1,
+             $camlInlined_attribute_on_unboxable_function__f_2,
+             apply_result)
+  in
+  cont done ($camlInlined_attribute_on_unboxable_function)

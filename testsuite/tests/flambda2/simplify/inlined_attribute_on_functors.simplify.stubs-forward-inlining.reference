@@ -10,10 +10,10 @@ let code loopify(never) size(15) stub
   in
   apply &my_alloc_region inlined(forward)
     (Make : val -> val) (funarg) -> k2 * k1
-    where k2 (`let` : val) =
-      let Pfield = %block_load.[`1`] (`let`) in
-      let Pmakeblock = %block.[`0`].my_alloc_region (Pfield) in
-      cont k (Pmakeblock)
+  where k2 (`let` : val) =
+    let Pfield = %block_load.[`1`] (`let`) in
+    let Pmakeblock = %block.[`0`].my_alloc_region (Pfield) in
+    cont k (Pmakeblock)
 in
 let code loopify(never) size(9) newer_version_of(Make_0)
       Make_0_1 (X : val) my_closure &my_alloc_region my_depth -> k * k1 : val =

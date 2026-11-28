@@ -29,10 +29,10 @@ let code loopify(never) size(13) newer_version_of(F3_2)
         : val =
   apply direct(F2_1_1 &my_alloc_region)
     ($camlFunctors2__F2_2 : _ -> val) (M1, M2) -> k2 * k1
-    where k2 (include : val) =
-      let Pfield = %block_load.[`0`] (include) in
-      let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, 0) in
-      cont k (Pmakeblock)
+  where k2 (include : val) =
+    let Pfield = %block_load.[`0`] (include) in
+    let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, 0) in
+    cont k (Pmakeblock)
 in
 let $camlFunctors2__F3_3 = closure F3_2_1 @F3 &toplevel in
 let $camlFunctors2 =

@@ -15,8 +15,8 @@
  in
  let $camlOver_app_kind_check_classic__s1 = closure f_1 @f &toplevel in
  cont k ($camlOver_app_kind_check_classic__s2))
-  where k define_root_symbol (module_block) =
-    let $camlOver_app_kind_check_classic =
-      Block 0 ($camlOver_app_kind_check_classic__s0)
-    in
-    cont done ($camlOver_app_kind_check_classic)
+where k define_root_symbol (module_block) =
+  let $camlOver_app_kind_check_classic =
+    Block 0 ($camlOver_app_kind_check_classic__s0)
+  in
+  cont done ($camlOver_app_kind_check_classic)

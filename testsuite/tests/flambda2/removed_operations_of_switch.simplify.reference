@@ -9,12 +9,12 @@ let code loopify(never) size(27) newer_version_of(f_0)
    switch untagged
      | 0 -> k2
      | 1 -> k3)
-    where k3 =
-      let Pmakeblock = %block.[`0`].my_alloc_region (x, y) in
-      cont k (Pmakeblock)
-    where k2 =
-      let Pmakeblock = %block.[`0`].my_alloc_region (y, x) in
-      cont k (Pmakeblock)
+  where k3 =
+    let Pmakeblock = %block.[`0`].my_alloc_region (x, y) in
+    cont k (Pmakeblock)
+  where k2 =
+    let Pmakeblock = %block.[`0`].my_alloc_region (y, x) in
+    cont k (Pmakeblock)
 in
 let $camlRemoved_operations_of_switch__f_1 = closure f_0_1 @f &toplevel in
 let code loopify(never) size(4) newer_version_of(g_1)

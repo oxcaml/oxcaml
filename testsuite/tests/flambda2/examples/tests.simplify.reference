@@ -22,11 +22,11 @@ let code loopify(never) size(22) newer_version_of(f_1)
   switch prim
     | 0 -> k2
     | 1 -> k (0)
-    where k2 =
-      let prim_1 = %is_int (n) in
-      switch prim_1
-        | 0 -> k (42)
-        | 1 -> k (1)
+  where k2 =
+    let prim_1 = %is_int (n) in
+    switch prim_1
+      | 0 -> k (42)
+      | 1 -> k (1)
 in
 let $camlTests__f_2 = closure f_1_1 @f &toplevel in
 let $camlTests = Block 0 ($camlTests__to_inline_1, $camlTests__f_2) in
