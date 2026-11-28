@@ -305,6 +305,16 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+and law_declaration =
+  {
+    law_params : (Ident.t * type_expr) list;
+    law_assumptions : Spec.expression list;
+    law_conclusion : Spec.expression;
+    law_attributes : Parsetree.attributes;
+    law_uid : Shape.Uid.t;
+    law_loc : Location.t
+  }
+
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id
@@ -772,6 +782,7 @@ module type Wrapped = sig
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
   | Sig_jkind of Ident.t * jkind_declaration * visibility
+  | Sig_law of Ident.t * law_declaration * visibility
 
   and module_declaration =
   {
@@ -830,7 +841,8 @@ module Make_wrapped(Wrap : Wrap) = struct
       end
     | Sig_class _ ->
         Fixed Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ ->
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _
+    | Sig_law _ ->
       Absent_at_runtime
 
   let expect_fixed_representation items =
@@ -906,6 +918,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class_type (id,ctd,rs,vis)
     | Sig_jkind (id,jkd,vis) ->
         To.Sig_jkind (id,jkd,vis)
+    | Sig_law (id,ld,vis) ->
+        To.Sig_law (id,ld,vis)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
@@ -1169,7 +1183,8 @@ let item_visibility = function
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis)
-  | Sig_jkind (_, _, vis) -> vis
+  | Sig_jkind (_, _, vis)
+  | Sig_law (_, _, vis) -> vis
 
 let rec bound_value_identifiers = function
     [] -> []
@@ -1190,6 +1205,7 @@ let signature_item_id = function
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
   | Sig_jkind (id, _, _)
+  | Sig_law (id, _, _)
     -> id
 
 type arg_signature = {
