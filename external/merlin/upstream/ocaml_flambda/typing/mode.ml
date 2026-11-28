@@ -5695,29 +5695,25 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let to_of_const_exn m = S.to_of_const_exn obj m
 
-  let unhint = S.Unhint.unhint
+  let apply_hint hint m = S.apply obj ~hint C.id m
 
-  let hint ?hint = S.Unhint.hint obj ?hint
-
-  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
-
-  let apply_hint hint m = wrap ~hint Fun.id m
-
-  let meet_const_unhint c m =
+  let meet_const_morph c =
     (* [meet_const max] is the identity *)
     if C.le obj (C.max obj) c
-    then m
-    else S.Unhint.apply obj (Simple (Meet_const c)) m
+    then C.id
+    else C.Simple (C.Simple_morph.Meet_const c)
 
-  let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) (disallow_right m)
+  let meet_const ?hint c m =
+    S.apply obj ?hint (meet_const_morph c) (disallow_right m)
 
-  let imply_const_unhint c m =
+  let imply_const_morph c =
     (* [imply_const max] is the identity *)
     if C.le obj (C.max obj) c
-    then m
-    else S.Unhint.apply obj (Simple (Imply_const c)) m
+    then C.id
+    else C.Simple (C.Simple_morph.Imply_const c)
 
-  let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
+  let imply_const ?hint c m =
+    S.apply obj ?hint (imply_const_morph c) (disallow_left m)
 
   let desc a = S.desc obj a
 
@@ -5905,31 +5901,27 @@ module Monadic_gen (Obj : Obj) = struct
 
   let to_of_const_exn m = S.to_of_const_exn obj m
 
-  let unhint = S.Unhint.unhint
+  let apply_hint hint m = S.apply obj ~hint C.id m
 
-  let hint ?hint = S.Unhint.hint obj ?hint
-
-  let wrap ?hint:h f m = m |> unhint |> f |> hint ?hint:h
-
-  let apply_hint hint m = wrap ~hint Fun.id m
-
-  let join_const_unhint c m =
+  let join_const_morph c =
     (* The underlying object is the opposite lattice, so this is a meet, and
        [meet_const max] is the identity *)
     if C.le obj (C.max obj) c
-    then m
-    else S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
+    then C.id
+    else C.Simple (C.Simple_morph.Meet_const c)
 
-  let join_const ?hint c m = wrap ?hint (join_const_unhint c) (disallow_left m)
+  let join_const ?hint c m =
+    S.apply obj ?hint (join_const_morph c) (disallow_left m)
 
-  let subtract_const_unhint c m =
+  let subtract_const_morph c =
     (* The underlying object is the opposite lattice, so this is an imply, and
        [imply_const max] is the identity *)
     if C.le obj (C.max obj) c
-    then m
-    else S.Unhint.apply obj (Simple (Imply_const c)) m
+    then C.id
+    else C.Simple (C.Simple_morph.Imply_const c)
 
-  let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
+  let subtract_const ?hint c m =
+    S.apply obj ?hint (subtract_const_morph c) (disallow_right m)
 
   let desc a = S.desc obj a
 
@@ -6688,16 +6680,6 @@ module Mode_with (Areality : Areality) = struct
     let comonadic = Comonadic.to_of_const_exn comonadic in
     let monadic = Monadic.to_of_const_exn monadic in
     { comonadic; monadic }
-
-  let unhint { monadic; comonadic } =
-    let comonadic = Comonadic.unhint comonadic in
-    let monadic = Monadic.unhint monadic in
-    { monadic; comonadic }
-
-  let hint ?monadic ?comonadic t =
-    let comonadic = Comonadic.hint ?hint:comonadic t.comonadic in
-    let monadic = Monadic.hint ?hint:monadic t.monadic in
-    { monadic; comonadic }
 
   module Const = struct
     (* CR-soon zqian: make a functor [Mode.With_regionality.Const.Make] to generalize over any type
@@ -8600,15 +8582,15 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left (Modality (Join_const c)) m =
-      Mode.subtract_const_unhint c
-        (Mode.unhint (Mode.join [Mode.of_const c; m]))
+      (* [subtract_const c] is the left adjoint of [join_const c], and
+         [subtract_const c (join_const c m) = subtract_const c m] *)
+      Mode.subtract_const ~hint:Crossing c m
 
-    let apply_right_unhint (Modality (Join_const c)) m =
+    let apply_right (Modality (Join_const c)) m =
       (* On the image of join, identity is its right adjoint *)
-      Mode.join_const_unhint c m
+      Mode.join_const ~hint:Crossing c m
 
-    let apply_right_with_locality t m =
-      Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
+    let apply_right_with_locality = apply_right
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
         =
@@ -8637,14 +8619,6 @@ module Crossing = struct
     let print ppf (Modality m) =
       Fmt.fprintf ppf "Modality %a" Modality.Const.print m
   end
-
-  let comonadic_locality_as_regionality comonadic =
-    S.Unhint.apply With_regionality.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Locality_as_regionality))) comonadic
-
-  let comonadic_regional_to_local comonadic =
-    S.Unhint.apply With_locality.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Regional_to_local))) comonadic
 
   module Comonadic = struct
     module Modality = Modality.Comonadic
@@ -8709,17 +8683,48 @@ module Crossing = struct
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
-    let apply_left_unhint (Modality (Meet_const c)) m =
+    let apply_left (Modality (Meet_const c)) m =
       (* On the image of meet, identity is its left adjoint *)
-      Mode.meet_const_unhint c m
-
-    let apply_left_with_locality t m =
-      With_locality.Comonadic.hint ~hint:Crossing
-        (comonadic_locality_as_regionality (S.Unhint.unhint m)
-        |> apply_left_unhint t |> comonadic_regional_to_local)
+      Mode.meet_const ~hint:Crossing c m
 
     let apply_right (Modality (Meet_const c)) m =
-      Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
+      (* [imply_const c] is the right adjoint of [meet_const c], and
+         [imply_const c (meet_const c m) = imply_const c m] *)
+      Mode.imply_const ~hint:Crossing c m
+
+    (* Our mode crossing is for [With_regionality] modes, but can be extended
+       to [With_locality] modes via [locality_as_regionality], defined as
+       follows:
+
+       Given a mode crossing [f] for [With_regionality], and we are to check
+       [With_locality] submoding [m1 <= m2], we will instead check
+       [f (locality_as_regionality m1) <= f (locality_as_regionality m2)].
+
+       By adjunction tricks, this is equivalent to
+       - [ m1 <= regional_to_global ∘ fr ∘ f ∘ locality_as_regionality m2 ]
+       - [ regional_to_local ∘ fl ∘ f ∘ locality_as_regionality m1 <= m2 ]
+       where [regional_to_global] is the right adjoint of
+       [locality_as_regionality], and [regional_to_local] the left adjoint.
+
+       The morphisms are composed before being applied, so that the whole
+       composition is explained by a single [Crossing] hint. *)
+
+    let via_regionality locality_adjoint f m =
+      let obj = With_locality.Comonadic.Obj.obj in
+      let morph =
+        C.compose obj locality_adjoint
+          (C.compose Mode.Obj.obj f
+             (C.Simple (Core (Locality_full Locality_as_regionality))))
+      in
+      S.apply obj ~hint:Crossing morph m
+
+    let apply_left_with_locality (Modality (Meet_const c)) m =
+      via_regionality (C.Simple (Core (Locality_full Regional_to_local)))
+        (Mode.meet_const_morph c) m
+
+    let apply_right_with_locality (Modality (Meet_const c)) m =
+      via_regionality (C.Simple (Core (Locality_full Regional_to_global)))
+        (Mode.imply_const_morph c) m
 
     let le (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
       Mode.Const.le c1 c2
@@ -8834,81 +8839,32 @@ module Crossing = struct
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_left t.monadic monadic in
-    let comonadic =
-      Comonadic.apply_left_unhint t.comonadic (S.Unhint.unhint comonadic)
-    in
-    { monadic; comonadic }
-
   let apply_left t m =
-    With_regionality.hint ~monadic:Crossing ~comonadic:Crossing
-      (apply_left_unhint t (With_regionality.disallow_right m))
-
-  let apply_right_unhint t { monadic; comonadic } =
-    let monadic =
-      Monadic.apply_right_unhint t.monadic (S.Unhint.unhint monadic)
-    in
-    let comonadic = Comonadic.apply_right t.comonadic comonadic in
+    let { monadic; comonadic } = With_regionality.disallow_right m in
+    let monadic = Monadic.apply_left t.monadic monadic in
+    let comonadic = Comonadic.apply_left t.comonadic comonadic in
     { monadic; comonadic }
 
   let apply_right t m =
-    With_regionality.hint ~monadic:Crossing ~comonadic:Crossing
-      (apply_right_unhint t (With_regionality.disallow_left m))
+    let { monadic; comonadic } = With_regionality.disallow_left m in
+    let monadic = Monadic.apply_right t.monadic monadic in
+    let comonadic = Comonadic.apply_right t.comonadic comonadic in
+    { monadic; comonadic }
 
-  (* Our mode crossing is for [With_regionality] modes, but can be extended to
-     [With_locality] modes via [with_locality_as_regionality], defined as
-     follows:
+  let apply_left_with_locality t { monadic; comonadic } =
+    let monadic = Monadic.apply_left t.monadic monadic in
+    let comonadic = Comonadic.apply_left_with_locality t.comonadic comonadic in
+    { monadic; comonadic }
 
-     Given a mode crossing [f] for [With_regionality], and we are to check
-     [With_locality] submoding [m1 <= m2], we will instead check
-     [f (with_locality_as_regionality m1) <=
-      f (with_locality_as_regionality m2)].
+  let apply_right_with_locality t { monadic; comonadic } =
+    let monadic = Monadic.apply_right t.monadic monadic in
+    let comonadic = Comonadic.apply_right_with_locality t.comonadic comonadic in
+    { monadic; comonadic }
 
-     By adjunction tricks, this is equivalent to
-     - [ m1 <= regional_to_global ∘ fr ∘ f ∘ with_locality_as_regionality m2 ]
-     - [ regional_to_local ∘ fl ∘ f ∘ with_locality_as_regionality m1 <= m2 ]
-     where [regional_to_global] is the right adjoint of
-     [with_locality_as_regionality], and [regional_to_local] the left
-     adjoint. *)
-
-  let with_regionality_to_locality_r2l_unhint m =
-    let { comonadic; monadic } = m in
-    let comonadic =
-      S.Unhint.apply With_locality.Comonadic.Obj.obj
-        (Simple (Core (Locality_full Regional_to_local))) comonadic
-    in
-    { comonadic; monadic }
-
-  let with_regionality_to_locality_r2g_unhint m =
-    let { comonadic; monadic } = m in
-    let comonadic =
-      S.Unhint.apply With_locality.Comonadic.Obj.obj
-        (Simple (Core (Locality_full Regional_to_global))) comonadic
-    in
-    { comonadic; monadic }
-
-  let apply_left_with_locality t m =
-    m |> with_locality_as_regionality |> apply_left_unhint t
-    |> with_regionality_to_locality_r2l_unhint
-    |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
-
-  let apply_right_with_locality t m =
-    m |> with_locality_as_regionality |> apply_right_unhint t
-    |> with_regionality_to_locality_r2g_unhint
-    |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
-
-  let apply_left_right_with_locality t m =
-    let { monadic; comonadic } = With_locality.unhint m in
-    let monadic = Monadic.apply_right_unhint t.monadic monadic in
-    let comonadic =
-      comonadic |> comonadic_locality_as_regionality
-      |> Comonadic.apply_left_unhint t.comonadic
-      |> comonadic_regional_to_local
-      (* the left adjoint of [locality_as_regionality]*)
-    in
-    With_locality.hint ~monadic:Crossing ~comonadic:Crossing
-      { monadic; comonadic }
+  let apply_left_right_with_locality t { monadic; comonadic } =
+    let monadic = Monadic.apply_right t.monadic monadic in
+    let comonadic = Comonadic.apply_left_with_locality t.comonadic comonadic in
+    { monadic; comonadic }
 
   let le t1 t2 =
     Monadic.le t1.monadic t2.monadic && Comonadic.le t1.comonadic t2.comonadic

@@ -21,7 +21,7 @@
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
                     Tpat_var \"problem\"
                     sort value
-                    value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,many,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                    value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,many,nonportable,unforkable,yielding,stateful]);id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
                     Texp_variant \"Problem\"
                     None
@@ -82,7 +82,7 @@
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
             Tpat_var \"f\"
             sort value
-            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (type.ml[1,0+8]..type.ml[1,0+61])
             extra (type.ml[1,0+18]..type.ml[1,0+19])
               Texp_newtype  t
@@ -109,7 +109,7 @@
                     []
                   Tpat_var \"foo\"
                   sort value
-                  value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#8<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                  value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#8<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 proj_Locality(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
@@ -226,7 +226,7 @@
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
     Tpat_var \"f\"
     sort value
-    value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
   ",
                     "children": []
                   },
@@ -273,7 +273,7 @@
       []
     Tpat_var \"x\"
     sort '_representable_layout_1
-    value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
   ",
                         "children": []
                       },
