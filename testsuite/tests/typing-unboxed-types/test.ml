@@ -152,10 +152,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of string [@@ocaml.unboxed]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of string [@@unboxed] end
-       is not included in
-         sig type t = A of string end
        Type declarations do not match:
          type t = A of string [@@unboxed]
        is not included in
@@ -175,10 +171,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of string [@@ocaml.unboxed]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of string [@@unboxed] end
-       is not included in
-         sig type t = A of string end
        Type declarations do not match:
          type t = A of string [@@unboxed]
        is not included in
@@ -199,10 +191,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of string
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of string end
-       is not included in
-         sig type t = A of string [@@unboxed] end
        Type declarations do not match:
          type t = A of string
        is not included in
@@ -222,10 +210,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { f : string } [@@ocaml.unboxed]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { f : string; } [@@unboxed] end
-       is not included in
-         sig type t = { f : string; } end
        Type declarations do not match:
          type t = { f : string; } [@@unboxed]
        is not included in
@@ -245,10 +229,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { f : string }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { f : string; } end
-       is not included in
-         sig type t = { f : string; } [@@unboxed] end
        Type declarations do not match:
          type t = { f : string; }
        is not included in
@@ -268,10 +248,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of { f : string } [@@ocaml.unboxed]
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of { f : string; } [@@unboxed] end
-       is not included in
-         sig type t = A of { f : string; } end
        Type declarations do not match:
          type t = A of { f : string; } [@@unboxed]
        is not included in
@@ -291,10 +267,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = A of { f : string }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of { f : string; } end
-       is not included in
-         sig type t = A of { f : string; } [@@unboxed] end
        Type declarations do not match:
          type t = A of { f : string; }
        is not included in
@@ -314,10 +286,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = #{ a : string }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ a : string; } end
-       is not included in
-         sig type t = { a : string; } end
        Type declarations do not match:
          type t = #{ a : string; }
        is not included in
@@ -336,10 +304,6 @@ Lines 3-5, characters 6-3:
 4 |   type t = { a : string }
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : string; } end
-       is not included in
-         sig type t = #{ a : string; } end
        Type declarations do not match:
          type t = { a : string; }
        is not included in
@@ -366,10 +330,6 @@ Lines 7-11, characters 6-3:
 10 |   and s
 11 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type r = { r : #(t * s); } and t and s end
-       is not included in
-         sig type r = { r : #(t * s); } and t : bits64 and s end
        Type declarations do not match:
          type r = { r : #(t * s); }
        is not included in
@@ -479,10 +439,6 @@ Lines 4-7, characters 6-3:
 6 |   type u = { f1 : t; f2 : t }
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = A of float [@@unboxed] type u = { f1 : t; f2 : t; } end
-       is not included in
-         sig type t type u = { f1 : t; f2 : t; } end
        Type declarations do not match:
          type u = { f1 : t; f2 : t; }
        is not included in
@@ -505,10 +461,6 @@ Lines 4-7, characters 6-3:
 6 |   type u = { f1 : t; f2 : t }
 7 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ a : float; } type u = { f1 : t; f2 : t; } end
-       is not included in
-         sig type t type u = { f1 : t; f2 : t; } end
        Type declarations do not match:
          type u = { f1 : t; f2 : t; }
        is not included in

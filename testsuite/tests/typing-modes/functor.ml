@@ -54,10 +54,6 @@ Lines 1-3, characters 34-3:
 2 |     let g = M.f
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val g : unit -> unit end @ nonportable
-       is not included in
-         T @ portable
        Values do not match:
          val g : unit -> unit (* in a structure at nonportable *)
        is not included in
@@ -190,8 +186,7 @@ let () =
 Line 2, characters 20-25:
 2 |     let module M' = F (M) in
                         ^^^^^
-Error: Modules do not match: sig val f : unit -> unit end @ nonportable
-     is not included in S @ portable
+Error: Modules do not match: M @ nonportable is not included in S @ portable
      Values do not match:
        val f : unit -> unit (* in a structure at nonportable *)
      is not included in
@@ -759,14 +754,6 @@ Line 1, characters 36-37:
 1 | module F (M : Portable_Portable) = (M : Nonportable_Portable)
                                         ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (M : S @ portable) ->
-               sig val g : unit -> unit end @ portable
-         end
-       is not included in
-         Nonportable_Portable
        In module "F":
        Modules do not match:
          (M : S @ portable) -> ...
@@ -790,23 +777,11 @@ Line 1, characters 39-40:
 1 | module F (M : Portable_Nonportable) = (M : Portable_Portable)
                                            ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (M : S @ portable) -> sig val g : unit -> unit end
-         end
-       is not included in
-         Portable_Portable
        In module "F":
        Modules do not match:
          functor (M : S @ portable) -> sig val g : unit -> unit end
        is not included in
          functor (M : S @ portable) -> T @ portable
-       In module "F":
-       Modules do not match:
-         sig val g : unit -> unit end @ nonportable
-       is not included in
-         T @ portable
        In module "F":
        Values do not match:
          val g : unit -> unit (* in a structure at nonportable *)
@@ -864,10 +839,6 @@ Error: Signature mismatch:
          functor (Arg : S) -> sig val f : unit -> unit end
        is not included in
          S -> S @ shareable
-       Modules do not match:
-         sig val f : unit -> unit end @ nonportable
-       is not included in
-         S @ shareable
        Values do not match:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
@@ -921,10 +892,6 @@ Error: Signature mismatch:
          functor (Arg : S) -> sig val t : int * int ref end @ immutable
        is not included in
          S -> T
-       Modules do not match:
-         sig val t : int * int ref end @ immutable
-       is not included in
-         T @ read_write
        Values do not match:
          val t : int * int ref (* in a structure at immutable *)
        is not included in
@@ -999,10 +966,6 @@ Error: Signature mismatch:
          functor (X : S) -> sig val f : unit -> unit end
        is not included in
          S -> S @ portable
-       Modules do not match:
-         sig val f : unit -> unit end @ nonportable
-       is not included in
-         S @ portable
        Values do not match:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
@@ -1021,8 +984,7 @@ end
 Line 3, characters 40-44:
 3 |     = functor (X : S) -> struct include G(X) end
                                             ^^^^
-Error: Modules do not match: sig val f : unit -> unit end @ nonportable
-     is not included in S @ portable
+Error: Modules do not match: X @ nonportable is not included in S @ portable
      Values do not match:
        val f : unit -> unit (* in a structure at nonportable *)
      is not included in
@@ -1199,14 +1161,6 @@ Line 1, characters 40-41:
 1 | module F (M : SigWithFunctorNoModal) = (M : SigWithModalFunctor3)
                                             ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           module F :
-             functor (Arg : S @ portable) ->
-               sig val f : unit -> unit end @ portable
-         end @ nonportable
-       is not included in
-         SigWithModalFunctor3 @ nonportable
        In module "F":
        Got "nonportable"
        but expected "portable".

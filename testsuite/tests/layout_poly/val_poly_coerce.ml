@@ -489,12 +489,6 @@ Line 3, characters 6-8:
 3 | end = Id;;
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val poly_ id : 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -514,12 +508,6 @@ Line 3, characters 6-8:
 3 | end = Id;;
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l l0. ('a : l). 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -537,12 +525,6 @@ Line 3, characters 6-8:
 3 | end = Id;;
           ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l l0. ('a : l0). 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -588,12 +570,6 @@ Line 1, characters 13-15:
 1 | module M = ((Id : sig
                  ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val poly_ id : 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -630,12 +606,6 @@ Line 1, characters 14-16:
 1 | module M0 = ((Id : sig
                   ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l l0. ('a : l0). 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -656,12 +626,6 @@ Line 1, characters 14-16:
 1 | module M1 = ((Id : sig
                   ^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l l0. ('a : l). 'a -> 'a end
        Values do not match:
          external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
        is not included in
@@ -746,10 +710,6 @@ Line 7, characters 6-7:
 7 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end @ dynamic
-       is not included in
-         sig val id : 'a -> 'a end @ dynamic
        Values do not match:
          val poly_ id : 'a -> 'a (* in a structure at dynamic *)
        is not included in
@@ -807,10 +767,6 @@ Line 6, characters 6-7:
 6 | end = M
           ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a @@ dynamic val x : int @@ dynamic end @ static
-       is not included in
-         sig val id : 'a -> 'a end @ dynamic
        Values do not match:
          val poly_ id : 'a -> 'a @@ dynamic (* in a structure at static *)
        is not included in

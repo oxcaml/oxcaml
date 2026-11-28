@@ -552,8 +552,7 @@ end
 Line 3, characters 11-15:
 3 |   type v = G(M).u
                ^^^^
-Error: Modules do not match: sig type t = M.t val x : t val y : int end
-     is not included in U
+Error: Modules do not match: M is not included in U
      Signatures containing unrepresentable items cannot be
      coerced to other module types.
      "x" is not representable.
@@ -582,10 +581,6 @@ Line 2, characters 35-36:
 2 |   module N : sig val y : int end = M
                                        ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M.t val x : t val y : int end
-       is not included in
-         sig val y : int end
        Signatures containing unrepresentable items cannot be
        coerced to other module types.
        "x" is not representable.
@@ -604,15 +599,6 @@ Line 2, characters 54-77:
 2 |   module O : sig module N : sig val y : int end end = struct module N = M end
                                                           ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
-       Modules do not match:
-         sig module N : sig type t = M.t val x : t val y : int end end
-       is not included in
-         sig module N : sig val y : int end end
-       In module "N":
-       Modules do not match:
-         sig type t = M.t val x : t val y : int end
-       is not included in
-         sig val y : int end
        In module "N":
        Signatures containing unrepresentable items cannot be
        coerced to other module types.
@@ -672,10 +658,6 @@ Line 7, characters 31-32:
 7 | let f (module M : S) = (module M : S2)
                                    ^
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = M.t val x : t val y : int end
-       is not included in
-         S2
        Signatures containing unrepresentable items cannot be
        coerced to other module types.
        "x" is not representable.

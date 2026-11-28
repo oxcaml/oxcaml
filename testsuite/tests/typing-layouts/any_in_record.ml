@@ -425,10 +425,6 @@ Lines 4-6, characters 28-3:
 5 |   type t = { a : float# }
 6 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : float#; } end
-       is not included in
-         sig type t = { a : float#; } end
        Type declarations do not match:
          type t = { a : float#; }
        is not included in
@@ -451,10 +447,6 @@ Lines 5-7, characters 51-3:
 6 |   type t = { a : float# }
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { a : float#; } end
-       is not included in
-         sig type t = { a : float#; } end
        Type declarations do not match:
          type t = { a : float#; }
        is not included in
@@ -476,10 +468,6 @@ Lines 5-7, characters 47-3:
 6 |   type a = A of unit# [@immediate_all_void_constructor]
 7 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig type a = A of unit# [@immediate_all_void_constructor] end
-       is not included in
-         sig type a = A of unit# end
        Type declarations do not match:
          type a = A of unit# [@immediate_all_void_constructor]
        is not included in

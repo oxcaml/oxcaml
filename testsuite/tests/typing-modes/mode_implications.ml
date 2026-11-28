@@ -382,10 +382,6 @@ Lines 3-5, characters 6-3:
 4 |   let f x y = use_local_unyielding x; use_local_unyielding y
 5 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : 'a -> 'b @ local unyielding -> unit end
-       is not included in
-         sig val f : 'a @ local -> 'b @ local -> unit end
        Values do not match:
          val f : 'a -> 'b @ local unyielding -> unit
        is not included in
@@ -466,7 +462,7 @@ module Stateless_nonportable : Runnable
 Line 7, characters 11-53:
 7 | module _ = Functor_arg_unused (Stateless_nonportable)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig val run : unit -> unit end @ nonportable
+Error: Modules do not match: Stateless_nonportable @ nonportable
      is not included in Runnable @ portable
      Values do not match:
        val run : unit -> unit (* in a structure at nonportable *)

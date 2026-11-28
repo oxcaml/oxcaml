@@ -116,10 +116,6 @@ Lines 2-5, characters 57-3:
 4 |   module Id2 = Id
 5 | end..
 Error: Signature mismatch:
-       Modules do not match:
-         sig module Id : sig end module Id2 = Id end
-       is not included in
-         sig module Id2 = T'.Term0.Id end
        In module "Id2":
        Module "T'.Term0.Id" cannot be aliased
 |}]

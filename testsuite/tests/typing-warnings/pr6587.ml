@@ -28,10 +28,6 @@ Lines 2-4, characters 2-5:
 3 |     let f A = FP_normal
 4 |   end
 Error: Signature mismatch:
-       Modules do not match:
-         sig val f : fpclass -> Stdlib.fpclass end
-       is not included in
-         sig val f : fpclass -> fpclass end
        Values do not match:
          val f : fpclass -> Stdlib.fpclass
        is not included in

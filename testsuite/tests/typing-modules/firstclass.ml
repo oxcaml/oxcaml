@@ -34,10 +34,6 @@ Line 5, characters 3-4:
        ^
 Error: The value "x" has type "(module S2 with type t = int and type u = bool)"
        but an expression was expected of type "(module S')"
-       Modules do not match:
-         S'
-       is not included in
-         sig type u = bool type t = int type w end
        The type "w" is required but not provided
 |}];;
 

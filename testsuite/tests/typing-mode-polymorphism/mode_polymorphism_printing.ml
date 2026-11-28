@@ -434,13 +434,6 @@ Lines 5-9, characters 6-3:
 8 |   let illegal = id
 9 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t = unit -> unit
-           val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
-         end
-       is not included in
-         sig type t val illegal : t -> t @ portable end
        Values do not match:
          val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
@@ -801,14 +794,6 @@ Lines 1-3, characters 63-3:
 2 |   let g f = ignore (f == (fun (x @ local) y z -> z))
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val g :
-             ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
-             unit @ [> dynamic]
-         end
-       is not included in
-         sig val g : ('a -> int) -> unit end
        Values do not match:
          val g :
            ('a @ [> local] -> 'b @ 'm -> 'c @ [< 'n] -> 'c @ [> 'n]) @ [< many uncontended read_write] ->
