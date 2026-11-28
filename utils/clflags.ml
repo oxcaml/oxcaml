@@ -192,6 +192,16 @@ and for_package = ref (None: string option) (* -for-pack *)
 and error_size = ref 256                (* -error-size *)
 and float_const_prop = ref true         (* -no-float-const-prop *)
 and no_alias_deps = ref false           (* -no-alias-deps *)
+and no_crc = ref false                  (* -no-crc *)
+(* CR-soon zqian: [-no-crc] currently only omits interface CRCs at compile
+   time. It should also cover:
+   - implementation (.cmx) CRCs, which are still recorded and checked;
+   - the linkers' own consistency checks (Bytelink, Linkenv), which still run
+     on whatever CRCs the linked objects carry;
+   - Dynlink and the native toplevel's [#load] of a prebuilt .cmxs, which
+     cannot see the flag: .cmxs files and executables need a marker so that a
+     -no-crc plugin is only accepted by a -no-crc host (see
+     testsuite/tests/no-crc/dynlink_gap.ml). *)
 let unique_ids = ref true               (* -d(no-)unique-ids *)
 let canonical_ids = ref false           (* -d(no-)canonical-ids *)
 let locations = ref true                (* -d(no-)locations *)

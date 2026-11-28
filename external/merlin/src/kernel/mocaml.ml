@@ -60,6 +60,7 @@ let setup_reader_config config =
   principal := ocaml.principal;
   real_paths := ocaml.real_paths;
   recursive_types := ocaml.recursive_types;
+  no_crc := ocaml.no_crc;
   strict_sequence := ocaml.strict_sequence;
   applicative_functors := ocaml.applicative_functors;
   nopervasives := ocaml.nopervasives;

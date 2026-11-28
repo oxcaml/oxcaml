@@ -24,7 +24,9 @@
  *                                                                                *
  **********************************************************************************)
 
-type error = Not_an_object_file of Misc.filepath
+type error =
+  | Not_an_object_file of Misc.filepath
+  | Needs_no_crc of Misc.filepath
 
 exception Error of error
 
@@ -36,13 +38,21 @@ let read_cmo file =
   then raise (Error (Not_an_object_file file));
   let compunit_pos = input_binary_int ic in
   seek_in ic compunit_pos;
-  (input_value ic : Cmo_format.compilation_unit_descr)
+  let cmo = (input_value ic : Cmo_format.compilation_unit_descr) in
+  if cmo.cu_no_crc && not !Clflags.no_crc then raise (Error (Needs_no_crc file));
+  cmo
 
 open Format_doc
 
 let report_error ppf = function
   | Not_an_object_file file ->
     fprintf ppf "%a is not a bytecode object file" Location.Doc.filename file
+  | Needs_no_crc file ->
+    fprintf ppf
+      "@[<hov>The file %a@ was compiled with %a.@ It can only be used by tools \
+       that also pass %a.@]"
+      Location.Doc.quoted_filename file Misc.Style.inline_code "-no-crc"
+      Misc.Style.inline_code "-no-crc"
 
 let () =
   Location.register_error_of_exn (function

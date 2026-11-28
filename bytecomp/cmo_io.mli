@@ -31,7 +31,9 @@
    inline the same cmo-reading logic. *)
 val read_cmo : Misc.filepath -> Cmo_format.compilation_unit_descr
 
-type error = Not_an_object_file of Misc.filepath
+type error =
+  | Not_an_object_file of Misc.filepath
+  | Needs_no_crc of Misc.filepath
 
 exception Error of error
 

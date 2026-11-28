@@ -133,6 +133,7 @@ let print_cmo_infos cu =
         printf "YES\n";
         printf "Primitives declared in this module:\n";
         List.iter print_line l);
+  if cu.cu_no_crc then printf "CRC: no\n";
   printf "Force link: %s\n" (if cu.cu_force_link then "YES" else "no")
 
 let print_spaced_string s =
@@ -379,6 +380,7 @@ let print_cmx_infos (uir, sections, crc) =
   if Option.is_some uir.uir_lto_info then
     printf "Flambda 2 unit with LTO information\n";
   print_generic_fns uir.uir_generic_fns;
+  if uir.uir_no_crc then printf "CRC: no\n";
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
     (Format_doc.compat Slambda.CU_data.print)
@@ -405,6 +407,7 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
             B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmi.(i)) u.li_quoted_cmi)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmx.(i)) u.li_quoted_cmx);
+        if u.li_no_crc then printf "CRC: no\n";
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
 
 let print_cmxs_infos header =
@@ -512,6 +515,8 @@ let dump_obj_by_kind filename ic obj_kind =
        begin match cmi with
          | None -> ()
          | Some cmi ->
+            if List.mem Cmi_format.No_crc cmi.Cmi_format.cmi_flags then
+              printf "CRC: no\n";
             print_cmi_infos cmi.Cmi_format.cmi_name cmi.Cmi_format.cmi_crcs
               cmi.Cmi_format.cmi_kind cmi.Cmi_format.cmi_params
               cmi.Cmi_format.cmi_globals

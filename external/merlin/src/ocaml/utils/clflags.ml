@@ -17,6 +17,7 @@ let all_ppx             = ref []
 let principal           = ref false
 let real_paths          = ref true
 let recursive_types     = ref false
+let no_crc              = ref false
 let strict_sequence     = ref false
 let applicative_functors = ref true
 let typing_recovery     = ref true

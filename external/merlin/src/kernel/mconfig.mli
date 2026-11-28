@@ -12,6 +12,7 @@ type ocaml =
     real_paths : bool;
     threads : [ `None | `Threads | `Vmthreads ];
     recursive_types : bool;
+    no_crc : bool;
     strict_sequence : bool;
     applicative_functors : bool;
     nopervasives : bool;

@@ -1,0 +1,5 @@
+File "alias.ml", line 1, characters 11-12:
+1 | module M = B
+               ^
+Error: The interface b.cmi for module B was compiled with -no-crc.
+       It can only be used by tools that also pass -no-crc.

@@ -19,6 +19,7 @@ type pers_flags =
   | Rectypes
   | Alerts of alerts
   | Opaque
+  | No_crc
 
 type kind =
   | Normal of {
@@ -245,12 +246,17 @@ let output_cmi filename oc cmi =
     };
   flush oc;
   let crc = Digest.file filename in
+  let no_crc =
+    List.exists (function No_crc -> true | _ -> false) cmi.cmi_flags
+  in
   let my_info =
-    match cmi.cmi_kind with
-    | Normal { cmi_impl } ->
-      Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
-    | Parameter ->
-      Import_info.Intf.create_parameter cmi.cmi_name ~crc
+    if no_crc then Import_info.Intf.create cmi.cmi_name None
+    else
+      match cmi.cmi_kind with
+      | Normal { cmi_impl } ->
+        Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
+      | Parameter ->
+        Import_info.Intf.create_parameter cmi.cmi_name ~crc
   in
   let crcs = Array.append [| my_info |] cmi.cmi_crcs in
   output_value oc (crcs : crcs);

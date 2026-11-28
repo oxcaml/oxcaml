@@ -43,6 +43,7 @@ type error =
   | Camlheader of string * filepath
   | Link_error of Linkdeps.error
   | Needs_custom_runtime of filepath
+  | Needs_no_crc of filepath
 
 exception Error of error
 

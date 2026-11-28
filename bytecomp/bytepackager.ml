@@ -303,9 +303,13 @@ let package_object_files ~ppf_dump files target coercion =
         (Bytelink.extract_crc_interfaces())
     in
     let import_info_for_the_pack_itself =
-      let crc = Env.crc_of_unit packed_compilation_unit_name in
-      Import_info.create packed_compilation_unit_name
-        ~crc_with_unit:(Some (packed_compilation_unit, crc))
+      let crc_with_unit =
+        if !Clflags.no_crc then None
+        else
+          Some (packed_compilation_unit,
+                Env.crc_of_unit packed_compilation_unit_name)
+      in
+      Import_info.create packed_compilation_unit_name ~crc_with_unit
     in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
@@ -322,6 +326,7 @@ let package_object_files ~ppf_dump files target coercion =
         cu_primitives = List.rev state.primitives;
         cu_required_compunits = CU.Set.elements required_compunits;
         cu_force_link = force_link;
+        cu_no_crc = !Clflags.no_crc;
         cu_debug = if pos_final > pos_debug then pos_debug else 0;
         cu_debugsize = pos_final - pos_debug } in
     Emitcode.marshal_to_channel_with_possibly_32bit_compat

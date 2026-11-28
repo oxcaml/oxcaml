@@ -111,6 +111,7 @@ val ensure_sharing_between_cmi_and_cmx_imports :
 type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
+  | Needs_no_crc of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
 
 exception Error of error
