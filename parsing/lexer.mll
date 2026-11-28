@@ -1309,6 +1309,7 @@ and skip_hash_bang = parse
 
   let init ?(keyword_edition=Config.default_keyword_edition) () =
     populate_keywords keyword_edition;
+    Queue.clear deferred_tokens;
     is_in_string := false;
     comment_start_loc := [];
     comment_list := [];
