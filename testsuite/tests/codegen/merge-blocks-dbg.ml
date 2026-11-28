@@ -25,3 +25,24 @@ get_x:
   movq  (%rax), %rax
   ret
 |}]
+
+(* Both branches compile to CFG blocks that are identical except for the debug
+   info of the raise. That debug info is recorded in the frame descriptor of
+   the raise, from which the runtime builds backtraces: [Cfg_merge_blocks]
+   must keep the two raises apart, as merging them would make backtraces
+   report the wrong location. *)
+
+let two_raises b exn = if b then raise exn else raise exn
+[%%expect_asm X86_64{|
+two_raises:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  cmpq  $1, %rdi
+  jne   .L1
+  call  caml_reraise_exn@PLT
+.L0:
+.L1:
+  call  caml_reraise_exn@PLT
+.L2:
+|}]

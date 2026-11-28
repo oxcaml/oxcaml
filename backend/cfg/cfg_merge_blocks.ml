@@ -12,13 +12,40 @@ module Equivalent : sig
     Cfg.basic_block ->
     bool
 end = struct
+  (* The two functions below tell whether the emitters record the debug info of
+     an instruction in a frame descriptor, from which the runtime builds
+     backtraces. *)
+
+  let basic_dbg_in_frame_descr : Cfg.basic -> bool = function
+    | Op _ ->
+      (* The frame descriptors of allocations use the [dbginfo] of the
+         operation, which is compared by [Cfg.equal_basic], and the ones of
+         polls carry no debug info. *)
+      false
+    | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _ ->
+      false
+
+  let terminator_dbg_in_frame_descr : Cfg.terminator -> bool = function
+    | Call _ | Call_no_return _ | Prim { op = Probe _; label_after = _ } -> true
+    | External_call_no_return { alloc; stack_ofs; _ }
+    | Prim { op = External { alloc; stack_ofs; _ }; label_after = _ } ->
+      alloc || stack_ofs > 0
+    | Invalid { stack_ofs; _ } -> stack_ofs > 0
+    | Raise (Raise_regular | Raise_reraise) -> true
+    | Raise Raise_notrace -> false
+    | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return | Tailcall_self _ | Tailcall_func _ ->
+      false
+
   let instruction : type a.
       equal_desc:(a -> a -> bool) ->
+      dbg_in_frame_descr:(a -> bool) ->
       equal_reg:(Reg.t -> Reg.t -> bool) ->
       a Cfg.instruction ->
       a Cfg.instruction ->
       bool =
-   fun ~equal_desc ~equal_reg left right ->
+   fun ~equal_desc ~dbg_in_frame_descr ~equal_reg left right ->
     (* CR xclerc for xclerc: consider using other fields *)
     (* CR mshinwell: [available_before], [available_across] and
        [phantom_available_before] are ignored here, meaning that blocks that
@@ -57,9 +84,14 @@ end = struct
       && equal_desc left_desc right_desc
       (* CR-someday xclerc for xclerc: consider definin equal in `Debuginfo` *)
       (* Debug info is allowed to differ (the merged-away paths inherit the
-         representative block's locations), unless the user has asked for
-         debugging to take precedence over code generation. *)
-      && ((not !Dwarf_flags.gdwarf_may_alter_codegen)
+         representative block's locations), unless it is recorded in a frame
+         descriptor (backtraces would otherwise report the locations of the
+         representative block, or miss frames), or the user has asked for
+         debugging to take precedence over code generation. The descriptions
+         are equal at this point, so looking at the left one is enough. *)
+      && ((not
+             (dbg_in_frame_descr left_desc
+             || !Dwarf_flags.gdwarf_may_alter_codegen))
          || Debuginfo.compare left_dbg right_dbg = 0)
 
   let basic_block :
@@ -95,12 +127,15 @@ end = struct
       Int.equal left_stack_offset right_stack_offset
       && Bool.equal left_is_trap_handler right_is_trap_handler
       && Option.equal Label.equal left_exn right_exn
-      && instruction ~equal_desc:Cfg.equal_terminator ~equal_reg left_terminator
-           right_terminator
+      && instruction ~equal_desc:Cfg.equal_terminator
+           ~dbg_in_frame_descr:terminator_dbg_in_frame_descr ~equal_reg
+           left_terminator right_terminator
       && DLL.equal
            (fun (left : Cfg.basic Cfg.instruction)
                 (right : Cfg.basic Cfg.instruction) ->
-             instruction ~equal_desc:Cfg.equal_basic ~equal_reg left right)
+             instruction ~equal_desc:Cfg.equal_basic
+               ~dbg_in_frame_descr:basic_dbg_in_frame_descr ~equal_reg left
+               right)
            left_body right_body
 end
 
