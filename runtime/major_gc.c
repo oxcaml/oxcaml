@@ -2515,6 +2515,18 @@ mark_again:
   if (events_begun) {
     CAML_EV_END(EV_MAJOR_SLICE);
     CAML_EV_COUNTER(EV_C_MAJOR_SLICE_WORK_DONE, total_work);
+    if (sweep_work > 0) {
+      CAML_EV_COUNTER(EV_C_MAJOR_SLICE_SWEEP_WORK, sweep_work);
+    }
+    if (mark_work > 0) {
+      CAML_EV_COUNTER(EV_C_MAJOR_SLICE_MARK_WORK, mark_work);
+    }
+    if (ephe_mark_work > 0) {
+      CAML_EV_COUNTER(EV_C_MAJOR_SLICE_EPHE_MARK_WORK, ephe_mark_work);
+    }
+    if (ephe_sweep_work > 0) {
+      CAML_EV_COUNTER(EV_C_MAJOR_SLICE_EPHE_SWEEP_WORK, ephe_sweep_work);
+    }
   }
 
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
