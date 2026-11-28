@@ -120,3 +120,9 @@ end
 val valid_string_constant_delimiter : string -> string
 (** [valid_string_constant_delimiter x] finds a delimiter [y] such that
     [Pconst_string (x, loc, Some y)] is valid. *)
+
+module Private : sig
+  val reset_gen_symbol : unit -> unit
+  (** Restart numbering for an independent inline expectation. Names generated before
+      and after a reset need not be distinct. *)
+end
