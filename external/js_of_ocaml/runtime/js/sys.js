@@ -502,15 +502,16 @@ function caml_sys_proc_self_exe(_unit) {
   return 0;
 }
 
+// These primitives are technically OCaml 5.5+ or OxCaml
 //Provides: caml_sys_get_stdlib_dirs
-//Version: >= 5.5
+//Version: >= 5.4
 function caml_sys_get_stdlib_dirs(stdlib_default) {
   return [0, stdlib_default, 0];
 }
 
 //Provides: caml_sys_const_standard_library_default const
 //Requires: caml_string_of_jsstring
-//Version: >= 5.5
+//Version: >= 5.4
 function caml_sys_const_standard_library_default(_unit) {
   return caml_string_of_jsstring("/static/cmis/");
 }

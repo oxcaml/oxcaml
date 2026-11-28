@@ -96,7 +96,9 @@ type 'a close_program_metadata =
 type 'a close_program_result =
   { unit : Flambda_unit.t;
     metadata : 'a close_program_metadata;
-    code_slot_offsets : Slot_offsets.t Code_id.Map.t
+    code_slot_offsets : Slot_offsets.t Code_id.Map.t;
+    needs_standard_library_default : bool
+        (* Whether some unit references [%standard_library_default]. *)
   }
 
 val close_program :

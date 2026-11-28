@@ -5225,6 +5225,10 @@ let predef_exception i name =
   let data_items = emit_block exn_sym (block_header tag size) fields in
   Cdata data_items
 
+let emit_global_string_constant name value =
+  let symbol = global_symbol ~ty:typ_static_block name in
+  Cdata (emit_string_constant symbol value [])
+
 (* Header for a plugin *)
 
 let plugin_header units =

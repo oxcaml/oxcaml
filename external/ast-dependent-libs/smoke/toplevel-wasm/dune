@@ -34,7 +34,7 @@
    (with-stdout-to
     main.actual
     (setenv
-     TOPLEVEL_CMIS
+     OCAMLLIB
      %{ocaml_where}
      (run node %{dep:main.js})))
    (diff main.expected main.actual))))

@@ -1,0 +1,19 @@
+(* @configure_input@ *)
+#3 "utils/config.fixed_libdir.ml.in"
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                   David Allsopp, Jane Street, London                   *)
+(*                                                                        *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+let standard_library_default () = {@QS@|@ocaml_libdir_boot@|@QS@}
+let stdlib_dirs standard_library_default_raw =
+  standard_library_default_raw, None

@@ -755,6 +755,19 @@ int main() { return 0; }
   CFLAGS="$saved_CFLAGS"
 ])
 
+# GNU ar records the mtime, uid, gid and mode of each member unless it was
+# configured with --enable-deterministic-archives or is given the D modifier.
+AC_DEFUN([OCAML_AR_SUPPORTS_DETERMINISTIC_ARCHIVES], [
+  AC_CACHE_CHECK([whether $AR supports the D modifier],
+    [ocaml_cv_prog_ar_deterministic],
+    [ocaml_cv_prog_ar_deterministic=no
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM],
+      [rm -f conftest.a
+      AS_IF([$AR rcD conftest.a conftest.$ac_objext >&AS_MESSAGE_LOG_FD 2>&1],
+        [ocaml_cv_prog_ar_deterministic=yes])
+      rm -f conftest.a])])
+])
+
 AC_DEFUN([OCAML_OBJCOPY_COMPRESSION_SUPPORT], [
   AC_MSG_CHECKING([whether objcopy supports --compress-debug-sections=zlib])
 

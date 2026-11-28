@@ -22,13 +22,42 @@ let copy_files ~ppf files =
 let sprintf = Printf.sprintf
 let fprintf = Printf.fprintf
 
+(* Encode a string as a dune quoted string *)
+let dune_string s =
+  let b = Buffer.create (String.length s + 2) in
+  Buffer.add_char b '"';
+  String.iter (fun c ->
+    if c = '"' || c = '\\' then Buffer.add_char b '\\';
+    Buffer.add_char b c) s;
+  Buffer.add_char b '"';
+  Buffer.contents b
+
+let command_line words = String.concat " " (List.map dune_string words)
+
 module StrTbl = Hashtbl.Make (String)
 module StrSet = Set.Make (String)
+
+(* Parse a file of "key" followed " item1" " item2" lists *)
+let parse_settings filename : string list StrTbl.t =
+  let table = StrTbl.create 10 in
+  let process_line s acc =
+    if s <> "" && s.[0] = ' ' then
+      (String.sub s 1 (String.length s - 1))::acc
+    else begin
+      StrTbl.replace table s (if acc = [""] then [] else acc);
+      []
+    end
+  in
+  let lines = In_channel.with_open_text filename In_channel.input_lines in
+  if List.fold_right process_line lines [] <> [] then
+    failwith "Malformed settings file"
+  else
+    table
 
 (* Parse a file of "key1: val1 val2 val3" lines *)
 let parse_table filename : string list StrTbl.t =
   let table = StrTbl.create 10 in
-  let process_line s =
+  let process_line table s =
     match String.index_opt s ':' with
     | None -> failwith ("Malformed line: " ^ s)
     | Some i ->
@@ -38,15 +67,10 @@ let parse_table filename : string list StrTbl.t =
          |> String.split_on_char ' '
          |> List.filter (fun s -> s <> "")
        in
-       StrTbl.replace table key vals
+       StrTbl.replace table key vals;
+       table
   in
-  In_channel.with_open_text filename (fun ch ->
-    while
-      match input_line ch with
-      | s -> process_line s; true
-      | exception End_of_file -> false
-    do () done);
-  table
+  In_channel.with_open_text filename @@ In_channel.fold_lines process_line table
 
 let rec trans_closure ~dst ~src s =
   match StrTbl.find dst s with
@@ -126,7 +150,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
      in
      rule ~ppf ~target ~exts:["cmo";"cms";"cmt"] ~src ~deps ~action
 
-let settings_table = parse_table Sys.argv.(1)
+let settings_table = parse_settings Sys.argv.(1)
 let setting s =
   try StrTbl.find settings_table s
   with Not_found -> failwith ("Missing build_setting " ^ s)
@@ -188,6 +212,8 @@ let write_stdlib_dune ppf =
   copy_files ~ppf "../../runtime/ld.conf";
   fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
+  (rule (target target_runtime-launch-info)
+        (action (copy ../target_runtime.info %{target})))
   (alias
     (name stdlib)
     (deps
@@ -198,7 +224,7 @@ let write_stdlib_dune ppf =
        std_exit.cmo std_exit.o std_exit.cmx
        (glob_files *.{cmi,cmti,cmsi,cmo,cms,cmt,cmx})
        (glob_files caml/*.{h,tbl})
-       Makefile.config runtime-launch-info ld.conf
+       Makefile.config runtime-launch-info target_runtime-launch-info ld.conf
        stdlib/META dynlink/dynlink.cmxa))
   |}
 
@@ -332,6 +358,23 @@ let write_runtime_dune ppf =
     | `Native -> setting "runtime_sources.native"
   in
 
+  (* The working directory of the compiler is recorded in the debug
+     information. After (chdir ..), its parent is _build, or the dune sandbox
+     standing for it, whose name is the digest of the rule: map it as _build.
+     This must come after the other mappings, since the last match wins. *)
+  let run_mapping_sandbox cmd =
+    match setting "build_map_flags" with
+    | [] -> sprintf "(run %s)" (command_line cmd)
+    | flags ->
+       let script =
+         flags
+         |> List.map (sprintf " '%s'\"${PWD%%/*}\"=+build/_build")
+         |> String.concat ""
+         |> sprintf "exec \"$@\"%s"
+       in
+       sprintf "(run sh -c %s sh %s)" (dune_string script) (command_line cmd)
+  in
+
   (* object files *)
   let compile_object ~variant ~mode src =
     match Filename.extension src with
@@ -346,11 +389,10 @@ let write_runtime_dune ppf =
          "(rule\n\
          \ (target %s)\n\
          \ (deps %s (glob_files caml/*.{h,tbl}) (glob_files *.h))\n\
-         \ (action (chdir .. (run %s %s -o %%{target}))))\n"
+         \ (action (chdir .. %s)))\n"
          (obj_name ~variant ~mode src)
          (Filename.basename src)
-         (String.concat " " cmd)
-         src
+         (run_mapping_sandbox (cmd @ [src; "-o"; "%{target}"]))
     | s -> failwith ("Unknown source type " ^ s)
   in
 
@@ -358,32 +400,33 @@ let write_runtime_dune ppf =
   let archive ~variant ~mode =
     let srcs = sources ~variant ~mode in
     let objs = List.map (obj_name ~variant ~mode) srcs in
-    let target, cmd =
+    let target, cmd, args, post_args =
       match variant, mode with
       | (`Normal|`Debug|`PIC) as variant, `Byte ->
          "libcamlrun" ^ variant_suff ~variant ^ ".a",
-         setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
+         setting "ar", setting "arflags", []
       | (`Normal|`Debug|`PIC) as variant, `Native ->
          "libasmrun" ^ variant_suff ~variant ^ ".a",
-         setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
+         setting "ar", setting "arflags", []
       | `Zstd, _ ->
          "libcomprmarsh.a",
-         setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
+         setting "ar", setting "arflags", []
       | `Shared, `Byte ->
          "libcamlrun_shared.so",
-         setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs"
+         setting "mkdll", ["-o"], setting "bytecclibs"
       | `Shared, `Native ->
          "libasmrun_shared.so",
-         setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"]
-           @ setting "nativecclibs"
+         setting "mkdll", ["-o"], setting "nativecclibs"
     in
     (* ar likes appending to existing archives, so delete the target first *)
     fprintf ppf
       "(rule\n\
       \ (target %s)\n\
       \ (deps %s)\n\
-      \ (action (progn (run rm -f %%{target}) (run %s))))\n"
-      target (String.concat " " objs) (String.concat " " cmd)
+      \ (action\n\
+      \   (progn (run rm -f %%{target}) (run %s %s %%{target} %%{deps} %s))))\n"
+      target (String.concat " " objs)
+             (command_line cmd) (command_line args) (command_line post_args)
   in
 
   compile_object ~variant:`PIC ~mode:`Native "runtime/zstd.c";
@@ -417,8 +460,8 @@ let write_runtime_dune ppf =
       \ (action (run %s -o %%{target} %%{deps} %s)))\n"
       target
       ("libcamlrun" ^ variant_suff ~variant ^ ".a")
-      (setting ("mkexe" ^ variant_suff ~variant) |> String.concat " ")
-      (setting "bytecclibs" |> String.concat " "));
+      (command_line (setting ("mkexe" ^ variant_suff ~variant)))
+      (command_line (setting "bytecclibs")));
 
   (* build_config.h *)
   fprintf ppf "%s\n" {|

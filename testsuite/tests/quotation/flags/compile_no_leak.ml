@@ -1,7 +1,8 @@
 (* TEST
  readonly_files = "mod_directive_on.ml mod_uses_dollar.ml";
  setup-ocamlc.byte-build-env;
- commandline = "-c -no-syntax-quotations mod_directive_on.ml mod_uses_dollar.ml";
+ commandline = "-nostdlib -I ${ocamlsrcdir}/stdlib \
+              \ -c -no-syntax-quotations mod_directive_on.ml mod_uses_dollar.ml";
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)

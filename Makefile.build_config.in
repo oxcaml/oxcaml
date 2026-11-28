@@ -80,14 +80,37 @@ TEST_CXX_CXXFLAGS = @common_cflags@
 TEST_CXX_CPPFLAGS = @common_cppflags@
 CXXFLAGS ?=
 
+BUILD_PATH_LOGICAL = @srcdir_abs@
+BUILD_PATH_PHYSICAL = @srcdir_abs_real@
+BUILD_MAP_FLAGS = @build_map_flags@
+BUILD_MAP_CFLAGS = $(foreach flag, $(BUILD_MAP_FLAGS), \
+  $(call QUOTE_SINGLE,$(flag)$(BUILD_PATH_LOGICAL)=+build) \
+  $(if $(BUILD_PATH_PHYSICAL), \
+    $(call QUOTE_SINGLE,$(flag)$(BUILD_PATH_PHYSICAL)=+build)))
+
+# Dune may run make in a sandbox, _build/.sandbox/<rule digest>. The digest
+# depends on the build path, so the sandbox is mapped as if it were _build.
+# Its mappings come last, since the last one that matches wins.
+BUILD_MAP_SANDBOX_DIGEST = \
+  $(strip $(if $(findstring /_build/.sandbox/,$(CURDIR)), \
+    $(firstword $(subst /, , \
+      $(lastword $(subst /_build/.sandbox/, ,$(CURDIR)))))))
+BUILD_MAP_SANDBOX = $(if $(BUILD_MAP_SANDBOX_DIGEST), \
+  $(call QUOTE_SINGLE,$\
+    $(1)$(2)/_build/.sandbox/$(BUILD_MAP_SANDBOX_DIGEST)=+build/_build))
+BUILD_MAP_CFLAGS += $(foreach flag, $(BUILD_MAP_FLAGS), \
+  $(call BUILD_MAP_SANDBOX,$(flag),$(BUILD_PATH_LOGICAL)) \
+  $(if $(BUILD_PATH_PHYSICAL), \
+    $(call BUILD_MAP_SANDBOX,$(flag),$(BUILD_PATH_PHYSICAL))))
+
 # Default flags to use to compile C files
-OC_CFLAGS = @oc_cflags@
+OC_CFLAGS = @oc_cflags@ $(BUILD_MAP_CFLAGS)
 
 # Flags to use when compiling C files to be linked with bytecode
-OC_BYTECODE_CFLAGS = @oc_bytecode_cflags@
+OC_BYTECODE_CFLAGS = @oc_bytecode_cflags@ $(BUILD_MAP_CFLAGS)
 
 # Flags to use when compiling C files to be linked with native code
-OC_NATIVE_CFLAGS = @oc_native_cflags@
+OC_NATIVE_CFLAGS = @oc_native_cflags@ $(BUILD_MAP_CFLAGS)
 
 # The submodules should be searched *before* any other external -I paths
 OC_INCLUDES = $(addprefix -I $(ROOTDIR)/, \
@@ -148,6 +171,7 @@ DOCDIR=@docdir@
 
 ### Where to look for the standard library on target
 TARGET_LIBDIR=@TARGET_LIBDIR@
+TARGET_LIBDIR_IS_RELATIVE=@target_libdir_is_relative@
 
 unix_directory = @unix_directory@
 unix_library = @unix_library@

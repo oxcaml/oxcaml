@@ -93,7 +93,13 @@ let compile_file ?output ?(opt="") ?stable_name name =
       ("", "") in
   let debug_prefix_map =
     match stable_name with
-    | Some stable when Config.c_has_debug_prefix_map ->
+    | Some stable
+      when Config.c_has_debug_prefix_map
+           && not (String.starts_with ~prefix:"mingw" Config.system) ->
+      (* -fdebug-prefix-map exists on mingw-w64 but at present it is not used
+         for BUILD_PATH_PREFIX_MAP because there isn't yet a good story for how
+         to deal with Cygwin, where the paths are Cygwin-style paths and MSYS2,
+         where they are native Windows paths. *)
       Printf.sprintf " -fdebug-prefix-map=%s=%s" name stable
     | Some _ | None -> "" in
   let debug_flags =
@@ -160,8 +166,11 @@ let create_archive archive file_list =
                                (quote_files ~response_files:true file_list))
     | _ ->
         assert(String.length Config.ar > 0);
-        command(Printf.sprintf "%s rc %s %s"
-                Config.ar quoted_archive
+        command(Printf.sprintf "%s %s %s %s"
+                Config.ar
+                (if Config.ar_supports_deterministic_archives then "rcD"
+                 else "rc")
+                quoted_archive
                 (quote_files ~response_files:Config.ar_supports_response_files
                   file_list))
 
