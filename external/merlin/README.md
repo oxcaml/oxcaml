@@ -50,7 +50,7 @@ Compilation
 Dependencies: `yojson` >= 2.0.0, `dune` >= 2.7.
 
 ```shell
-dune build -p dot-merlin-reader,merlin
+dune build -p merlin
 ```
 
 Note: if you want to work on Merlin, you'll want to avoid the `-p merlin` to
@@ -67,7 +67,7 @@ Installation
 If you haven't encountered any errors in the previous step, just run:
 
 ```shell
-dune install -p dot-merlin-reader,merlin
+dune install -p merlin
 ```
 
 You can pass an explicit prefix to Dune, using `--prefix`. It defaults to

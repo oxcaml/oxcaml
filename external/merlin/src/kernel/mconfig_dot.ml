@@ -92,176 +92,128 @@ let parse_suffix str =
     if String.get first 0 != '.' || String.get second 0 != '.' then []
     else [ (first, second) ]
 
-(* This module contains invariants around processes that need to be preserved *)
-module Configurator : sig
-  type t = Dot_merlin | Dune
-
-  val of_string_opt : string -> t option
-  val to_string : t -> string
-
-  exception Process_exited
-
-  module Process : sig
-    type nonrec t =
-      { kind : t;
-        initial_cwd : string;
-        stdin : out_channel;
-        stdout : in_channel;
-        stderr : in_channel
-      }
-  end
-
-  (* [Some] if the process is live, [None] if the process died immediately after
-     spawning.  The check is a bit fragile, but is principally there to check if
-     `dot-merlin-reader` isn't installed or isn't on the PATH; it only needs to
-     be best-effort besides that. This function can raise [Process_exited] and
-     [Unix_error]. *)
-  val get_process_exn : dir:string -> t -> Process.t
-end = struct
+module Configurator = struct
   type t = Dot_merlin | Dune
 
   let of_string_opt = function
     | ".merlin" -> Some Dot_merlin
     | "dune-project" | "dune-workspace" -> Some Dune
     | _ -> None
+end
 
-  let to_string = function
-    | Dot_merlin -> "dot-merlin-reader"
-    | Dune -> "dune"
+module Dune_process : sig
+  type t =
+    { initial_cwd : string;
+      stdin : out_channel;
+      stdout : in_channel;
+      stderr : in_channel
+    }
 
-  let find_exe = function
-    | Dot_merlin ->
-      (* 1. If DOT_MERLIN_READER_EXE is defined, then use its value for the
-            dot-merlin-reader exe
-         2. If not, look in the same directory as the merlin executable for a
-            dot-merlin-reader.
-         3. If not, fallback to using whatever one is on the PATH. *)
-      let get_from_env_var = lazy (Sys.getenv_opt "DOT_MERLIN_READER_EXE") in
-      let get_from_same_dir_as_merlin_exe =
-        lazy
-          (let merlin_exe = Unix.realpath Sys.executable_name in
-           let merlin_bin = Filename.dirname merlin_exe in
-           let dot_merlin_reader_exe =
-             Filename.concat merlin_bin "dot-merlin-reader"
-           in
-           match Sys.file_exists dot_merlin_reader_exe with
-           | true -> Some dot_merlin_reader_exe
-           | false -> None)
-      in
-      List.find_map_opt
-        [ get_from_env_var; get_from_same_dir_as_merlin_exe ]
-        ~f:Lazy.force
-      |> Option.value ~default:"dot-merlin-reader"
-    | Dune ->
-      (* Always use the dune on the PATH *)
-      (* CR-someday: consider doing something better here *)
-      "dune"
+  exception Exited
 
-  exception Process_exited
+  (* Returns a live [dune ocaml-merlin] process started from [dir]. Raises
+     [Exited] if the process died immediately after spawning. The check is a bit
+     fragile, but is principally there to check if `dune` isn't installed or
+     isn't on the PATH; it only needs to be best-effort besides that. This
+     function can also raise [Unix_error]. *)
+  val get_exn : dir:string -> t
+end = struct
+  type t =
+    { initial_cwd : string;
+      stdin : out_channel;
+      stdout : in_channel;
+      stderr : in_channel
+    }
 
-  module Process = struct
-    type nonrec t =
-      { kind : t;
-        initial_cwd : string;
-        stdin : out_channel;
-        stdout : in_channel;
-        stderr : in_channel
-      }
+  exception Exited
 
-    module With_pid = struct
-      type nonrec t = { pid : int; process : t }
-    end
-
-    let start ~dir cfg =
-      let prog, args =
-        match cfg with
-        | Dot_merlin ->
-          let prog = find_exe Dot_merlin in
-          (prog, [| prog |])
-        | Dune ->
-          let prog = find_exe Dune in
-          (prog, [| prog; "ocaml-merlin"; "--no-print-directory" |])
-      in
-      let cwd = Sys.getcwd () in
-      let stdin_r, stdin_w = Unix.pipe () in
-      let stdout_r, stdout_w = Unix.pipe () in
-      let stderr_r, stderr_w = Unix.pipe () in
-      Unix.chdir dir;
-      Unix.set_close_on_exec stdin_w;
-      (* Set the windows equivalent of close on exec for and stdin stderr
-
-         Most processes spawned by merlin are supposed to inherit stderr to
-         output their debug information. This is fine because these processes
-         are short-lived.
-         However the dune helper we are about to spawn is long-lived, which can
-         cause issues with inherited descriptors because it will outlive
-         merlin's client process.
-         This is not an issue under Unix because file descriptors are replaced
-         (stdin/out/err are new), but under Windows, handle can accumulate.
-         This makes emacs block, synchronously waiting for the inherited (but
-         unused) stdout/stderr to be closed.
-
-         Os_ipc.merlin_dont_inherit_stdio is a no-op under Unix.
-      *)
-      Os_ipc.merlin_dont_inherit_stdio true;
-      log ~title:"get_config" "Starting %s configuration provider from dir %s."
-        (to_string cfg) dir;
-
-      let pid =
-        let open Unix in
-        try create_process prog args stdin_r stdout_w stderr_w
-        with Unix_error _ as err ->
-          Os_ipc.merlin_dont_inherit_stdio false;
-          chdir cwd;
-          List.iter ~f:close
-            [ stdin_r; stdin_w; stdout_r; stdout_w; stderr_r; stderr_w ];
-          raise err
-      in
-      Os_ipc.merlin_dont_inherit_stdio false;
-      Unix.chdir cwd;
-      Unix.close stdin_r;
-      Unix.close stdout_w;
-      Unix.close stderr_w;
-      let stdin = Unix.out_channel_of_descr stdin_w in
-      let stdout = Unix.in_channel_of_descr stdout_r in
-      let stderr = Unix.in_channel_of_descr stderr_r in
-      let initial_cwd = Misc.canonicalize_filename dir in
-      With_pid.
-        { pid; process = { kind = cfg; initial_cwd; stdin; stdout; stderr } }
+  module With_pid = struct
+    type nonrec t = { pid : int; process : t }
   end
+
+  let start ~dir =
+    (* Always use the dune on the PATH *)
+    (* CR-someday: consider doing something better here *)
+    let prog = "dune" in
+    let args = [| prog; "ocaml-merlin"; "--no-print-directory" |] in
+    let cwd = Sys.getcwd () in
+    let stdin_r, stdin_w = Unix.pipe () in
+    let stdout_r, stdout_w = Unix.pipe () in
+    let stderr_r, stderr_w = Unix.pipe () in
+    Unix.chdir dir;
+    Unix.set_close_on_exec stdin_w;
+    (* Set the windows equivalent of close on exec for and stdin stderr
+
+       Most processes spawned by merlin are supposed to inherit stderr to
+       output their debug information. This is fine because these processes
+       are short-lived.
+       However the dune helper we are about to spawn is long-lived, which can
+       cause issues with inherited descriptors because it will outlive
+       merlin's client process.
+       This is not an issue under Unix because file descriptors are replaced
+       (stdin/out/err are new), but under Windows, handle can accumulate.
+       This makes emacs block, synchronously waiting for the inherited (but
+       unused) stdout/stderr to be closed.
+
+       Os_ipc.merlin_dont_inherit_stdio is a no-op under Unix.
+    *)
+    Os_ipc.merlin_dont_inherit_stdio true;
+    log ~title:"get_config" "Starting dune configuration provider from dir %s."
+      dir;
+
+    let pid =
+      let open Unix in
+      try create_process prog args stdin_r stdout_w stderr_w
+      with Unix_error _ as err ->
+        Os_ipc.merlin_dont_inherit_stdio false;
+        chdir cwd;
+        List.iter ~f:close
+          [ stdin_r; stdin_w; stdout_r; stdout_w; stderr_r; stderr_w ];
+        raise err
+    in
+    Os_ipc.merlin_dont_inherit_stdio false;
+    Unix.chdir cwd;
+    Unix.close stdin_r;
+    Unix.close stdout_w;
+    Unix.close stderr_w;
+    let stdin = Unix.out_channel_of_descr stdin_w in
+    let stdout = Unix.in_channel_of_descr stdout_r in
+    let stderr = Unix.in_channel_of_descr stderr_r in
+    let initial_cwd = Misc.canonicalize_filename dir in
+    With_pid.{ pid; process = { initial_cwd; stdin; stdout; stderr } }
 
   (* Invariant: Every PID in this hashtable can be waited on.  This means it's
      either running or hasn't been waited on yet.  To ensure this invariant is
-     preserved, we don't expose the PIDs outside of the [Configurator]
+     preserved, we don't expose the PIDs outside of the [Dune_process]
      module. *)
-  let running_processes : (string * t, Process.With_pid.t) Hashtbl.t =
-    Hashtbl.create 0
+  let running_processes : (string, With_pid.t) Hashtbl.t = Hashtbl.create 0
 
-  let get_process_with_pid ~dir configurator =
+  let get_with_pid ~dir =
     try
-      let p = Hashtbl.find running_processes (dir, configurator) in
+      let p = Hashtbl.find running_processes dir in
       let i, _ = Unix.waitpid [ WNOHANG ] p.pid in
       if i = 0 then p
       else
-        let p = Process.start ~dir configurator in
-        Hashtbl.replace running_processes (dir, configurator) p;
+        let p = start ~dir in
+        Hashtbl.replace running_processes dir p;
         p
     with Not_found ->
-      let p = Process.start ~dir configurator in
-      Hashtbl.add running_processes (dir, configurator) p;
+      let p = start ~dir in
+      Hashtbl.add running_processes dir p;
       p
 
-  let get_process_exn ~dir configurator =
-    let p = get_process_with_pid ~dir configurator in
+  let get_exn ~dir =
+    let p = get_with_pid ~dir in
     match Unix.waitpid [ WNOHANG ] p.pid with
     | 0, _ -> p.process
     | _ -> begin
-      Hashtbl.remove running_processes (dir, configurator);
-      raise Process_exited
+      Hashtbl.remove running_processes dir;
+      raise Exited
       end
 end
 
-let prepend_config ~dir:cwd configurator (directives : directive list) config =
+let prepend_config ~dir:cwd (configurator : Configurator.t)
+    (directives : directive list) config =
   List.fold_left ~init:(config, [])
     ~f:(fun (config, errors) directive ->
       match (directive : directive) with
@@ -301,13 +253,15 @@ let prepend_config ~dir:cwd configurator (directives : directive list) config =
       | `EXCLUDE_QUERY_DIR -> ({ config with exclude_query_dir = true }, errors)
       | `USE_PPX_CACHE -> ({ config with use_ppx_cache = true }, errors)
       | `ERROR_MSG str -> (config, str :: errors)
-      | `UNKNOWN_TAG _ when configurator = Configurator.Dune ->
-        (* For easier forward compatibility we ignore unknown configuration tags
-           when they are provided by dune *)
-        (config, errors)
-      | `UNKNOWN_TAG tag ->
-        let error = Printf.sprintf "Unknown configuration tag \"%s\"" tag in
-        (config, error :: errors)
+      | `UNKNOWN_TAG tag -> (
+        match configurator with
+        | Dune ->
+          (* For easier forward compatibility we ignore unknown configuration
+             tags when they are provided by dune *)
+          (config, errors)
+        | Dot_merlin ->
+          let error = Printf.sprintf "Unknown tag in .merlin: %s" tag in
+          (config, error :: errors))
       | `UNIT_NAME_FOR_ERROR error -> (config, error :: errors))
     directives
 
@@ -338,14 +292,23 @@ type context =
 
 exception End_of_input
 
-let get_config { workdir; process_dir; configurator } path_abs =
+let get_dot_merlin_config ~process_dir =
+  log ~title:"get_config" "Reading .merlin from dir %s." process_dir;
+  let dot_merlin = Filename.concat (Unix.realpath process_dir) ".merlin" in
+  match Dot_merlin_reader.load dot_merlin with
+  | directives -> Ok directives
+  | exception Sys_error message ->
+    Error
+      (Printf.sprintf "Failed to read the .merlin configuration file: %s"
+         message)
+
+let get_dune_config ~workdir ~process_dir path_abs =
   let log_query path =
     log ~title:"get_config"
-      "Querying %s (inital cwd: %s) for file: %s.\nWorkdir: %s"
-      (Configurator.to_string configurator)
-      process_dir path workdir
+      "Querying dune (inital cwd: %s) for file: %s.\nWorkdir: %s" process_dir
+      path workdir
   in
-  let query path (p : Configurator.Process.t) =
+  let query path (p : Dune_process.t) =
     let open Merlin_dot_protocol.Blocking in
     log_query path;
     Commands.send_file p.stdin path;
@@ -353,7 +316,7 @@ let get_config { workdir; process_dir; configurator } path_abs =
     read p.stdout
   in
   try
-    let p = Configurator.get_process_exn ~dir:process_dir configurator in
+    let p = Dune_process.get_exn ~dir:process_dir in
     (* Both [p.initial_cwd] and [path_abs] have gone through
        [canonicalize_filename] *)
     let path_rel =
@@ -367,83 +330,64 @@ let get_config { workdir; process_dir; configurator } path_abs =
           else path)
     in
 
-    let path =
-      match (p.kind, path_rel) with
-      | Dune, Some path_rel -> path_rel
-      | _, _ -> path_abs
-    in
+    let path = Option.value path_rel ~default:path_abs in
 
     (* Starting with Dune 2.8.3 relative paths are preferred. However to maintain
        compatibility with 2.8 <= Dune <= 2.8.2  we always retry with an absolute
        path if using a relative one failed *)
     let answer =
       match query path p with
-      | Ok [ `ERROR_MSG _ ] when p.kind = Dune -> query path_abs p
+      | Ok [ `ERROR_MSG _ ] -> query path_abs p
       | answer -> answer
     in
 
     match answer with
-    | Ok directives ->
-      let cfg, failures =
-        prepend_config ~dir:workdir configurator directives empty_config
-      in
-      (postprocess_config cfg, failures)
-    | Error (Merlin_dot_protocol.Unexpected_output msg) ->
-      (empty_config, [ msg ])
+    | Ok directives -> Ok directives
+    | Error (Merlin_dot_protocol.Unexpected_output msg) -> Error msg
     | Error (Merlin_dot_protocol.Csexp_parse_error _) -> raise End_of_input
   with
-  | Configurator.Process_exited ->
+  | Dune_process.Exited ->
     (* This can happen
-       - If `dot-merlin-reader` is not installed and the project use `.merlin`
-         files
-       - There was a bug in the external reader causing a crash *)
+       - If `dune` is not installed
+       - There was a bug in dune causing a crash *)
     let program_name = Lib_config.program_name () in
-    let error =
-      Printf.sprintf
-        "A problem occurred with %s external configuration reader. %s If the \
-         problem persists, please file an issue on %s's tracker."
-        program_name
-        (match configurator with
-        | Dot_merlin -> "Check that `dot-merlin-reader` is installed."
-        | Dune -> "Check that `dune` is installed and up-to-date.")
-        program_name
-    in
-    (empty_config, [ error ])
+    Error
+      (Printf.sprintf
+         "A problem occurred with %s external configuration reader. Check that \
+          `dune` is installed and up-to-date. If the problem persists, please \
+          file an issue on %s's tracker."
+         program_name program_name)
   | Unix.Unix_error (ENOENT, "create_process", "dune") ->
-    let error =
-      Printf.sprintf
-        "%s could not find `dune` in the PATH to get project configuration. If \
-         you do not rely on Dune, make sure `.merlin` files are present in the \
-         project's sources."
-        (Lib_config.program_name ())
-    in
-    (empty_config, [ error ])
-  | Unix.Unix_error (ENOENT, "create_process", "dot-merlin-reader") ->
-    let error =
-      Printf.sprintf
-        "%s could not find `dot-merlin-reader`. Please make sure that \
-         `dot-merlin-reader` is installed. `dot-merlin-reader` is expected to \
-         be in the same directory as the merlin executable or on the PATH. You \
-         may also specify the path to `dot-merlin-reader` via the \
-         `DOT_MERLIN_READER_EXE` environment variable."
-        (Lib_config.program_name ())
-    in
-    (empty_config, [ error ])
+    Error
+      (Printf.sprintf
+         "%s could not find `dune` in the PATH to get project configuration. \
+          If you do not rely on Dune, make sure `.merlin` files are present in \
+          the project's sources."
+         (Lib_config.program_name ()))
   | End_of_input ->
     (* This can happen
        - if a project using old-dune has not been built and Merlin wrongly tries to
          start `new-dune ocaml-merlin` in the absence of `.merlin` files
        - the process stopped in the middle of its answer (which is very unlikely) *)
-    let program_name = Lib_config.program_name () in
-    let error =
-      Printf.sprintf
-        "%s could not load its configuration from the external reader. %s"
-        program_name
-        (match configurator with
-        | Dot_merlin -> "If the problem persists, please file an issue."
-        | Dune -> "Building your project with `dune` might solve this issue.")
+    Error
+      (Printf.sprintf
+         "%s could not load its configuration from the external reader. \
+          Building your project with `dune` might solve this issue."
+         (Lib_config.program_name ()))
+
+let get_config { workdir; process_dir; configurator } path_abs =
+  let directives =
+    match configurator with
+    | Dot_merlin -> get_dot_merlin_config ~process_dir
+    | Dune -> get_dune_config ~workdir ~process_dir path_abs
+  in
+  match directives with
+  | Ok directives ->
+    let cfg, failures =
+      prepend_config ~dir:workdir configurator directives empty_config
     in
-    (empty_config, [ error ])
+    (postprocess_config cfg, failures)
+  | Error message -> (empty_config, [ message ])
 
 let find_project_context start_dir =
   (* The workdir is the first directory we find which contains a [dune] file.
@@ -470,8 +414,8 @@ let find_project_context start_dir =
            ~f:(fun f ->
              let fname = Filename.concat dir f in
              if Sys.file_exists fname && not (Sys.is_directory fname) then
-               (* When starting [dot-merlin-reader] from [dir]
-                  the workdir is always [dir] *)
+               (* When reading [.merlin] from [dir] the workdir is always
+                  [dir] *)
                let workdir = if f = ".merlin" then None else workdir in
                let workdir = Option.value ~default:dir workdir in
                Some

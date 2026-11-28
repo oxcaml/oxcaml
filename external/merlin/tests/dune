@@ -27,7 +27,6 @@
   %{bin:ocaml-index}
   %{bin:ocamlmerlin-server}
   %{bin:ocamlmerlin}
-  %{bin:dot-merlin-reader}
   %{bin:revert-newlines}
   %{bin:extract_ranges}
   %{bin:show_location}

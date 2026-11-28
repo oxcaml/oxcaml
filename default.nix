@@ -227,7 +227,7 @@ let
     testOcaml:
     let
       ocamlPackages = bootOcamlPackages.overrideScope (
-        _: _: { inherit (packages) merlin-lib dot-merlin-reader merlin; }
+        _: _: { inherit (packages) merlin-lib merlin; }
       );
 
       inherit (ocamlPackages) buildDunePackage;
@@ -244,16 +244,6 @@ let
           doCheck = true;
         };
 
-        dot-merlin-reader = buildDunePackage {
-          pname = "dot-merlin-reader";
-          version = "dev";
-          src = merlinSrc;
-          duneVersion = "3";
-          buildInputs = [ merlin-lib ];
-          checkInputs = [ ocamlPackages.alcotest ];
-          doCheck = true;
-        };
-
         merlin = buildDunePackage {
           pname = "merlin";
           version = "dev";
@@ -261,7 +251,6 @@ let
           duneVersion = "3";
           buildInputs = [
             merlin-lib
-            dot-merlin-reader
             ocamlPackages.menhirLib
             ocamlPackages.menhirSdk
             ocamlPackages.yojson
@@ -271,7 +260,6 @@ let
             pkgs.jq
           ];
           nativeCheckInputs = [
-            dot-merlin-reader
             ocamlPackages.findlib
             pkgs.python3
             pkgs.which
