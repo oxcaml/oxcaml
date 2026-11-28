@@ -345,7 +345,6 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->exn_handler = th->exn_handler;
   Caml_state->async_exn_handler = th->async_exn_handler;
   Caml_state->local_roots = th->local_roots;
-  Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
   /* We might have gotten here from [caml_c_thread_register], which calls
      [restore_runtime_state] *before* allocating [descr]. In that case,
@@ -355,8 +354,15 @@ static void restore_runtime_state(caml_thread_t th)
     Caml_state->thread_id = Ident(th->descr);
   }
   caml_tls_update_cache();
-  caml_modify_generational_global_root
-    (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
+  if (caml_backtrace_active) {
+    Caml_state->backtrace_pos = th->backtrace_pos;
+    caml_modify_generational_global_root
+      (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
+  } else {
+    Caml_state->backtrace_pos = 0;
+    caml_modify_generational_global_root
+      (&Caml_state->backtrace_last_exn, Val_unit);
+  }
   Caml_state->preemption = th->preemption_scheduled ? Val_long(1) : Val_long(0);
 #ifndef NATIVE_CODE
   Caml_state->trap_sp_off = th->trap_sp_off;
@@ -1022,7 +1028,7 @@ CAMLprim value caml_thread_uncaught_exception(value exn)
   fprintf(stderr, "Thread %d killed on uncaught exception %s\n",
           Int_val(Ident(Active_thread->descr)), msg);
   caml_stat_free(msg);
-  if (Caml_state->backtrace_active) caml_print_exception_backtrace();
+  if (caml_backtrace_active) caml_print_exception_backtrace();
   fflush(stderr);
   return Val_unit;
 }

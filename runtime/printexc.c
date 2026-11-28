@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "caml/backtrace.h"
+#include "caml/backtrace_prim.h"
 #include "caml/callback.h"
 #include "caml/debugger.h"
 #include "caml/fail.h"
@@ -114,30 +115,49 @@ static void default_fatal_uncaught_exception(value exn, const char *msg2)
 {
   char * msg;
   const value * at_exit;
-  int saved_backtrace_active, saved_backtrace_pos;
+  intnat saved_backtrace_pos;
+  intnat backtrace_active;
+  backtrace_slot* saved_backtrace_buffer;
 
   /* Build a string representation of the exception */
   msg = caml_format_exception(exn);
+
   /* Perform "at_exit" processing, ignoring all exceptions that may
      be triggered by this */
-  saved_backtrace_active = Caml_state->backtrace_active;
-  saved_backtrace_pos = Caml_state->backtrace_pos;
-  Caml_state->backtrace_active = 0;
+  backtrace_active = caml_backtrace_active;
+  if (backtrace_active) {
+    saved_backtrace_pos = Caml_state->backtrace_pos;
+    Caml_state->backtrace_pos = 0;
+
+    saved_backtrace_buffer = Caml_state->backtrace_buffer;
+    Caml_state->backtrace_buffer = NULL;
+
+    caml_modify_generational_global_root
+      (&Caml_state->backtrace_last_exn, Val_unit);
+  }
+
   at_exit = caml_named_value("Pervasives.do_at_exit");
   /* In the event of an asynchronous exception occurring, it will still get
      caught here, because of the semantics of [caml_callback_exn]. */
   if (at_exit != NULL) caml_callback_res(*at_exit, Val_unit);
-  Caml_state->backtrace_active = saved_backtrace_active;
-  Caml_state->backtrace_pos = saved_backtrace_pos;
+
   /* Display the uncaught exception */
   if (msg2)
     fprintf(stderr, "Fatal error: exception (from %s) %s\n", msg2, msg);
   else
     fprintf(stderr, "Fatal error: exception %s\n", msg);
   caml_stat_free(msg);
+
   /* Display the backtrace if available */
-  if (!DEBUGGER_IN_USE && Caml_state->backtrace_active)
-    caml_print_exception_backtrace();
+  if (backtrace_active) {
+    Caml_state->backtrace_pos = saved_backtrace_pos;
+
+    caml_free_backtrace_buffer(Caml_state->backtrace_buffer);
+    Caml_state->backtrace_buffer = saved_backtrace_buffer;
+
+    if (!DEBUGGER_IN_USE)
+      caml_print_exception_backtrace();
+  }
 }
 
 int caml_abort_on_uncaught_exn = 0; /* see afl.c */

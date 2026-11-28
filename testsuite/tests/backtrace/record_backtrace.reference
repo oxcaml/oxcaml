@@ -1,0 +1,4 @@
+on domain 0, trace false
+on domain 1, trace false
+on domain 0, trace true
+on domain 1, trace true

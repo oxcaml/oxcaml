@@ -292,7 +292,10 @@ external get_raw_backtrace_next_slot :
    returns the *string* corresponding to the global current backtrace *)
 let get_backtrace () = raw_backtrace_to_string (get_raw_backtrace ())
 
-external record_backtrace: bool -> unit @@ portable = "caml_record_backtrace"
+module Racy = struct
+  external record_backtrace: bool -> unit @@ portable = "caml_record_backtrace"
+end
+include Racy
 external backtrace_status: unit -> bool @@ portable = "caml_backtrace_status"
 
 let rec register_printer_safe fn =

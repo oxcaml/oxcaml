@@ -37,6 +37,7 @@
 #include "caml/fail.h"
 #include <string.h>
 #include "caml/callback.h"
+#include "caml/backtrace.h"
 
 /* TODO: move this declaration to e.g. fiber.c */
 atomic_uintnat caml_max_stack_wsize;
@@ -601,7 +602,7 @@ CAMLprim value caml_runtime_parameters (value unit)
      ",p="F_Z",s="F_Z",t="F_Z",v="F_Z",V="F_Z
      ",W="F_Z"%s",
        /* a was OCaml 4 allocation policy */
-       /* b */ (int) Caml_state->backtrace_active,
+       /* b */ (int) caml_backtrace_active,
        /* c */ caml_params->cleanup_on_exit,
        /* d */ caml_params->max_domains,
        /* e */ caml_params->runtime_events_log_wsize,
