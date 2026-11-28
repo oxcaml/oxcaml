@@ -433,8 +433,6 @@ AC_SUBST([install_ocamlnat])
 AC_SUBST([reserved_header_bits])
 AC_SUBST([custom_ops_struct_size])
 AC_SUBST([no_partial_inlining_cflags])
-AC_SUBST([frame_pointers])
-AC_SUBST([address_sanitizer])
 AC_SUBST([cpp_mangling])
 AC_SUBST([name_mangling_scheme])
 AC_SUBST([flambda])
@@ -457,7 +455,6 @@ AC_SUBST([build_libraries_manpages])
 AC_SUBST([compute_deps])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
-AC_SUBST([poll_insertion])
 AC_SUBST([dune])
 AC_SUBST([opam])
 AC_SUBST([opam_switch])
@@ -1976,6 +1973,9 @@ dnl pages) only on amd64 and arm64, where stack checks are an axis of the
 dnl codegen variants (see "## Codegen variants" below).  On every other
 dnl architecture the runtime is built with them, whatever the options say:
 dnl m.h defines STACK_CHECKS_ENABLED there (see "## Stack checks" below).
+dnl That is a setting of the C runtime and not of a codegen variant: those
+dnl architectures have no native backend here, hence no variants, and
+dnl nothing else that configure writes depends on it.
 AS_CASE([$arch],
   [amd64|arm64], [stack_checks_mandatory=false],
   [stack_checks_mandatory=true])
@@ -3115,13 +3115,9 @@ dnl runtime archives and library trees ("## Codegen variants" below); the
 dnl --enable-<axis> and --disable-<axis> options are requirements on that
 dnl list.  So no option adds C flags, linker flags or macros for an axis
 dnl here: the root's m.h defines no axis macro, and the build gives each
-dnl variant its own flags (Makefile.codegen-variants).  The variables
-dnl below are what the templates still substitute for "the configured
-dnl default" of each axis.
-
-frame_pointers=false
-address_sanitizer=false
-poll_insertion=false
+dnl variant its own flags (Makefile.codegen-variants).  Nor is anything
+dnl substituted for the default of an axis: Config reports the settings of
+dnl base (utils/config.common.ml.in).
 
 dnl Where codegen variants can be built: with the native backends that
 dnl generate code for more than one of them, on the systems and with the
@@ -3197,25 +3193,14 @@ dnl are an axis of the codegen variants, off in the library root.
 
 AS_IF([$stack_checks_mandatory],
   [AC_DEFINE([STACK_CHECKS_ENABLED])
-   stack_checks=true
-   AC_MSG_NOTICE([using stack checks (mandatory on this architecture)])],
-  [stack_checks=false])
-AC_SUBST([stack_checks])
+   AC_MSG_NOTICE([using stack checks (mandatory on this architecture)])])
 
 ## Codegen variants
 
-dnl The name of the variant that the library root holds: base, which has
-dnl every axis off.  (On the architectures where stack checks are
-dnl mandatory the root's C runtime is built with them, hence the other
-dnl name there; these have no native backend to build a variant for.)
-dnl The naming scheme is defined by utils/codegen_variant_name.ml: the
-dnl '-'-joined, sorted names of the enabled axis tokens ("asan", "fp",
-dnl "poll", "sc"), or "base" when every axis is off.
-
-AS_IF([$stack_checks_mandatory],
-  [codegen_default_variant=sc],
-  [codegen_default_variant=base])
-AC_SUBST([codegen_default_variant])
+dnl The library root holds the base variant, which has every axis off.  The
+dnl naming scheme of the others is defined by
+dnl utils/codegen_variant_name.ml: the '-'-joined, sorted names of the
+dnl enabled axis tokens ("asan", "fp", "poll", "sc").
 
 dnl What the --enable-<axis> and --disable-<axis> options ask of the list
 dnl of variants below.
