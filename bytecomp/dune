@@ -32,3 +32,5 @@
  (deps    (:instr (file opcodes.ml)))
  (action
   (bash "ocamlc -i %{instr} > %{targets}")))
+
+(ocamllex byterntm)

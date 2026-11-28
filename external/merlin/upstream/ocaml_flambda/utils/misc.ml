@@ -2187,6 +2187,175 @@ module Magic_number = struct
            | Ok () -> Ok info
 end
 
+module RuntimeID = struct
+  type t = {
+    dev: bool;
+    release: int;
+    reserved: int;
+    no_flat_float_array: bool;
+    fp: bool;
+    tsan: bool;
+    int31: bool;
+    static: bool;
+    no_compression: bool;
+    ansi: bool;
+    oxcaml: bool;
+    magic: int;
+    stack_checks: bool;
+    asan: bool;
+    multidomain: bool;
+  }
+
+  let make fn ?(dev = not Config.is_official_release)
+              ?(release = Config.release_number)
+              ?(reserved = Config.reserved_header_bits)
+              ?(no_flat_float_array = not Config.flat_float_array)
+              ?(fp = Config.with_frame_pointers)
+              ?(tsan = Config.tsan)
+              ?(int31 = (Sys.int_size = 31))
+              ?(static = not Config.supports_shared_libraries)
+              ?(no_compression = (Config.compression_c_libraries = ""))
+              ?(ansi = Config.target_win32 && not Config.windows_unicode)
+              ?(oxcaml = true)
+              ?(magic =
+                  if oxcaml then Magic_number.(current_version Exec) else 0)
+              ?(stack_checks = oxcaml && not Config.no_stack_checks)
+              ?(asan = oxcaml && Config.with_address_sanitizer)
+              ?(multidomain = oxcaml && Config.multidomain) () =
+    if release < 0 || release > 63 || reserved < 0 || reserved > 31
+       || magic < 0 || magic > 1023 then
+      invalid_arg fn
+    else
+      {dev; release; reserved; no_flat_float_array; fp; tsan; int31; static;
+       no_compression; ansi; oxcaml; magic; stack_checks; asan; multidomain}
+
+  let make_zinc =
+    make "Misc.RuntimeID.make_zinc"
+      ~reserved:0 ~fp:false ~tsan:false ~ansi:false
+      ~stack_checks:false ~asan:false ~multidomain:false
+
+  let make_bytecode =
+    make "Misc.RuntimeID.make_bytecode" ~fp:false ~tsan:false
+      ~stack_checks:false
+
+  let make_native = make "Misc.RuntimeID.make_native"
+
+  let is_zinc = function
+  | {dev = _; release = _; reserved = 0; no_flat_float_array = _; fp = false;
+     tsan = false; int31 = _; static = _; no_compression = _; ansi = false;
+     oxcaml = _; magic = _; stack_checks = false; asan = false;
+     multidomain = false} ->
+      true
+  | _ ->
+      false
+
+  let is_bytecode = function
+  | {dev = _; release = _; reserved = _; no_flat_float_array = _; fp = false;
+     tsan = false; int31 = _; static = _; no_compression = _; ansi = _;
+     oxcaml = _; magic = _; stack_checks = false; asan = _;
+     multidomain = _} -> true
+  | _ -> false
+
+  let is_native _ = true
+
+  let to_string t =
+    let alpha = "0123456789abcdefghijklmnopqrstuv" in
+    let bit bit cond = if cond then 1 lsl bit else 0 in
+    let q0 =
+      (bit 0 t.dev) lor
+      ((t.release lsl 1) land 0b11110) (* 4 bits *)
+    in
+    let q1 =
+      t.release lsr 4 lor               (* 2 bits *)
+      ((t.reserved lsl 2) land 0b11100) (* 3 bits *)
+    in
+    let q2 =
+      t.reserved lsr 3 lor (* 2 bits *)
+      bit 2 t.no_flat_float_array lor
+      bit 3 t.fp lor
+      bit 4 t.tsan
+    in
+    let q3 =
+      bit 0 t.int31 lor
+      bit 1 t.static lor
+      bit 2 t.no_compression lor
+      bit 3 t.ansi lor
+      bit 4 t.oxcaml
+    in
+    let id =
+      Printf.sprintf "%c%c%c%c" alpha.[q0] alpha.[q1] alpha.[q2] alpha.[q3]
+    in
+    if t.oxcaml then
+      let q4 = t.magic land 0b11111 in
+      let q5 = t.magic lsr 5 in
+      let q6 =
+        bit 0 t.stack_checks lor
+        bit 1 t.asan lor
+        bit 2 t.multidomain
+      in
+      Printf.sprintf "%s%c%c%c" id alpha.[q4] alpha.[q5] alpha.[q6]
+    else
+      id
+
+  let of_string s =
+    let len = String.length s in
+    if len <> 4 && len <> 7 then
+      None
+    else
+      let convert c =
+        match c with
+        | '0'..'9' -> Char.code c - Char.code '0'
+        | 'a'..'v' -> Char.code c - Char.code 'a' + 10
+        | _ -> -1
+      in
+      let set bit q = (q land (1 lsl bit) <> 0) in
+      let q0 = convert s.[0] in
+      let q1 = convert s.[1] in
+      let q2 = convert s.[2] in
+      let q3 = convert s.[3] in
+      let q4, q5, q6 =
+        if len = 7 then
+          convert s.[4], convert s.[5], convert s.[6]
+        else
+          0, 0, 0
+      in
+      (* Only OxCaml has q4-q6; bits 3 and 4 of q6 are unused *)
+      if q0 lor q1 lor q2 lor q3 lor q4 lor q5 lor q6 >= 0
+         && set 4 q3 = (len = 7) && q6 lsr 3 = 0 then
+        Some {dev = set 0 q0; release = ((q1 land 0b11) lsl 4) lor (q0 lsr 1);
+              reserved = ((q2 land 0b11) lsl 3) lor (q1 lsr 2);
+              no_flat_float_array = set 2 q2; fp = set 3 q2; tsan = set 4 q2;
+              int31 = set 0 q3; static = set 1 q3; no_compression = set 2 q3;
+              ansi = set 3 q3; oxcaml = set 4 q3; magic = (q5 lsl 5) lor q4;
+              stack_checks = set 0 q6; asan = set 1 q6;
+              multidomain = set 2 q6}
+      else
+        None
+
+  let ocamlrun variant runtime_id =
+    if is_zinc runtime_id then
+      Printf.sprintf "ocamlrun%s-%s" variant (to_string runtime_id)
+    else
+      invalid_arg "Misc.RuntimeID.ocamlrun"
+
+  let shared_runtime ?runtime_id ?(host = Config.target) ?(prefix = "-l")
+                     backend_type =
+    match backend_type with
+    | Sys.Native ->
+        let runtime_id = Option.value ~default:(make_native ()) runtime_id in
+        Printf.sprintf "%sasmrun-%s-%s" prefix host (to_string runtime_id)
+    | Sys.Bytecode ->
+        let runtime_id = Option.value ~default:(make_bytecode ()) runtime_id in
+        Printf.sprintf "%scamlrun-%s-%s" prefix host (to_string runtime_id)
+    | Sys.Other _ ->
+        invalid_arg "Misc.RuntimeID.shared_runtime"
+
+  let stubslib ?(runtime_id = make_bytecode ())
+               ?(host = Config.target)
+               name =
+    Printf.sprintf "%s-%s-%s" name host (to_string runtime_id)
+end
+
 module Le_result = struct
   type t =
     | Equal

@@ -431,6 +431,7 @@
   bytepackager
   emitcode
   printinstr
+  byterntm
   instruct
   ;; driver/
   errors
@@ -442,6 +443,7 @@
  (modes byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlbytecomp ocamlfrontend)
  (modules main))
 
@@ -509,6 +511,24 @@
   (= %{context_name} "main"))
  (action
   (write-file %{targets} "")))
+
+; Bytecode launcher flags: empty for the boot (system-compiler) context, which
+; does not understand -launch-method/-runtime-search, and the configured flags
+; for the main context (see Makefile.common-ox).
+
+(rule
+ (targets bytecode_launcher_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (write-file bytecode_launcher_flags.sexp "()")))
+
+(rule
+ (targets bytecode_launcher_flags.sexp)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (copy %{project_root}/bytecode_launcher_flags_oxcaml.sexp %{targets})))
 
 ; Write empty files in an unconfigured tree
 (rule
@@ -883,6 +903,7 @@
  (modes byte)
  (instrumentation
   (backend bisect_ppx))
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries
   memtrace
   flambda2

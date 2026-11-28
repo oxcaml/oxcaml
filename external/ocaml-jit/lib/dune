@@ -14,6 +14,7 @@
   (jit.cmxa as ocaml-jit/jit.cmxa)
   (jit.a as ocaml-jit/jit.a)
   (libjit_stubs.a as ocaml-jit/libjit_stubs.a)
+  (dlljit_stubs.so as stublibs/dlljit_stubs.so)
   (jit.cmxs as ocaml-jit/jit.cmxs)
   (jit.cma as ocaml-jit/jit.cma)
   (.jit.objs/byte/jit.cmi as ocaml-jit/jit.cmi)

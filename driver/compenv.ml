@@ -836,7 +836,7 @@ type deferred_action =
   | ProcessCFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
-  | ProcessDLLs of string list
+  | ProcessDLLs of bool * string list
 
 let c_object_of_filename name =
   Filename.chop_suffix (Filename.basename name) ".c" ^ Config.ext_obj
@@ -881,8 +881,8 @@ let process_action
       | None ->
         ccobjs := names @ !ccobjs
       end
-  | ProcessDLLs names ->
-      dllibs := names @ !dllibs
+  | ProcessDLLs (suffixed, names) ->
+      dllibs := (List.map (fun n -> (~suffixed, n)) names) @ !dllibs
   | ProcessOtherFile name ->
       if !Clflags.functorize then
         (* Anonymous args are module names, not filepaths. *)
@@ -909,7 +909,7 @@ let process_action
       end
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then
-        dllibs := name :: !dllibs
+        dllibs := (~suffixed:false, name) :: !dllibs
       else
         match Compiler_pass.of_input_filename name with
         | Some start_from ->

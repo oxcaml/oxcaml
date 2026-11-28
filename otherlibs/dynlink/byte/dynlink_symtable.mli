@@ -32,7 +32,7 @@ module Global : sig
   val description: Format.formatter -> t -> unit
 end
 
-val open_dlls : string list -> unit
+val open_dlls : (suffixed:bool * string) list -> unit
 
 val patch_object:
   (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->

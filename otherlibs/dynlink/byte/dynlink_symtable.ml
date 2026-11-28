@@ -89,14 +89,24 @@ let primitives : (string, int) Hashtbl.t = Hashtbl.create 100
 #52 "bytecomp/dll.ml"
 (* Extract the name of a DLLs from its external name (xxx.so or -lxxx) *)
 
-let extract_dll_name file =
-  if Filename.check_suffix file Config.ext_dll then
+let extract_dll_name (~suffixed, file) =
+  if not suffixed && Filename.check_suffix file Config.ext_dll then
     Filename.chop_suffix file Config.ext_dll
-  else if String.length file >= 2 && String.sub file 0 2 = "-l" then
-    "dll" ^ String.sub file 2 (String.length file - 2)
   else
-    file (* will cause error later *)
-#100 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+    let file =
+      if String.starts_with ~prefix:"-l" file then
+      "dll" ^ String.sub file 2 (String.length file - 2)
+    else
+      file
+    in
+      if suffixed then
+#104 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+        (* This name must be in sync with Misc.RuntimeID.stubslib *)
+        Printf.sprintf "%s-%s-%s" file Config.target Config.bytecode_runtime_id
+#66 "bytecomp/dll.ml"
+      else
+        file
+#110 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 (* Specialized version of [Dll.{open_dll,open_dlls,find_primitive}] for the
     execution mode. *)
 let open_dll name =
@@ -233,12 +243,12 @@ let patch_object buff patchlist =
 (* Functions for toplevel use *)
 
 (* Update the in-core table of globals *)
-#237 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#247 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 module Meta = struct
 #16 "bytecomp/meta.ml"
 external global_data : unit -> Obj.t array = "caml_get_global_data"
 external realloc_global_data : int -> unit = "caml_realloc_global"
-#242 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#252 "otherlibs/dynlink/byte/dynlink_symtable.ml"
 end
 #332 "bytecomp/symtable.ml"
 let update_global_table () =
@@ -264,7 +274,7 @@ external get_bytecode_sections : unit -> bytecode_sections =
 let init_toplevel () =
   let sect = get_bytecode_sections () in
   global_table := sect.symb;
-#268 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#278 "otherlibs/dynlink/byte/dynlink_symtable.ml"
   Dll.init ~dllpaths:sect.dlpt ~prims:sect.prim;
 #358 "bytecomp/symtable.ml"
   sect.crcs
@@ -317,7 +327,7 @@ let current_state () = !global_table
 #412 "bytecomp/symtable.ml"
 let hide_additions (st : global_map) =
   if st.cnt > !global_table.cnt then
-#321 "otherlibs/dynlink/byte/dynlink_symtable.ml"
+#331 "otherlibs/dynlink/byte/dynlink_symtable.ml"
     failwith "Symtable.hide_additions";
 #415 "bytecomp/symtable.ml"
   global_table :=
