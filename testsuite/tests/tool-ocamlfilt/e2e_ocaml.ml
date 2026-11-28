@@ -313,6 +313,91 @@ module Ordinals = struct
     List.map (fun[@inline never] x -> x + Lazy.force t) xs
 end
 
+(* {1 Anonymous first-class modules}
+
+   The two [(module struct ... end)] bodies are anonymous modules, numbered
+   among the anonymous items of [pick]: [pick.mod_{0}.v] and
+   [pick.mod_{1}.v]. *)
+module type V = sig
+  val v : int -> int
+end
+
+let pick flag : (module V) =
+  if flag
+  then
+    (module struct
+      let[@cold] v x = x + 1
+    end)
+  else
+    (module struct
+      let[@cold] v x = x - 1
+    end)
+
+(* {1 Partial application}
+
+   A partial application that the frontend compiles to a closure (a
+   later labelled argument is supplied while an earlier one is omitted)
+   is marked [partial{<callee>}], with the callee's path as written at
+   the application site. Merely using a primitive as a first-class value
+   ([let neg = ( ~- )]) is an eta-expansion, not a partial application,
+   so it gets no marker: the wrapper simply is [neg]. The middle end
+   marks the wrappers it creates for the partial applications it
+   compiles itself ([curried]) in the same way. *)
+module Partial = struct
+  let[@inline never] labelled ~a ~b = a - b
+
+  let[@inline never] sum3 ~a ~b ~c = a + b + c
+
+  let[@inline never] text ?(indent = 0) ~wrap s =
+    String.make indent ' ' ^ s ^ string_of_int wrap
+
+  let[@inline never] omit_first x = labelled ~b:x
+
+  let neg = ( ~- )
+end
+
+let[@inline never] omit_first_qualified x = Partial.labelled ~b:x
+
+let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
+
+(* Partially applying a partial application applies the original callee
+   to more arguments: the wrapper is [partial{Partial.sum3}], not
+   [partial{first.partial{Partial.sum3}}]. *)
+let first = Partial.sum3 ~a:(Sys.opaque_identity 1)
+
+let second = first ~b:(Sys.opaque_identity 2)
+
+(* Applying a function with optional arguments to a labelled argument only
+   makes the type checker eta-expand the application; the resulting
+   closure is the partial application too: [render.partial{Partial.text}]. *)
+let[@inline never] render l = List.map (Partial.text ~wrap:80) l
+
+(* The eta-expansion of a complete application whose result happens to be a
+   function with optional arguments is a partial application of that result,
+   not of the function applied, which is left unknown: [use_app.partial{?}]
+   rather than [use_app.partial{Stdlib.Sys.opaque_identity}]. *)
+let[@inline never] with_opt ?(opt = 0) b = opt + b
+
+let[@inline never] apply_int (g : int -> int) = g 2
+
+let[@inline never] use_app () = apply_int (Sys.opaque_identity with_opt)
+
+(* {1 Primitives re-exported as values}
+
+   When a signature declares as a [val] what the structure defines as an
+   [external], the compiler wraps the primitive in a closure to fill the
+   module field. The wrapper is named after the value it implements
+   ([Prims.<], [Prims.compare]), not after the primitive. *)
+module Prims : sig
+  val ( < ) : int -> int -> bool
+
+  val compare : int -> int -> int
+end = struct
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external compare : int -> int -> int = "%compare"
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -345,4 +430,14 @@ let _ =
   ignore (Ordinals.siblings_and_nesting [ 1; -2; 3 ]);
   ignore (Ordinals.labelled_out_of_order 6);
   ignore (Lazy.force Ordinals.thunk);
-  ignore (Ordinals.lazy_then_lambda [ 7 ])
+  ignore (Ordinals.lazy_then_lambda [ 7 ]);
+  ignore (Partial.omit_first 1 ~a:2);
+  ignore (omit_first_qualified 3 ~a:4);
+  ignore (Partial.neg 5);
+  ignore (curried ~b:6);
+  ignore (second ~c:7);
+  ignore (render [ "a" ]);
+  ignore (use_app ());
+  ignore (pick true);
+  ignore (Prims.( < ) 1 2);
+  ignore (Prims.compare 1 2)
