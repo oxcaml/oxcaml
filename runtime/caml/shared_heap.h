@@ -23,6 +23,7 @@
 #include "roots.h"
 #include "domain.h"
 #include "misc.h"
+#include "gc.h" /* Make_header, for POOL_FREE_HEADER */
 #include "gc_stats.h"
 #include "major_gc.h"
 #include "sizeclasses.h"
@@ -129,6 +130,15 @@ Caml_inline status caml_allocation_status(void) {
     : caml_global_heap_state.UNMARKED;
 }
 
+/* Free blocks in pools are combined into runs (see shared_heap.c).  A
+   run's head block has this header; its size field holds the extent in
+   words of the additional blocks in the run (a multiple of the size
+   class), and its first field points to the next run (or NULL). */
+#define POOL_BLOCK_FREE_HD(hd) \
+  (Tag_hd(hd) == No_scan_tag && (Color_hd(hd) == NOT_MARKABLE))
+#define POOL_BLOCK_FREE_HP(p) (POOL_BLOCK_FREE_HD(Hd_hp(p)))
+#define POOL_FREE_HEADER(wosize) Make_header(wosize, No_scan_tag, NOT_MARKABLE)
+
 /* Notionally-opaque type to support fast inline allocation on a shared heap */
 
 typedef struct shared_heap_fast_data_s *shared_heap_fast_data_p;
@@ -175,7 +185,18 @@ Caml_inline void *caml_shared_fast_alloc (mlsize_t whsize,
   }
   value *block = *free_p;
   CAMLassert(block != NULL);
-  value *next = (value*)(block[1]);
+  CAMLassert(POOL_BLOCK_FREE_HP(block));
+  value *next;
+  mlsize_t run = Wosize_hp(block); /* words of free blocks following */
+  if (run > 0) {
+    /* Carve the head block off the run: the remainder becomes the new
+       head, inheriting the next-run pointer. */
+    next = block + whsize_sizeclass[sz];
+    *(header_t*)next = POOL_FREE_HEADER(run - whsize_sizeclass[sz]);
+    next[1] = block[1];
+  } else {
+    next = (value*)(block[1]);
+  }
   caml_prefetchw(next);
   caml_prefetchw(next+3); /* will coalesce, or prefetch the next cache line */
   *free_p = next;

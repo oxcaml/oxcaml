@@ -1,0 +1,17 @@
+{
+  header_t* p = POOL_FIRST_BLOCK(a, sz);
+  header_t* end = POOL_END(a);
+  mlsize_t wh = wsize_sizeclass[a->sz];
+
+  do {
+    header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
+    if (POOL_BLOCK_FREE_HD(hd)) {
+      p += wh * Wosize_hd(hd); /* skip contiguous free blocks */
+    } else {
+      // ... 
+    }
+    p += wh;
+  } while (p < end);
+  CAMLassert(end == p);
+
+}
