@@ -1,0 +1,5 @@
+domains placed: ok
+allocators ran: ok
+stw sections measured: ok
+barrier waits measured: ok
+stw accounting: ok

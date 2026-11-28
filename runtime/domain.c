@@ -1570,9 +1570,14 @@ static void global_barrier_wait(barrier_status sense, int num_participating)
   caml_plat_barrier_wait_sense(&stw_request.barrier, sense);
 }
 
+/* The EV_STW_GLOBAL_BARRIER span begins before arrival, as no domain
+   may write events between the last arrival and the flip: that is
+   where runtime_events itself is set up and torn down. */
+
 void caml_enter_global_barrier(int num_participating)
 {
   CAMLassert(num_participating == stw_request.num_domains);
+  CAML_EV_BEGIN(EV_STW_GLOBAL_BARRIER);
   barrier_status b = global_barrier_begin();
   barrier_status sense = b & BARRIER_SENSE_BIT;
   if (global_barrier_is_nth(b, num_participating)) {
@@ -1580,17 +1585,21 @@ void caml_enter_global_barrier(int num_participating)
   } else {
     global_barrier_wait(sense, num_participating);
   }
+  CAML_EV_END(EV_STW_GLOBAL_BARRIER);
 }
 
 barrier_status caml_global_barrier_and_check_final(int num_participating)
 {
   CAMLassert(num_participating == stw_request.num_domains);
+  CAML_EV_BEGIN(EV_STW_GLOBAL_BARRIER);
   barrier_status b = global_barrier_begin();
   if (global_barrier_is_nth(b, num_participating)) {
     CAMLassert(b); /* always nonzero */
+    CAML_EV_END(EV_STW_GLOBAL_BARRIER);
     return b;
   } else {
     global_barrier_wait(b & BARRIER_SENSE_BIT, num_participating);
+    CAML_EV_END(EV_STW_GLOBAL_BARRIER);
     return 0;
   }
 }

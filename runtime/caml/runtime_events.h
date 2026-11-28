@@ -126,6 +126,7 @@ typedef enum {
     EV_EMPTY_MINOR,
     EV_MINOR_EPHE_CLEAN,
     EV_MINOR_DEPENDENT,
+    EV_STW_GLOBAL_BARRIER,
 } ev_runtime_phase;
 
 typedef enum {

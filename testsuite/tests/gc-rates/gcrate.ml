@@ -1,170 +1,88 @@
 (* TEST
+ modules = "workloads.ml";
  include unix;
  include runtime_events;
  hasunix;
  no-tsan;
- native;
+ native-compiler;
+ setup-ocamlopt.opt-build-env;
+ ocamlopt.opt;
+ check-ocamlopt.opt-output;
+ {
+   run;
+   check-program-output;
+ }{
+   multicore;
+   arguments = "--self-test-domains";
+   output = "domains.output";
+   reference = "${test_source_directory}/gcrate.domains.reference";
+   run;
+   check-program-output;
+ }
 *)
 
 (* Measure the rates at which the major GC marks and sweeps, the minor GC
-   promotes, and the compactor compacts.
+   promotes, and the compactor compacts, and how the time domains spend
+   in stop-the-world sections divides between work and waiting.
 
    The measurement is taken entirely from OUTSIDE the measured process,
-   by watching its runtime-events ring: time comes from the EV_MAJOR_MARK,
-   EV_MAJOR_SWEEP, EV_MINOR and EV_COMPACT spans, and work from the
-   EV_C_MAJOR_SLICE_*_WORK and EV_C_MINOR_* counters.  Rates are
-   whole-run averages over the watched window.
+   by watching its runtime-events ring and accumulating phase spans and
+   counters.  All figures are whole-run totals over the watched window;
+   times are summed over domains ("domain-time").
 
    `gcrate CMD ARG...` is a wrapper in the style of time(1): it runs CMD
    with runtime events enabled, passes its exit status through, and
    reports on stderr.  `gcrate --watch PID` attaches to a process already
    running with OCAML_RUNTIME_EVENTS_START=1.
 
-   `gcrate --bench LIVE-GIB` watches a built-in workload, run in a forked
-   child, which builds a live heap of mixed structure, churns it, and
-   then compacts three times: at steady state (live data, garbage-laden
-   heap), immediately again (live data, compacted heap), and after
-   dropping the data (near-empty).  The child also prints its own
-   progress and Gc statistics.
+   `gcrate --bench LIVE-GIB` and `gcrate --domains A,S,I` watch the
+   synthetic workloads in workloads.ml, run in a forked child, which
+   also prints its own progress and statistics.
 
-   With no arguments (testsuite mode): the same workload with a small
-   heap for a few seconds, and terse output checking that the rates
-   clear generous de-minimis thresholds. *)
+   With no arguments (testsuite mode): the single-domain workload, small
+   and for a few seconds, with terse output checking that the
+   measurements clear generous de-minimis thresholds.
+   `gcrate --self-test-domains` does the same for the multi-domain
+   workload, which needs a runtime that can spawn domains. *)
 
 module RE = Runtime_events
 
-let usage =
-  {|usage: gcrate [--] CMD [ARG...]
-       gcrate --watch PID [--dir DIR] [--seconds SECONDS]
-       gcrate --bench LIVE-GIB [--seconds SECONDS] [--seed SEED]
-       gcrate
+let check = Workloads.check
+let secs = Workloads.secs
+let rate = Workloads.rate
 
-Estimates the rates at which the OCaml major GC marks and sweeps,
-the minor GC evacuates survivors, and the compactor compacts, from
-the runtime events of a watched process.
+(* The name of the program using this module, for messages. *)
+let me = Filename.remove_extension (Filename.basename Sys.executable_name)
 
-CMD [ARG...]
-    Run an OCaml program with runtime events enabled, like time(1):
-    the report goes to stderr and the exit status is CMD's.  Options
-    are only recognised before CMD; -- ends them explicitly.
---watch PID
-    Attach to process PID, which must have been started with
-    OCAML_RUNTIME_EVENTS_START=1, until it exits.
---bench LIVE-GIB
-    Run the built-in workload: build LIVE-GIB GiB of live
-    mixed-structure heap, churn it, then compact twice, drop the
-    roots, and compact once more.
---dir DIR
-    With --watch: the directory holding PID's ring file (default
-    $OCAML_RUNTIME_EVENTS_DIR, or the current directory).
---seconds SECONDS
-    With --watch: stop watching after SECONDS.  With --bench: churn
-    for SECONDS (default 300).
---seed SEED
-    With --bench: random seed (default 42).
--h, --help
-    Print this message.
+(* Where reports go: they must keep out of the way of a wrapped
+   command's output. *)
+let out = ref stdout
 
-With no arguments: self-test, as run from the testsuite - 32 MiB live
-heap, 3 s churn, terse pass/fail output against de-minimis rate
-thresholds.
-|}
-
-let usage_error msg =
-  Printf.eprintf "gcrate: %s (try --help)\n" msg;
-  exit 2
-
-type mode =
-  | Self_test
-  | Bench
-  | Watch of int
-  | Command of string list
-
-let opt_bench = ref None
-let opt_watch = ref None
-let opt_dir = ref None
-let opt_seconds = ref None
-let opt_seed = ref None
-
-(* Options stop at the first argument which is not one, so that the
-   wrapped command keeps its own. *)
-let mode =
-  let set r conv opt v =
-    match conv v with
-    | Some x -> r := Some x
-    | None -> usage_error (Printf.sprintf "bad argument %S to %s" v opt)
-  in
-  let rec parse = function
-    | [] -> []
-    | [ "--" ] -> usage_error "no command after --"
-    | "--" :: cmd -> cmd
-    | ("-h" | "--help") :: _ ->
-      print_string usage;
-      exit 0
-    | ("--bench" as o) :: v :: rest ->
-      set opt_bench float_of_string_opt o v; parse rest
-    | ("--watch" as o) :: v :: rest ->
-      set opt_watch int_of_string_opt o v; parse rest
-    | "--dir" :: v :: rest -> opt_dir := Some v; parse rest
-    | ("--seconds" as o) :: v :: rest ->
-      set opt_seconds float_of_string_opt o v; parse rest
-    | ("--seed" as o) :: v :: rest ->
-      set opt_seed int_of_string_opt o v; parse rest
-    | [ ("--bench" | "--watch" | "--dir" | "--seconds" | "--seed") as o ] ->
-      usage_error (o ^ " needs an argument")
-    | o :: _ when String.starts_with ~prefix:"-" o ->
-      usage_error ("unknown option " ^ o)
-    | cmd -> cmd
-  in
-  let cmd = parse (List.tl (Array.to_list Sys.argv)) in
-  let mode =
-    match cmd, !opt_bench, !opt_watch with
-    | [], None, None -> Self_test
-    | [], Some _, None -> Bench
-    | [], None, Some pid -> Watch pid
-    | _ :: _, None, None -> Command cmd
-    | _ -> usage_error "give only one of CMD, --watch and --bench"
-  in
-  let only opt given ok =
-    if given && not ok then
-      usage_error (opt ^ " does not apply here")
-  in
-  let is_watch = match mode with Watch _ -> true | _ -> false in
-  only "--dir" (!opt_dir <> None) is_watch;
-  only "--seconds" (!opt_seconds <> None) (is_watch || mode = Bench);
-  only "--seed" (!opt_seed <> None) (mode = Bench);
-  mode
-
-let manual = mode <> Self_test
-
-(* The report shares stdout with the built-in workload, but must keep out
-   of the way of a wrapped command's output. *)
-let out = match mode with Command _ -> stderr | _ -> stdout
-
-let live_gib = Option.value !opt_bench ~default:0.03125 (* self-test: 32 MiB *)
-let duration =
-  Option.value !opt_seconds ~default:(if manual then 300.0 else 3.0)
-let seed = Option.value !opt_seed ~default:42
-
-let target_words = int_of_float (live_gib *. (1024. *. 1024. *. 1024. /. 8.))
-let slot_words = 2000
-let nslots = max 64 (target_words / slot_words)
+(* System load (1/5/15 min), for judging interference from other work on
+   the machine.  Linux-only; reports "n/a" elsewhere. *)
+let loadavg () =
+  match open_in "/proc/loadavg" with
+  | exception Sys_error _ -> "n/a"
+  | ic ->
+    let line = try input_line ic with End_of_file -> "" in
+    close_in ic;
+    (match String.split_on_char ' ' line with
+     | a :: b :: c :: _ -> Printf.sprintf "%s/%s/%s" a b c
+     | _ -> "n/a")
 
 (* De-minimis thresholds for testsuite mode, 20-40x below rates measured on
    an idle x86-64 dev box in 2026 (mark ~200 Mwords/s, sweep ~1600 Mwords/s,
    roughly independent of heap size): only catastrophic regressions or broken
    measurement plumbing should fail.  Debug/instrumented runtimes are slower
    still. *)
-let variant_factor =
-  match Sys.runtime_variant () with "" -> 1.0 | _ -> 0.1
-
-let min_mark_rate = 10e6 *. variant_factor
-let min_sweep_rate = 40e6 *. variant_factor
-let min_compact_rate = 2e6 *. variant_factor (* live words / compact time *)
-let min_promote_rate = 2e6 *. variant_factor (* promoted words / minor time *)
+let min_mark_rate = 10e6 *. Workloads.variant_factor
+let min_sweep_rate = 40e6 *. Workloads.variant_factor
+(* promoted words / minor time *)
+let min_promote_rate = 2e6 *. Workloads.variant_factor
 
 (* ---------------- runtime-events consumption ---------------- *)
 
+(* Span counts and durations, summed over all domains. *)
 let phase_total : (RE.runtime_phase, int ref * int ref) Hashtbl.t =
   Hashtbl.create 64
 
@@ -195,17 +113,203 @@ let tally tbl key v =
   incr count;
   total := !total + v
 
+let span phase =
+  match Hashtbl.find_opt phase_total phase with
+  | Some (c, ns) -> (!c, !ns)
+  | None -> (0, 0)
+
+let counter_tally ?(tbl = counter_total) c =
+  match Hashtbl.find_opt tbl c with
+  | Some (n, t) -> (!n, !t)
+  | None -> (0, 0)
+
+(* ---------------- domain lifetimes ---------------- *)
+
+(* Total domain-time: how long each domain existed within the watched
+   window, summed over domains, as a yardstick for the other domain-times.
+   A domain is taken to exist from the first event seen on its ring until
+   its EV_DOMAIN_TERMINATE, or else the last event seen on any ring; a
+   blocked domain still exists. *)
+let domain_since : (int, int) Hashtbl.t = Hashtbl.create 64
+
+(* Rings whose domain has terminated. A few events can follow the
+   termination, so only a spawn brings such a ring back to life. *)
+let domain_gone : (int, unit) Hashtbl.t = Hashtbl.create 64
+let domains_seen = ref 0
+let domains_ended_ns = ref 0
+let last_ns = ref 0
+
+let domain_seen ?(spawned = false) ring ns =
+  if ns > !last_ns then last_ns := ns;
+  if spawned then Hashtbl.remove domain_gone ring;
+  if not (Hashtbl.mem domain_since ring || Hashtbl.mem domain_gone ring)
+  then begin
+    Hashtbl.add domain_since ring ns;
+    incr domains_seen
+  end
+
+let domain_ended ring ns =
+  match Hashtbl.find_opt domain_since ring with
+  | None -> ()
+  | Some t0 ->
+    Hashtbl.remove domain_since ring;
+    Hashtbl.replace domain_gone ring ();
+    domains_ended_ns := !domains_ended_ns + (ns - t0)
+
+let total_domain_ns () =
+  Hashtbl.fold (fun _ t0 acc -> acc + (!last_ns - t0)) domain_since
+    !domains_ended_ns
+
+(* ---------------- stop-the-world accounting ---------------- *)
+
+(* What a stop-the-world section was for, judged from the spans a domain
+   opens inside it.  A major-cycle section embeds a minor collection and
+   may embed a compaction, so the constructors are in increasing order
+   of precedence.  A forced major cycle (Gc.full_major, Gc.compact) does
+   all the cycle's remaining marking and sweeping inside its section,
+   where a natural cycle only ends there. *)
+type cause =
+  | Other | Minor | Phase_change | Major_cycle | Forced_major | Compact
+
+let cause_name = function
+  | Other -> "other"
+  | Minor -> "minor"
+  | Phase_change -> "phase-change"
+  | Major_cycle -> "major-cycle"
+  | Forced_major -> "forced-major"
+  | Compact -> "compact"
+
+let causes =
+  [ Minor; Phase_change; Major_cycle; Forced_major; Compact; Other ]
+
+(* One domain's passage through one section. *)
+type passage =
+  { mutable inside : bool;
+    mutable leader : bool;
+    mutable cause : cause;
+    mutable waits_open : int;
+    mutable entry : int; (* EV_STW_API_BARRIER *)
+    mutable barrier : int; (* EV_STW_GLOBAL_BARRIER *)
+    mutable leave : int; (* EV_MINOR_LEAVE_BARRIER *)
+    mutable opportunistic : int (* major GC work done while waiting *)
+  }
+
+(* Domain-time totals, in ns, for one (class, cause). *)
+type row =
+  { mutable sections : int; (* counted by their leaders *)
+    mutable passages : int;
+    mutable total : int;
+    mutable r_entry : int;
+    mutable r_barrier : int;
+    mutable r_leave : int;
+    mutable r_opportunistic : int
+  }
+
+let new_row () =
+  { sections = 0; passages = 0; total = 0; r_entry = 0; r_barrier = 0;
+    r_leave = 0; r_opportunistic = 0 }
+
+let passages : (int, passage) Hashtbl.t = Hashtbl.create 64
+let rows : (string * cause, row) Hashtbl.t = Hashtbl.create 64
+
+(* Maps a ring (domain index) to a workload-defined class of domain. *)
+let class_of_ring = ref (fun (_ : int) -> "all")
+
+let passage ring =
+  match Hashtbl.find_opt passages ring with
+  | Some p -> p
+  | None ->
+    let p =
+      { inside = false; leader = false; cause = Other; waits_open = 0;
+        entry = 0; barrier = 0; leave = 0; opportunistic = 0 }
+    in
+    Hashtbl.add passages ring p;
+    p
+
+let row cls cause =
+  match Hashtbl.find_opt rows (cls, cause) with
+  | Some r -> r
+  | None ->
+    let r = new_row () in
+    Hashtbl.add rows (cls, cause) r;
+    r
+
+let is_section : RE.runtime_phase -> bool = function
+  | EV_STW_LEADER | EV_STW_HANDLER -> true
+  | _ -> false
+
+let is_wait : RE.runtime_phase -> bool = function
+  | EV_STW_API_BARRIER | EV_STW_GLOBAL_BARRIER | EV_MINOR_LEAVE_BARRIER -> true
+  | _ -> false
+
+let stw_begin ring (phase : RE.runtime_phase) =
+  let p = passage ring in
+  if is_section phase then begin
+    p.inside <- true;
+    p.leader <- (phase = EV_STW_LEADER);
+    p.cause <- Other;
+    p.waits_open <- 0;
+    p.entry <- 0;
+    p.barrier <- 0;
+    p.leave <- 0;
+    p.opportunistic <- 0
+  end
+  else if p.inside then begin
+    if is_wait phase then p.waits_open <- p.waits_open + 1;
+    let cause =
+      match phase with
+      | EV_MINOR -> Minor
+      | EV_MAJOR_GC_PHASE_CHANGE -> Phase_change
+      | EV_MAJOR_GC_STW -> Major_cycle
+      | EV_MAJOR_FINISH_CYCLE -> Forced_major
+      | EV_COMPACT -> Compact
+      | _ -> Other
+    in
+    p.cause <- max p.cause cause
+  end
+
+let stw_end ring (phase : RE.runtime_phase) ns =
+  let p = passage ring in
+  if p.inside then begin
+    if is_wait phase then p.waits_open <- max 0 (p.waits_open - 1);
+    match phase with
+    | EV_STW_API_BARRIER -> p.entry <- p.entry + ns
+    | EV_STW_GLOBAL_BARRIER -> p.barrier <- p.barrier + ns
+    | EV_MINOR_LEAVE_BARRIER -> p.leave <- p.leave + ns
+    | EV_MAJOR_MARK_OPPORTUNISTIC when p.waits_open > 0 ->
+      p.opportunistic <- p.opportunistic + ns
+    | EV_STW_LEADER | EV_STW_HANDLER ->
+      p.inside <- false;
+      let r = row (!class_of_ring ring) p.cause in
+      if p.leader then r.sections <- r.sections + 1;
+      r.passages <- r.passages + 1;
+      r.total <- r.total + ns;
+      r.r_entry <- r.r_entry + p.entry;
+      r.r_barrier <- r.r_barrier + p.barrier;
+      r.r_leave <- r.r_leave + p.leave;
+      r.r_opportunistic <- r.r_opportunistic + p.opportunistic
+    | _ -> ()
+  end
+
+(* ---------------- callbacks and watcher ---------------- *)
+
 let runtime_begin ring ts phase =
-  Hashtbl.replace phase_open (ring, phase) (ns_of ts)
+  domain_seen ring (ns_of ts);
+  Hashtbl.replace phase_open (ring, phase) (ns_of ts);
+  stw_begin ring phase
 
 let runtime_end ring ts phase =
+  domain_seen ring (ns_of ts);
   match Hashtbl.find_opt phase_open (ring, phase) with
   | None -> () (* span began before we started consuming *)
   | Some t0 ->
     Hashtbl.remove phase_open (ring, phase);
-    tally phase_total phase (ns_of ts - t0)
+    let ns = ns_of ts - t0 in
+    tally phase_total phase ns;
+    stw_end ring phase ns
 
-let runtime_counter ring _ts counter v =
+let runtime_counter ring ts counter v =
+  domain_seen ring (ns_of ts);
   let tbl =
     if Hashtbl.mem phase_open (ring, RE.EV_MAJOR_MARK_OPPORTUNISTIC)
     then opportunistic_total
@@ -213,11 +317,16 @@ let runtime_counter ring _ts counter v =
   in
   tally tbl counter v
 
+let lifecycle ring ts (event : RE.lifecycle) _data =
+  let ns = ns_of ts in
+  domain_seen ~spawned:(event = EV_DOMAIN_SPAWN) ring ns;
+  if event = EV_DOMAIN_TERMINATE then domain_ended ring ns
+
 let lost_events _ring n = lost_total := !lost_total + n
 
 let callbacks =
   RE.Callbacks.create ~runtime_begin ~runtime_end ~runtime_counter
-    ~lost_events ()
+    ~lifecycle ~lost_events ()
 
 let cursor = ref None
 
@@ -225,343 +334,6 @@ let poll () =
   match !cursor with
   | None -> ()
   | Some c -> ignore (RE.read_poll c callbacks None)
-
-let span phase =
-  match Hashtbl.find_opt phase_total phase with
-  | Some (c, ns) -> (!c, !ns)
-  | None -> (0, 0)
-
-(* ---------------- representative heap ---------------- *)
-
-(* Shared immortal strings, like interned symbols/atoms. *)
-let interned =
-  let st = Random.State.make [| 0xbeef |] in
-  Array.init 4096 (fun _ ->
-      String.init
-        (8 + Random.State.int st 24)
-        (fun _ -> Char.chr (97 + Random.State.int st 26)))
-
-type node =
-  | Leaf
-  | Str of string
-  | Floats of floatarray
-  | Ints of int array
-  | Cons of node * node
-  | Pair of node * node
-  | Rec of record
-
-and record =
-  { id : int;
-    name : string;
-    mutable hits : int;
-    mutable score : float; (* boxed *)
-    kids : node array
-  }
-
-(* Builders track an approximate word budget so a "slot" lands near
-   [slot_words] total. *)
-type builder =
-  { rng : Random.State.t;
-    mutable budget : int
-  }
-
-let charge b w = b.budget <- b.budget - w
-
-(* Uniform in [1, 2*mean-1]; mean is [mean]. *)
-let rand_len b mean = 1 + Random.State.int b.rng ((2 * mean) - 1)
-
-let pick_interned b =
-  interned.(Random.State.int b.rng (Array.length interned))
-
-(* Smart constructors: each charges the builder for the words it
-   allocates (header included) as it constructs.  [build_leaf]
-   allocates nothing but still charges a word, so that budgets always
-   make progress; [build_interned] shares an existing string and
-   charges nothing. *)
-
-let build_leaf b = charge b 1; Leaf
-
-let build_interned b = Str (pick_interned b)
-
-let build_cons b x xs = charge b 3; Cons (x, xs)
-
-let build_pair b x y = charge b 3; Pair (x, y)
-
-let build_string b =
-  let len = rand_len b 40 in
-  charge b (2 + (len / 8));
-  Str (String.make len (Char.chr (97 + Random.State.int b.rng 26)))
-
-let build_floats b =
-  let len = rand_len b 24 in
-  charge b (1 + len);
-  Floats (Float.Array.init len (fun i -> float_of_int i *. 1.5))
-
-let build_ints b =
-  let len = rand_len b 16 in
-  charge b (1 + len);
-  Ints (Array.init len (fun i -> i * 7))
-
-let build_rec b ~id ~name ~score ~kids =
-  charge b (6 + 2 + 1 + Array.length kids)
-    (* record + boxed float + kids array *);
-  Rec { id; name; hits = 0; score; kids }
-
-let rec build b depth =
-  if b.budget <= 0 || depth > 14 then build_leaf b
-  else
-    match Random.State.int b.rng 100 with
-    | n when n < 25 ->
-      (* a run of list cells holding small elements *)
-      let len = rand_len b 24 in
-      let tail = ref Leaf in
-      for _ = 1 to len do
-        let elt =
-          match Random.State.int b.rng 10 with
-          | 0 | 1 | 2 | 3 -> build_interned b
-          | 4 -> build_string b
-          | 5 -> build_pair b Leaf Leaf
-          | _ -> Leaf
-        in
-        tail := build_cons b elt !tail
-      done;
-      !tail
-    | n when n < 40 -> build_string b
-    | n when n < 50 -> build_floats b
-    | n when n < 57 -> build_ints b
-    | n when n < 87 ->
-      let nkids = 1 + Random.State.int b.rng 7 in
-      build_rec b
-        ~id:(Random.State.int b.rng 1000000)
-        ~name:(pick_interned b)
-        ~score:(Random.State.float b.rng 1.0)
-        ~kids:(Array.init nkids (fun _ -> build b (depth + 1)))
-    | _ ->
-      build_pair b (build b (depth + 1)) (build b (depth + 1))
-
-let build_slot rng budget =
-  let b = { rng; budget } in
-  let acc = ref Leaf in
-  while b.budget > 0 do
-    acc := build_cons b (build b 0) !acc
-  done;
-  !acc
-
-let rec first_record node depth =
-  if depth > 8 then None
-  else
-    match node with
-    | Rec r -> Some r
-    | Cons (a, b) | Pair (a, b) -> (
-      match first_record a (depth + 1) with
-      | Some _ as s -> s
-      | None -> first_record b (depth + 1))
-    | Leaf | Str _ | Floats _ | Ints _ -> None
-
-(* Shallow walk: consumes freshly built ephemeral data so it can't be
-   optimized away, and touches it like a real mutator would. *)
-let rec checksum node depth acc =
-  if depth > 4 then acc
-  else
-    match node with
-    | Leaf -> acc + 1
-    | Str s -> acc + String.length s
-    | Floats f -> acc + Float.Array.length f
-    | Ints a -> acc + Array.length a
-    | Cons (a, b) | Pair (a, b) ->
-      checksum b (depth + 1) (checksum a (depth + 1) acc)
-    | Rec r -> acc + r.id
-
-(* System load (1/5/15 min), for judging interference from other work on
-   the machine.  Linux-only; reports "n/a" elsewhere. *)
-let loadavg () =
-  match open_in "/proc/loadavg" with
-  | exception Sys_error _ -> "n/a"
-  | ic ->
-    let line = try input_line ic with End_of_file -> "" in
-    close_in ic;
-    (match String.split_on_char ' ' line with
-     | a :: b :: c :: _ -> Printf.sprintf "%s/%s/%s" a b c
-     | _ -> "n/a")
-
-(* Disable auto-compaction: Gc.full_major runs its last cycle with
-   Compaction_auto, which fires once the roots are dropped and would compact
-   the heap before the measured Gc.compact sees it. *)
-let () = Gc.set { (Gc.get ()) with Gc.max_overhead = 1000000 }
-
-(* ---------------- reporting ---------------- *)
-
-let secs ns = float_of_int ns /. 1e9
-let rate words ns = if ns = 0 then 0.0 else float_of_int words /. secs ns
-
-let report_stat prefix (s : Gc.stat) =
-  Printf.printf
-    "META %s: minor_words=%.0f promoted_words=%.0f major_words=%.0f \
-     minor_collections=%d major_collections=%d heap_words=%d \
-     top_heap_words=%d compactions=%d forced_major_collections=%d\n"
-    prefix s.minor_words s.promoted_words s.major_words s.minor_collections
-    s.major_collections s.heap_words s.top_heap_words s.compactions
-    s.forced_major_collections
-
-let report_rate what words ns =
-  Printf.fprintf out
-    "%-8s %16d words in %9.3f s -> %7.1f Mwords/s (%.2f GiB/s)\n"
-    what words (secs ns)
-    (rate words ns /. 1e6)
-    (rate words ns *. 8. /. (1024. *. 1024. *. 1024.))
-
-(* Compaction measurement.  [mapped_before] estimates the mapped heap
-   extent: sweeping parks fully-empty pools on an OS freelist that
-   heap_words no longer counts, so we carry forward the previous
-   compaction's heap_after (pools mapped then stay mapped until a
-   compaction releases them). *)
-type compaction =
-  { clabel : string;
-    live_before : int;
-    heap_before : int;
-    heap_after : int;
-    runs : int; (* Gc.stat compactions delta: 1 if it really ran *)
-    wall : float
-  }
-
-(* Compaction timing on the workload side is wall-clock: compaction is
-   a stop-the-world phase, so this matches the EV_COMPACT span that the
-   watcher sees, without needing event access from inside. *)
-let measure_compaction clabel =
-  if manual then Printf.printf "# compacting (%s)\n%!" clabel;
-  Gc.full_major ();
-  let b = Gc.quick_stat () in
-  let t0 = Unix.gettimeofday () in
-  Gc.compact ();
-  let t1 = Unix.gettimeofday () in
-  let a = Gc.quick_stat () in
-  { clabel;
-    live_before = b.live_words;
-    heap_before = b.heap_words;
-    heap_after = a.heap_words;
-    runs = a.compactions - b.compactions;
-    wall = t1 -. t0
-  }
-
-let report_compaction c =
-  Printf.printf
-    "META compaction %s: live_before=%d heap_before=%d heap_after=%d \
-     runs=%d wall=%.3f\n"
-    c.clabel c.live_before c.heap_before c.heap_after c.runs c.wall
-
-let check name ok detail =
-  if ok then Printf.printf "%s: ok\n" name
-  else Printf.printf "%s: FAIL (%s)\n" name detail
-
-(* ---------------- workload: the watched child ---------------- *)
-
-let run_workload () =
-  let rng = Random.State.make [| seed |] in
-  if manual then
-    Printf.printf "# building %.3f GiB live: %d slots of ~%d words\n%!"
-      live_gib nslots slot_words;
-  let t0 = Unix.gettimeofday () in
-  let slots = Array.make nslots Leaf in
-  let recs = Array.make nslots None in
-  let tick = max 1 (nslots / 10) in
-  for i = 0 to nslots - 1 do
-    let s = build_slot rng slot_words in
-    slots.(i) <- s;
-    recs.(i) <- first_record s 0;
-    if i mod tick = 0 then begin
-      if manual && i / tick < 10 then
-        Printf.printf "# build %d%%\n%!" (i / tick * 10)
-    end
-  done;
-  if manual then
-    Printf.printf "# build done in %.1f s\n%!" (Unix.gettimeofday () -. t0);
-  Gc.full_major ();
-  Gc.full_major ();
-  let stat0 = Gc.quick_stat () in
-  let wall0 = Unix.gettimeofday () in
-  let cpu0 = Sys.time () in
-  let iters = ref 0 in
-  let sink = ref 0 in
-  let deadline = wall0 +. duration in
-  let next_decade = ref 1 in
-  if manual then
-    Printf.printf "# churn 0%% (heap %d Mwords)\n%!"
-      ((Gc.quick_stat ()).heap_words / 1048576);
-  (try
-     while true do
-       incr iters;
-       (* replace one slot: ~slot_words of allocation that survives *)
-       let i = Random.State.int rng nslots in
-       let s = build_slot rng slot_words in
-       slots.(i) <- s;
-       recs.(i) <- first_record s 0;
-       (* ~4x that in short-lived garbage *)
-       for _ = 1 to 4 do
-         sink := checksum (build_slot rng slot_words) 0 !sink
-       done;
-       (* mutation traffic on old records *)
-       for _ = 1 to 8 do
-         match recs.(Random.State.int rng nslots) with
-         | None -> ()
-         | Some r ->
-           r.hits <- r.hits + 1;
-           r.score <- r.score +. 0.5
-       done;
-       if !iters land 255 = 0 then begin
-         let now = Unix.gettimeofday () in
-         if now > deadline then raise Exit;
-         if manual && !next_decade <= 9
-            && now >= wall0 +. (duration *. float_of_int !next_decade /. 10.)
-         then begin
-           Printf.printf "# churn %d%% (heap %d Mwords)\n%!"
-             (!next_decade * 10)
-             ((Gc.quick_stat ()).heap_words / 1048576);
-           incr next_decade
-         end
-       end
-     done
-   with Exit -> ());
-  let wall1 = Unix.gettimeofday () in
-  let cpu1 = Sys.time () in
-  let stat1 = Gc.quick_stat () in
-  let c1 = measure_compaction "steady" in
-  let c2 = measure_compaction "compacted" in
-  Array.fill slots 0 nslots Leaf;
-  Array.fill recs 0 nslots None;
-  let c3 = measure_compaction "emptied" in
-  if manual then begin
-    Printf.printf
-      "META config: live_gib=%.3f duration=%.1f seed=%d slots=%d \
-       slot_words=%d minor_heap_size=%d space_overhead=%d\n"
-      live_gib duration seed nslots slot_words (Gc.get ()).minor_heap_size
-      (Gc.get ()).space_overhead;
-    Printf.printf "META churn: wall=%.3f cpu=%.3f iters=%d sink=%d\n"
-      (wall1 -. wall0) (cpu1 -. cpu0) !iters !sink;
-    report_stat "stat0" stat0;
-    report_stat "stat1" stat1;
-    report_compaction c1;
-    report_compaction c2;
-    report_compaction c3
-  end
-  else begin
-    check "heap built" (stat1.heap_words >= target_words)
-      (Printf.sprintf "heap_words=%d < target=%d" stat1.heap_words
-         target_words);
-    check "compaction runs"
-      (c1.runs = 1 && c2.runs = 1 && c3.runs = 1
-       && c1.heap_after < c1.heap_before
-       && c3.live_before * 4 < c1.live_before)
-      (Printf.sprintf "runs=%d,%d,%d heap=%d->%d live=%d->%d" c1.runs c2.runs
-         c3.runs c1.heap_before c1.heap_after c1.live_before c3.live_before);
-    check "compaction rate"
-      (rate c1.live_before (int_of_float (c1.wall *. 1e9))
-       >= min_compact_rate)
-      (Printf.sprintf "%.1f Mwords/s < %.1f"
-         (rate c1.live_before (int_of_float (c1.wall *. 1e9)) /. 1e6)
-         (min_compact_rate /. 1e6))
-  end
-
-(* ---------------- watcher ---------------- *)
 
 (* Attach to the ring of [pid] under [dir] and poll it until
    [still_running] turns false, then drain.  Returns false if there was
@@ -608,16 +380,21 @@ let watch_target dir pid ~still_running =
 
 let no_ring dir pid =
   Printf.eprintf
-    "gcrate: no runtime-events ring for process %d in %s (not an OCaml 5 \
+    "%s: no runtime-events ring for process %d in %s (not an OCaml 5 \
      program?)\n"
-    pid dir
+    me pid dir
 
-let report_watch ~test =
-  let counter_tally ?(tbl = counter_total) c =
-    match Hashtbl.find_opt tbl c with
-    | Some (n, t) -> (!n, !t)
-    | None -> (0, 0)
-  in
+(* ---------------- GC rate report ---------------- *)
+
+(* One row of the table of rates. *)
+let report_rate what words ns =
+  Printf.fprintf !out "%-13s %16d %9.3f %9.1f %8.2f\n"
+    what words (secs ns)
+    (rate words ns /. 1e6)
+    (rate words ns *. 8. /. (1024. *. 1024. *. 1024.))
+
+(* [compactions] is the number of compactions the workload runs. *)
+let report_gc ~test ~compactions =
   let _, sweep_work = counter_tally RE.EV_C_MAJOR_SLICE_SWEEP_WORK in
   let _, mark_work = counter_tally RE.EV_C_MAJOR_SLICE_MARK_WORK in
   let _, ephe_mark_work =
@@ -665,28 +442,32 @@ let report_watch ~test =
       (rate promoted minor_ns >= min_promote_rate)
       (Printf.sprintf "%.1f Mwords/s < %.1f"
          (rate promoted minor_ns /. 1e6) (min_promote_rate /. 1e6));
-    check "compactions seen" (compact_spans = 3)
+    check "compactions seen" (compact_spans = compactions)
       (Printf.sprintf "compact_spans=%d" compact_spans)
   end
   else begin
-    Printf.fprintf out "\nwatched: slices=%d ephe_mark=%d ephe_sweep=%d \
+    Printf.fprintf !out "\nwatched: slices=%d ephe_mark=%d ephe_sweep=%d \
                         lost_events=%d\n"
       slices ephe_mark_work ephe_sweep_work !lost_total;
-    Printf.fprintf out
+    Printf.fprintf !out
       "work cross-check: per-phase sum %d vs work_done %d\n"
       phase_work ev_total;
-    (* Opportunistic work is in neither rate below: its span is not
+    Printf.fprintf !out "%-13s %16s %9s %9s %8s\n"
+      "" "words" "seconds" "Mwords/s" "GiB/s";
+    report_rate "sweep" sweep_work sweep_ns;
+    report_rate "mark" mark_work mark_ns;
+    report_rate "promotion" promoted minor_ns;
+    (* Opportunistic work is in neither rate above: its span is not
        divided between sweeping and marking. *)
-    let opp counter = snd (counter_tally ~tbl:opportunistic_total counter) in
+    let opp tbl_counter = snd (counter_tally ~tbl:opportunistic_total
+                                 tbl_counter) in
     let opp_spans, opp_ns = span RE.EV_MAJOR_MARK_OPPORTUNISTIC in
-    Printf.fprintf out
+    Printf.fprintf !out
       "opportunistic: %d sweep + %d mark words (work_done %d) in %d spans, \
        %.3f s\n"
       (opp RE.EV_C_MAJOR_SLICE_SWEEP_WORK) (opp RE.EV_C_MAJOR_SLICE_MARK_WORK)
       (opp RE.EV_C_MAJOR_SLICE_WORK_DONE) opp_spans (secs opp_ns);
-    report_rate "sweep" sweep_work sweep_ns;
-    report_rate "mark" mark_work mark_ns;
-    Printf.fprintf out
+    Printf.fprintf !out
       "minor: %d collections in %.3f s (mean pause %.0f us), %d words \
        allocated, %d promoted (%.1f%% survival)\n"
       minor_colls (secs minor_ns)
@@ -695,21 +476,186 @@ let report_watch ~test =
       minor_allocated promoted
       (if minor_allocated = 0 then 0.
        else 100. *. float_of_int promoted /. float_of_int minor_allocated);
-    report_rate "promotion (minor live evacuation)" promoted minor_ns;
-    Printf.fprintf out "compaction: %d runs in %.3f s total\n"
+    Printf.fprintf !out "compaction: %d runs in %.3f s total\n"
       compact_spans (secs compact_ns);
     if mark_work > 0 && mark_ns > 0 && sweep_ns > 0 then
-      Printf.fprintf out
+      Printf.fprintf !out
         "sweep/mark rate ratio: %.2f (runtime assumes \
          percent_sweep_per_mark=120, i.e. 1.20)\n"
         (rate sweep_work sweep_ns /. rate mark_work mark_ns)
   end
 
-(* ---------------- wrapper ---------------- *)
+(* ---------------- stop-the-world report ---------------- *)
 
-(* Run [cmd] with runtime events enabled, watch it, report, and exit with
-   its status. *)
-let run_command cmd =
+let sum_rows keep =
+  let acc = new_row () in
+  Hashtbl.iter
+    (fun key r ->
+       if keep key then begin
+         acc.sections <- acc.sections + r.sections;
+         acc.passages <- acc.passages + r.passages;
+         acc.total <- acc.total + r.total;
+         acc.r_entry <- acc.r_entry + r.r_entry;
+         acc.r_barrier <- acc.r_barrier + r.r_barrier;
+         acc.r_leave <- acc.r_leave + r.r_leave;
+         acc.r_opportunistic <- acc.r_opportunistic + r.r_opportunistic
+       end)
+    rows;
+  acc
+
+let waits r = r.r_entry + r.r_barrier + r.r_leave
+
+(* Time spent waiting and not doing opportunistic major GC work. *)
+let idle r = max 0 (waits r - r.r_opportunistic)
+
+(* With a single domain there is no waiting to report. *)
+let print_row ~single label r =
+  if r.passages = 0 then ()
+  else if single then
+    Printf.fprintf !out "%-13s %8d %9.3f\n" label r.sections (secs r.total)
+  else
+    Printf.fprintf !out
+      "%-13s %8d %9d %9.3f %9.3f %9.3f %9.3f %9.3f %9.3f %6.1f%%\n"
+      label r.sections r.passages (secs r.total) (secs r.r_entry)
+      (secs r.r_barrier) (secs r.r_leave) (secs r.r_opportunistic)
+      (secs (r.total - waits r))
+      (100. *. float_of_int (idle r) /. float_of_int (max 1 r.total))
+
+(* [classes] lists the classes of domain the workload runs. *)
+let report_stw ~test ~classes =
+  let all = sum_rows (fun _ -> true) in
+  if test then begin
+    let minor = sum_rows (fun (_, cause) -> cause = Minor) in
+    let missing =
+      List.filter
+        (fun cls -> (sum_rows (fun (c, _) -> c = cls)).passages = 0)
+        classes
+    in
+    check "stw sections measured"
+      (minor.sections >= 10 && missing = [])
+      (Printf.sprintf "minor sections=%d, classes not seen: %s" minor.sections
+         (String.concat "," missing));
+    let api, _ = span RE.EV_STW_API_BARRIER in
+    let global, _ = span RE.EV_STW_GLOBAL_BARRIER in
+    let leave, _ = span RE.EV_MINOR_LEAVE_BARRIER in
+    check "barrier waits measured" (api > 0 && global > 0 && leave > 0)
+      (Printf.sprintf "api=%d global=%d leave=%d" api global leave);
+    check "stw accounting" (all.total > 0 && waits all <= all.total)
+      (Printf.sprintf "total=%d waits=%d" all.total (waits all))
+  end
+  else begin
+    let single = !domains_seen <= 1 in
+    let print_row = print_row ~single in
+    if single then
+      Printf.fprintf !out
+        "\nStop-the-world sections: time in seconds (lost_events=%d)\n\
+         %-13s %8s %9s\n"
+        !lost_total "" "sections" "total"
+    else
+      Printf.fprintf !out
+        "\nStop-the-world sections: domain-time in seconds \
+         (lost_events=%d)\n\
+         %-13s %8s %9s %9s %9s %9s %9s %9s %9s %7s\n"
+        !lost_total "" "sections" "passages" "total" "entry" "barrier"
+        "leave" "opport." "work" "idle";
+    List.iter
+      (fun cause ->
+         print_row (cause_name cause) (sum_rows (fun (_, c) -> c = cause)))
+      causes;
+    print_row "total" all;
+    if List.length classes > 1 then begin
+      Printf.fprintf !out "by class of domain:\n";
+      List.iter
+        (fun cls -> print_row cls (sum_rows (fun (c, _) -> c = cls)))
+        classes
+    end;
+    let domain_ns = total_domain_ns () in
+    let percent ns =
+      100. *. float_of_int ns /. float_of_int (max 1 domain_ns) in
+    if single then
+      Printf.fprintf !out "total time %.3f s: %.1f%% in sections\n"
+        (secs domain_ns) (percent all.total)
+    else begin
+      Printf.fprintf !out
+        "total domain-time %.3f s over %d domains: %.1f%% in sections, \
+         %.1f%% idle in them\n"
+        (secs domain_ns) !domains_seen (percent all.total)
+        (percent (idle all));
+      Printf.fprintf !out
+        "entry: waiting to enter a section; barrier: at a barrier inside \
+         one; leave: leaving a minor GC.\n\
+         opport.: major GC work done while waiting, included in the wait \
+         times. work = total - waits.\n\
+         idle%% = (waits - opport.) / total\n"
+    end
+  end
+
+(* ---------------- running ---------------- *)
+
+(* Fork [workload] as a child with runtime events enabled, watch it until
+   it exits, then call [report]. *)
+let run ~manual ~workload ~report =
+  let load0 = loadavg () in
+  (* The child must not inherit buffered output. *)
+  flush stdout;
+  flush stderr;
+  match Unix.fork () with
+  | 0 ->
+    (* Keep the ring file after exit so the watcher can drain it. *)
+    Unix.putenv "OCAML_RUNTIME_EVENTS_PRESERVE" "1";
+    RE.start ();
+    workload ();
+    exit 0
+  | child ->
+    let finished = ref false in
+    let still_running () =
+      !finished = false
+      && (match Unix.waitpid [ Unix.WNOHANG ] child with
+          | 0, _ -> true
+          | _ -> finished := true; false)
+    in
+    let attached = watch_target "." child ~still_running in
+    if not !finished then ignore (Unix.waitpid [] child);
+    (try Sys.remove (string_of_int child ^ ".events")
+     with Sys_error _ -> ());
+    if not attached then begin
+      no_ring "." child;
+      exit 1
+    end;
+    if manual then
+      Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
+    report ()
+
+(* Attach to process [pid], which must have been started with
+   OCAML_RUNTIME_EVENTS_START=1 and have its ring in [dir], until it
+   exits or [seconds] have passed, then call [report]. *)
+let watch_pid pid ~dir ~seconds ~report =
+  let deadline =
+    match seconds with
+    | Some secs -> Unix.gettimeofday () +. secs
+    | None -> infinity
+  in
+  let alive () =
+    match Unix.kill pid 0 with
+    | () -> true
+    | exception Unix.Unix_error (Unix.EPERM, _, _) -> true
+    | exception Unix.Unix_error _ -> false
+  in
+  let load0 = loadavg () in
+  if not
+       (watch_target dir pid
+          ~still_running:(fun () ->
+            Unix.gettimeofday () < deadline && alive ()))
+  then begin
+    no_ring dir pid;
+    exit 1
+  end;
+  Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
+  report ()
+
+(* Run [cmd] with runtime events enabled, watch it, call [report], and
+   exit with its status. *)
+let run_command cmd ~report =
   let prog = List.hd cmd in
   (* The ring file goes in a private directory, unless the caller chose
      one, and is kept past the command's exit so that it can be drained;
@@ -755,7 +701,8 @@ let run_command cmd =
       Unix.create_process_env prog (Array.of_list cmd) env Unix.stdin
         Unix.stdout Unix.stderr
     with Unix.Unix_error (e, _, _) ->
-      Printf.eprintf "gcrate: cannot run %s: %s\n" prog (Unix.error_message e);
+      Printf.eprintf "%s: cannot run %s: %s\n" me prog
+        (Unix.error_message e);
       cleanup 0;
       exit 127
   in
@@ -782,17 +729,17 @@ let run_command cmd =
   let others = other_rings pid in
   cleanup pid;
   if attached then begin
-    report_watch ~test:false;
-    Printf.fprintf out "elapsed: %.3f s\n" elapsed;
-    Printf.fprintf out "META loadavg: %s -> %s\n" load0 (loadavg ())
+    report ();
+    Printf.fprintf !out "elapsed: %.3f s\n" elapsed;
+    Printf.fprintf !out "META loadavg: %s -> %s\n" load0 (loadavg ())
   end
   else no_ring dir pid;
   if others <> [] then
     Printf.eprintf
-      "gcrate: ignored %d other process(es) with runtime events, started \
+      "%s: ignored %d other process(es) with runtime events, started \
        by %s\n"
-      (List.length others) prog;
-  flush out;
+      me (List.length others) prog;
+  flush !out;
   match status with
   | Unix.WEXITED n -> exit n
   | Unix.WSIGNALED signal ->
@@ -802,64 +749,180 @@ let run_command cmd =
     exit 255
   | Unix.WSTOPPED _ -> exit 255
 
+(* ---------------- command line ---------------- *)
+
+let usage =
+  {|usage: gcrate [--] CMD [ARG...]
+       gcrate --watch PID [--dir DIR] [--seconds SECONDS]
+       gcrate --bench LIVE-GIB [--seconds SECONDS] [--seed SEED]
+       gcrate --domains A,S,I [--seconds SECONDS] [--seed SEED]
+       gcrate [--self-test-domains]
+
+Estimates the rates at which the OCaml major GC marks and sweeps,
+the minor GC evacuates survivors, and the compactor compacts, and
+the time domains spend working and waiting in stop-the-world
+sections, from the runtime events of a watched process.
+
+CMD [ARG...]
+    Run an OCaml program with runtime events enabled, like time(1):
+    the report goes to stderr and the exit status is CMD's.  Options
+    are only recognised before CMD; -- ends them explicitly.
+--watch PID
+    Attach to process PID, which must have been started with
+    OCAML_RUNTIME_EVENTS_START=1, until it exits.
+--bench LIVE-GIB
+    Run the built-in single-domain workload: build LIVE-GIB GiB of
+    live mixed-structure heap, churn it, then compact twice, drop the
+    roots, and compact once more.
+--domains A,S,I
+    Run the built-in multi-domain workload: A domains allocate, S
+    domains compute without allocating, and I domains are blocked.
+    The stop-the-world table is also broken down by class of domain.
+--dir DIR
+    With --watch: the directory holding PID's ring file (default
+    $OCAML_RUNTIME_EVENTS_DIR, or the current directory).
+--seconds SECONDS
+    With --watch: stop watching after SECONDS.  With --bench or
+    --domains: run for SECONDS (default 300 and 30).
+--seed SEED
+    With --bench or --domains: random seed (default 42).
+-h, --help
+    Print this message.
+
+With no arguments: self-test, as run from the testsuite - the
+single-domain workload, small and for a few seconds, with terse
+pass/fail output against de-minimis thresholds.  With
+--self-test-domains: the same for the multi-domain workload.
+|}
+
+let usage_error msg =
+  Printf.eprintf "gcrate: %s (try --help)\n" msg;
+  exit 2
+
+type mode =
+  | Self_test
+  | Self_test_domains
+  | Bench of float
+  | Domains of int * int * int
+  | Watch of int
+  | Command of string list
+
+(* Options stop at the first argument which is not one, so that the
+   wrapped command keeps its own. *)
+let mode, opt_dir, opt_seconds, opt_seed =
+  let bench = ref None and domains = ref None and watch = ref None in
+  let self_test_domains = ref false in
+  let dir = ref None and seconds = ref None and seed = ref None in
+  let set r conv opt v =
+    match conv v with
+    | Some x -> r := Some x
+    | None -> usage_error (Printf.sprintf "bad argument %S to %s" v opt)
+  in
+  let counts v =
+    match List.map int_of_string_opt (String.split_on_char ',' v) with
+    | [ Some a; Some s; Some i ] when a >= 0 && s >= 0 && i >= 0 ->
+      Some (a, s, i)
+    | _ -> None
+  in
+  let rec parse = function
+    | [] -> []
+    | [ "--" ] -> usage_error "no command after --"
+    | "--" :: cmd -> cmd
+    | ("-h" | "--help") :: _ ->
+      print_string usage;
+      exit 0
+    | "--self-test-domains" :: rest -> self_test_domains := true; parse rest
+    | ("--bench" as o) :: v :: rest ->
+      set bench float_of_string_opt o v; parse rest
+    | ("--domains" as o) :: v :: rest -> set domains counts o v; parse rest
+    | ("--watch" as o) :: v :: rest ->
+      set watch int_of_string_opt o v; parse rest
+    | "--dir" :: v :: rest -> dir := Some v; parse rest
+    | ("--seconds" as o) :: v :: rest ->
+      set seconds float_of_string_opt o v; parse rest
+    | ("--seed" as o) :: v :: rest ->
+      set seed int_of_string_opt o v; parse rest
+    | [ ("--bench" | "--domains" | "--watch" | "--dir" | "--seconds"
+        | "--seed") as o ] ->
+      usage_error (o ^ " needs an argument")
+    | o :: _ when String.starts_with ~prefix:"-" o ->
+      usage_error ("unknown option " ^ o)
+    | cmd -> cmd
+  in
+  let cmd = parse (List.tl (Array.to_list Sys.argv)) in
+  let mode =
+    match cmd, !bench, !domains, !watch with
+    | _ when !self_test_domains ->
+      if cmd = [] && !bench = None && !domains = None && !watch = None
+      then Self_test_domains
+      else usage_error "--self-test-domains takes nothing else"
+    | [], None, None, None -> Self_test
+    | [], Some live_gib, None, None -> Bench live_gib
+    | [], None, Some (a, s, i), None -> Domains (a, s, i)
+    | [], None, None, Some pid -> Watch pid
+    | _ :: _, None, None, None -> Command cmd
+    | _ ->
+      usage_error "give only one of CMD, --watch, --bench and --domains"
+  in
+  let only opt given ok =
+    if given && not ok then
+      usage_error (opt ^ " does not apply here")
+  in
+  let watching, workload =
+    match mode with
+    | Watch _ -> (true, false)
+    | Bench _ | Domains _ -> (false, true)
+    | Self_test | Self_test_domains | Command _ -> (false, false)
+  in
+  only "--dir" (!dir <> None) watching;
+  only "--seconds" (!seconds <> None) (watching || workload);
+  only "--seed" (!seed <> None) workload;
+  (mode, !dir, !seconds, Option.value !seed ~default:42)
+
 (* ---------------- dispatch ---------------- *)
+
+let report_all () =
+  report_gc ~test:false ~compactions:0;
+  report_stw ~test:false ~classes:[]
+
+let run_heap ~manual ~live_gib ~seconds =
+  run ~manual
+    ~workload:(Workloads.Heap.run ~manual ~live_gib ~seconds ~seed:opt_seed)
+    ~report:(fun () ->
+      report_gc ~test:(not manual) ~compactions:3;
+      if manual then report_stw ~test:false ~classes:[])
+
+let run_domains ~manual ~allocators ~spinners ~idlers ~seconds =
+  class_of_ring := Workloads.Domains.class_of_index ~allocators ~spinners;
+  let classes = Workloads.Domains.classes ~allocators ~spinners ~idlers in
+  run ~manual
+    ~workload:
+      (Workloads.Domains.run ~manual ~allocators ~spinners ~idlers ~seconds
+         ~seed:opt_seed)
+    ~report:(fun () ->
+      if manual then report_gc ~test:false ~compactions:0;
+      report_stw ~test:(not manual) ~classes)
 
 let () =
   match mode with
-  | Command cmd -> run_command cmd
+  | Command cmd ->
+    out := stderr;
+    run_command cmd ~report:report_all
   | Watch pid ->
     let dir =
-      match !opt_dir, Sys.getenv_opt "OCAML_RUNTIME_EVENTS_DIR" with
+      match opt_dir, Sys.getenv_opt "OCAML_RUNTIME_EVENTS_DIR" with
       | Some dir, _ | None, Some dir -> dir
       | None, None -> "."
     in
-    let deadline =
-      match !opt_seconds with
-      | Some secs -> Unix.gettimeofday () +. secs
-      | None -> infinity
-    in
-    let alive () =
-      match Unix.kill pid 0 with
-      | () -> true
-      | exception Unix.Unix_error (Unix.EPERM, _, _) -> true
-      | exception Unix.Unix_error _ -> false
-    in
-    let load0 = loadavg () in
-    if not
-         (watch_target dir pid
-            ~still_running:(fun () ->
-              Unix.gettimeofday () < deadline && alive ()))
-    then begin
-      no_ring dir pid;
-      exit 1
-    end;
-    Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
-    report_watch ~test:false
-  | Self_test | Bench ->
-    let load0 = loadavg () in
-    match Unix.fork () with
-    | 0 ->
-      (* Keep the ring file after exit so the watcher can drain it. *)
-      Unix.putenv "OCAML_RUNTIME_EVENTS_PRESERVE" "1";
-      RE.start ();
-      run_workload ();
-      exit 0
-    | child ->
-      let finished = ref false in
-      let still_running () =
-        !finished = false
-        && (match Unix.waitpid [ Unix.WNOHANG ] child with
-            | 0, _ -> true
-            | _ -> finished := true; false)
-      in
-      let attached = watch_target "." child ~still_running in
-      if not !finished then ignore (Unix.waitpid [] child);
-      (try Sys.remove (string_of_int child ^ ".events")
-       with Sys_error _ -> ());
-      if not attached then begin
-        no_ring "." child;
-        exit 1
-      end;
-      if manual then
-        Printf.printf "META loadavg: %s -> %s\n" load0 (loadavg ());
-      report_watch ~test:(not manual)
+    watch_pid pid ~dir ~seconds:opt_seconds ~report:report_all
+  | Bench live_gib ->
+    run_heap ~manual:true ~live_gib
+      ~seconds:(Option.value opt_seconds ~default:300.0)
+  | Domains (allocators, spinners, idlers) ->
+    run_domains ~manual:true ~allocators ~spinners ~idlers
+      ~seconds:(Option.value opt_seconds ~default:30.0)
+  | Self_test ->
+    run_heap ~manual:false ~live_gib:0.03125 (* 32 MiB *) ~seconds:3.0
+  | Self_test_domains ->
+    run_domains ~manual:false ~allocators:2 ~spinners:1 ~idlers:1
+      ~seconds:2.0
