@@ -314,6 +314,27 @@ let%expect_test "JSIR whole program" =
     hello whole program
     |}]
 
+(* A whole program that calls a primitive that neither the runtime nor the
+   stubs provide. *)
+let missing_primitive =
+  jsir_file ~whole_program:true ~name:"prog" ~imports:[] (fun ~fresh ->
+      [ Let (fresh (), extern "jsir_test_missing" [ string "x" ]) ])
+
+let%expect_test "JSIR whole program with a missing primitive" =
+  with_temp_dir ~f:(fun () ->
+      write_jsir_file "prog.cm-jsir-js" missing_primitive;
+      js_of_ocaml [ "prog.cm-jsir-js"; "-o"; "prog.js" ] |> print_string;
+      run ~filter:(String.starts_with ~prefix:"Fatal error") "prog.js");
+  [%expect
+    {|
+    Warning [missing-primitive]: There are some missing primitives.
+    Dummy implementations (raising 'Failure' exception) will be used if they are not available at runtime.
+    You can prevent the generation of dummy implementations with the commandline option '--disable genprim'
+    Missing primitives:
+      jsir_test_missing
+    Fatal error: exception Failure("jsir_test_missing not implemented")
+    |}]
+
 (* The error messages, without the path to the executable. *)
 let print_errors output =
   let marker = "Error: " in
