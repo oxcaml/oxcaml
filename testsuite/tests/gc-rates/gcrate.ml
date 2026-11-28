@@ -1,10 +1,14 @@
 (* TEST
+ ocamlrunparam += ",Xsmall_heap_limit=256k";
  include unix;
  include runtime_events;
  hasunix;
  no-tsan;
  native;
 *)
+
+(* This test depends on the major GC running: it undoes the default
+   OCAMLRUNPARAM of the top-level Makefile. *)
 
 (* Measure the rates at which the major GC marks and sweeps, the minor GC
    promotes, and the compactor compacts.

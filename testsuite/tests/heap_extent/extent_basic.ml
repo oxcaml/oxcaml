@@ -1,4 +1,5 @@
 (* TEST
+ ocamlrunparam += ",Xsmall_heap_limit=256k";
  modules = "extent_stubs.c";
  {
    bytecode;
@@ -6,6 +7,9 @@
    native;
  }
 *)
+
+(* This test depends on the major GC running: it undoes the default
+   OCAMLRUNPARAM of the top-level Makefile. *)
 
 (* Basic single-domain tests of heap extents: creation, liveness,
    field access, partial and complete death, sweeping, freeing, and

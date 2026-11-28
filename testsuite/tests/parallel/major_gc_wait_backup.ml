@@ -1,4 +1,5 @@
 (* TEST
+ ocamlrunparam += ",Xsmall_heap_limit=256k";
  multicore;
  include unix;
  hasunix;
@@ -8,6 +9,9 @@
    bytecode;
  }
 *)
+
+(* This test depends on the major GC running: it undoes the default
+   OCAMLRUNPARAM of the top-level Makefile. *)
 
 type 'a tree = Empty | Node of 'a tree * 'a tree
 

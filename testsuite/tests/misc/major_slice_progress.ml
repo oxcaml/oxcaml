@@ -1,10 +1,14 @@
 (* TEST
+ ocamlrunparam += ",Xsmall_heap_limit=256k";
  {
    bytecode;
  }{
    native;
  }
 *)
+
+(* This test depends on the major GC running: it undoes the default
+   OCAMLRUNPARAM of the top-level Makefile. *)
 
 (* Repeated calls to [Gc.major_slice] must complete major cycles even in
    the absence of allocation: forced slices spend their budget on the
