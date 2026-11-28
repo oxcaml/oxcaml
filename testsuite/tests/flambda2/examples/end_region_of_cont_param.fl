@@ -1,0 +1,61 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-raw, dump-simplify;
+*)
+
+(* The continuation [k2] ends a region that it receives as a parameter, for
+   which [k3] and [k4] each pass a region of their own. Both regions are
+   required, as something is allocated in them, so [r] and the [%end_region]
+   must be kept, even though an [%end_region] does not count as a use of its
+   region. *)
+
+let code inline(never) size(50)
+      f_keep_region (c : imm, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (switch c
+     | 0 -> k3
+     | 1 -> k4
+     where k3 =
+       let r1 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region.local[r1] (n) in
+       cont k2 (blk, r1)
+     where k4 =
+       let r2 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region.local[r2] (n, n) in
+       cont k2 (blk, r2))
+    where k2 (res : val, r : region) =
+      let u = %end_region (r) in
+      cont k (res)
+in
+let $f_keep_region = closure f_keep_region @f &toplevel in
+
+(* In this version, the region are not forced to be kept alive *)
+
+let code inline(never) size(50)
+      f_remove_region (c : imm, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (switch c
+     | 0 -> k3
+     | 1 -> k4
+     where k3 =
+       let r1 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region (n) in
+       cont k2 (blk, r1)
+     where k4 =
+       let r2 = %begin_region () in
+       let blk = %block.[`0`].my_alloc_region (n, n) in
+       cont k2 (blk, r2))
+    where k2 (res : val, r : region) =
+      let u = %end_region (r) in
+      cont k (res)
+in
+let $f_remove_region = closure f_remove_region @f &toplevel in
+
+let $camlEnd_region_of_cont_param = Block 0 ($f_keep_region, $f_remove_region) in
+cont done ($camlEnd_region_of_cont_param)

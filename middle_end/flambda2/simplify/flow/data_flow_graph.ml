@@ -22,6 +22,7 @@ type t =
     code_id_to_code_id : Code_id.Set.t Code_id.Map.t;
     unconditionally_used : Name.Set.t;
     code_id_unconditionally_used : Code_id.Set.t;
+    ended_region_names : Name.Set.t;
     is_toplevel : bool
   }
 
@@ -153,7 +154,8 @@ let empty code_age_relation is_toplevel ~code_ids_to_never_delete =
     code_id_to_name = Code_id.Map.empty;
     code_id_to_code_id = Code_id.Map.empty;
     unconditionally_used = Name.Set.empty;
-    code_id_unconditionally_used = code_ids_to_never_delete
+    code_id_unconditionally_used = code_ids_to_never_delete;
+    ended_region_names = Name.Set.empty
   }
 
 let print ppf
@@ -164,14 +166,16 @@ let print ppf
       code_id_to_code_id;
       code_age_relation;
       unconditionally_used;
-      code_id_unconditionally_used
+      code_id_unconditionally_used;
+      ended_region_names
     } =
   Format.fprintf ppf
     "@[<hov 1>(@[<hov 1>(is_toplevel %b)@]@ @[<hov 1>(code_age_relation@ \
      %a)@]@ @[<hov 1>(name_to_name@ %a)@]@ @[<hov 1>(name_to_code_id@ %a)@]@ \
      @[<hov 1>(code_id_to_name@ %a)@]@ @[<hov 1>(code_id_to_code_id@ %a)@]@ \
      @[<hov 1>(unconditionally_used@ %a)@]@ @[<hov \
-     1>(code_id_unconditionally_used@ %a)@])@]"
+     1>(code_id_unconditionally_used@ %a)@]@ @[<hov 1>(ended_region_names@ \
+     %a)@])@]"
     is_toplevel Code_age_relation.print code_age_relation
     (Name.Map.print Name.Set.print)
     name_to_name
@@ -181,7 +185,7 @@ let print ppf
     code_id_to_name
     (Code_id.Map.print Code_id.Set.print)
     code_id_to_code_id Name.Set.print unconditionally_used Code_id.Set.print
-    code_id_unconditionally_used
+    code_id_unconditionally_used Name.Set.print ended_region_names
 
 (* *)
 let fold_name_occurrences name_occurrences ~init ~names ~code_ids =
@@ -259,6 +263,7 @@ let add_continuation_info map ~return_continuation ~exn_continuation
         direct_aliases;
         mutable_let_prims_rev;
         defined = _;
+        ended_regions;
         code_ids;
         value_slots;
         continuation = _;
@@ -269,6 +274,12 @@ let add_continuation_info map ~return_continuation ~exn_continuation
       } t =
   (* Add the vars used in the handler *)
   let t = add_name_occurrences used_in_handler t in
+  let t =
+    { t with
+      ended_region_names =
+        Name.Set.union (Name.set_of_var_set ended_regions) t.ended_region_names
+    }
+  in
   (* Add the dependencies created by closures vars in envs *)
   let is_value_slot_used =
     match (used_value_slots : _ Or_unknown.t) with
@@ -420,16 +431,46 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
     | Known _ -> true
     | Unknown -> false
   in
-  let t =
-    Continuation.Map.fold
-      (add_continuation_info map ~return_continuation ~exn_continuation
-         ~used_value_slots)
-      map
-      (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
-  in
-  t
+  Continuation.Map.fold
+    (add_continuation_info map ~return_continuation ~exn_continuation
+       ~used_value_slots)
+    map
+    (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
 
-let required_names
+let names_reachable_from t name =
+  let queue = Queue.create () in
+  Queue.push name queue;
+  let rec loop enqueued =
+    match Queue.take_opt queue with
+    | None -> enqueued
+    | Some src ->
+      loop (Reachable.Name_Name_Edge.push ~src enqueued queue t.name_to_name)
+  in
+  loop (Name.Set.singleton name)
+
+(* An [End_region] is not recorded as a use of its region, and is deleted when
+   the name it is given is not required (see [Simplify_let_expr]). That is right
+   as long as this name is the one bound by the [Begin_region]: the region is
+   then begun and ended, or neither. It is not when the name is a parameter of a
+   continuation that stands for several regions (the lifting of continuations
+   followed by specialisation makes such parameters): these regions can be
+   required, by the allocations made in them, while the parameter is not, and
+   they would then never be ended.
+
+   A variable of kind [Region] is bound by a [Begin_region], which depends on
+   nothing, or is a parameter or an alias, so the names reachable in the graph
+   from the name given to an [End_region] are exactly the regions that it may
+   end, together with the parameters and aliases in between. This returns the
+   names given to an [End_region] that are not required although one of the
+   names reachable from them is. *)
+let ended_regions_to_require t ~required_names =
+  Name.Set.filter
+    (fun region ->
+      (not (Name.Set.mem region required_names))
+      && not (Name.Set.disjoint (names_reachable_from t region) required_names))
+    t.ended_region_names
+
+let rec required_names
     ({ code_age_relation = _;
        name_to_name = _;
        name_to_code_id = _;
@@ -437,6 +478,7 @@ let required_names
        code_id_to_code_id = _;
        unconditionally_used;
        code_id_unconditionally_used;
+       ended_region_names = _;
        is_toplevel
      } as t) =
   let name_queue = Queue.create () in
@@ -447,5 +489,20 @@ let required_names
     Code_id.Set.iter
       (fun v -> Queue.push v code_id_queue)
       code_id_unconditionally_used;
-  Reachable.reachable_names t code_id_queue code_id_unconditionally_used
-    Code_id.Set.empty name_queue unconditionally_used
+  let result =
+    Reachable.reachable_names t code_id_queue code_id_unconditionally_used
+      Code_id.Set.empty name_queue unconditionally_used
+  in
+  (* Requiring such a region requires every region that flows into it, which can
+     in turn call for other names given to an [End_region] to be required, hence
+     the iteration. This is rare enough that we just run the analysis again. *)
+  let regions =
+    ended_regions_to_require t ~required_names:result.required_names
+  in
+  if Name.Set.is_empty regions
+  then result
+  else
+    required_names
+      { t with
+        unconditionally_used = Name.Set.union regions unconditionally_used
+      }
