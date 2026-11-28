@@ -938,6 +938,7 @@ and jkind_declaration =
 
 and law_declaration =
   {
+    plaw_flag : law_flag;
     plaw_name : string loc;
     plaw_params : (string loc * core_type option) list;
     plaw_assumptions : expression list;
@@ -945,8 +946,8 @@ and law_declaration =
     plaw_attributes : attributes;
     plaw_loc : Location.t
   }
-  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C], where
-      each parameter [pi] is [x] or [(x : T)] *)
+  (** [law_? name p1 ... pn : A1 implies_ ... implies_ Ak implies_ C] or
+      [law_ name ...], where each parameter [pi] is [x] or [(x : T)] *)
 
 
 (** {1 Class language} *)

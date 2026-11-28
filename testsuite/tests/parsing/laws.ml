@@ -39,6 +39,16 @@ Lines 1-4, characters 0-22:
 Error: Laws are not supported yet.
 |}]
 
+law_ provable_refl (x : int) : x = x
+[%%expect {|
+
+law_ provable_refl (x : int) : x = x;;
+Line 1, characters 0-36:
+1 | law_ provable_refl (x : int) : x = x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
 module M = struct
   law_? trivial : true
 end
@@ -48,6 +58,25 @@ module M = struct law_? trivial : true end;;
 Line 2, characters 2-22:
 2 |   law_? trivial : true
       ^^^^^^^^^^^^^^^^^^^^
+Error: Laws are not supported yet.
+|}]
+
+module type T = sig
+  val g : int -> int
+  law_ g_nonneg (x : int) : x >= 0 implies_ g x >= 0 [@@attr]
+  law_? g_zero : g 0 = 0
+end
+[%%expect {|
+
+module type T  =
+  sig
+    val g : int -> int
+    law_ g_nonneg (x : int) : x >= 0 implies_ (g x) >= 0[@@attr ]
+    law_? g_zero : (g 0) = 0
+  end;;
+Line 3, characters 2-61:
+3 |   law_ g_nonneg (x : int) : x >= 0 implies_ g x >= 0 [@@attr]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Laws are not supported yet.
 |}]
 

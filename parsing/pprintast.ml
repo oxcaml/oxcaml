@@ -1600,7 +1600,12 @@ and law_def ctxt f ld =
   in
   let clause = law_clause ctxt in
   let assumption f e = pp f "%a implies_@ " clause e in
-  pp f "@[<2>law_?@ %a%a :@ %a%a@]%a"
+  let flag f = function
+    | Testable -> pp f "law_?"
+    | Provable -> pp f "law_"
+  in
+  pp f "@[<2>%a@ %a%a :@ %a%a@]%a"
+    flag ld.plaw_flag
     ident_of_name ld.plaw_name.txt
     (list law_param ~sep:"") ld.plaw_params
     (list assumption ~sep:"") ld.plaw_assumptions
