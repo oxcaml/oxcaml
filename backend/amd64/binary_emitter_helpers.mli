@@ -25,10 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Hooks for connecting the x86 binary emitter to the emit process.
-
-    CR mshinwell: Implement binary sections saving for x86 to match ARM64.
-    Currently this module provides stub implementations. *)
+(** Hooks for connecting the x86 binary emitter to the emit process. *)
 
 (** Returns true if the binary emitter should be enabled for this compilation.
     Currently always returns false on x86. *)
