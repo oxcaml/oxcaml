@@ -72,13 +72,14 @@ Triggering of a minor collection during memprof young sampling.
 *)
 | EV_C_MINOR_PROMOTED
 (**
-Total words promoted from the minor heap to the major in the last minor
-collection.
+Total {b bytes} promoted from the minor heap of this Domain to the major heap
+in the last minor collection.
 @since 5.0
 *)
 | EV_C_MINOR_ALLOCATED
 (**
-Total {b bytes} allocated in the minor heap in the last minor collection.
+Total {b bytes} allocated in the minor heap of this Domain in the
+last minor collection.
 @since 5.0
 *)
 | EV_C_REQUEST_MAJOR_ALLOC_SHR
@@ -112,16 +113,16 @@ Triggering of a minor collection due to dependent table reallocation.
 @since 5.4 *)
 | EV_C_MAJOR_HEAP_POOL_WORDS
 (**
-Total words in a Domain's major heap pools. This is the sum of unallocated and
-live words in each pool.
+Total {b words} in a Domain's major heap pools. This is the sum of
+unallocated and live words in each pool.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
 (**
-Current live words in a Domain's major heap pools.
+Current live {b words} in a Domain's major heap pools.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_LARGE_WORDS
 (**
-Total words of a Domain's major heap large allocations.
+Total {b words} of a Domain's major heap large allocations.
 A large allocation is an allocation larger than the largest sized pool.
 @since 5.1 *)
 | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
@@ -181,6 +182,18 @@ because its continuation was promoted (value: bytes copied).
 An idle stack was woken: copied onto a fresh guarded stack for
 resumption (value: bytes copied).
 @since 5.4 *)
+| EV_C_MINOR_ALLOCATED_WORDS
+(**
+Total {b words} allocated in the minor heap of this Domain in the
+last minor collection.
+@since 5.4
+*)
+| EV_C_MINOR_PROMOTED_WORDS
+(**
+Total {b words} promoted from the minor heap of this Domain to the major heap
+in the last minor collection.
+@since 5.4
+*)
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =

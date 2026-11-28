@@ -163,6 +163,9 @@ typedef enum {
     EV_C_STACK_FREED,
     EV_C_STACK_IDLED,
     EV_C_STACK_WOKEN,
+
+    EV_C_MINOR_ALLOCATED_WORDS,
+    EV_C_MINOR_PROMOTED_WORDS,
 } ev_runtime_counter;
 
 typedef enum {

@@ -1,6 +1,17 @@
 OCaml 5.4.1
 -----------
 
+### Runtime system:
+
+- #14189: Add runtime counters EV_C_MINOR_PROMOTED_WORDS and
+  EV_C_MINOR_ALLOCATED_WORDS. EV_C_MINOR_PROMOTED_WORDS reports words promoted
+  by minor GC and EV_C_MINOR_ALLOCATED_WORDS reports words allocated by minor
+  GC. Both have equivalent bytes counters. Also updated the documentation for
+  EV_C_MINOR_PROMOTED and EV_C_MINOR_ALLOCATED to qualify scope of the values
+  reported as being per-domain.
+  (Tim McGilchrist, review by Nick Barnes, Sadiq Jaffer and
+  Gabriel Scherer)
+
 ### Bug fixes:
 
 - #14010: Fix miscompilation / liveness errors for string operations
@@ -16,6 +27,10 @@ OCaml 5.4.1
 
 - #14370: Fix headers for C++ inclusion.
   (Antonin Décimo, review by Gabriel Scherer)
+
+- #14969: Fix the units of the runtime events counter EV_C_MINOR_ALLOCATED_WORDS
+  to report as the number of words of minor heap consumed, including headers.
+  (Tim McGilchrist, review by Nicolás Ojeda Bär)
 
 - #15016, #14151: Fix spurious "Runtime_events: corrupt stream" failures when a
   consumer falls behind the producer. The consumer now reports an overwritten
