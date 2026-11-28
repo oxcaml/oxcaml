@@ -285,8 +285,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
        is not included in
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
-       The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
-       is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
+       The type "'a @ [< 'm] -> 'a @ [> 'm | local]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -399,10 +399,10 @@ Error: Signature mismatch:
          val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-       The type
-         "'a @ [> past('m) | local] -> 'b @ [< 'n > past('o)] -> 'b @ [> 'n]"
+       The type "'a @ [< past('m)] -> ('b -> 'b) @ [> past('m) | local]"
        is not compatible with the type
-         "'a @ [< past('m) & global] -> 'b @ [< 'p & past('o)] -> 'b @ [> 'p]"
+         "'a @ [< past('n) & global] ->
+         ('b @ [< 'o] -> 'b @ [> 'o]) @ [> past('n)]"
        The return mode was expected to be "global" but is "local"
 |}]
 
@@ -426,7 +426,7 @@ Error: Signature mismatch:
        is not included in
          val f : 'a @ local -> 'a
        The type
-         "'a @ [< 'm > local aliased nonportable unforkable yielding stateful dynamic] ->
+         "'a @ [< 'm] ->
          'a @ [> 'm | local aliased nonportable unforkable yielding stateful dynamic]"
        is not compatible with the type "'a @ local -> 'a"
        The return mode was expected to be "global"
@@ -454,7 +454,7 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
        is not included in
          val f : 'a -> 'a
-       The type "'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]"
+       The type "'a @ [< 'm & global portable] -> 'a @ [> 'm]"
        is not compatible with the type "'a -> 'a"
        The argument mode was expected to be "portable" but is "nonportable"
 |}]

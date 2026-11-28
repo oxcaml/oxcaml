@@ -6932,7 +6932,8 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
     let pos : Errortrace.arrow_position =
       if is_ret then Return else Argument
     in
-    raise_for Moregen (Mode_mismatch (pos, e))
+    raise_for Moregen
+      (Mode_mismatch { pos; got = a1; expected = a2; error = e })
 
 exception Complicated_moregen
 
