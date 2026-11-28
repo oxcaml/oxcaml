@@ -1473,6 +1473,7 @@ val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
 val class_mode : Mode.With_regionality.lr
+val class_modality : Mode.Modality.Const.t
 val toplevel_mode : Mode.With_regionality.lr
 
 (* Merlin specific *)

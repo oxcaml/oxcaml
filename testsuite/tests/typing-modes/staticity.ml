@@ -419,6 +419,19 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
+module (M @ static) : sig
+    class point : object
+        val mutable x : int
+    end
+end = struct
+    class point = object
+        val mutable x = 0
+    end
+end
+[%%expect{|
+module M : sig class point : object val mutable x : int end end
+|}]
+
 (* Staticity interacts with functors as follows:
    - Functors with a parameter annotated as [static] are template functors,
      otherwise they are non-template functors.
@@ -762,6 +775,39 @@ Error: Signature mismatch in included functor's parameter:
          val x : int (* in a structure at static *)
        The first is "dynamic"
        but the second is "static".
+|}]
+
+(* a class in the argument to [include functor] *)
+module M = struct
+  module type F =
+    functor (_ : sig class c : object end end @ static) -> sig val y : int end
+  module type T = sig
+    module Y : sig class c : object end include functor F end
+  end
+end
+[%%expect{|
+module M :
+  sig
+    module type F =
+      sig class c : object  end end @ static -> sig val y : int end
+    module type T =
+      sig module Y : sig class c : object  end val y : int end end
+  end
+|}]
+
+(* likewise in a structure *)
+module M = struct
+  module F (X : sig class c : object end end @ static) = struct let y = 1 end
+  module Y = struct class c = object end include functor F end
+end
+[%%expect{|
+module M :
+  sig
+    module F :
+      functor (X : sig class c : object  end end @ static) ->
+        sig val y : int end
+    module Y : sig class c : object  end val y : int end
+  end
 |}]
 
 module type Id = sig val poly_ id : 'a -> 'a end

@@ -321,7 +321,10 @@ module Core_inclusion = struct
 
   let class_declarations ~loc:_ env ~direction:_ subst id ~mmodes decl1 decl2 =
     let modes = Includecore.child_modes (Ident.name id) mmodes in
-    match Includecore.check_modes env ~item:Class modes with
+    let crossing =
+      Mode.Crossing.modality Types.class_modality Mode.Crossing.max
+    in
+    match Includecore.check_modes env ~item:Class ~crossing modes with
     | Error e ->
         Error Error.(Core(Class_declarations(
           mdiff decl1 decl2 mmodes (Class_mode e))))
