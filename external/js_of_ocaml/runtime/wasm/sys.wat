@@ -511,6 +511,12 @@
       (param (ref eq)) (result (ref eq))
       (ref.i31 (global.get $on_arm64)))
 
+   ;; Only bytecode calls this: [%target_is_jsir] is a compile-time constant in
+   ;; code compiled with the OxCaml JSIR backend.
+   (func (export "caml_sys_const_target_is_jsir")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
    (func (export "caml_is_boot_compiler") (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 
