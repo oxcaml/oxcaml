@@ -611,9 +611,8 @@ module Symbol = struct
     | Symbol sym -> Asm_symbol.print ppf sym
 
   let print_with_reloc_directive : type w.
-      Format.formatter -> string * w reloc_directive -> unit =
-   fun ppf (s, reloc) ->
-    let macosx = Target_system.is_macos () in
+      macosx:bool -> Format.formatter -> string * w reloc_directive -> unit =
+   fun ~macosx ppf (s, reloc) ->
     match reloc with
     | LOWER_TWELVE -> Format.fprintf ppf ":lo12:%s" s
     | GOT_LOWER_TWELVE -> Format.fprintf ppf ":got_lo12:%s" s
@@ -645,19 +644,33 @@ module Symbol = struct
     then Format.fprintf ppf "-%d" (-ofs)
     else ()
 
-  let print : type w. Format.formatter -> w t -> unit =
-   fun ppf t ->
+  let print_with_target_name : type w.
+      macosx:bool -> target_name:string -> Format.formatter -> w t -> unit =
+   fun ~macosx ~target_name ppf t ->
+    match t.reloc with
+    | Same_section_and_unit ->
+      Format.fprintf ppf "%s%a" target_name print_int_offset t.offset
+    | Needs_reloc reloc ->
+      Format.fprintf ppf "%a%a"
+        (print_with_reloc_directive ~macosx)
+        (target_name, reloc) print_int_offset t.offset
+
+  let print ppf t =
     let target_name =
       match t.target with
       | Label lbl -> Asm_label.encode lbl
       | Symbol sym -> Asm_symbol.encode sym
     in
-    match t.reloc with
-    | Same_section_and_unit ->
-      Format.fprintf ppf "%s%a" target_name print_int_offset t.offset
-    | Needs_reloc reloc ->
-      Format.fprintf ppf "%a%a" print_with_reloc_directive (target_name, reloc)
-        print_int_offset t.offset
+    print_with_target_name
+      ~macosx:(Target_system.is_macos ())
+      ~target_name ppf t
+
+  let print_gas_syntax ~target_name ppf t =
+    print_with_target_name ~macosx:false ~target_name ppf t
+
+  type printer = { print : 'w. Format.formatter -> 'w t -> unit }
+
+  let default_printer = { print }
 end
 
 (** Immediates used in instruction operands. Signedness: Six is unsigned (0-63),
@@ -672,13 +685,13 @@ module Immediate = struct
     | Nativeint : nativeint -> [> `Sixty_four] t
   [@@warning "-37"]
 
-  let print : type w. Format.formatter -> w t -> unit =
-   fun ppf t ->
+  let print : type w. symbol:Symbol.printer -> Format.formatter -> w t -> unit =
+   fun ~symbol ppf t ->
     match t with
     | Six n -> Format.fprintf ppf "#%d" n
     | Twelve n -> Format.fprintf ppf "#%d" n
     | Sixteen_unsigned n -> Format.fprintf ppf "#%d" n
-    | Sym s -> Symbol.print ppf s
+    | Sym s -> symbol.print ppf s
     | Float f -> Format.fprintf ppf "#%.7f" f
     | Nativeint n -> Format.fprintf ppf "#%s" (Nativeint.to_string n)
 end
@@ -706,11 +719,12 @@ module Addressing_mode = struct
       | Symbol_with_reloc : [`Twelve] Symbol.t -> [`Twelve_unsigned_scaled] t
     [@@warning "-37"]
 
-    let print : type a. Format.formatter -> a t -> unit =
-     fun ppf t ->
+    let print : type a. symbol:Symbol.printer -> Format.formatter -> a t -> unit
+        =
+     fun ~symbol ppf t ->
       match t with
       | Imm i -> Addressing_offset.print ppf i
-      | Symbol_with_reloc s -> Symbol.print ppf s
+      | Symbol_with_reloc s -> symbol.print ppf s
   end
 
   type single =
@@ -755,9 +769,10 @@ module Addressing_mode = struct
         -> [> `Post_pair] t
   [@@warning "-37"]
 
-  let print : type a. Format.formatter -> a t -> unit =
-   fun ppf t ->
+  let print : type a. symbol:Symbol.printer -> Format.formatter -> a t -> unit =
+   fun ~symbol ppf t ->
     let open Format in
+    let offset ppf off = Offset.print ~symbol ppf off in
     match t with
     | Reg r -> fprintf ppf "[%s]" (Reg.name r)
     | Offset_twelve_unsigned_scaled (r, off) ->
@@ -765,14 +780,13 @@ module Addressing_mode = struct
     | Offset_nine_signed_unscaled (r, off) ->
       fprintf ppf "[%s, %a]" (Reg.name r) Addressing_offset.print off
     | Offset_sym (r, sym) ->
-      fprintf ppf "[%s, %a]" (Reg.name r) Symbol.print sym
-    | Literal sym -> fprintf ppf "%a" Symbol.print sym
-    | Pre (r, off) -> fprintf ppf "[%s, %a]!" (Reg.name r) Offset.print off
-    | Post (r, off) -> fprintf ppf "[%s], %a" (Reg.name r) Offset.print off
-    | Offset_pair (r, off) ->
-      fprintf ppf "[%s, %a]" (Reg.name r) Offset.print off
-    | Pre_pair (r, off) -> fprintf ppf "[%s, %a]!" (Reg.name r) Offset.print off
-    | Post_pair (r, off) -> fprintf ppf "[%s], %a" (Reg.name r) Offset.print off
+      fprintf ppf "[%s, %a]" (Reg.name r) symbol.print sym
+    | Literal sym -> fprintf ppf "%a" symbol.print sym
+    | Pre (r, off) -> fprintf ppf "[%s, %a]!" (Reg.name r) offset off
+    | Post (r, off) -> fprintf ppf "[%s], %a" (Reg.name r) offset off
+    | Offset_pair (r, off) -> fprintf ppf "[%s, %a]" (Reg.name r) offset off
+    | Pre_pair (r, off) -> fprintf ppf "[%s, %a]!" (Reg.name r) offset off
+    | Post_pair (r, off) -> fprintf ppf "[%s], %a" (Reg.name r) offset off
 end
 
 module Operand = struct
@@ -804,9 +818,10 @@ module Operand = struct
         amount : 'amount Immediate.t
       }
 
-    let print ppf t =
+    let print ~symbol ppf t =
       let { kind; amount } = t in
-      Format.fprintf ppf "%s %a" (Kind.to_string kind) Immediate.print amount
+      Format.fprintf ppf "%s %a" (Kind.to_string kind) (Immediate.print ~symbol)
+        amount
   end
 
   (** LSL shift positions for MOVK/MOVN/MOVZ instructions. These position a
@@ -883,20 +898,22 @@ module Operand = struct
   (** Neon vector register operand with arrangement and element width *)
   type ('arr, 'w) neon_vector = [`Reg of [`Neon of [`Vector of 'arr * 'w]]] t
 
-  let rec print : type a. Format.formatter -> a t -> unit =
-   fun ppf t ->
+  let rec print : type a.
+      symbol:Symbol.printer -> Format.formatter -> a t -> unit =
+   fun ~symbol ppf t ->
     match t with
-    | Imm imm -> Immediate.print ppf imm
+    | Imm imm -> Immediate.print ~symbol ppf imm
     | Reg r -> Format.fprintf ppf "%s" (Reg.name r)
     | Lsl_by_twelve -> Format.fprintf ppf "lsr #12"
-    | Shift s -> Shift.print ppf s
+    | Shift s -> Shift.print ~symbol ppf s
     | Lsl_by_multiple_of_16_bits s -> Lsl_by_multiple_of_16_bits.print ppf s
     | Shift_by_element_width s -> Shift_by_element_width.print ppf s
     | Cond c -> Format.fprintf ppf "%s" (Cond.to_string c)
     | Float_cond c -> Format.fprintf ppf "%s" (Float_cond.to_string c)
-    | Mem m -> Format.fprintf ppf "%a" Addressing_mode.print m
+    | Mem m -> Format.fprintf ppf "%a" (Addressing_mode.print ~symbol) m
     | Bitmask b -> Bitmask.print ppf b
-    | Optional opt -> ( match opt with Some op -> print ppf op | None -> ())
+    | Optional opt -> (
+      match opt with Some op -> print ~symbol ppf op | None -> ())
     | Unit -> ()
 
   module Wrapped = struct
@@ -904,7 +921,7 @@ module Operand = struct
 
     let create (type a) (o : a operand) : t = O o
 
-    let print ppf (O t) = print ppf t
+    let print ~symbol ppf (O t) = print ~symbol ppf t
   end
 end
 
@@ -2660,7 +2677,7 @@ module Instruction = struct
 
   let create name ~operands = I { name; operands }
 
-  let print ppf (I { name; operands }) =
+  let print_with ~symbol ppf (I { name; operands }) =
     let name_str = Instruction_name.Wrapped.to_string (I name) in
     let operands_arr =
       Instruction_name.Untyped.operands_as_array name operands
@@ -2672,8 +2689,10 @@ module Instruction = struct
       Array.iteri
         (fun i op ->
           if i > 0 then Format.fprintf ppf ", ";
-          Operand.Wrapped.print ppf op)
+          Operand.Wrapped.print ~symbol ppf op)
         operands_arr)
+
+  let print ppf t = print_with ~symbol:Symbol.default_printer ppf t
 
   (* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
      assume we will never exceed this. It would seem to be most likely to occur
@@ -3040,11 +3059,18 @@ module DSL = struct
 
     let clear_emit_instruction () = emit_instruction := None
 
+    let observe_instruction : (Instruction.t -> unit) option ref = ref None
+
+    let set_observe_instruction observe = observe_instruction := observe
+
     let ins (type num a) (name : (num, a) Instruction_name.t)
         (operands : (num, a) many) =
       let instr = Instruction.create name ~operands in
       (* Emit to binary emitter if configured *)
       (match !emit_instruction with Some emit -> emit instr | None -> ());
+      (match !observe_instruction with
+      | Some observe -> observe instr
+      | None -> ());
       (* Emit to text if configured *)
       let str = Format.asprintf "\t%a\n" Instruction.print instr in
       match !emit_string with None -> () | Some emit_string -> emit_string str
@@ -3057,9 +3083,11 @@ module DSL = struct
     let with_measuring ~f =
       let saved_emit_string = !emit_string in
       let saved_emit_instruction = !emit_instruction in
+      let saved_observe_instruction = !observe_instruction in
       let count = ref 0 in
       let min_disp = ref None in
       emit_string := None;
+      observe_instruction := None;
       let emit_instruction_callback instr =
         incr count;
         match Instruction.max_displacement instr with
@@ -3074,6 +3102,7 @@ module DSL = struct
       f ();
       emit_string := saved_emit_string;
       emit_instruction := saved_emit_instruction;
+      observe_instruction := saved_observe_instruction;
       { count = !count; min_max_displacement = !min_disp }
 
     let ins1 name a = ins name (Singleton a)

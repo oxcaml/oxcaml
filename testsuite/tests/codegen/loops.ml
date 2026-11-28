@@ -49,6 +49,34 @@ loop_code_layout:
 loop_code_layout.cold:
   movl  $1, %eax
   ret
+|}, Arm64{|
+loop_code_layout:
+  sub   sp, sp, #16
+  str   lr, [sp, #8]
+.L0:
+  orr   x1, xzr, #1
+.L1:
+.L2:
+  add   x1, x1, x0
+  sub   x1, x1, #1
+  subs  xzr, x0, #1
+  b.ne  .L4
+  str   x1, [sp, #0]
+  orr   x0, xzr, #1
+  bl    camlTOP2__cold_1_4_code
+.L3:
+  ldr   x0, [sp, #0]
+  ldr   lr, [sp, #8]
+  add   sp, sp, #16
+  ret
+.L4:
+  sub   x0, x0, #2
+  b     .L1
+.L5:
+
+loop_code_layout.cold:
+  orr   x0, xzr, #1
+  ret
 |}]
 
 let for_loop_layout n f =
@@ -82,6 +110,37 @@ for_loop_layout:
 .L2:
   movl  $1, %eax
   ret
+|}, Arm64{|
+for_loop_layout:
+.L0:
+  subs  xzr, x0, #1
+  b.lt  .L3
+  sub   sp, sp, #32
+  str   lr, [sp, #24]
+  str   x1, [sp, #0]
+  sbfm  x0, x0, #1, #63
+  str   x0, [sp, #16]
+  orr   x0, xzr, xzr
+.L1:
+  str   x0, [sp, #8]
+  orr   x0, xzr, #1
+  ldr   x2, [x1, #0]
+  blr   x2
+.L2:
+  ldr   x0, [sp, #8]
+  add   x0, x0, #1
+  ldr   x1, [sp, #0]
+  ldr   x2, [sp, #16]
+  subs  xzr, x0, x2
+  b.le  .L1
+  orr   x0, xzr, #1
+  ldr   lr, [sp, #24]
+  add   sp, sp, #32
+  ret
+.L3:
+  orr   x0, xzr, #1
+  ret
+.L4:
 |}]
 
 (* CR ttebbi: loop peeling could avoid repeating List.hd *)
@@ -110,6 +169,35 @@ loop_with_non_dominating_load:
   jg    .L0
   addq  $8, %rsp
   ret
+|}, Arm64{|
+loop_with_non_dominating_load:
+  sub   sp, sp, #16
+  str   lr, [sp, #8]
+.L0:
+  orr   x0, xzr, #1
+  movz  x2, #201, lsl #0
+.L1:
+.L2:
+  tbz   x1, #0, .L5
+.L3:
+  adrp  x0, :got:camlStdlib__List__Pmakeblock2543_19
+  ldr   x0, [x0, :got_lo12:camlStdlib__List__Pmakeblock2543_19]
+  bl    caml_reraise_exn
+.L4:
+.L5:
+.L6:
+  ldr   x3, [x1, #0]
+.L7:
+  add   x0, x0, x3
+  sub   x0, x0, #1
+  sub   x2, x2, #2
+  subs  xzr, x2, #1
+  b.gt  .L1
+.L8:
+  ldr   lr, [sp, #8]
+  add   sp, sp, #16
+  ret
+.L9:
 |}]
 
 
@@ -153,6 +241,47 @@ f.do_work:
   cmpq  $100, %rdi
   jle   .L0
   ret
+|}, Arm64{|
+f:
+  sub   sp, sp, #16
+  str   lr, [sp, #8]
+.L0:
+  ldr   x16, [x28, #0]
+  sub   x27, x27, #32
+  subs  xzr, x27, x16
+  b.cc  <hidden GC jump pad>
+.L1:
+  add   x1, x27, #8
+  movz  x2, #3319, lsl #0
+  str   x2, [x1, #-8]
+  adrp  x2, <hidden PC-relative offset>
+  ldr   x2, [x2, <hidden PC-relative offset>]
+  str   x2, [x1, #0]
+  movz  x2, #7, lsl #0
+  movk  x2, #384, lsl #48
+  str   x2, [x1, #8]
+  str   x0, [x1, #16]
+  orr   x0, xzr, #1
+  ldr   lr, [sp, #8]
+  add   sp, sp, #16
+  b     camlTOP5__do_work_7_15_code
+.L2:
+
+f.do_work:
+  ldr   x0, [x1, #16]
+.L0:
+  add   x0, x0, x0
+  sub   x0, x0, #1
+  orr   x2, xzr, #1
+.L1:
+  ldr   x3, [x1, #16]
+  add   x0, x0, x3
+  sub   x0, x0, #1
+  add   x2, x2, #1
+  subs  xzr, x2, #100
+  b.le  .L1
+  ret
+.L2:
 |}]
 
 
@@ -172,6 +301,21 @@ noop_loop:
 .L1:
   movl  $1, %eax
   ret
+|}, Arm64{|
+noop_loop:
+.L0:
+  subs  xzr, x0, x1
+  b.gt  .L2
+  sbfm  x0, x0, #1, #63
+  sbfm  x1, x1, #1, #63
+.L1:
+  add   x0, x0, #1
+  subs  xzr, x0, x1
+  b.le  .L1
+.L2:
+  orr   x0, xzr, #1
+  ret
+.L3:
 |}]
 
 
@@ -205,6 +349,26 @@ f:
 .L1:
   movl  $1, %eax
   ret
+|}, Arm64{|
+f:
+.L0:
+  subs  xzr, x0, #1
+  b.lt  .L2
+  sbfm  x2, x0, #1, #63
+  orr   x0, xzr, #1
+  orr   x1, xzr, xzr
+.L1:
+  ubfm  x3, x1, #63, #62
+  orr   x4, xzr, #3
+  madd  x0, x4, x3, x0
+  add   x1, x1, #1
+  subs  xzr, x1, x2
+  b.le  .L1
+  ret
+.L2:
+  orr   x0, xzr, #1
+  ret
+.L3:
 |}]
 
 module M = struct
@@ -259,6 +423,45 @@ M.f:
 .L1:
   vxorpd %xmm0, %xmm0, %xmm0
   ret
+|}, Arm64{|
+M.f:
+.L0:
+  ldr   x1, [x0, #-8]
+  ubfm  x1, x1, #56, #55
+  ubfm  x1, x1, #18, #63
+  ubfm  x2, x1, #63, #63
+  movz  x3, #21846, lsl #0
+  movk  x3, #21845, lsl #16
+  movk  x3, #21845, lsl #32
+  movk  x3, #21845, lsl #48
+  smulh x1, x1, x3
+  add   x1, x1, x2
+  movn  x2, #0
+  add   x1, x2, x1, lsl #1
+  subs  xzr, x1, #1
+  b.lt  .L2
+  sbfm  x3, x1, #1, #63
+  fmov  d0, xzr
+  orr   x1, xzr, xzr
+.L1:
+  orr   x2, xzr, #1
+  orr   x4, xzr, #3
+  ubfm  x5, x1, #63, #62
+  madd  x2, x5, x4, x2
+  add   x2, x0, x2, lsl #2
+  ldr   d1, [x2, #12]
+  ldr   d2, [x2, #4]
+  ldr   d3, [x2, #-4]
+  fmul  d2, d3, d2
+  fmadd d0, d2, d1, d0
+  add   x1, x1, #1
+  subs  xzr, x1, x3
+  b.le  .L1
+  ret
+.L2:
+  fmov  d0, xzr
+  ret
+.L3:
 |}]
 
 
@@ -295,6 +498,38 @@ loop_invariant_code:
   movl  $1, %eax
   addq  $24, %rsp
   ret
+|}, Arm64{|
+loop_invariant_code:
+  sub   sp, sp, #32
+  str   lr, [sp, #24]
+  str   x0, [sp, #0]
+  str   x1, [sp, #8]
+  orr   x2, xzr, xzr
+  subs  xzr, x0, #1
+  b.eq  .L4
+  b     .L1
+.L0:
+  subs  xzr, x0, #1
+  b.eq  .L4
+.L1:
+.L2:
+  str   x2, [sp, #16]
+  orr   x0, xzr, #1
+  ldr   x2, [x1, #0]
+  blr   x2
+.L3:
+  ldr   x0, [sp, #0]
+  ldr   x1, [sp, #8]
+  ldr   x2, [sp, #16]
+.L4:
+  add   x2, x2, #1
+  subs  xzr, x2, #9
+  b.le  .L0
+  orr   x0, xzr, #1
+  ldr   lr, [sp, #24]
+  add   sp, sp, #32
+  ret
+.L5:
 |}]
 
 (* CR ttebbi: The loop should have a fall-through check. *)
@@ -312,4 +547,16 @@ match_loop:
 .L1:
   movq  %rbx, %rax
   jmp   .L0
+|}, Arm64{|
+match_loop:
+.L0:
+.L1:
+  ldr   x1, [x0, #0]
+  subs  xzr, x1, #0
+  b.ne  .L2
+  ret
+.L2:
+  orr   x0, xzr, x1
+  b     .L0
+.L3:
 |}]

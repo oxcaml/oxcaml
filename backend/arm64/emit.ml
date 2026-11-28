@@ -45,6 +45,71 @@ module R = Ast.Reg
 module S = Asm_targets.Asm_symbol
 open! Int_replace_polymorphic_compare
 
+(* The lines emitted for the current function, while an [%%expect_asm] test is
+   waiting for them. *)
+module Expect_asm_capture : sig
+  module Line = Arm64_ast.Expect_asm.Line
+
+  val start : unit -> unit
+
+  val add : Line.t -> unit
+
+  (** The number of lines captured so far. *)
+  val position : unit -> int
+
+  val stop : unit -> Line.t array
+end = struct
+  module Line = Arm64_ast.Expect_asm.Line
+
+  type t =
+    { mutable rev_lines : Line.t list;
+      mutable length : int
+    }
+
+  let current = ref None
+
+  let add line =
+    match !current with
+    | None -> ()
+    | Some t ->
+      t.rev_lines <- line :: t.rev_lines;
+      t.length <- t.length + 1
+
+  let start () =
+    if Emit_expect_asm.enabled ()
+    then (
+      current := Some { rev_lines = []; length = 0 };
+      A.set_observe_instruction (Some (fun instr -> add (Instruction instr))))
+
+  let position () = match !current with None -> 0 | Some t -> t.length
+
+  let stop () =
+    let lines =
+      match !current with
+      | None -> [||]
+      | Some t -> Array.of_list (List.rev t.rev_lines)
+    in
+    current := None;
+    A.set_observe_instruction None;
+    lines
+end
+
+let record_for_expect_asm (fundecl : Linear.fundecl) ~fun_body_end
+    ~gc_jump_pads_end lines =
+  let range ~from ~until =
+    Array.to_list (Array.sub lines from (until - from))
+  in
+  Emit_expect_asm.record ~fun_name:fundecl.fun_name ~fun_dbg:fundecl.fun_dbg
+    ~format:(fun ~name ->
+      Arm64_ast.Expect_asm.format ~name
+        ~body:
+          (range ~from:0
+             ~until:
+               (if !Emit_expect_asm.whole_function
+                then Array.length lines
+                else fun_body_end))
+        ~hidden_gc_jump_pads:(range ~from:fun_body_end ~until:gc_jump_pads_end))
+
 (* Emitter environment *)
 
 type gc_call =
@@ -2314,10 +2379,15 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
+  Expect_asm_capture.start ();
   emit_all env fundecl.fun_body;
+  let fun_body_end = Expect_asm_capture.position () in
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
+  let gc_jump_pads_end = Expect_asm_capture.position () in
   emit_stack_realloc env;
+  let lines = Expect_asm_capture.stop () in
+  record_for_expect_asm fundecl ~fun_body_end ~gc_jump_pads_end lines;
   let num_call_gc_sites_after_relaxation =
     List.length (Env.call_gc_sites env)
   in
@@ -2379,6 +2449,7 @@ let begin_assembly _unix =
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
       (* Emit to binary emitter if enabled *)
       binary_emitter_callback d;
+      Expect_asm_capture.add (Directive d);
       (* Emit to text *)
       Buffer.clear asm_line_buffer;
       D.Directive.print asm_line_buffer d;
@@ -2406,11 +2477,6 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
-
-(* Not implemented for arm64 *)
-let register_expect_asm_callback (_ : string -> unit) = ()
-
-let expect_asm_whole_function = ref false
 
 let end_assembly () =
   Emit_sancov.emit_data !sancov;
@@ -2484,5 +2550,6 @@ let end_assembly () =
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   Probe_emission.emit_probe_notes ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ();
+  Emit_expect_asm.invoke_callbacks ();
   (* Finalize binary emitter if enabled *)
   Binary_emitter_helpers.end_emission ()

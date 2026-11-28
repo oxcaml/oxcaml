@@ -393,57 +393,36 @@ let generate_asm oc lines =
 let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
   let module D = Asm_targets.Asm_directives.Directive in
   let module L = Asm_targets.Asm_label in
-  let tab_stops = [| 2; 8 |] in
-  let tabs_to_spaces s =
-    let result = Buffer.create (String.length s) in
-    let col = ref 0 in
-    let tab_index = ref 0 in
-    String.iter
-      (fun c ->
-        if Char.equal c '\t' && !tab_index < Array.length tab_stops
-        then (
-          let target_col = tab_stops.(!tab_index) in
-          let spaces = max 1 (target_col - !col) in
-          for _ = 1 to spaces do
-            Buffer.add_char result ' '
-          done;
-          col := !col + spaces;
-          incr tab_index)
-        else (
-          Buffer.add_char result c;
-          incr col))
-      s;
-    Buffer.contents result
+  let defined_label line =
+    match line with Ins _ -> None | Directive d -> D.defined_label d
   in
   (* Hide labels that only delimit DWARF ranges. *)
   let body =
     List.filter
       (fun line ->
-        match[@warning "-4"] line with
-        | Directive (D.New_label (D.Label l, _)) ->
-          not (L.is_dwarf_only_label l)
-        | Ins _ | Directive _ -> true)
+        match defined_label line with
+        | Some l -> not (L.is_dwarf_only_label l)
+        | None -> true)
       body
   in
   let label_map : (string, L.t) Hashtbl.t = Hashtbl.create 16 in
   let next_id = ref 0 in
   List.iter
     (fun line ->
-      match[@warning "-4"] line with
-      | Directive (D.New_label (D.Label l, _)) ->
-        let old_str = L.encode l in
-        let new_label = L.create_int (L.section l) !next_id in
-        Hashtbl.add label_map old_str new_label;
-        incr next_id
-      | Ins _ | Directive _ -> ())
+      Option.iter
+        (fun l ->
+          let old_str = L.encode l in
+          let new_label = L.create_int (L.section l) !next_id in
+          Hashtbl.add label_map old_str new_label;
+          incr next_id)
+        (defined_label line))
     body;
   let hidden_labels : (string, unit) Hashtbl.t = Hashtbl.create 16 in
   List.iter
     (fun line ->
-      match[@warning "-4"] line with
-      | Directive (D.New_label (D.Label l, _)) ->
-        Hashtbl.add hidden_labels (L.encode l) ()
-      | Ins _ | Directive _ -> ())
+      Option.iter
+        (fun l -> Hashtbl.add hidden_labels (L.encode l) ())
+        (defined_label line))
     hidden_gc_jump_pads;
   let rewrite_str s =
     match Hashtbl.find_opt label_map s with
@@ -492,9 +471,7 @@ let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
       in
       if should_output
       then (
-        let line_buf = Buffer.create 128 in
-        print_line line_buf line;
-        Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
+        print_line buf line;
         Buffer.add_char buf '\n'))
     body;
   Buffer.contents buf

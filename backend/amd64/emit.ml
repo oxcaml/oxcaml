@@ -46,57 +46,16 @@ module L = Asm_targets.Asm_label
 (* Name of current function *)
 let function_name = ref ""
 
-(* These callbacks are just instrumentation for expect_asm tests. *)
-let expect_asm_callbacks = ref []
-
-let asm_collected_for_expect_asm = ref []
-
-(* When set, [record_for_expect_asm] extends the captured body past the hot body
-   to the end of the function's emission, including the trailing out-of-line
-   code (GC jump pads, safety-error calls, the stack-realloc handler). Used by
-   the [%%expect_asm_full] variant. *)
-let expect_asm_whole_function = ref false
-
-let register_expect_asm_callback f =
-  expect_asm_callbacks := f :: !expect_asm_callbacks
-
-let invoke_expect_asm_callbacks () =
-  let output =
-    "\n" ^ String.concat "\n" (List.rev !asm_collected_for_expect_asm)
-  in
-  let callbacks = !expect_asm_callbacks in
-  expect_asm_callbacks := [];
-  asm_collected_for_expect_asm := [];
-  List.iter (fun f -> f output) callbacks
-
 let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
     ~gc_jump_pads_start ~gc_jump_pads_end =
-  if
-    (not (List.is_empty !expect_asm_callbacks))
-    && (not (String.ends_with ~suffix:"__entry" name))
-    && not (String.starts_with ~prefix:"caml_curry" name)
-  then
-    let name =
-      match Debuginfo.to_items debug_info with
-      | item :: _ ->
-        (* CR-someday ttebbi: We could assign disambiguating names for multiple
-           anonymous functions *)
-        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
-          item.dinfo_scopes
-        (* Remove the module name introduced by the toplevel eval loop. *)
-        |> String.split_first_exn ~split_on:'.'
-        |> snd
-      | _ -> name
-    in
-    let output =
+  Emit_expect_asm.record ~fun_name:name ~fun_dbg:debug_info
+    ~format:(fun ~name ->
       X86_gas.format_asm_for_expect_asm ~name
         ~body:
           (X86_proc.output_range ~from_pos:fun_body_start ~to_pos:fun_body_end)
         ~hidden_gc_jump_pads:
           (X86_proc.output_range ~from_pos:gc_jump_pads_start
-             ~to_pos:gc_jump_pads_end)
-    in
-    asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
+             ~to_pos:gc_jump_pads_end))
 
 module I = struct
   include I
@@ -2969,7 +2928,7 @@ let fundecl fundecl =
   record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
     ~fun_body_start
     ~fun_body_end:
-      (if !expect_asm_whole_function
+      (if !Emit_expect_asm.whole_function
        then current_output_pos ()
        else fun_body_end)
     ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
@@ -3450,7 +3409,7 @@ let end_assembly () =
   in
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
-  invoke_expect_asm_callbacks ();
+  Emit_expect_asm.invoke_callbacks ();
   X86_proc.generate_code asm;
   (* The internal assembler does not work if reset_all is called here *)
   if not !Oxcaml_flags.internal_assembler then reset_all ()

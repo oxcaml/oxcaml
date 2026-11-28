@@ -618,6 +618,7 @@
   dsl_helpers
   binary_emitter_helpers
   emit
+  emit_expect_asm
   emit_sancov
   emit_sancov_common
   emitaux
