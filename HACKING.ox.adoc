@@ -602,7 +602,11 @@ they print the same with any axis flags and any `OCAMLPARAM`. The fields
 `with_frame_pointers`, `no_stack_checks`, `with_address_sanitizer` and
 `poll_insertion` describe `base`, which is what `ocamlopt` compiles for when
 nothing selects a variant: they are `false`, `true`, `false` and `false` on
-every installation, whatever options it was configured with.
+every installation, whatever options it was configured with. (That includes
+an architecture other than x86-64 and arm64, which has no native compiler
+and no variants. The C runtime is built with stack checks there, as its
+`caml/m.h` says by defining `STACK_CHECKS_ENABLED`: that is a setting of
+the runtime, which these fields do not describe.)
 `standard_library` is the library root (`OCAMLLIB`, when it is set), and
 `codegen_variants` lists the variant trees found in it: the variants that
 the installation serves besides `base`.
@@ -782,11 +786,10 @@ What to keep in mind:
   though: given to `ocamlopt` with `-ccopt` it instruments the `.c` files of
   the command and links the AddressSanitizer runtime into a program whose
   OCaml code and runtime library are built without it. Select the variant
-  with `-asan` or `OCAMLPARAM`. `ocamlopt` compiles a `.c` file for the
-  variant it was asked for, also when flags of another variant come to it
-  through `-ccopt` (or with `-cc`, which replaces the configured command):
-  for a variant without `asan` it turns the instrumentation off after those
-  options, when it compiles the file and when it links the program.
+  with `-asan` or `OCAMLPARAM`: `ocamlopt` then gives the `.c` files that it
+  compiles the macros and the flags of that variant, and the link the
+  AddressSanitizer runtime, also with `-cc`, which replaces the configured
+  command.
 * In the tree of a variant with `asan`, the stdlib, the otherlibs and the C
   stubs that native programs link are instrumented. The OCaml code of the
   compiler's own libraries (compiler-libs, the native toplevel, eval, the

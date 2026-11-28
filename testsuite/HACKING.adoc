@@ -14,8 +14,8 @@ Variables given to `make` select how the tests run:
 - `RUNPARAM=<params>` adds to `OCAMLRUNPARAM` for the test programs only
   (not for the compilers).
 - `CODEGEN_VARIANT=<name>` runs the tests for another codegen variant of the
-  compiler under test (`fp`, `sc`, `poll`, ...; see `ocamlopt -config-var
-  codegen_variants`), as if it were the compiler's default: the native test
+  compiler under test than `base` (`fp`, `sc`, `poll`, ...; see `ocamlopt
+  -config-var codegen_variants`): the native test
   programs are built for it, and native expect, toplevel and asmgen tests
   run in the builds of their host programs for it. A test that selects a
   variant itself keeps its selection. Bytecode and JSIR have no codegen
