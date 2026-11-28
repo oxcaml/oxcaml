@@ -25,3 +25,9 @@ let perform_checks_on_extensions = false
 let perform_locations_check = true
 let fail_on_duplicate_derivers = false
 let diff_command = None
+
+(* When embedding errors, the driver carries on after a rewriter raises: the
+   error takes the place of the code the rewriter was to generate, and the
+   other rewriters and the checks still run. Otherwise the first exception
+   stops it, and is reported with the code as it was before any rewriting. *)
+let continue_after_exception = true

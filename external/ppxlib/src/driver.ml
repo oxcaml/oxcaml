@@ -1069,6 +1069,10 @@ end
 
 let process_ast (ast : Intf_or_impl.t) ~input_name ~tool_name ~hook
     ~expect_mismatch_handler ~embed_errors =
+  (* If we shouldn't continue after an exception, don't embed errors inside the
+     rewriters: let the first exception escape, then catch it later below. *)
+  let stop = embed_errors && not Options.continue_after_exception in
+  let embed_errors = embed_errors && not stop in
   match ast with
   | Intf x ->
       let ast =
@@ -1077,6 +1081,9 @@ let process_ast (ast : Intf_or_impl.t) ~input_name ~tool_name ~hook
             ~input_name:(Some input_name) ~embed_errors
         with
         | ast -> ast
+        | exception exn when stop ->
+            let error = error_to_sig_extension (exn_to_loc_error exn) in
+            { x with psg_items = error :: x.psg_items }
       in
       Intf_or_impl.Intf ast
   | Impl x ->
@@ -1086,6 +1093,8 @@ let process_ast (ast : Intf_or_impl.t) ~input_name ~tool_name ~hook
             ~input_name:(Some input_name) ~embed_errors
         with
         | ast -> ast
+        | exception exn when stop ->
+            error_to_str_extension (exn_to_loc_error exn) :: x
       in
       Intf_or_impl.Impl ast
 
