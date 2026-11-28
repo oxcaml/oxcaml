@@ -155,21 +155,8 @@ val probes : bool
 val stack_allocation : bool
 (** Whether stack allocation is enabled *)
 
-val poll_insertion : bool
-(** Whether the configure DEFAULT enables poll insertion (a per-invocation
-    codegen axis; a test's effective value can differ, e.g. via the
-    codegen_variant TSL variable) *)
-
-val frame_pointers : bool
-(** Whether the configure DEFAULT enables frame pointers (a per-invocation
-    codegen axis; see {!poll_insertion}) *)
-
 val naked_pointers : bool
 (** Whether the runtime system supports naked pointers outside the heap *)
 
 val tsan : bool
 (** Whether ThreadSanitizer support has been enabled at configure time *)
-
-val address_sanitizer : bool
-(** Whether the configure DEFAULT enables AddressSanitizer instrumentation
-    (a per-invocation codegen axis; see {!poll_insertion}) *)

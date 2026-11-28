@@ -106,21 +106,10 @@ let function_sections = @function_sections@
 
 let instrumented_runtime = @instrumented_runtime@
 
-(* Each codegen axis below records the configure DEFAULT only: the axes are
-   per-invocation flags, so a test's effective value can differ (e.g. via the
-   codegen_variant TSL variable or explicit flags). *)
-let frame_pointers = @frame_pointers@
-
 let probes = @probes@
 
 let stack_allocation = @stack_allocation@
 
-(* The configure DEFAULT (see frame_pointers above). *)
-let poll_insertion = @poll_insertion@
-
 let naked_pointers = false
 
 let tsan = @tsan@
-
-(* The configure DEFAULT (see frame_pointers above). *)
-let address_sanitizer = @address_sanitizer@

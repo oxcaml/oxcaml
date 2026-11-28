@@ -15,23 +15,10 @@
 
 (* Flags used in OCaml commands *)
 
-(* Composed from the copied utils/config.ml, which carries the configure
-   default of every axis (a new axis adds its [Config] read here). *)
+(* The variant that the compilers compile for when nothing selects one,
+   and that the library root of every install holds: base. *)
 let default_codegen_variant =
-  Codegen_variant_name.to_string
-    (Codegen_variant_name.of_tokens
-       ((if Config.with_address_sanitizer
-         then [Codegen_variant_name.Address_sanitizer]
-         else [])
-        @ (if Config.with_frame_pointers
-           then [Codegen_variant_name.Frame_pointers]
-           else [])
-        @ (if Config.poll_insertion
-           then [Codegen_variant_name.Poll_insertion]
-           else [])
-        @ (if Config.no_stack_checks
-           then []
-           else [Codegen_variant_name.Stack_checks])))
+  Codegen_variant_name.to_string Codegen_variant_name.base
 
 let codegen_variant_directory name =
   if String.equal name default_codegen_variant

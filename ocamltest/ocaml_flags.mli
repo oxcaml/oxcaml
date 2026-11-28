@@ -15,8 +15,8 @@
 
 (* Flags used in OCaml commands *)
 
-(* The configure-time default variant's name, composed from the copied
-   utils/config.ml. *)
+(* The name of the variant that the compilers compile for when nothing
+   selects one, and that the library root of every install holds: base. *)
 val default_codegen_variant : string
 
 (* The test's own selection, from the [codegen_variant] TSL variable
