@@ -101,25 +101,31 @@ let canonicalise availability =
         match RD.debug_info reg with
         | None -> ()
         | Some debug_info -> (
-          let name = RD.Debug_info.holds_value_of debug_info in
-          if not (V.is_global_or_predef name)
-          then
-            match V.Tbl.find regs_by_ident name with
-            | exception Not_found -> V.Tbl.add regs_by_ident name reg
-            | (reg' : RD.t) -> (
-              (* We prefer registers that are assigned to the stack since they
-                 probably give longer available ranges (less likely to be
-                 clobbered). *)
-              match RD.location reg, RD.location reg' with
-              | Reg _, Stack _
-              | Reg _, Reg _
-              | Stack _, Stack _
-              | _, Unknown
-              | Unknown, _ ->
-                ()
-              | Stack _, Reg _ ->
-                V.Tbl.remove regs_by_ident name;
-                V.Tbl.add regs_by_ident name reg)))
+          match RD.Debug_info.holds_value_of debug_info with
+          | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+            (* Constants and projections are tracked for call site information
+               only; they do not give rise to canonical locations for
+               variables. *)
+            ()
+          | Var name -> (
+            if not (V.is_global_or_predef name)
+            then
+              match V.Tbl.find regs_by_ident name with
+              | exception Not_found -> V.Tbl.add regs_by_ident name reg
+              | (reg' : RD.t) -> (
+                (* We prefer registers that are assigned to the stack since they
+                   probably give longer available ranges (less likely to be
+                   clobbered). *)
+                match RD.location reg, RD.location reg' with
+                | Reg _, Stack _
+                | Reg _, Reg _
+                | Stack _, Stack _
+                | _, Unknown
+                | Unknown, _ ->
+                  ()
+                | Stack _, Reg _ ->
+                  V.Tbl.remove regs_by_ident name;
+                  V.Tbl.add regs_by_ident name reg))))
       availability;
     let result =
       V.Tbl.fold
