@@ -1,0 +1,4 @@
+ramp-up spans: 1 begin, 1 end
+suspended words in ramp-up: true
+resumed words: true
+direct words: true

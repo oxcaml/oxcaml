@@ -73,7 +73,8 @@ let runtime_counter dom _ts counter v =
     end
   | EV_C_MAJOR_SLICE_ALLOC_WORDS | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
   | EV_C_MAJOR_SLICE_NEW_WORK | EV_C_MAJOR_SLICE_TOTAL_WORK
-  | EV_C_MAJOR_SLICE_BUDGET ->
+  | EV_C_MAJOR_SLICE_BUDGET | EV_C_MAJOR_DIRECT_ALLOCATED_WORDS
+  | EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS | EV_C_MAJOR_RESUMED_ALLOCATED_WORDS ->
     if in_opp.(dom) then violation "domain %d: slice counter in opp span" dom
   | _ -> ()
 
