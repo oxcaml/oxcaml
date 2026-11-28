@@ -1815,9 +1815,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
         ap_args;
         ap_result_layout = layout_module;
         ap_loc = Loc_unknown;
-        (* CR-someday zqian: [Always_inlined] mirrors [transl_instance], but
-           it is not clear it is always wanted here; consider a CLI flag. *)
-        ap_inlined = Always_inlined;
+        ap_inlined = Default_inlined;
         ap_tailcall = Default_tailcall;
         ap_specialised = Default_specialise;
         ap_mode = not_alloc_stack;
