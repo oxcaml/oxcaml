@@ -117,16 +117,22 @@ module Context : sig
   val map_terminator : t -> finished Terminator.t -> out Terminator.t
 end
 
+(* CR-someday xclerc for xclerc: Consider whether we should restrict [Move_to]
+   to [visit_instruction] in the type system, instead of rejecting it at runtime
+   in the other hooks. *)
+
 (** A hook's decision for one instruction or terminator. [Unchanged]: defer to
     the next reducer (under [Combine]) or the framework's default translation.
     [Reduce f]: the reducer takes over; [f] is run with the output cursor (to
     emit through the [Context]) and returns what the input maps to: the result
     value(s) for [visit_instruction] / [emit_op], or the replacement
     [(dbg, terminator)] for [visit_terminator] / [finish_block] (which the
-    framework then finishes and re-reduces). *)
+    framework then finishes and re-reduces). [Move_to target]: only valid for
+    [visit_instruction]; the other hooks must not return it. *)
 type 'a reduction =
   | Unchanged
   | Reduce of (Context.Cursor.t -> 'a)
+  | Move_to of finished Block.t
 
 (** A reducer is turned into an optimization pass using the {!Make_run} functor.
     The {!Combine} functor can be used to compose multiple reducers into one. *)
@@ -140,7 +146,10 @@ module type Reducer = sig
       handles the instruction itself (by emitting replacements via the given
       cursor [c], or by doing nothing, which means it is dropped). The closure
       returns what the input instruction's results map to (empty for a trap
-      instruction), and is remembered as the output-graph mapping. *)
+      instruction), and is remembered as the output-graph mapping.
+      [Move_to target]: emit the [Op] instruction at the start of [target]
+      instead, with the framework's default translation (so it still goes
+      through [emit_op], but not through [visit_instruction] again). *)
   val visit_instruction :
     t ->
     finished Block.t ->
