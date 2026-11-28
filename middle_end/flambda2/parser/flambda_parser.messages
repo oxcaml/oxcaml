@@ -6,20 +6,6 @@
 
 
 
-flambda_unit: KWD_APPLY KWD_WITH
-##
-## Ends in an error in state: 525.
-##
-## atomic_expr -> KWD_APPLY . apply_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## KWD_APPLY
-##
-
-Expected the name of a function to apply.
-Example of an application:
-  apply f (arg1 arg2) -> cont * exn_cont
-
 
 flambda_unit: KWD_CONT IDENT LPAREN SYMBOL KWD_WITH
 ##
@@ -3696,27 +3682,6 @@ flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY AMP IDENT RPAREN
-##
-## Ends in an error in state: 553.
-##
-## apply_expr -> call_kind . option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-## apply_expr -> call_kind . option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-## apply_expr -> call_kind . option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 541, spurious reduction of production alloc_mode_for_applications -> AMP region
-## In state 617, spurious reduction of production call_kind -> alloc_mode_for_applications
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 flambda_unit: KWD_APPLY AMP IDENT KWD_UNROLL TILDE
 ##
 ## Ends in an error in state: 554.
@@ -4141,30 +4106,6 @@ flambda_unit: KWD_APPLY AMP IDENT LPAREN RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER TILDE
-##
-## Ends in an error in state: 606.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT TILDE
-##
-## Ends in an error in state: 607.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 flambda_unit: KWD_APPLY AMP IDENT FLOAT SYMBOL
 ##
 ## Ends in an error in state: 609.
@@ -4186,30 +4127,6 @@ flambda_unit: KWD_APPLY AMP IDENT FLOAT LPAREN RPAREN TILDE
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple simple_args
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_APPLY AMP IDENT FLOAT MINUSGREATER TILDE
-##
-## Ends in an error in state: 611.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_APPLY AMP IDENT FLOAT MINUSGREATER IDENT TILDE
-##
-## Ends in an error in state: 612.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
